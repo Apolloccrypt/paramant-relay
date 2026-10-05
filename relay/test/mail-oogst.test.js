@@ -190,7 +190,7 @@ test('de herinnering: wat er in staat en wat er niet in staat', async () => {
   const rr = await fetch(BASE + '/v2/user/sends/reinvite', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Internal-Auth': INTERN },
-    body: JSON.stringify({ user_id: 'acct_mail_oogst', send_id: SEND_ID, email: doel }),
+    body: JSON.stringify({ user_id: 'acct_mail_oogst', send_id: SEND_ID, email: doel, token: tokens[doel] }),
   });
   assert.equal(rr.status, 200, await rr.text());
   await wacht(400);
@@ -207,16 +207,44 @@ test('de herinnering: wat er in staat en wat er niet in staat', async () => {
     assert.ok(!hooi.includes(a), 'ander adres in de herinnering');
   }
   for (const a of ADRESSEN) {
-    assert.ok(!hooi.includes(tokens[a]), 'token in de herinnering');
+    // DASH-15-A (2026-10-05): de herinnering draagt de link van de ontvanger
+    // zelf, dezelfde als de uitnodiging. Nooit die van een ander, nooit een
+    // wrapped_key.
+    if (a !== doel) assert.ok(!hooi.includes(tokens[a]), 'token van een ander in de herinnering');
     assert.ok(!hooi.includes(sealed[a].wrapped_key), 'wrapped_key in de herinnering');
   }
+  assert.ok(her.text.includes('/ontvang/' + encodeURIComponent(tokens[doel]) + '?r='),
+    'de herinnering draagt niet dezelfde link als de uitnodiging');
   // BEVINDING: de herinnering noemt de bestandsnaam NIET, de andere twee wel.
   assert.ok(!her.text.includes(NAAM), 'de herinnering noemt het bestand niet');
-  // Eindmatrix DASH-15-A: wie de eerste mail kwijt is, leest in de tekstmail
-  // (niet alleen in de html) waarom er geen link in staat en wat hij dan doet.
-  assert.match(her.text, /Deze herinnering bevat bewust geen link: de sleutel van het bestand zit alleen in de eerste mail\./);
-  assert.match(her.text, /Kunt u die mail niet vinden\? Vraag de afzender het bestand opnieuw te sturen\./);
-  assert.match(her.text, /Cannot find that mail\? Ask the sender to send the file again\./);
+  // Eindmatrix DASH-15-A: wie de eerste mail kwijt is, heeft aan de
+  // herinnering genoeg: dezelfde werkende link, en dat staat er ook.
+  assert.match(her.text, /Dit is dezelfde link als in de eerste mail\./);
+  assert.match(her.text, /It is the same link as in the first mail\./);
+  assert.doesNotMatch(her.text, /bevat bewust geen link/);
+});
+
+test('DASH-15-A: zonder link uit de browser, of met de link van een ander, gaat er niets uit', async () => {
+  post.length = 0;
+  const doel = ADRESSEN[1];
+  const ander = ADRESSEN.find(a => a !== doel);
+  const zonder = await fetch(BASE + '/v2/user/sends/reinvite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Internal-Auth': INTERN },
+    body: JSON.stringify({ user_id: 'acct_mail_oogst', send_id: SEND_ID, email: doel }),
+  });
+  assert.equal(zonder.status, 400);
+  assert.equal((await zonder.json()).error, 'link_not_in_browser');
+  const verkeerd = await fetch(BASE + '/v2/user/sends/reinvite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Internal-Auth': INTERN },
+    body: JSON.stringify({ user_id: 'acct_mail_oogst', send_id: SEND_ID, email: doel, token: tokens[ander] }),
+  });
+  assert.equal(verkeerd.status, 409);
+  assert.equal((await verkeerd.json()).error, 'wrong_link');
+  await wacht(300);
+  assert.equal(post.filter(p => (p.to || []).includes(doel) || (p.to || []).includes(ander)).length, 0,
+    'er ging toch een mail uit');
 });
 
 test('LOGS: geen token, geen code, geen wrapped_key, geen volledig adres', async () => {

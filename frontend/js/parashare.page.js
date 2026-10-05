@@ -835,7 +835,7 @@ async function discoverRelay() {
 }
 
 // ── Credential validation ──
-// Nothing is written to localStorage, and on the hosted relay nothing that
+// No credential is written to localStorage, and on the hosted relay nothing that
 // reaches this page is an API key at all: the credential is a pst_ session
 // token, minted per browser session and scoped by the relay to the five routes
 // a transfer walks. The manual card below is the self-host path, and it is the
@@ -1327,6 +1327,30 @@ function backToSetup() {
 // After every block has landed, turn them into one send with a link per person.
 // A separate call on purpose: a file arrives as many blocks, and reading a
 // recipient list off one of them would make many sends out of one file.
+// The recipients' links of this send, kept in THIS browser only, so the
+// dashboard can send a reminder with the same link (DASH-15-A). The link is
+// the recipient's token; the relay never writes it down, so a reminder can
+// only be built here, the way the invitation was. Kept until the send closes
+// (at most eight days), wiped on sign-out and on an account switch
+// (nav-auth.js), never sent anywhere except back to the relay for a reminder
+// to that same person. On its own the token opens nothing: collecting needs
+// the code that goes to the recipient's mailbox.
+//
+// Sealed under the account key (js/account-seal.js, review #573 M4), never
+// readable in storage. Without a signed-in account nothing is kept.
+function rememberSendLinks(verzending, sealed) {
+  try {
+    if (!verzending || !verzending.send_id || !sealed) return;
+    const cap = Date.now() + 8 * 864e5;
+    const until = Date.parse(verzending.expires_at || '');
+    const links = Object.keys(sealed).map(function (e) { return { e: e, t: sealed[e].token }; });
+    import('/js/account-seal.js?v=1').then(function (m) {
+      return m.sealPut('paramant.send.links.v1:' + verzending.send_id, { links: links },
+        Number.isFinite(until) ? Math.min(until, cap) : cap);
+    }).catch(function () { /* no key or storage off: the dashboard says the links are not here */ });
+  } catch (_) { /* storage off */ }
+}
+
 async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed) {
   const r = await relayFetch(RELAY_API + '/v2/sends', {
     method: 'POST',
@@ -1986,6 +2010,7 @@ async function createLink() {
       $('seal-status').textContent = t('sendingInvites');
       const verzending = await maakVerzending(
         nieuw[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
+      rememberSendLinks(verzending, sealed);
       setSealProgress(100);
       return toonVerzending(verzending, files[0].name);
     }

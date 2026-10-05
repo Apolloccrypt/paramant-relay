@@ -440,6 +440,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return r.json();
     }).then(function (body) {
       sends = Array.isArray(body.sends) ? body.sends : [];
+      // A finished send has no reminder left: its kept links go (review #573, M4).
+      sends.forEach(function (x) { if (x && x.id && (x.status === 'expired' || x.outstanding === 0)) { try { localStorage.removeItem('paramant.send.links.v1:' + x.id); } catch (e) { /* storage off */ } } });
       if (!sends.length) { hide(section); return; }
       show(section);
       renderSends();
@@ -523,7 +525,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         var knoppen = p.status === 'waiting'
           ? '<button type="button" class="dh-rowbtn" data-pa-action="send-remind" ' +
               'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '" ' +
-              nlEn('title="Stuurt een herinnering. De oorspronkelijke link blijft werken en verandert niet."', 'title="Sends a nudge. Their original link still works and does not change."') +
+              nlEn('title="Stuurt een herinnering met dezelfde link als de eerste mail. De link verandert niet."', 'title="Sends a reminder with the same link as the first mail. The link does not change."') +
               nlEn('>Herinneren</button>', '>Remind</button>') +
             '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke" ' +
               'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + nlEn('">Intrekken</button>', '">Withdraw</button>')
@@ -558,14 +560,39 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (veilig && veilig.focus) veilig.focus();
   }
 
-  function sendAction(pad, id, email, button, klaar) {
+  // The recipient's link of a send by name, kept in THIS browser by
+  // /parashare (parashare.page.js rememberSendLinks). A reminder is built from
+  // it the way the invitation was, so it carries the same working link. The
+  // relay never kept it; without it here there is no honest reminder to send.
+  function storedSendToken(id, email) {
+    return sealMod().then(function (m) { return m.sealGet('paramant.send.links.v1:' + id); }).then(function (rec) {
+      if (!rec || !Array.isArray(rec.links)) return '';
+      var want = String(email || '').trim().toLowerCase();
+      for (var i = 0; i < rec.links.length; i++) {
+        var l = rec.links[i];
+        if (l && String(l.e || '').toLowerCase() === want && typeof l.t === 'string' && l.t) return l.t;
+      }
+      return '';
+    }).catch(function () { return ''; });
+  }
+  var LINK_NOT_HERE_NL = 'De link van deze ontvanger staat niet in deze browser. Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw.';
+  var LINK_NOT_HERE_EN = 'This recipient\'s link is not in this browser. Open the request in the browser you sent it from, or withdraw it and send it again.';
+  function sayLinkNotHere(button) {
+    var row = button && button.closest ? button.closest('.dh-send-person') : null;
+    var text = nlEn(LINK_NOT_HERE_NL, LINK_NOT_HERE_EN);
+    if (row) row.innerHTML = '<span class="dh-rowsay fail" role="status">' + esc(text) + '</span>';
+  }
+
+  function sendAction(pad, id, email, button, klaar, extra) {
     if (button) button.disabled = true;
     var row = button && button.closest ? button.closest('.dh-send-person') : null;
     if (row) row.innerHTML = nlEn('<span class="dh-rowsay" role="status">Bezig...</span>', '<span class="dh-rowsay" role="status">Working...</span>');
+    var payload = { email: email };
+    if (extra && extra.token) payload.token = extra.token;
     fetch('/api/user/sends/' + encodeURIComponent(id) + '/' + pad, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ email: email })
+      body: JSON.stringify(payload)
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (b) {
         if (!r.ok) throw new Error(b.error || ('http_' + r.status));
@@ -581,6 +608,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
           esc(err.message === 'already_collected' ? nlEn('Het is al opgehaald.', 'They already collected it.')
             : err.message === 'reminder_limit'
               ? nlEn('Er zijn al drie herinneringen gestuurd. Verstuur het bestand liever opnieuw.', 'They have had three reminders. Send the file again instead.')
+            : (err.message === 'link_not_in_browser' || err.message === 'wrong_link')
+              ? nlEn(LINK_NOT_HERE_NL, LINK_NOT_HERE_EN)
             : err.message === 'reminder_not_sent'
               ? nlEn('De mail is niet verstuurd. Er is niets veranderd. Probeer het over een minuut opnieuw.', 'The email did not go out. Nothing changed; try again in a minute.')
             : nlEn('Dat is niet gelukt. Er is niets veranderd.', 'That did not go through. Nothing changed.')) + '</span>';
@@ -645,8 +674,14 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       }
       if (act === 'send-remind') {
         ev.preventDefault();
-        sendAction('reinvite', t.getAttribute('data-send-id'),
-                   t.getAttribute('data-email'), t, nlEn('Herinnering verstuurd. De link is niet veranderd. De herinnering verwijst naar de eerste mail, want alleen daarin zit de sleutel. Is die mail kwijt, stuur het bestand dan opnieuw.', 'Reminder sent. Their link is unchanged. The reminder points to the first mail, because only that one holds the key. If that mail is lost, send the file again.'));
+        var remId = t.getAttribute('data-send-id'), remWho = t.getAttribute('data-email');
+        t.disabled = true;
+        storedSendToken(remId, remWho).then(function (remToken) {
+          if (!remToken) { t.disabled = false; sayLinkNotHere(t); return; }
+          sendAction('reinvite', remId, remWho, t,
+                     nlEn('Herinnering verstuurd, met dezelfde link als de eerste mail. Die link opent het bestand ook op een ander apparaat.', 'Reminder sent, with the same link as the first mail. That link opens the file on another device too.'),
+                     { token: remToken });
+        });
         return;
       }
       if (act === 'send-revoke') {
@@ -658,6 +693,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         ev.preventDefault();
         sendAction('revoke', t.getAttribute('data-send-id'),
                    t.getAttribute('data-email'), t, nlEn('Ingetrokken. Die link werkt niet meer.', 'Withdrawn. Their link no longer works.'));
+        return;
+      }
+      if (act === 'document-resend-invite') {
+        ev.preventDefault();
+        resendSignerInvite(t.getAttribute('data-document-id'), Number(t.getAttribute('data-party')), t);
         return;
       }
       if (act === 'document-copy-link') {
@@ -947,29 +987,95 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // browser and is kept only there (sign-flow.js rememberSignerLinks), never
   // on a server. So it is shown from this browser's storage, with a copy
   // button, or the page says honestly that it is not here.
+  // Sealed under the account key (js/account-seal.js, review #573 M4): read
+  // through it, never as plain storage.
+  function sealMod() { return import('/js/account-seal.js?v=1'); }
   function storedSignerLinks(id) {
-    try {
-      var raw = localStorage.getItem('paramant.cosign.links.v1:' + id);
-      var rec = raw ? JSON.parse(raw) : null;
-      if (!rec || !(Date.now() < Number(rec.exp)) || !Array.isArray(rec.links)) return null;
+    return sealMod().then(function (m) { return m.sealGet('paramant.cosign.links.v1:' + id); }).then(function (rec) {
+      if (!rec || !Array.isArray(rec.links)) return null;
       return rec.links.filter(function (l) { return l && typeof l.url === 'string' && /^https?:\/\/[^#]+\/co-sign\?[^#]*#ks=v1\.[A-Za-z0-9_-]{43}$/.test(l.url); });
-    } catch (e) { return null; }
+    }).catch(function () { return null; });
   }
+  var SIGNER_LINKS_NOT_HERE_NL = 'De volledige ondertekenlinks staan niet in deze browser. Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw.';
+  var SIGNER_LINKS_NOT_HERE_EN = 'The full signing links are not in this browser. Open the request in the browser you sent it from, or withdraw it and send it again.';
+  var signerLinksReady = null;
   function signerLinksHtml(doc) {
-    var links = storedSignerLinks(doc.id);
-    var head = nlEn('<dt>Volledige links</dt>', '<dt>Full links</dt>');
+    signerLinksReady = storedSignerLinks(doc.id).then(function (links) {
+      var host = document.querySelector('[data-signer-links="' + cssEscape(doc.id) + '"]');
+      if (host) host.innerHTML = signerLinksInner(doc, links);
+    });
+    return '<div data-signer-links="' + esc(doc.id) + '"></div>';
+  }
+  function signerLinksInner(doc, links) {
+    var head = nlEn('<dt>Uitnodigingen</dt>', '<dt>Invitations</dt>');
     if (!links || !links.length) {
-      return '<dl class="dh-doc-kv">' + head + '<dd>' + esc(nlEn(
-        'De volledige ondertekenlinks staan niet in deze browser. Ze worden alleen bewaard in de browser waarmee u het verzoek verstuurde, en dan hoogstens tot het verzoek verloopt. Heeft een ondertekenaar de link nodig, open dit verzoek dan in die browser en kopieer de link daar. Lukt dat niet, trek dit verzoek dan in en stuur een nieuw verzoek.',
-        'The full signing links are not in this browser. They are kept only in the browser you sent the request from, and at most until the request expires. If a signer needs the link, open this request in that browser and copy the link there. If that does not work, withdraw this request and send a new one.')) + '</dd></dl>';
+      return '<dl class="dh-doc-kv">' + head + '<dd>' + esc(nlEn(SIGNER_LINKS_NOT_HERE_NL, SIGNER_LINKS_NOT_HERE_EN)) + '</dd></dl>';
     }
     var signedIdx = {};
     (Array.isArray(doc.parties) ? doc.parties : []).forEach(function (p) { if (p && p.status === 'signed') signedIdx[Number(p.index)] = true; });
     return '<dl class="dh-doc-kv">' + head + '<dd>' + links.filter(function (l) { return !signedIdx[Number(l.i)]; }).map(function (l) {
       var who = l.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(l.i || 0) + 1));
-      return '<div class="dh-doc-link"><span>' + esc(who) + '</span> ' +
-        '<button type="button" class="dh-rowbtn" data-pa-action="document-copy-link" data-link="' + esc(l.url) + '">' + nlEn('Link kopiëren', 'Copy link') + '</button></div>';
-    }).join('') + '<span class="dh-doc-linknote">' + esc(nlEn('Deze link opent het document alleen voor wie met het uitgenodigde e-mailadres inlogt.', 'This link opens the document only for whoever signs in with the invited email address.')) + '</span></dd></dl>';
+      return '<div class="dh-doc-link" data-party-row="' + esc(String(Number(l.i))) + '"><span>' + esc(who) + '</span> ' +
+        '<button type="button" class="dh-rowbtn" data-pa-action="document-resend-invite" data-document-id="' + esc(doc.id) + '" data-party="' + esc(String(Number(l.i))) + '">' + nlEn('Uitnodiging opnieuw sturen', 'Send the invitation again') + '</button> ' +
+        '<button type="button" class="dh-rowbtn" data-pa-action="document-copy-link" data-link="' + esc(l.url) + '">' + nlEn('Link kopiëren', 'Copy link') + '</button>' +
+        '<span class="dh-rowsay" role="status" data-resend-say="' + esc(String(Number(l.i))) + '"></span></div>';
+    }).join('') + '<span class="dh-doc-linknote">' + esc(nlEn('De uitnodiging gaat opnieuw naar het uitgenodigde adres, met dezelfde link als de eerste keer. Die link opent het document op elk apparaat, maar alleen voor wie met dat e-mailadres inlogt.', 'The invitation goes to the invited address again, with the same link as the first time. That link opens the document on any device, but only for whoever signs in with that email address.')) + '</span></dd></dl>';
+  }
+
+  // The resend, built in THIS browser exactly like the first invitation
+  // (sign-flow.js deliverInviteEmails): the stored link with half A of the
+  // key ('#ks='), posted to the same route, which checks the address against
+  // the party and refuses any other fragment. Half B stays on the relay; no
+  // whole key reaches a server and nothing extra is stored.
+  function resendSignerInvite(id, partyIndex, button) {
+    var say = document.querySelector('[data-resend-say="' + cssEscape(String(partyIndex)) + '"]');
+    function tell(text, tone) { if (say) { say.className = 'dh-rowsay ' + (tone || ''); say.textContent = text; } }
+    if (button) button.disabled = true;
+    tell(nlEn('Bezig...', 'Working...'));
+    storedSignerLinks(id).then(function (links) {
+    links = links || [];
+    var link = null;
+    for (var i = 0; i < links.length; i++) if (Number(links[i].i) === partyIndex) link = links[i];
+    var email = link ? String(link.e || (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(link.label || '') ? link.label : '')).trim().toLowerCase() : '';
+    if (!link || !email) { if (button) button.disabled = false; tell(nlEn(SIGNER_LINKS_NOT_HERE_NL, SIGNER_LINKS_NOT_HERE_EN), 'fail'); return; }
+    return fetch('/api/user/envelopes/' + encodeURIComponent(id) + '/invitations', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      // reminder: true keeps this body apart from the first invitation's, so
+      // the double-click guard on the route does not swallow it.
+      body: JSON.stringify({ invitations: [{ party_index: partyIndex, email: email, label: link.label && link.label !== email ? link.label : '', invite_url: link.url }], reminder: true, lang: nlEn('nl', 'en') })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (b) { return { ok: r.status === 200 && b && b.ok !== false, b: b }; });
+    }).then(function (x) {
+      if (x.ok) tell(nlEn('Verstuurd naar ', 'Sent to ') + email + nlEn('. Met dezelfde link als de eerste uitnodiging; die opent het document ook op een ander apparaat.', '. With the same link as the first invitation; it opens the document on another device too.'), 'done');
+      else { if (button) button.disabled = false; tell(x.b && x.b.error === 'rate_limited' ? nlEn('Even te vaak geprobeerd. Probeer het over een uur opnieuw.', 'Tried too often. Try again in an hour.') : nlEn('De uitnodiging is niet verstuurd. Probeer het over een minuut opnieuw.', 'The invitation did not go out. Try again in a minute.'), 'fail'); }
+    });
+    }).catch(function () {
+      if (button) button.disabled = false;
+      tell(nlEn('De uitnodiging is niet verstuurd. Probeer het over een minuut opnieuw.', 'The invitation did not go out. Try again in a minute.'), 'fail');
+    });
+  }
+
+  // The button in "Een ondertekenaar vraagt de link opnieuw" (relay.js
+  // notifySenderLinkRequested) lands here: /dashboard?herzend=<id>&p=<i> opens
+  // that request with the resend button of that signer in focus. One click,
+  // never automatic: a link in a mail must not send mail by itself.
+  function openResendFromMail() {
+    var q;
+    try { q = new URLSearchParams(location.search); } catch (e) { return; }
+    var id = q.get('herzend');
+    if (!id || !/^[A-Za-z0-9_-]{20,64}$/.test(id) || !documentById(id)) return;
+    var p = Number(q.get('p'));
+    openDocumentDialog(id);
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* keep the query */ }
+    (signerLinksReady || Promise.resolve()).then(function () {
+    var btn = document.querySelector('[data-pa-action="document-resend-invite"][data-party="' + cssEscape(String(p)) + '"]');
+    var say = document.querySelector('[data-resend-say="' + cssEscape(String(p)) + '"]');
+    if (btn) {
+      if (say) say.textContent = nlEn('Deze ondertekenaar vroeg om de uitnodiging. Klik op Uitnodiging opnieuw sturen.', 'This signer asked for the invitation. Click Send the invitation again.');
+      btn.focus();
+    }
+    });
   }
 
   // Say what is happening in the row the sender is looking at, not only in a
@@ -1066,7 +1172,17 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return r.json();
     }).then(function (body) {
       documents = Array.isArray(body.documents) ? body.documents : [];
+      // Completed, withdrawn or expired: nobody needs the kept signing links
+      // or key halves of that request any more (review #573, M4).
+      documents.forEach(function (d) {
+        if (!d || !d.id || documentState(d) === 'waiting' || documentState(d) === 'in_progress') return;
+        try {
+          localStorage.removeItem('paramant.cosign.links.v1:' + d.id);
+          for (var i = localStorage.length - 1; i >= 0; i--) { var k = localStorage.key(i); if (k && k.indexOf('paramant.cosign.share.v1:' + d.id + ':') === 0) localStorage.removeItem(k); }
+        } catch (e) { /* storage off */ }
+      });
       renderDocuments();
+      openResendFromMail();
     }).catch(function () {
       list.innerHTML = nlEn('<div class="dh-empty"><strong>We konden uw documenten nu niet laden</strong><span>Er is niets veranderd. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Opnieuw proberen</button></span></div>', '<div class="dh-empty"><strong>We could not load your documents just now</strong><span>Nothing has changed. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>');
     }).finally(function () {
@@ -1141,7 +1257,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         var k = localStorage.key(i);
         if (!k || k.indexOf(prefix) !== 0) continue;
         var rec = JSON.parse(localStorage.getItem(k) || 'null');
-        if (rec && Date.now() < Number(rec.exp)) return true;
+        if (rec && rec.v === 2 && Date.now() < Number(rec.exp)) return true;
       }
     } catch (e) { /* storage off */ }
     return false;
@@ -1163,33 +1279,27 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         if (!r.ok) throw new Error(body.error || 'failed');
         return body;
       });
-    }).then(function (body) {
-      // The address comes back from the server and is the reader's own: it is
-      // the only address the mail could have gone to.
-      button.textContent = body && body.sent_to ? nlEn('Verstuurd naar ', 'Sent to ') + body.sent_to : nlEn('Verstuurd', 'Sent');
-      // The resent link opens the request, not the document: the key half is
-      // on no server. sender_notified means the sender was asked to send the
-      // full link (admin/server.js, COSIGN-46). Say that next to the button.
-      if (body && body.opens_document === false) {
-        var note = document.createElement('p');
-        note.className = 'dh-inbox-note';
-        note.setAttribute('role', 'status');
-        note.textContent = body.sender_notified
-          ? nlEn('Deze link opent het verzoek, niet het document. We hebben de afzender gevraagd u de link opnieuw te sturen.', 'This link opens the request, not the document. We have asked the sender to send you the link again.')
-          : nlEn('Deze link opent het verzoek, niet het document. Vraag de afzender om de link opnieuw te sturen.', 'This link opens the request, not the document. Ask the sender to send you the link again.');
-        // This browser may hold the key half from the first invitation
-        // (js/cosign-share-memory.js): then the new link opens the document
-        // here, and only elsewhere does it open just the request (COSIGN-46-A).
-        if (heldShare(id)) note.textContent = (body.sender_notified
-            ? nlEn('In deze browser opent de nieuwe link het document: hij bewaarde de sleutel van uw eerste uitnodiging. Op een ander apparaat opent hij alleen het verzoek; daarvoor hebben we de afzender gevraagd u de link opnieuw te sturen.', 'In this browser the new link opens the document: it kept the key from your first invitation. On another device it opens only the request; for that we have asked the sender to send you the link again.')
-            : nlEn('In deze browser opent de nieuwe link het document: hij bewaarde de sleutel van uw eerste uitnodiging. Op een ander apparaat opent hij alleen het verzoek; vraag de afzender dan om de link opnieuw te sturen.', 'In this browser the new link opens the document: it kept the key from your first invitation. On another device it opens only the request; then ask the sender to send you the link again.'));
-        var prev = button.parentNode && button.parentNode.querySelector('.dh-inbox-note');
-        if (prev) prev.remove();
-        if (button.parentNode) button.parentNode.appendChild(note);
-      }
+    }).then(function () {
+      // No mail goes out from here: the link that opens the document is
+      // built in the sender's browser, so the sender has been asked to send
+      // the invitation again (admin/server.js, COSIGN-46). Say that.
+      button.textContent = nlEn('Gevraagd aan de afzender', 'Asked the sender');
+      var note = document.createElement('p');
+      note.className = 'dh-inbox-note';
+      note.setAttribute('role', 'status');
+      note.textContent = nlEn('We hebben de afzender gevraagd u de uitnodiging opnieuw te sturen. Alleen de afzender heeft de sleutel van het document. De nieuwe mail heeft dezelfde link als de eerste en opent het document op elk apparaat.', 'We have asked the sender to send you the invitation again. Only the sender holds the document key. The new mail has the same link as the first one and opens the document on any device.');
+      // This browser may hold the key half from the first invitation
+      // (js/cosign-share-memory.js): then the first mail's link opens the
+      // document here already.
+      if (heldShare(id)) note.textContent += ' ' + nlEn('In deze browser opent de link uit uw eerste uitnodiging het document nu al.', 'In this browser the link from your first invitation already opens the document.');
+      var prev = button.parentNode && button.parentNode.querySelector('.dh-inbox-note');
+      if (prev) prev.remove();
+      if (button.parentNode) button.parentNode.appendChild(note);
     }).catch(function (err) {
       button.textContent = err.message === 'rate_limited'
-        ? nlEn('Al verstuurd, probeer het over een uur opnieuw', 'Already sent, try again in an hour')
+        ? nlEn('Al gevraagd, probeer het over een uur opnieuw', 'Already asked, try again in an hour')
+        : err.message === 'sender_not_reachable'
+          ? nlEn('De afzender is nu niet te bereiken, probeer het later opnieuw', 'The sender cannot be reached now, try again later')
         : nlEn('Versturen is niet gelukt, probeer het later opnieuw', 'Could not send, try again later');
       if (err.message !== 'rate_limited') button.disabled = false;
     });

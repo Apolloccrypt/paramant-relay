@@ -23,6 +23,7 @@ import { requestsForParties, pageListText } from '/js/cosign-layout.js?v=5';
 import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=4';
+import { sealPut } from '/js/account-seal.js?v=1';
 
 // One file, two languages. /sign is Dutch and /en/sign is the English copy of
 // the same page; both load this script, and the page's own lang attribute picks
@@ -715,9 +716,11 @@ function noticeUrl(signPath) {
   return (location.origin + signPath).split('#')[0] + (state.keyShareFragment || '');
 }
 
-// The same links, kept in THIS browser only, so the dashboard can hand a
-// signer the full link again (acceptatie r3, A3): a resent invitation opens
-// the request, not the document. Only the #ks= half travels in them, which
+// The same links, kept in THIS browser only, so the dashboard can send a
+// signer the invitation again with a link that opens the document (COSIGN-46,
+// DASH-15): the resend is built here, from this half, exactly like the first
+// invitation. The address (e) is kept beside it, because the mail route checks
+// it against the party. Only the #ks= half travels in them, which
 // opens nothing without the invited mailbox's login and the relay's half.
 // Kept until the request expires (at most eight days), wiped on sign-out and
 // on an account switch (nav-auth.js), never sent to a server.
@@ -728,8 +731,9 @@ function rememberSignerLinks(envelopeId, partyLinks, expiresAt) {
     const until = Date.parse(expiresAt || '');
     const links = partyLinks
       .filter((p) => recipientOfParty(p.party_index))
-      .map((p) => ({ i: p.party_index, label: recipientOfParty(p.party_index)?.label || recipientOfParty(p.party_index)?.email || '', url: noticeUrl(p.sign_path) }));
-    localStorage.setItem('paramant.cosign.links.v1:' + envelopeId, JSON.stringify({ exp: Number.isFinite(until) ? Math.min(until, cap) : cap, links }));
+      .map((p) => ({ i: p.party_index, label: recipientOfParty(p.party_index)?.label || recipientOfParty(p.party_index)?.email || '', e: recipientOfParty(p.party_index)?.email || '', url: noticeUrl(p.sign_path) }));
+    // Sealed under the account key, never readable (review #573, M4).
+    sealPut('paramant.cosign.links.v1:' + envelopeId, { links }, Number.isFinite(until) ? Math.min(until, cap) : cap).catch(() => {});
   } catch { /* storage off: the dashboard says the links are not here */ }
 }
 

@@ -3591,14 +3591,18 @@ api.post("/user/sends/:id/revoke", authUser, async (req, res) => {
   }
 });
 
-// Send one person a fresh link. The old one stops working at that moment, and
-// the new one goes out by mail, never through this response.
+// A reminder with the same link. The token comes from the sender's browser,
+// which made it and kept it beside the send; this process only passes it on
+// and the relay checks it belongs to this recipient. Never logged, never
+// returned.
 api.post("/user/sends/:id/reinvite", authUser, async (req, res) => {
   const { user_id } = req.userSession;
+  const token = String((req.body || {}).token || "");
+  if (!token || token.length > 128) return res.status(400).json({ error: "link_not_in_browser" });
   try {
     const relayRes = await callRelay("/v2/user/sends/reinvite",
       { user_id, send_id: String(req.params.id || ""),
-        email: String((req.body || {}).email || "") }, "POST");
+        email: String((req.body || {}).email || ""), token }, "POST");
     const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
     return res.status(relayRes.status).json(body);
   } catch (err) {
@@ -3702,15 +3706,14 @@ api.get("/user/parasign/inbox", authUser, async (req, res) => {
 // created_at, so the resent link expires at the same moment as the first one and
 // the link already in the reader's mailbox keeps working.
 //
-// WHAT THE RESENT MAIL CARRIES. The document is unlocked by a key that lives in
+// WHY THE SENDER SENDS IT. The document is unlocked by a key that lives in
 // the URL fragment, and no server ever holds it. The first invitation carries
 // half of a split key (#ks=), added in the sender's browser; the relay holds
-// the other half and releases it only to the invited mailbox. This resent mail
-// is built here, from the stored invite token alone, so it carries no key half:
-// it opens the request, not the document. The full link stays in the sender's
-// browser, where the dashboard shows it per signer with a copy button
-// (frontend/js/dashboard.js signerLinksHtml); the sender is told so by mail
-// (relay.js notifySenderLinkRequested).
+// the other half and releases it only to the invited mailbox. A mail built
+// here, from the stored invite token alone, would carry no key half. So the
+// sender is asked by mail (relay.js notifySenderLinkRequested) and resends
+// from the dashboard (frontend/js/dashboard.js resendSignerInvite), the same
+// invitation with the same link, which opens the document on any device.
 //
 // One per envelope per hour, per account. The bucket is keyed on the session
 // account and the envelope together, never on the envelope alone: an id the
@@ -3745,28 +3748,14 @@ api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
     return res.status(502).json({ error: "relay_unreachable" });
   }
 
-  // The signing link, rebuilt from the stored token. Same origin, same path and
-  // same parameters the sender's browser used, minus the fragment nobody has.
-  const inviteUrl = `${new URL(SITE_URL).origin}/co-sign?env=${encodeURIComponent(id)}&p=${encodeURIComponent(invite.party_index)}&t=${encodeURIComponent(invite.invite_token)}`;
-  try {
-    await emailTemplates.sendEmail(email, emailTemplates.signingInviteEmail({
-      inviteUrl,
-      recipientLabel: invite.party_label || "",
-      senderLabel: invite.sender || "",
-      expiresAt: invite.signing_closes_at,
-      envelopeId: id,
-      partyIndex: invite.party_index,
-    }));
-  } catch (err) {
-    console.error("[user/parasign/inbox resend mail]", err.message);
-    return res.status(502).json({ error: "email_delivery_failed" });
-  }
-  // The address is echoed so the page can say where it went, and it is the
-  // reader's own: it came out of their session, not out of the envelope.
-  // sender_notified: the resent link opens the request, not the document (the
-  // key half is not on any server); the sender has been asked for the full
-  // link (COSIGN-46). The page can say so.
-  return res.json({ ok: true, sent_to: email, opens_document: false, sender_notified: !!invite.sender_notified });
+  // NO MAIL TO THE READER FROM HERE. A link rebuilt from the stored token
+  // carries no key half, so it opened the request and not the document, and
+  // only in the browser that had opened it before (COSIGN-46). The relay has
+  // asked the sender instead: a mail with a button to the resend action in
+  // the dashboard, which mails this reader the same invitation as the first
+  // time, built in the sender's browser with half A of the key.
+  if (!invite.sender_notified) return res.status(502).json({ error: "sender_not_reachable" });
+  return res.json({ ok: true, asked_sender: true, sent_to: null });
 });
 
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──

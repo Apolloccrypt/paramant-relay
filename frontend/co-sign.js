@@ -35,7 +35,7 @@ import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParti
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 import { stashReturn, resumeReturn, stashSignupReturn, takeSignupReturn } from '/js/login-return.js?v=2';
-import { rememberShare, recallShare } from '/js/cosign-share-memory.js?v=1';
+import { rememberShare, recallShare, forgetShare } from '/js/cosign-share-memory.js?v=2';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -368,6 +368,7 @@ async function init() {
     __session = await loadSession();
 
     if (state === 'declined' || state === 'cancelled' || (state === 'expired' && me.status !== 'signed')) {
+      try { forgetShare(envId, partyIndex); } catch { /* storage off */ }
       return showClosed(state);
     }
     if (__sessionFault) return showSessionFault();
@@ -767,7 +768,7 @@ async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
   // before, it kept that half, and the document opens here (COSIGN-46-A).
   let fromMemory = false;
   if (!key) {
-    const remembered = recallShare(envId, partyIndex);
+    const remembered = await recallShare(envId, partyIndex);
     const share = remembered ? parseKeyShareFragment('#ks=' + remembered) : null;
     if (share) { key = { share }; fromMemory = true; }
   }
@@ -806,7 +807,7 @@ async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
     __docKey = docKey;
     // The half from the link opened the document: remember it for a link
     // without one (only a half, and only after it proved to be the right one).
-    if (!fromMemory && !key.whole && ksText && partyIndex != null) rememberShare(envId, partyIndex, 'v1.' + String(ksText).replace(/^v1\./, ''), __envelope.sign_expires_at);
+    if (!fromMemory && !key.whole && ksText && partyIndex != null) rememberShare(envId, partyIndex, 'v1.' + String(ksText).replace(/^v1\./, ''), __envelope.sign_expires_at).catch(() => {});
     delivered.fromMemory = fromMemory;
     return delivered;
   } finally {
@@ -2012,6 +2013,8 @@ async function doSign() {
     let ink = '';
     try { ink = await sealInk({ ink: __ink, documentKey: __docKey, envelopeId: __envelope.id, partyIndex: __partyIndex }); } catch { ink = ''; }
     const data = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance, ink });
+    // Signed: the remembered key half has no use left (review #573, M4).
+    try { forgetShare(__envelope.id, __partyIndex); } catch { /* storage off */ }
 
     // The line under the heading follows the status: the last signer read
     // "once everyone has signed..." under "Signed by everyone" (hertest r2 K1).

@@ -29,25 +29,32 @@ test('the mail to the signer, for a link without the key, gives the one advice',
   assert.doesNotMatch(m.text, OLD, m.text);
 });
 
-test('the page and the dashboard note say the same to the signer', () => {
+test('the page says the one advice; the dashboard note says the sender was asked', () => {
   const page = read('frontend/co-sign.js');
   const keyless = page.slice(page.indexOf('async function fetchAndOpenCapsule'), page.indexOf('const capsule = new Uint8Array(await r.arrayBuffer());'));
   assert.match(keyless, SIGNER_NL);
   assert.match(keyless, SIGNER_EN);
   assert.doesNotMatch(keyless, OLD);
+  // COSIGN-46-A (2026-10-05): "Stuur mij de link opnieuw" no longer mails a
+  // link that opens only the request; the sender is asked to resend.
   const dash = read('frontend/js/dashboard.js');
-  const note = dash.slice(dash.indexOf('body.opens_document === false'), dash.indexOf("note.className") + 400);
-  assert.match(note, /de link opnieuw te sturen/);
-  assert.doesNotMatch(note, OLD);
+  const fn = dash.slice(dash.indexOf('function resendInvitation'), dash.indexOf('function wireDocumentFilters'));
+  assert.match(fn, /We hebben de afzender gevraagd u de uitnodiging opnieuw te sturen\./);
+  assert.match(fn, /We have asked the sender to send you the invitation again\./);
+  assert.doesNotMatch(fn, /opent het verzoek, niet het document/);
+  assert.doesNotMatch(fn, OLD);
 });
 
-test('the mail to the sender: copy it from the dashboard in the browser you sent from, else withdraw and resend', () => {
+test('the mail to the sender: one button to the resend action, else withdraw and resend', () => {
   const relay = read('relay/relay.js');
   const fn = relay.slice(relay.indexOf('async function notifySenderLinkRequested'), relay.indexOf('function senderLabelOf'));
-  assert.match(fn, /Open uw dashboard in de browser waarmee u het verzoek verstuurde\. Klik op dit verzoek en kies bij de ondertekenaar Link kopiëren/);
-  assert.match(fn, /Trek het verzoek dan in en stuur een nieuw verzoek/);
-  assert.match(fn, /Open your dashboard in the browser you sent the request from\. Click this request and choose Copy link/);
-  // And the dashboard, where that copy happens, agrees: copy it there, else withdraw.
+  assert.match(fn, /'\/dashboard\?herzend=' \+ encodeURIComponent\(String\(envelopeId\)\)/);
+  assert.match(fn, /knopHtml\('Uitnodiging opnieuw sturen'\)/);
+  assert.match(fn, /Open deze link in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen/);
+  assert.match(fn, /Trek het verzoek dan in en stuur het opnieuw\./);
+  assert.doesNotMatch(fn, /Link kopiëren/, 'no more copy-it-yourself as the way');
+  // And the dashboard, where the resend happens, agrees.
   const dash = read('frontend/js/dashboard.js');
-  assert.match(dash, /open dit verzoek dan in die browser en kopieer de link daar\. Lukt dat niet, trek dit verzoek dan in en stuur een nieuw verzoek\./);
+  assert.match(dash, /Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw\./);
+  assert.match(dash, /data-pa-action="document-resend-invite"/);
 });

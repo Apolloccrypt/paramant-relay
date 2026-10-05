@@ -2291,10 +2291,14 @@ async function notifySenderQuota(envelopeId, accountId) {
   return !!(r && r.ok);
 }
 
-// A signer asked for the invitation again. The resent mail can only open the
-// request (no document key half reaches a server); the full link is the
-// sender's. Tell the sender, at most once an hour per envelope.
-async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
+// A signer asked for the invitation again. Only the sender's browser holds the
+// link with the key half that opens the document (sign-flow.js
+// rememberSignerLinks); no server has it. So the sender gets a mail with one
+// button, to the resend action for this signer in the dashboard, which builds
+// the invitation again in that browser exactly like the first one. At most
+// once an hour per envelope. The envelope id rides in the button: this mail
+// goes to the owner of the envelope, the one person who already has it.
+async function notifySenderLinkRequested(envelopeId, accountId, partyLabel, partyIndex) {
   const to = senderLabelOf(accountId);
   if (!to || !redisClient || !redisClient.isReady) return false;
   const k = 'paramant:sign:link-request:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
@@ -2303,21 +2307,29 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
   const who = veiligeBestandsnaam(partyLabel || '') || 'Een ondertekenaar';
   const whoEn = veiligeBestandsnaam(partyLabel || '') || 'A signer';
   const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const knop = base + '/dashboard?herzend=' + encodeURIComponent(String(envelopeId))
+             + '&p=' + encodeURIComponent(String(Number(partyIndex) || 0));
+  const knopHtml = (tekst) => '<p><a href="' + escHtml(knop) + '" style="display:inline-block;padding:11px 18px;'
+             + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">' + tekst + '</a></p>';
   const r = await mailer.stuur({
     to,
-    subject: 'Een ondertekenaar vraagt de link opnieuw',
+    subject: 'Een ondertekenaar vraagt de uitnodiging opnieuw',
     text: tweetaligTekst('nl',
-      `${who} vroeg de uitnodiging opnieuw aan. De nieuwe link opent alleen het verzoek, niet het document. De sleutel van het document zit alleen in de volledige link die u bij het versturen kreeg. Die link bewaren wij niet.`
-      + '\n\nOpen uw dashboard in de browser waarmee u het verzoek verstuurde. Klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat de link er niet? Trek het verzoek dan in en stuur een nieuw verzoek.'
-      + '\n\n' + base + '/dashboard',
-      `${whoEn} asked for the invitation again. The new link opens only the request, not the document. The document key is only in the full link you got when you sent it. We do not keep that link.`
-      + '\n\nOpen your dashboard in the browser you sent the request from. Click this request and choose Copy link next to the signer. Send that link to the signer yourself. Is the link not there? Then withdraw the request and send a new one.'),
+      `${who} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.`
+      + '\n\nOpen deze link in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen:\n' + knop
+      + '\n\nDe ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.',
+      `${whoEn} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.`
+      + '\n\nOpen this link in the browser you sent the request from and click Send the invitation again:\n' + knop
+      + '\n\nThe signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.'),
     html: tweetaligHtml('nl',
-      `<p>${escHtml(who)} vroeg de uitnodiging opnieuw aan. De nieuwe link opent alleen het verzoek, niet het document. De sleutel van het document zit alleen in de volledige link die u bij het versturen kreeg. Die link bewaren wij niet.</p>`
-      + '<p>Open uw dashboard in de browser waarmee u het verzoek verstuurde. Klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat de link er niet? Trek het verzoek dan in en stuur een nieuw verzoek.</p>'
-      + '<p><a href="' + base + '/dashboard">Naar uw dashboard</a></p>',
-      `<p>${escHtml(whoEn)} asked for the invitation again. The new link opens only the request, not the document. The document key is only in the full link you got when you sent it. We do not keep that link.</p>`
-      + '<p>Open your dashboard in the browser you sent the request from. Click this request and choose Copy link next to the signer. Send that link to the signer yourself. Is the link not there? Then withdraw the request and send a new one.</p>'),
+      `<p>${escHtml(who)} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.</p>`
+      + '<p>Open deze knop in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen.</p>'
+      + knopHtml('Uitnodiging opnieuw sturen')
+      + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
+      `<p>${escHtml(whoEn)} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.</p>`
+      + '<p>Open this button in the browser you sent the request from and click Send the invitation again.</p>'
+      + knopHtml('Send the invitation again')
+      + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.</p>'),
   });
   log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);
@@ -6199,23 +6211,24 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/user/sends/reinvite ──────────────────────────────────────────
-  // A REMINDER, and it carries no new link.
+  // A REMINDER, with the SAME link as the invitation.
   //
-  // It used to mint a fresh token and kill the old one, and that destroyed the
-  // file for the person it was meant to help: the file key is wrapped under the
-  // recipient's own token, and this relay cannot make a new wrapping because it
-  // never holds the file key. They spent their one-time link on bytes that
-  // opened into nothing. Keeping the token instead is not an option either: not
-  // writing it down is why the relay cannot open what it has STORED.
+  // The link is the recipient's own token, and this relay cannot rebuild it:
+  // the file key is wrapped under that token in the sender's browser, and the
+  // token was mailed once and never written down. Minting a fresh one is not
+  // an option either, because this relay never holds the file key to wrap
+  // again. So the reminder is built where the token still lives: the sender's
+  // browser kept it beside the send (parashare.page.js rememberSendLinks) and
+  // hands it back here, exactly the way the invitation did at create time.
+  // The relay checks that it is the token of THIS recipient and mails it.
   //
-  // BE PRECISE ABOUT WHAT THAT PROVES. The relay does see each token for the
-  // moment it mails the invitation (it is the mailer), and the wrapping key is
-  // derived from the token. So this is "not stored", not zero-knowledge: a
-  // relay that kept what it mails could open the file. Real end-to-end for
-  // sends by name needs a recipient key the relay never sees (issue #550: ParaSend
-  // op naam zero-knowledge met ontvangerssleutel).
+  // BE PRECISE ABOUT WHAT THAT PROVES. As with the invitation, the relay sees
+  // the token for the moment it mails it, so this is "not stored", not
+  // zero-knowledge (issue #550). Nothing extra is stored for a reminder.
   //
-  // So this points at the invitation they already have, which still works.
+  // No token from the browser (another browser, storage wiped) means no
+  // reminder: a mail without a working link only sent people looking for the
+  // first one. The dashboard says how to go on instead.
   if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
     if (!_internalOk()) return _internalReject();
     try {
@@ -6232,6 +6245,8 @@ async function handleRelayRequest(req, res) {
       //
       // The seat is taken before the send store is touched, and handed back
       // below if the reminder turns out not to be allowed.
+      const token = typeof input.token === 'string' ? input.token : '';
+      if (!token) { res.writeHead(400); return res.end(J({ error: 'link_not_in_browser' })); }
       const _remH = inviteRateOk(accountVan(userId), apiKeys.get(userId) || null, 1);
       if (!_remH.ok) {
         log('warn', 'reminder_rate_limited', { limit: _remH.limit, used: _remH.used });
@@ -6240,7 +6255,7 @@ async function handleRelayRequest(req, res) {
         return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
                            limit: _remH.limit, retry_after_s: _remH.retry_after_s }));
       }
-      const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
+      const out = await _sendStore().reinvite(sendId, (input.email || '').toString(), token);
       if (!out.ok) {
         inviteRateGeef(accountVan(userId), 1);
         res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
@@ -6253,6 +6268,12 @@ async function handleRelayRequest(req, res) {
       const totEn = mailDatum(out.expires_at || Date.now(), 'en', _remOpt);
       // Awaited, so the dashboard's "reminder sent" is about what happened.
       const wie3 = mailer.veiligeNaam(out.sender_name || '');
+      const base3 = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+      // The same link as the invitation, built the same way (see POST /v2/sends).
+      const link3 = base3 + (taal3 === 'en' ? '/en' : '') + '/ontvang/' + encodeURIComponent(token)
+                  + '?r=' + encodeURIComponent(sectorOfKey(apiKeys.get(userId) || null));
+      const knop3 = (tekst) => '<p><a href="' + link3 + '" style="display:inline-block;padding:11px 18px;'
+                  + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">' + tekst + '</a></p>';
       const bezorgd = await mailer.stuur({
         to: out.email,
         from: mailer.afzenderNamens(undefined, wie3),
@@ -6263,29 +6284,26 @@ async function handleRelayRequest(req, res) {
           : (wie3 ? 'Herinnering van ' + wie3 + ': uw bestand staat nog klaar'
                   : 'Herinnering: er staat nog een bestand voor u klaar'),
         text: tweetaligTekst(taal3,
-              'Er staat nog een bestand voor u klaar.\n\nGebruik de link uit de eerdere mail '
-            + 'van Paramant. Die werkt nog en is nog steeds alleen voor u. '
-            + 'Beschikbaar tot ' + tot + '.\n\nDeze herinnering bevat bewust geen link: '
-            + 'de sleutel van het bestand zit alleen in de eerste mail. '
-            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.',
-              'A file is still waiting for you.\n\nUse the link in the earlier mail '
-            + 'from Paramant; it still works and it is still yours alone. '
-            + 'Available until ' + totEn + '.\n\nThis reminder carries no link on purpose: '
-            + 'the key to the file is only in the first mail. '
-            + 'Cannot find that mail? Ask the sender to send the file again.'),
+              'Er staat nog een bestand voor u klaar.\n\n' + link3
+            + '\n\nDit is dezelfde link als in de eerste mail. Hij is alleen voor u en werkt één keer. '
+            + 'Als u hem opent, sturen we een korte controlecode naar dit adres. '
+            + 'Beschikbaar tot ' + tot + '.',
+              'A file is still waiting for you.'
+            + (taal3 === 'en' ? '\n\n' + link3 : '\n\nUse the link above.')
+            + '\n\nIt is the same link as in the first mail. It is yours alone and works once. '
+            + 'Opening it sends a short code to this address. '
+            + 'Available until ' + totEn + '.'),
         html: tweetaligHtml(taal3,
               '<p>Er staat nog een bestand voor u klaar.</p>'
-            + '<p>Gebruik de link uit de eerdere mail van Paramant. Die werkt nog '
-            + 'en is nog steeds alleen voor u.</p>'
-            + '<p style="color:#666;font-size:13px">Beschikbaar tot ' + escHtml(tot) + '. '
-            + 'Deze herinnering bevat bewust geen link: de sleutel van het bestand zit alleen in de eerste mail. '
-            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.</p>',
+            + knop3('Bestand openen')
+            + '<p style="color:#666;font-size:13px">Dit is dezelfde link als in de eerste mail. '
+            + 'Hij is alleen voor u en werkt één keer. Als u hem opent, sturen we een korte '
+            + 'controlecode naar dit adres.<br>Beschikbaar tot ' + escHtml(tot) + '.</p>',
               '<p>A file is still waiting for you.</p>'
-            + '<p>Use the link in the earlier mail from Paramant. It still works, '
-            + 'and it is still yours alone.</p>'
-            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(totEn) + '. '
-            + 'This reminder carries no link on purpose: the key to the file is only in the first mail. '
-            + 'Cannot find that mail? Ask the sender to send the file again.</p>')
+            + (taal3 === 'en' ? knop3('Open the file') : '<p>Use the button above to open the file.</p>')
+            + '<p style="color:#666;font-size:13px">It is the same link as in the first mail. '
+            + 'It is yours alone and works once. Opening it sends a short code to this address.'
+            + '<br>Available until ' + escHtml(totEn) + '.</p>')
             + VOET(wie3, out.sender_email, taal3),
       });
       if (!bezorgd || !bezorgd.ok) {
@@ -6359,11 +6377,12 @@ async function handleRelayRequest(req, res) {
       // on you any more". A caller who is not the party learns nothing, not even
       // that the id exists.
       if (!invite) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
-      // The resent link opens the REQUEST, never the document: the key half
-      // that opens it lives only in the link the sender's browser built and
-      // must not reach a server that also holds the other half (COSIGN-46).
-      // The safe way back is the sender, so the sender is told, once an hour.
-      const senderNotified = await notifySenderLinkRequested(parasignResendMatch[1], invite.sender_account_id, invite.party_label).catch(() => false);
+      // The key half that opens the document lives only in the link the
+      // sender's browser built and must not reach a server that also holds
+      // the other half (COSIGN-46). So the sender is asked, once an hour, to
+      // send the invitation again from that browser; the admin no longer
+      // mails a link that opens only the request.
+      const senderNotified = await notifySenderLinkRequested(parasignResendMatch[1], invite.sender_account_id, invite.party_label, invite.party_index).catch(() => false);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
       return res.end(J({
         ok: true,

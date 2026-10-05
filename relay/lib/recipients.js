@@ -430,6 +430,7 @@ module.exports = {
   EMAIL_HASH_EPHEMERAL,
   newPickupToken,
   tokenHash,
+  safeHexEqual,
   buildRecipients,
   newSendSalt,
   findByToken,

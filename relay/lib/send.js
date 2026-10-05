@@ -484,8 +484,8 @@ function createSendStore({ store, log, now }) {
       return opVolgorde(String(id || ''), () => this._revoke(id, email));
     },
 
-    async reinvite(id, email) {
-      return opVolgorde(String(id || ''), () => this._reinvite(id, email));
+    async reinvite(id, email, token) {
+      return opVolgorde(String(id || ''), () => this._reinvite(id, email, token));
     },
 
     // Which send a token belongs to, without touching it. Only used to pick the
@@ -790,13 +790,22 @@ function createSendStore({ store, log, now }) {
       return { ok: true, settled };
     },
 
-    // Send somebody a fresh link. The old one dies at that moment.
-    async _reinvite(id, email) {
+    // A reminder with the SAME link. The token comes from the sender's own
+    // browser, which made it and kept it (parashare.page.js rememberSendLinks);
+    // nothing on this side can recover it. It must be the token of exactly this
+    // recipient, or the reminder would mail somebody else's link.
+    async _reinvite(id, email, token) {
       const send = await readSend(id);
       if (!send) return { ok: false, reason: 'unknown_send' };
       const want = String(email || '').trim().toLowerCase();
       const record = send.records.find(r => r && r.email === want);
       if (!record) return { ok: false, reason: 'unknown_recipient' };
+      if (token !== undefined && token !== null) {
+        if (typeof token !== 'string' || !token || token.length > MAX_TOKEN_LEN
+            || !recipients.safeHexEqual(record.token_hash || '', recipients.tokenHash(token))) {
+          return { ok: false, reason: 'wrong_link' };
+        }
+      }
       const uit = recipients.reinvite(record, clock(), send.records);
       if (!uit) {
         return { ok: false,

@@ -16,9 +16,12 @@
     return out;
   }
   var COSIGN_LINKS = 'paramant.cosign.links.v1:';
+  // The recipients' links of a send by name (parashare.page.js
+  // rememberSendLinks), kept for the reminder: same lifetime, same wipes.
+  var SEND_LINKS = 'paramant.send.links.v1:';
   function cosignLinks() {
     var out = [];
-    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_LINKS) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && (k.indexOf(COSIGN_LINKS) === 0 || k.indexOf(SEND_LINKS) === 0)) out.push(k); } } catch (e) { /* storage off */ }
     return out;
   }
   // The signer's own key half per request (js/cosign-share-memory.js).
@@ -55,8 +58,10 @@
     var now = Date.now();
     // The signer links (sign-flow.js rememberSignerLinks) and the signer's own
     // key halves (cosign-share-memory.js) go when they expire.
+    // Only the sealed form (js/account-seal.js, v 2) may stay, and never past
+    // eight days from now (review #573, M4); a readable older record goes.
     cosignLinks().concat(cosignShares()).forEach(function(k) {
-      try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || !(now < Number(r.exp))) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
+      try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || r.v !== 2 || !(now < Number(r.exp)) || Number(r.exp) > now + 8 * 864e5) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
     });
     // An older record also held the invite link itself (url): it goes.
     try {
