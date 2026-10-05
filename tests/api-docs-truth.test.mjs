@@ -68,6 +68,16 @@ test('API-24-K / API-30-K / API-35-K: nothing burns before the whole body is del
   assert.match(RELAY, /if \(!burned \|\| !apiKey \|\| entry\.retryHeld\) return delivered\(\);/);
   assert.match(section(NL, 'outbound'), /Een lezing telt pas als de hele blob is afgeleverd/);
   assert.match(section(EN, 'outbound'), /A read only counts once the whole blob was delivered/);
+  // Review #573, M3: at the default 5 MB a break after the first kilobytes
+  // already counts (socket buffers), measured in
+  // relay/test/route-burn-after-delivery.test.js. The docs say so, and point
+  // at the claim mode as the exact way.
+  assert.match(API, /Up to the 5 MB default blob size, a\s+download broken off after the first kilobytes has as a rule already cost\s+the read/);
+  assert.match(API, /a blob up to the\s+5 MB default is as a rule written in full at once/);
+  assert.doesNotMatch(API, /on a fast line the last\s+byte leaves the relay well before it arrives/);
+  assert.match(section(NL, 'outbound'), /een blob tot de standaardgrens van 5 MB is meestal in één keer verstuurd/);
+  assert.match(section(EN, 'outbound'), /a blob up to the 5 MB default is as a rule sent in one go/);
+  for (const html of [NL, EN]) assert.doesNotMatch(html, /download halverwege af, dan blijft de blob|download off halfway, the blob stays/);
 });
 
 test('API-31-N: the CT examples show the fields the relay sends', () => {

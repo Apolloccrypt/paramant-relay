@@ -9257,9 +9257,10 @@ async function handleRelayRequest(req, res) {
     }
     outHeaders['X-Accel-Buffering'] = 'no';
     res.writeHead(200, outHeaders);
-    // Nothing is lost on a broken line (matrix API-24-K, API-35-K): the read
-    // only counts, and a burning read only destroys the blob, once the whole
-    // body was delivered. Until then the entry is unlisted, so a second
+    // A line broken before the last byte was written loses nothing (matrix
+    // API-24-K, API-35-K): the read only counts, and a burning read only
+    // destroys the blob, once the whole body was written. Socket buffers take
+    // a few MB, so for a blob under ~5 MB that is as a rule straight away. Until then the entry is unlisted, so a second
     // reader gets 404 as before.
     const outHash = outm[1];
     const delivered = () => {

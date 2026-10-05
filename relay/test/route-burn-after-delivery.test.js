@@ -1,17 +1,21 @@
 'use strict';
-// Nothing burns without a complete delivery (matrix API-24-K, API-30-K,
-// API-35-K, fase 2 eindmatrix).
+// Nothing burns before the relay wrote the last byte (matrix API-24-K,
+// API-30-K, API-35-K, fase 2 eindmatrix).
 //
 // A download without a claim, the route every SDK and script in the field
 // uses, burned the blob when the request came in (/v2/outbound) and answered
-// X-Burned: true before a single byte had left (/v2/dl/:token/get). A receiver
-// whose connection broke after the first 36 KB of a 4 MB file lost it: status
-// said available:false and the next GET was 404.
+// X-Burned: true before a single byte had left (/v2/dl/:token/get).
 //
-// Now the read only counts once the whole body was delivered: the blob is
+// Now the read only counts once the whole body was written: the blob is
 // hidden while it is being sent and destroyed after, and a reader that breaks
-// off puts it back. A complete read still burns, and a second read right after
-// it still finds nothing.
+// off before the last write puts it back. A complete read still burns, and a
+// second read right after it still finds nothing.
+//
+// "Before the last write" is measured at the relay. Socket buffers take a few
+// MB, so a reader that breaks off early only keeps a blob larger than that;
+// the suites below use 16 MB for it. At the default MAX_BLOB of 5 MB a 4 MB
+// blob is written in one go and a break after the first chunk counts (review
+// #573, M3): the last test pins that, and the claim mode as the exact way.
 // Run: node --test relay/test/route-burn-after-delivery.test.js
 
 const { test, before, after } = require('node:test');
@@ -43,8 +47,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // from the socket after the first chunk, and on loopback the kernel buffers
 // hold several MB, so 'finish' could fire before the abort (and once the
 // last byte was written the read counts, review #565 B1).
-function readFirstChunkAndAbort(path, headers = {}) {
-  const port = Number(new URL(srv.base).port);
+function readFirstChunkAndAbort(path, headers = {}, on = srv) {
+  const port = Number(new URL(on.base).port);
   return new Promise((resolve) => {
     const s = net.connect(port, '127.0.0.1');
     let got = 0; let hdr = false; let done = false;
@@ -279,5 +283,43 @@ test('broken-off downloads are bounded at five on both routes', async () => {
   await sleep(300);
   const out = await srv.get(`/v2/outbound/${c.hash}`, { headers: { 'X-Api-Key': KEY } });
   assert.equal(out.status, 404, 'the sixth GET after five broken ones');
+  did();
+});
+
+// Review #573, M3: what the docs promise at the default blob size. Socket
+// buffers take a few MB, so a 4 MB blob under the default MAX_BLOB of 5 MB is
+// written in full before a reader that stops after the first chunk breaks
+// off: on both claimless routes that read counts. Only the claim mode keeps
+// the link on a broken line at this size, and the docs say so.
+test('at the default MAX_BLOB a 4 MB claimless read broken off after the first chunk counts; a claimed one does not', async () => {
+  const small = await boot({
+    tag: 'burn-after-delivery-default',
+    env: { DELIVERY_SETTLE_MS: '500' },
+    users: { api_keys: [{ key: KEY, plan: 'pro', active: true, email: 'pro@example.test', account_id: 'acct_bad' }] },
+  });
+  const put = async () => {
+    const b = bigBlob(4);
+    const up = await small.post('/v2/inbound', { headers: { 'X-Api-Key': KEY }, body: { hash: b.hash, payload: b.payload.toString('base64') } });
+    assert.equal(up.status, 200, 'a 4 MB blob fits under the default MAX_BLOB');
+    return { ...b, token: up.json.download_token };
+  };
+  const a = await put();
+  const gotDl = await readFirstChunkAndAbort(`/v2/dl/${a.token}/get`, { 'User-Agent': 'curl/8.9.1' }, small);
+  assert.ok(gotDl > 0 && gotDl < 1024 * 1024, `read ${gotDl} bytes before breaking off`);
+  await sleep(1500);
+  assert.equal((await small.get(`/v2/dl/${a.token}/info`)).status, 404, 'the claimless link is spent');
+
+  const o = await put();
+  const gotOut = await readFirstChunkAndAbort(`/v2/outbound/${o.hash}`, { 'X-Api-Key': KEY }, small);
+  assert.ok(gotOut > 0 && gotOut < 1024 * 1024, `read ${gotOut} bytes before breaking off`);
+  await sleep(1500);
+  const st = await small.get(`/v2/status/${o.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.equal(st.json.available, false, 'the outbound read counted');
+
+  const c = await put();
+  const claim = crypto.randomBytes(16).toString('hex');
+  await readFirstChunkAndAbort(`/v2/dl/${c.token}/get?claim=${claim}`, { 'User-Agent': 'curl/8.9.1' }, small);
+  await sleep(1500);
+  assert.equal((await small.get(`/v2/dl/${c.token}/info`)).status, 200, 'the claimed link is still there');
   did();
 });

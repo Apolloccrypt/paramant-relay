@@ -206,9 +206,12 @@ burns anything:
   after the last byte cannot be told apart from a reader that took every byte
   and reset on purpose. A receiver that breaks off before that point gets the
   link back and can simply try again; a link is served at most five times in
-  all. Bear in
-  mind that the operating system buffers a few MB, so on a fast line the last
-  byte leaves the relay well before it arrives. The link is hidden from the
+  all. "Before that point" is measured at the relay, not at the receiver:
+  the operating system buffers a few MB per connection, so a file of a few MB
+  is written to the connection in one go. Up to the 5 MB default blob size, a
+  download broken off after the first kilobytes has as a rule already cost
+  the read; only a larger file keeps the link on a broken line. The link is
+  hidden from the
   last byte on (a second `GET` answers `410` at once). The response says
   `X-Burned: on-delivery`.
   The claim mode stays the exact one: there the burn waits for the receiver's
@@ -238,7 +241,10 @@ connection. While it is being sent and right after, the blob is hidden: a
 second `GET` answers `404`. If your client breaks off before the last byte
 (it closes or resets the connection), the relay puts the blob back and the
 next `GET` serves it again in full; a blob is served at most five times in
-all. A reset after
+all. "Before the last byte" is measured at the relay, not at your client:
+the operating system buffers a few MB per connection, so a blob up to the
+5 MB default is as a rule written in full at once, and a break after the
+first kilobytes then already counts as a delivery. A reset after
 the last byte counts as a delivery. A proxy in front of the relay (nginx,
 docker's port proxy) can hide a break: it has read every byte and closes
 towards the relay normally. So a connection that closes within three seconds

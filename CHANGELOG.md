@@ -36,6 +36,15 @@ Tagged `v3.1.1` on the merge commit before the frontend rollout
   lying turns the gate red.
 
 ### Fixed
+- **What a broken download without a claim costs, said precisely.** A claimless
+  read on `/v2/dl` or `/v2/outbound` counts once the relay has written the last
+  byte to the connection, not once it arrived. The operating system buffers a
+  few MB per connection, so up to the 5 MB default blob size a download broken
+  off after the first kilobytes has as a rule already used the read; only a
+  larger blob comes back. Measured with a 4 MB blob under the default limit.
+  `docs/api.md` and /docs say so and point at `?claim=` as the mode in which a
+  broken download costs nothing. Both routes now serve a blob at most five
+  times in all, broken reads included (`/v2/outbound` allowed a sixth).
 - **What a buyer reads around paying matches what he gets** (betaaltest
   2026-10-05). Business now carries the ParaSend half of Firm, written by the
   payment and floored at read time for older Business accounts, so /parashare
