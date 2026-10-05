@@ -576,3 +576,33 @@ test('OFFLINE VERIFICATION: every notary-signed field is covered, one sabotage a
   }
   did();
 });
+
+// ── Acceptatie r5, B: the invite token in a header ──────────────────────────
+// The co-sign page put the invite token in ?t= of every relay read, so it
+// landed in access logs. The page now sends X-Parasign-Invite-Token; ?t= is
+// still read for a page that was loaded before that change.
+
+test('the party view answers to the invite token in a header, without ?t=', async () => {
+  if (!ready()) return;
+  IP = nextIp();
+  const { id, docHash: dh, tokens } = await createEnvelope();
+  const r = await srv.get(`/v2/envelopes/${id}?p=1`, { headers: asParty({ 'X-Parasign-Invite-Token': tokens[1] }) });
+  assert.strictEqual(r.status, 200, r.text);
+  assert.strictEqual(r.json.envelope.doc_hash, dh, 'the header gives the party view');
+  const wrong = await srv.get(`/v2/envelopes/${id}?p=1`, { headers: asParty({ 'X-Parasign-Invite-Token': tokens[0] }) });
+  assert.strictEqual(wrong.status, 404, 'another party\'s token in the header opens nothing');
+  const legacy = await statusAsParty(id, 1, tokens[1]);
+  assert.strictEqual(legacy.status, 200, 'the old ?t= form still works for a page loaded before the change');
+  did();
+});
+
+test('a browser may send X-Parasign-Invite-Token cross-origin (CORS preflight)', async () => {
+  if (!ready()) return;
+  IP = nextIp();
+  const r = await srv.req('OPTIONS', '/v2/envelopes/abcdefghijklmnopqrstuv?p=0', {
+    headers: asParty({ Origin: 'https://paramant.app', 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'x-parasign-invite-token' }),
+  });
+  assert.ok(r.status === 204 || r.status === 200, `preflight answered ${r.status}`);
+  assert.match(String(r.headers['access-control-allow-headers'] || ''), /X-Parasign-Invite-Token/i);
+  did();
+});

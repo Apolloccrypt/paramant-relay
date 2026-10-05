@@ -4589,6 +4589,16 @@ function authByDid(didStr, signature, ctx) {
   return null;
 }
 
+// The invite token of a co-sign link. The page sends it in a header, so it
+// stays out of request lines and access logs. ?t= is still read for a page
+// that was loaded before this change.
+function inviteTokenFrom(req, query) {
+  const h = req && req.headers ? req.headers['x-parasign-invite-token'] : '';
+  const fromHeader = (Array.isArray(h) ? h[0] : h) || '';
+  if (fromHeader) return String(fromHeader);
+  return (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+}
+
 // ── CORS ──────────────────────────────────────────────────────────────────────
 function isAllowedOrigin(origin) {
   if (!origin) return false;
@@ -4603,7 +4613,7 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce, X-Parasign-Invite-Token');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
@@ -11479,7 +11489,7 @@ async function handleRelayRequest(req, res) {
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const token = inviteTokenFrom(req, query);
     const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
     try {
       const out = await store.getDocumentCapsule(envDocumentMatch[1], pi, token, verifiedEmailHash);
@@ -11636,7 +11646,7 @@ async function handleRelayRequest(req, res) {
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     const partyIndex = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const token = inviteTokenFrom(req, query);
     const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString();
     try {
       const party = await store.getForParty(envParticipantReceiptMatch[1], partyIndex, token);
@@ -11689,7 +11699,7 @@ async function handleRelayRequest(req, res) {
       // (possibly v2) sign-message locally, and gives a passer-by nothing.
       if (query.p !== undefined) {
         const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-        const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+        const token = inviteTokenFrom(req, query);
         const view = await store.getForParty(id, pi, token);
         if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
         res.writeHead(200, { 'Content-Type': 'application/json' });
