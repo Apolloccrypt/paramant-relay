@@ -2295,7 +2295,7 @@ test('the host hardening on /dpa is what deploy step 6l measures, and no more', 
   assert.ok(en.includes('--verify-only') && en.includes('this page states the check, not its outcome'), 'dpa: promises the check, not the outcome');
   assert.ok(nl.includes('We controleren bij elke uitrol') && nl.includes('of auditd actief is'), 'dpa (nl): names the auditd check');
   assert.ok(nl.includes(`of AIDE geïnstalleerd is en de dagelijkse integriteitscontrole van bestanden hooguit ${days[1]} dagen geleden draaide`), 'dpa (nl): names the AIDE age 6l checks');
-  assert.ok(nl.includes('AppArmor staat aan met profielen in enforcing-modus'), 'dpa (nl): names AppArmor enforcing');
+  assert.ok(nl.includes('of AppArmor aan staat met profielen in enforcing-modus'), 'dpa (nl): names AppArmor enforcing');
   assert.ok(nl.includes('--verify-only') && nl.includes('deze pagina noemt de controle, niet de uitkomst'), 'dpa (nl): promises the check, not the outcome');
   // More than 6l measures: figures, or CIS as a result rather than a guideline.
   for (const [name, row, guide] of [['en', en, 'CIS Ubuntu 24.04 benchmark as a guideline; that is not a checked claim'],
