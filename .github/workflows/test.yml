@@ -121,6 +121,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Check 3 (STALE) compares asset content with origin/main, what prod runs.
+      # The checkout is shallow, so fetch that one commit; without it the check
+      # skips with a notice.
+      - name: Fetch origin/main for the STALE check
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
       - name: All local css/js links must carry a single ?v= cache-bust
         run: scripts/check-cache-bust.sh
 
