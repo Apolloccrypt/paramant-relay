@@ -132,6 +132,9 @@ test('DASH-15-A: the reminder confirmation stays on screen', async () => {
   await page.click('[data-pa-action="send-remind"]');
   await page.waitForTimeout(3000);
   assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Herinnering verstuurd/);
+  // Eindmatrix DASH-15-A: the sender is told what the reminder does and does
+  // not carry, and what to do when the first mail is lost.
+  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /verwijst naar de eerste mail, want alleen daarin zit de sleutel\. Is die mail kwijt, stuur het bestand dan opnieuw\./);
   assert.equal(await page.locator('[data-send-people="snd_1"]').isVisible(), true, 'the panel closed over the confirmation');
   await ctx.close();
 });

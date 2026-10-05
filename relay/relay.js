@@ -6145,20 +6145,26 @@ async function handleRelayRequest(req, res) {
         text: tweetaligTekst(taal3,
               'Er staat nog een bestand voor u klaar.\n\nGebruik de link uit de eerdere mail '
             + 'van Paramant. Die werkt nog en is nog steeds alleen voor u. '
-            + 'Beschikbaar tot ' + tot + '.',
+            + 'Beschikbaar tot ' + tot + '.\n\nDeze herinnering bevat bewust geen link: '
+            + 'de sleutel van het bestand zit alleen in de eerste mail. '
+            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.',
               'A file is still waiting for you.\n\nUse the link in the earlier mail '
             + 'from Paramant; it still works and it is still yours alone. '
-            + 'Available until ' + totEn + '.'),
+            + 'Available until ' + totEn + '.\n\nThis reminder carries no link on purpose: '
+            + 'the key to the file is only in the first mail. '
+            + 'Cannot find that mail? Ask the sender to send the file again.'),
         html: tweetaligHtml(taal3,
               '<p>Er staat nog een bestand voor u klaar.</p>'
             + '<p>Gebruik de link uit de eerdere mail van Paramant. Die werkt nog '
             + 'en is nog steeds alleen voor u.</p>'
             + '<p style="color:#666;font-size:13px">Beschikbaar tot ' + escHtml(tot) + '. '
+            + 'Deze herinnering bevat bewust geen link: de sleutel van het bestand zit alleen in de eerste mail. '
             + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.</p>',
               '<p>A file is still waiting for you.</p>'
             + '<p>Use the link in the earlier mail from Paramant. It still works, '
             + 'and it is still yours alone.</p>'
             + '<p style="color:#666;font-size:13px">Available until ' + escHtml(totEn) + '. '
+            + 'This reminder carries no link on purpose: the key to the file is only in the first mail. '
             + 'Cannot find that mail? Ask the sender to send the file again.</p>')
             + VOET(wie3, out.sender_email, taal3),
       });

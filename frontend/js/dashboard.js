@@ -564,7 +564,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       if (act === 'send-remind') {
         ev.preventDefault();
         sendAction('reinvite', t.getAttribute('data-send-id'),
-                   t.getAttribute('data-email'), t, nlEn('Herinnering verstuurd. De link is niet veranderd.', 'Reminder sent. Their link is unchanged.'));
+                   t.getAttribute('data-email'), t, nlEn('Herinnering verstuurd. De link is niet veranderd. De herinnering verwijst naar de eerste mail, want alleen daarin zit de sleutel. Is die mail kwijt, stuur het bestand dan opnieuw.', 'Reminder sent. Their link is unchanged. The reminder points to the first mail, because only that one holds the key. If that mail is lost, send the file again.'));
         return;
       }
       if (act === 'send-revoke') {

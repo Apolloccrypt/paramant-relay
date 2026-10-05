@@ -212,6 +212,11 @@ test('de herinnering: wat er in staat en wat er niet in staat', async () => {
   }
   // BEVINDING: de herinnering noemt de bestandsnaam NIET, de andere twee wel.
   assert.ok(!her.text.includes(NAAM), 'de herinnering noemt het bestand niet');
+  // Eindmatrix DASH-15-A: wie de eerste mail kwijt is, leest in de tekstmail
+  // (niet alleen in de html) waarom er geen link in staat en wat hij dan doet.
+  assert.match(her.text, /Deze herinnering bevat bewust geen link: de sleutel van het bestand zit alleen in de eerste mail\./);
+  assert.match(her.text, /Kunt u die mail niet vinden\? Vraag de afzender het bestand opnieuw te sturen\./);
+  assert.match(her.text, /Cannot find that mail\? Ask the sender to send the file again\./);
 });
 
 test('LOGS: geen token, geen code, geen wrapped_key, geen volledig adres', async () => {
