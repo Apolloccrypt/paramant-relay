@@ -150,6 +150,21 @@ function createParaSignStore({ redis, encKey, log,
       try { return JSON.parse(buf.toString('utf8')); } catch { return null; }
     },
     async delMeta(id) { await del('meta', id); },
+    // Write only when nothing is there yet (SET NX). True when this call wrote
+    // it. The in-flight lock of the open API's Idempotency-Key uses it.
+    async claimMeta(id, obj, ttlMs) {
+      const plain = Buffer.from(JSON.stringify(obj || {}), 'utf8');
+      const n = Number(ttlMs);
+      const ttl = Math.max(1, (Number.isFinite(n) && n > 0) ? Math.floor(n) : 60_000);
+      if (useRedis) {
+        const sealed = seal(plain, key, aadOf('meta', id));
+        return (await redis.set(rkey('meta', id), sealed, { PX: ttl, NX: true })) === 'OK';
+      }
+      memSweep();
+      if (mem.has(rkey('meta', id))) return false;
+      mem.set(rkey('meta', id), { val: plain, expiresAt: Date.now() + ttl });
+      return true;
+    },
 
     // test/diagnostic hooks
     _mem: mem,

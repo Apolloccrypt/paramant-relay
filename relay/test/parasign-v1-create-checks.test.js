@@ -85,3 +85,38 @@ test('the same Idempotency-Key with a different body is refused (review #555)', 
   await api.route(same);
   assert.strictEqual(same.res.statusCode, 201);
 });
+
+// Herreview #560, LAAG: the replay only saw a FINISHED first request. Two
+// requests with one key in the same moment both found nothing and both ran a
+// create. Now the first claims the key; a twin gets 409, and a create that
+// ends in anything but 201 frees the key for the retry.
+test('two requests with one Idempotency-Key at once: the twin waits, nothing runs twice', async () => {
+  const saved = new Map();
+  const store = {
+    async getMeta(k) { return saved.get(k) || null; },
+    async putMeta(k, v) { saved.set(k, v); },
+    async delMeta(k) { saved.delete(k); },
+    async claimMeta(k, v) { if (saved.has(k)) return false; saved.set(k, v); return true; },
+  };
+  const body = JSON.stringify({ document: { content_base64: PDF }, signers: [{ email: 'a@example.org' }] });
+  let runs = 0; let open;
+  const gate = new Promise((r) => { open = r; });
+  const rate = async () => { runs++; await gate; return false; };
+  const a = deps(body, { headers: { 'idempotency-key': 'race-0001' }, store });
+  a.envCreateRateOk = rate;
+  const b = deps(body, { headers: { 'idempotency-key': 'race-0001' }, store });
+  b.envCreateRateOk = rate;
+  const pa = api.route(a);
+  await new Promise((r) => setImmediate(r));
+  await api.route(b);
+  assert.strictEqual(b.res.statusCode, 409, `the twin: ${b.res.statusCode} ${b.res._body}`);
+  assert.strictEqual(b.res.json().error, 'idempotency_in_flight');
+  open();
+  await pa;
+  assert.strictEqual(a.res.statusCode, 429);
+  assert.strictEqual(runs, 1, 'only one of the two ran a create');
+  assert.strictEqual(saved.size, 0, 'a create that did not end in 201 frees the key');
+  const c = deps(body, { headers: { 'idempotency-key': 'race-0001' }, store, rate: () => false });
+  await api.route(c);
+  assert.strictEqual(c.res.statusCode, 429, 'the retry runs for real');
+});

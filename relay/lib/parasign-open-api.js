@@ -38,6 +38,9 @@ const envelopeMod = require('../envelope');   // pure helpers: signMessageBytes,
 
 const SHA3 = (buf) => crypto.createHash('sha3-256').update(buf).digest('hex');
 const MAX_PDF_BYTES = parseInt(process.env.PARASIGN_MAX_PDF_BYTES || String(20 * 1024 * 1024), 10);
+// How long an Idempotency-Key claim of a running create holds. Longer than one
+// create with a document fetched by url; a crashed create frees it by expiry.
+const IDEM_INFLIGHT_MS = 120_000;
 
 // ── Durable side-store (documents + webhook meta) ─────────────────────────────
 // The blob (PDF bytes) and the meta side-record (webhook target/secret,
@@ -398,8 +401,42 @@ async function createEnvelope(deps, apiKey, mode, rec) {
       // is refused, not answered with the first envelope.
       if (prev && prev.body_hash && prev.body_hash !== bodyHash) return errRes(res, 422, 'idempotency_key_reused', 'This Idempotency-Key was used for a request with a different body.', J);
       if (prev && prev.status && prev.body) return jsonRes(res, prev.status, prev.body, J, { 'Idempotent-Replay': 'true' });
+      if (prev && prev.state === 'running') return inFlight();
     } catch (e) { /* no store: run as a first request */ }
   }
+
+  // IN-FLIGHT LOCK (herreview #560, LAAG). The replay above only sees a
+  // FINISHED first request. Two requests with the same key in the same moment
+  // both found nothing and made two envelopes. The first claims the key (SET
+  // NX) for the length of one create; a twin gets 409 and retries into the
+  // replay. A create that ends in anything but 201 releases the claim, so the
+  // retry runs for real.
+  function inFlight() {
+    return jsonRes(res, 409, { error: 'idempotency_in_flight', message: 'A request with this Idempotency-Key is still running. Retry shortly.' }, J, { 'Retry-After': '2' });
+  }
+  const pre = { stored: false };
+  let claimed = false;
+  if (idemKey && store && typeof store.claimMeta === 'function') {
+    try { claimed = await store.claimMeta(idemKey, { state: 'running', body_hash: bodyHash }, IDEM_INFLIGHT_MS); }
+    catch (e) { claimed = false; }
+    if (!claimed) {
+      let cur = null;
+      try { cur = await store.getMeta(idemKey); } catch (e) { cur = null; }
+      if (cur && cur.body_hash && cur.body_hash !== bodyHash) return errRes(res, 422, 'idempotency_key_reused', 'This Idempotency-Key was used for a request with a different body.', J);
+      if (cur && cur.status && cur.body) return jsonRes(res, cur.status, cur.body, J, { 'Idempotent-Replay': 'true' });
+      if (cur) return inFlight();
+      // Claim refused and nothing there: the store is out; run as before.
+    }
+  }
+  try {
+    return await createEnvelopeRun(deps, apiKey, mode, rec, { d, bodyHash, idemKey, store, pre });
+  } finally {
+    if (claimed && !pre.stored) { try { await store.delMeta(idemKey); } catch (e) { /* expires by itself */ } }
+  }
+}
+
+async function createEnvelopeRun(deps, apiKey, mode, rec, { d, bodyHash, idemKey, store, pre }) {
+  const { res, apiKeys, envStore, envCreateRateOk, readBody, J, publicOrigin } = deps;
 
   // SHAPE FIRST, then the hourly quota (sweep-api A6): fifty malformed
   // requests used to spend the whole hour's quota and the real create got 429.
@@ -602,7 +639,7 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     _sandbox_note: sandboxNote,
   };
   if (idemKey && store && typeof store.putMeta === 'function') {
-    try { await store.putMeta(idemKey, { status: 201, body: created, body_hash: bodyHash }, 24 * 3600 * 1000); } catch (e) { /* replay protection is best effort */ }
+    try { await store.putMeta(idemKey, { status: 201, body: created, body_hash: bodyHash }, 24 * 3600 * 1000); pre.stored = true; } catch (e) { /* replay protection is best effort */ }
   }
   return jsonRes(res, 201, created, J);
 }
