@@ -232,9 +232,19 @@ function applyConfig() {
   var applyBtn = $('#apply');
   if (status) { status.style.color = ''; status.textContent = 'Configuring...'; }
   if (applyBtn) { applyBtn.disabled = true; }
+  // The relay no longer accepts an anonymous apply (relay.js /v2/setup/apply):
+  // the operator proves ownership with the one-time setup token.
+  var tokenInput = $('#setup-token');
+  var setupToken = tokenInput ? String(tokenInput.value || '').trim() : '';
+  if (!setupToken) {
+    if (applyBtn) { applyBtn.disabled = false; }
+    if (status) { status.style.color = '#b00020'; status.textContent = 'Fill in the setup code first. The relay writes it to its log on first start, and to the file setup-token next to users.json.'; }
+    if (tokenInput) { tokenInput.focus(); }
+    return Promise.resolve();
+  }
   return fetch('/v2/setup/apply', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Setup-Token': setupToken },
     body: JSON.stringify(state.config)
   })
     .then(function (r) {
@@ -256,6 +266,10 @@ function applyConfig() {
           ((res.body && res.body.error) ? res.body.error : 'Check the relay logs: docker compose logs relay');
       } else {
         // 4xx: validation -- show message and let the user correct an earlier step.
+        if (res.status === 401 && res.body && res.body.error === 'setup_token_required') {
+          status.textContent = 'The setup code is not right. Copy it again from the relay log or from the file setup-token.';
+          return;
+        }
         status.textContent = (res.body && res.body.error)
           ? res.body.error
           : ('Please review your input (HTTP ' + res.status + ').');

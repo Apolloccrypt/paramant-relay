@@ -60,6 +60,7 @@ OWNER/PARTICIPANT.
 ```
 curl -X POST https://paramant.app/v1/envelopes \
   -H "Authorization: Bearer psk_live_..." \
+  -H "Idempotency-Key: quote-8842-v1" \
   -H "Content-Type: application/json" \
   -d '{
         "document": { "content_base64": "JVBERi0xLjc..." },
@@ -110,10 +111,29 @@ roughly 15 MB must therefore be delivered via `document.url`, not base64.
 
 `webhook_secret` is returned only here; store it to verify webhook HMACs.
 
-Create errors: `400 bad_json | missing_document | empty_document |
-missing_signers`, `422 not_a_pdf | document_unfetchable` (includes SSRF-guard
+Create errors: `400 bad_json | invalid_idempotency_key | ambiguous_document |
+invalid_binding_mode | missing_signers | invalid_signer_email | missing_document |
+empty_document`, `422 not_a_pdf | document_unfetchable` (includes SSRF-guard
 rejections), `413 document_too_large`, `429 rate_limited` (50 creations per key
 per hour), `402 monthly_sign_quota_reached` (plan cap; `Retry-After: 86400`).
+
+- `ambiguous_document`: both `document.content_base64` and `document.url` were sent.
+- `invalid_binding_mode`: `binding_mode` is set but is not `email` or `open`.
+- `invalid_signer_email`: with `binding_mode` `email` (the default) every signer
+  needs a valid email address; the body names the first bad one in
+  `signer_index`.
+- The body shape is checked before the hourly quota, so a malformed request
+  (400) does not spend one of the 50 creations.
+- `429 rate_limited` carries `Retry-After` and `retry_after_s`: the seconds left
+  until the current clock hour ends, not a flat 3600.
+
+Idempotency: send an `Idempotency-Key` header (8-128 characters of
+`A-Z a-z 0-9 _ . : -`) to make a retry safe. When the same key comes from the
+same API key within 24 hours, the relay returns the first `201` response again,
+with the header `Idempotent-Replay: true`, and creates no second envelope and
+spends no quota. Only a successful `201` is stored; an error is not replayed, so
+a retry after a 4xx or 5xx runs as a new request. A key in another format is a
+`400 invalid_idempotency_key`.
 
 ### GET /v1/envelopes/:id — status
 

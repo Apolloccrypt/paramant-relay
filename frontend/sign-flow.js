@@ -13,7 +13,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=21';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=22';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
@@ -604,6 +604,25 @@ function limitMessage(e) {
   if (e.status === 402 && code === 'sender_sign_quota_reached') {
     return L('Het tegoed van de afzender voor deze maand is op; de afzender krijgt daar een e-mail over.', "The sender's signing allowance for this month is used up; the sender gets an email about it.");
   }
+  // The relay refuses a request that needs more signatures than the plan has
+  // left this month (relay.js, sign_quota_insufficient), BEFORE anything is
+  // created. It sends the numbers; say them, and that nothing was sent.
+  if (code === 'sign_quota_insufficient') {
+    const d = e.data || {};
+    const needed = Number(d.needed), room = Number(d.room);
+    if (Number.isFinite(needed) && Number.isFinite(room)) {
+      return L(`Dit verzoek vraagt ${needed} handtekening${needed === 1 ? '' : 'en'} en uw plan heeft deze maand nog ruimte voor ${room}. Er is niets aangemaakt of verstuurd. Kies minder ondertekenaars, wacht tot open verzoeken klaar zijn of verhoog uw plan.`,
+        `This request needs ${needed} signature${needed === 1 ? '' : 's'} and your plan has room for ${room} this month. Nothing has been created or sent. Choose fewer signers, wait for open requests to finish, or upgrade your plan.`);
+    }
+    return L('Uw plan heeft deze maand niet genoeg handtekeningen meer voor dit verzoek. Er is niets aangemaakt of verstuurd.', 'Your plan does not have enough signatures left this month for this request. Nothing has been created or sent.');
+  }
+  // A document over the limit: the server says the limit and, for a request,
+  // that the empty request was withdrawn again (admin/server.js).
+  if (code === 'document_too_large') {
+    if (e.code === 'document_too_large' && e.message && !/^[a-z0-9_]+$/.test(e.message)) return null;
+    const mb = e.data && Number(e.data.max_mb) > 0 ? Number(e.data.max_mb) : 5;
+    return L(`Dit document is te groot (maximaal ${mb} MB). Er is niets verstuurd.`, `This document is too large (maximum ${mb} MB). Nothing has been sent.`);
+  }
   if (e.status === 429 || code === 'http_429' || code === 'too_many_requests') {
     // Retry-After as the relay and admin put it in the body (the header is not
     // readable through the signing chain); nginx's own 429 has neither.
@@ -818,10 +837,14 @@ async function shareEncryptedDocument({ envelopeId, bytes, filename, mime, docHa
   if (!upload.ok) {
     state.keyShareFragment = '';
     const tooLarge = uploadBody.error === 'document_too_large' || uploadBody.error === 'payload_too_large' || upload.status === 413;
+    const maxMb = Number(uploadBody.max_mb) > 0 ? Number(uploadBody.max_mb) : 5;
     const err = new Error(tooLarge
-      ? L('Dit document is te groot om versleuteld mee te sturen (maximaal 5 MB).', 'This document is too large for encrypted co-sign delivery (maximum 5 MB).')
+      ? L(`Dit document is te groot om versleuteld mee te sturen (maximaal ${maxMb} MB).`, `This document is too large for encrypted co-sign delivery (maximum ${maxMb} MB).`)
+        + (uploadBody.envelope_withdrawn ? L(' Het lege verzoek is weer ingetrokken; er is niets verstuurd.', ' The empty request was withdrawn again; nothing has been sent.') : '')
       : (uploadBody.error || L('Het versleutelde document kon niet worden opgeslagen.', 'Could not store the encrypted document.')));
     err.status = upload.status;
+    err.data = uploadBody;
+    if (tooLarge) err.code = 'document_too_large';
     throw err;
   }
   return { fragment: encrypted.fragment };
@@ -1619,6 +1642,8 @@ function setSealPlacement(placement) {
   const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages;
   updateSignatureSheetControls();
   reflowGhostStamps();
+  if (!hasInlineSeal()) showStampOverTextNotice(0);
+  else if (state.stamp) scheduleSoloCoverCheck();
   if (hasInlineSeal()) {
     reflowStampMarker();
     if (!hasSignatureSheet()) setPlaceHint(state.stamp ? L('Klik op een pagina om de stempel te verplaatsen.', 'Click a page to move the signature stamp.') : L('Klik op een pagina om de stempel te plaatsen.', 'Click a page to drop the signature stamp.'));
@@ -1631,6 +1656,7 @@ function removeStamp() {
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
   const cont = $('ds-place-continue'); if (cont) cont.disabled = hasInlineSeal();
   setPlaceHint(L('Handtekening verwijderd. Klik op een pagina om hem opnieuw te plaatsen.', 'Signature removed. Click a page to place it again.'));
+  showStampOverTextNotice(0);
 }
 
 // Re-derive the marker's pixel box from the PDF-point state.stamp at the current
@@ -2478,18 +2504,76 @@ function nearestFreeStampSpot(st, boxes, page) {
   }
   return best ? { x: best.x, y: best.y } : null;
 }
+// Pixels as well as text, for the one page the stamp is on: the same check
+// /co-sign makes for a signature box (co-sign.js boxesOfPdfjsPage, ink:true).
+// A page WITH a text layer used to be judged on its text alone, so articles
+// set as images, a scan with one stray character, a logo or a drawn table
+// under the stamp went unnoticed. Cached per document and page.
+let _stampInkCache = { bytes: null, pages: new Map() };
+function stampPageInkBoxes(bytes, pageIndex) {
+  if (_stampInkCache.bytes !== bytes) _stampInkCache = { bytes, pages: new Map() };
+  if (_stampInkCache.pages.has(pageIndex)) return _stampInkCache.pages.get(pageIndex);
+  const pr = (async () => {
+    try {
+      const pdfjs = await waitForPdfjs();
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true }).promise;
+      try { return await inkBoxesOfPage(await pdf.getPage(pageIndex + 1)); }
+      finally { try { pdf.destroy(); } catch (e) { /* best effort */ } }
+    } catch (e) { return null; }
+  })();
+  _stampInkCache.pages.set(pageIndex, pr);
+  return pr;
+}
+// Text and pixels under the stamp's page, view-space points. null: unknown.
+async function stampCoverBoxes(st) {
+  const all = await loadTextBoxes(state.doc.bytes);
+  const text = all && Array.isArray(all[st.pageIndex]) ? all[st.pageIndex] : null;
+  const ink = await stampPageInkBoxes(state.doc.bytes, st.pageIndex);
+  if (!text && !ink) return null;
+  return (text || []).concat(ink || []);
+}
+// The stamp lies over the text or the image of its page: said next to the
+// placement hint and again on the review step, like the paraaf
+// (showParaafOverTextNotice). page: 1-based, or 0 to take the notice away.
+function showStampOverTextNotice(page) {
+  for (const [anchorId, noticeId] of [['ds-place-hint', 'ds-stamp-over-text'], ['ds-review-doc-preview', 'ds-stamp-over-text-review']]) {
+    const anchor = $(anchorId);
+    let el = $(noticeId);
+    if (!page) { if (el) el.remove(); continue; }
+    if (!anchor) continue;
+    if (!el) {
+      el = document.createElement('p');
+      el.id = noticeId;
+      el.className = 'ds-banner err';
+      el.setAttribute('role', 'alert');
+      anchor.insertAdjacentElement('afterend', el);
+    }
+    el.textContent = L('Uw handtekening ligt op pagina ', 'Your signature lies on page ') + page
+      + L(' over tekst of een afbeelding. Kies bij Plaatsen een vrije plek of een apart handtekeningblad als die leesbaar moet blijven.',
+          ' over text or an image. At Place, pick a free spot or a separate signature sheet if that needs to stay readable.');
+  }
+}
+// The review step asks again, from the same boxes: the stamp may have been
+// moved, resized or the document changed since the placement check.
+async function refreshStampOverTextNotice() {
+  const st = state.stamp;
+  if (state.signingMode === 'invite' || state.mode !== 'pdf' || !st || st.isImage || !hasInlineSeal()) { showStampOverTextNotice(0); return; }
+  const boxes = await stampCoverBoxes(st);
+  if (state.stamp !== st) return;
+  showStampOverTextNotice(Array.isArray(boxes) && stampTextCover(st, boxes) > SOLO_COVER_LIMIT ? st.pageIndex + 1 : 0);
+}
 let _soloCoverTimer = 0;
 function scheduleSoloCoverCheck() {
   clearTimeout(_soloCoverTimer);
   _soloCoverTimer = setTimeout(() => { checkSoloStampCover().catch(() => {}); }, 250);
 }
 async function checkSoloStampCover() {
-  if (state.signingMode === 'invite' || state.mode !== 'pdf' || !state.stamp || state.stamp.isImage || !hasInlineSeal()) return;
-  const all = await loadTextBoxes(state.doc.bytes);
+  if (state.signingMode === 'invite' || state.mode !== 'pdf' || !state.stamp || state.stamp.isImage || !hasInlineSeal()) { showStampOverTextNotice(0); return; }
   const st = state.stamp;
-  const boxes = all && all[st.pageIndex];
-  if (!Array.isArray(boxes) || stampTextCover(st, boxes) <= SOLO_COVER_LIMIT) return;
+  const boxes = await stampCoverBoxes(st);
   if (state.stamp !== st) return;   // moved again in the meantime
+  if (!Array.isArray(boxes) || stampTextCover(st, boxes) <= SOLO_COVER_LIMIT) { showStampOverTextNotice(0); return; }
+  showStampOverTextNotice(st.pageIndex + 1);
   const hint = $('ds-place-hint');
   if (!hint) return;
   hint.textContent = L('Deze handtekening staat op de tekst van pagina ', 'This signature sits on the text of page ') + (st.pageIndex + 1)
@@ -2505,6 +2589,7 @@ async function checkSoloStampCover() {
       state.stamp = { ...state.stamp, x: spot.x, y: spot.y };
       reflowStampMarker(); reflowGhostStamps(); savePlacementTemplate();
       delete hint.dataset.cover;
+      showStampOverTextNotice(0);
       setPlaceHint(L('Stempel op pagina ', 'Stamp on page ') + (state.stamp.pageIndex + 1) + L(', op een vrije plek. Klik op een andere plek om hem te verplaatsen.', ', on a free spot. Click another spot to move it.'));
     });
     hint.append(b, ' ');
@@ -2512,7 +2597,7 @@ async function checkSoloStampCover() {
   const sheet = document.createElement('button');
   sheet.type = 'button'; sheet.className = 'btn btn-secondary btn-small'; sheet.id = 'ds-cover-sheet';
   sheet.textContent = L('Gebruik een handtekeningblad', 'Use a signature sheet');
-  sheet.addEventListener('click', () => { delete hint.dataset.cover; setSealPlacement('sheet'); });
+  sheet.addEventListener('click', () => { delete hint.dataset.cover; showStampOverTextNotice(0); setSealPlacement('sheet'); });
   hint.append(sheet);
 }
 
@@ -2669,7 +2754,7 @@ async function serverHasSigningKey() {
     const r = await fetch('/api/user/account/signing-key', { credentials: 'include' });
     if (!r.ok) return false;
     const body = await r.json().catch(() => ({}));
-    return Array.isArray(body.keys) && body.keys.some((k) => !k.revoked_at);
+    return Array.isArray(body.keys) && body.keys.some((k) => !k.revoked_at && !k.expired);
   } catch { return false; }
 }
 
@@ -3181,10 +3266,12 @@ async function renderDocPreview() {
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
     pane.appendChild(zoomwrap);
     if (state.sealPlacement === 'sheet') {
+      showStampOverTextNotice(0);
       zoomwrap.appendChild(buildSignatureSheetPreview());
       buildReviewZoom(zoomwrap);
       return;
     }
+    refreshStampOverTextNotice().catch(() => {});
     // Review shows EVERY page (capped), each with its own annotations, and the
     // seal on its page. Only the seal page gets the heavy supersample; other
     // pages render at screen resolution to keep memory sane on long documents.

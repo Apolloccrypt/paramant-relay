@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <meta property="og:title" content="API-documentatie en zelf hosten · Paramant">
-<meta property="og:description" content="Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta property="og:description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <meta property="og:url" content="https://paramant.app/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="API-documentatie en zelf hosten · Paramant">
-<meta name="twitter:description" content="Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="twitter:description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <link rel="canonical" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
+      "description": "Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
     },
     {
       "@type": "Organization",
@@ -259,7 +259,7 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">NASLAG</span>
     <h1>Documentatie</h1>
     <p class="docs-buyer">Overweegt u Paramant? Uw IT kan hier alles controleren. Abonnementen en prijzen staan op <a href="/pricing">Prijzen</a>.</p>
-    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.0.0. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
+    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.1.0. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Snel starten</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">Bekijk abonnementen en prijzen</a>
@@ -552,10 +552,17 @@ ws.onmessage = e => {
     <h2 id="webhook">POST /v2/webhook</h2>
     <pre>{ "device_id": "scanner-01", "url": "https://you.com/hook", "secret": "your-own-secret" }
 
-<span class="cm">Relay POSTs to your url when a blob for that device arrives (POST /v2/inbound):
+<span class="cm">Response (secret only when you sent none; shown once):
+{ "ok": true, "events": ["blob_ready", "blob_downloaded"], "secret": "whsec_..." }
+
+Relay POSTs to your url when a blob for that device arrives (POST /v2/inbound):
 { "event": "blob_ready", "device_id": "scanner-01", "ts": "2026-04-14T...",
-  "hash": "...", "size": 5242880, "ttl_ms": 3600000, "sig_valid": true }</span></pre>
-    <p>Alleen op Pro en hoger. <code>X-Paramant-Sig</code> is de HMAC-SHA256 van de body met het <code>secret</code> dat u bij de registratie meegaf. Zonder <code>secret</code> blijft de header leeg; geef er dus altijd een mee en weiger callbacks waarvan de handtekening niet klopt. De registratie staat alleen in het geheugen van die relay: na een herstart is ze weg en moet u opnieuw registreren. De relay probeert één keer (time-out 5 seconden) en doet geen nieuwe poging.</p>
+  "hash": "...", "size": 5242880, "ttl_ms": 3600000, "sig_valid": true }
+
+And when it is downloaded (via the link or GET /v2/outbound):
+{ "event": "blob_downloaded", "device_id": "scanner-01", "ts": "...",
+  "hash": "...", "size": 5242880, "via": "link" }   // or "api"</span></pre>
+    <p>Alleen op Pro en hoger. Elke webhook is ondertekend. Geeft u een <code>secret</code> mee, dan tekent de relay daarmee. Laat u het weg, dan maakt de relay er zelf een (<code>whsec_</code>…) en geeft het één keer terug in het antwoord; bewaar het meteen, want het komt niet opnieuw. Elke aanroep draagt de headers <code>X-Paramant-Event</code> (de eventnaam) en <code>X-Paramant-Sig</code>: de HMAC-SHA256 in hex van de ruwe body, met het secret als sleutel. Reken die zelf na over de onbewerkte body, vergelijk in constante tijd en weiger callbacks waarvan de handtekening niet klopt. De registratie staat in redis (het geheugen is alleen een cache), dus ze overleeft een herstart en geldt op elke sector; per apparaat blijven de laatste 20 registraties bewaard. De relay probeert één keer (time-out 5 seconden) en doet geen nieuwe poging.</p>
 
     <h2 id="health">GET /health</h2>
     <pre><span class="cm">{
@@ -580,6 +587,7 @@ POST   /v1/envelopes/:id/void       Void an open envelope (owner only)</pre>
     <pre><span class="cm"># Create an envelope. The document travels base64; signers get hosted pages.</span>
 curl -X POST https://paramant.app/v1/envelopes \
   -H "Authorization: Bearer psk_live_..." \
+  -H "Idempotency-Key: quote-8842-v1" \
   -H "Content-Type: application/json" \
   -d '{
         "document": { "content_base64": "JVBERi0xLjc..." },
@@ -591,6 +599,7 @@ curl -X POST https://paramant.app/v1/envelopes \
 curl https://paramant.app/v1/envelopes/env_.../receipt \
   -H "Authorization: Bearer psk_live_..." --output quote-8842.psign</pre>
     <p>Limiet: 50 nieuwe envelopes per sleutel per uur. Een envelope wordt standaard 30 dagen bewaard (in te stellen met <code>ttl_days</code>, maximaal 365). Zolang hij bestaat, bewaart de relay ook de pdf zelf, versleuteld in redis, omdat de ondertekenaars hem moeten kunnen openen en de gestempelde pdf eruit wordt gemaakt. Na het verlopen is hij weg. Webhooks: stel <code>webhook_url</code> in, dan komen <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> en <code>envelope.voided</code> binnen, ondertekend met HMAC-SHA256 in de header <code>X-Paramant-Sig</code>. Er is één afleverpoging zonder herhaling, dus controleer de status ook zelf met <code>GET /v1/envelopes/:id</code>. Bewijzen zijn offline te controleren tegen de openbare CT-log; zie <a href="/verify">/verify</a>.</p>
+    <p>Veilig opnieuw proberen: stuur bij <code>POST /v1/envelopes</code> een header <code>Idempotency-Key</code> mee (8 tot 128 tekens uit <code>A-Z a-z 0-9 _ . : -</code>). Komt dezelfde sleutel binnen 24 uur opnieuw van dezelfde API-sleutel, dan krijgt u het eerste <code>201</code>-antwoord terug met <code>Idempotent-Replay: true</code>, zonder tweede envelope en zonder quotum te verbruiken. Alleen een geslaagde <code>201</code> wordt bewaard. De relay controleert de body vóór het uurquotum: <code>400 ambiguous_document</code> (zowel <code>content_base64</code> als <code>url</code>), <code>400 invalid_binding_mode</code> (niet <code>email</code> of <code>open</code>), <code>400 invalid_signer_email</code> (bij <code>email</code>-binding heeft elke ondertekenaar een geldig adres nodig; <code>signer_index</code> noemt de eerste foute) en <code>400 invalid_idempotency_key</code> kosten dus geen aanmaak. Een <code>429 rate_limited</code> draagt <code>Retry-After</code> met de seconden tot het einde van het lopende uur.</p>
 
     <!-- ── Account & billing API ────────────────────────────────── -->
     <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
@@ -725,15 +734,19 @@ cd paramant-relay
 
 <span class="cm"># 2. Configure</span>
 cp .env.example .env
-echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
-nano .env   <span class="cm"># set TOTP_SECRET and RESEND_API_KEY if desired</span>
+nano .env   <span class="cm"># vul de verplichte geheimen in:</span>
+<span class="cm">#   ADMIN_TOKEN, REDIS_PASSWORD, INTERNAL_AUTH_TOKEN: openssl rand -hex 32</span>
+<span class="cm">#   RELAY_REDIS_URL=redis://:&lt;REDIS_PASSWORD&gt;@redis:6379</span>
+<span class="cm">#   PARAMANT_TOTP_MASTER_KEY: openssl rand -base64 32</span>
+<span class="cm">#   PARASIGN_PUBLIC_ORIGIN, RELAY_SELF_URL_&lt;SECTOR&gt;: uw eigen publieke adres</span>
+<span class="cm">#   (install.sh schrijft deze allemaal voor u)</span>
 
 <span class="cm"># 3. Launch</span>
 docker compose up -d
 
 <span class="cm"># 4. Verify</span>
 curl http://localhost:3000/health
-<span class="cm"># → {"ok":true,"version":"3.0.0","sector":"relay"}</span></pre>
+<span class="cm"># → {"ok":true,"version":"3.1.0","sector":"relay"}</span></pre>
     </div>
 
     <h3>Poorten per container</h3>
@@ -751,6 +764,12 @@ curl http://localhost:3000/health
     <table>
       <tr><th>Variabele</th><th>Verplicht</th><th>Omschrijving</th></tr>
       <tr><td>ADMIN_TOKEN</td><td>Ja</td><td>Wachtwoord van het beheerpaneel (minimaal 32 tekens, hex)</td></tr>
+      <tr><td>REDIS_PASSWORD</td><td>Ja</td><td>Wachtwoord van de redis-container; leeg start redis niet</td></tr>
+      <tr><td>RELAY_REDIS_URL</td><td>Ja</td><td><code>redis://:&lt;REDIS_PASSWORD&gt;@redis:6379</code></td></tr>
+      <tr><td>PARAMANT_TOTP_MASTER_KEY</td><td>Ja</td><td>Versleutelt de TOTP-geheimen van gebruikers (32 bytes, base64); verander hem nooit op een draaiende installatie</td></tr>
+      <tr><td>INTERNAL_AUTH_TOKEN</td><td>Ja</td><td>Tweede slot op de interne routes van de relays (beheer naar relay)</td></tr>
+      <tr><td>PARASIGN_PUBLIC_ORIGIN</td><td>Nee</td><td>Uw eigen publieke site; de betaling keert hierheen terug in plaats van naar paramant.app</td></tr>
+      <tr><td>RELAY_SELF_URL_&lt;SECTOR&gt;</td><td>Nee</td><td>Per relay (MAIN, HEALTH, FINANCE, LEGAL, IOT) zijn eigen publieke adres; zonder dit noemen ondertekende tree heads en bewijzen een paramant.app-host</td></tr>
       <tr><td>TOTP_SECRET</td><td>Aanbevolen</td><td>Base32 TOTP-geheim: zet MFA aan bij het inloggen als beheerder</td></tr>
       <tr><td>PLK_KEY</td><td>Nee</td><td>Licentiesleutel: maakt meer dan 5 gebruikers mogelijk (Community = gratis, maximaal 5)</td></tr>
       <tr><td>RESEND_API_KEY</td><td>Nee</td><td>Sleutel van de e-mailaanbieder (voor meldingen bij het afleveren van sleutels)</td></tr>
@@ -815,15 +834,24 @@ open https://your-domain.com/admin/</pre>
     <div class="callout"><span class="callout-label">Nieuw in 3.0.0</span>
       <p><strong style="color:var(--lime)">Begeleide installatie:</strong> een webwizard op <code>/setup</code> vervangt bij de eerste start de handmatige beheerscripts voor nieuwe beheerders. U maakt het admin-token aan, registreert TOTP en maakt de eerste sleutel, allemaal vanuit de browser. De wizard werkt alleen bij de eerste start (nog geen sleutels) of met de expliciete vlag <code>SETUP_MODE</code>, en voert grondiger controles uit via <code>/v2/health/deep</code> en DNS voordat hij meldt dat alles werkt (ontwerp: ADR R005). Draait de relay eenmaal, dan toont <code>/admin/settings</code> de configuratie in beeld, zodat u <code>.env</code> niet meer met de hand bewerkt. <code>/admin/cli</code> geeft beheerders een terminal in de browser voor foutopsporing zonder SSH.</p>
     </div>
+    <div class="callout"><span class="callout-label">Installatiecode</span>
+      <p><strong style="color:var(--lime)">De installatie afronden is niet anoniem:</strong> <code>POST /v2/setup/apply</code> vraagt het eenmalige installatietoken in de header <code>X-Setup-Token</code> (of uw <code>ADMIN_TOKEN</code> in <code>X-Admin-Token</code>), anders antwoordt hij <code>401 setup_token_required</code>. Bij de eerste start schrijft de relay het token (<code>pst_...</code>) in zijn log (regel <code>setup_token</code>) en in het bestand <code>setup-token</code> naast <code>users.json</code>. Plak het in het veld <strong>Installatiecode</strong> van de wizard. Na de installatie wordt het verwijderd en werkt het niet meer. U vindt het met <code>docker compose logs relay-main | grep setup_token</code>.</p>
+    </div>
     <div class="callout"><span class="callout-label">Nieuw in 3.0.0</span>
-      <p><strong style="color:var(--lime)">Direct bruikbaar:</strong> met <code>SERVE_FRONTEND=1</code> serveert één relay zijn eigen interface via een alleen-lezen statische handler, zodat een nieuwe zelf gehoste installatie geen aparte webserver nodig heeft (optioneel, standaard uit; ADR R011). Met <code>CRYPTO_MODE</code> kiest u welke algoritmen de relay meldt op <code>/v2/capabilities</code>: <code>core</code> (standaard: ML-KEM-768 + ML-DSA-65) of <code>extended</code> voor de volledige optionele set (ADR R006).</p>
+      <p><strong style="color:var(--lime)">Direct bruikbaar:</strong> met <code>SERVE_FRONTEND=true</code> serveert één relay zijn eigen interface via een alleen-lezen statische handler, zodat een nieuwe zelf gehoste installatie geen aparte webserver nodig heeft (optioneel, standaard uit; ADR R011). Met <code>CRYPTO_MODE</code> kiest u welke algoritmen de relay meldt op <code>/v2/capabilities</code>: <code>core</code> (standaard: ML-KEM-768 + ML-DSA-65) of <code>extended</code> voor de volledige optionele set (ADR R006).</p>
     </div>
 
     <h2 id="selfhost-upgrade">Upgraden</h2>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
-      <pre>cd /opt/paramant-relay
-git pull --ff-only
+      <pre><span class="cm"># Geïnstalleerd met install.sh: haalt de nieuwste v*-releasetag op</span>
+<span class="cm"># (of $PARAMANT_VERSION), bouwt opnieuw en herstart</span>
+paramant upgrade
+
+<span class="cm"># Met de hand: de clone staat vast op een tag, git pull verplaatst hem niet</span>
+cd /opt/paramant
+git fetch --depth 1 origin tag v3.1.0
+git checkout v3.1.0
 docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>

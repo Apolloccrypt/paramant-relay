@@ -52,7 +52,8 @@ test('docs: /v2/webhook beschrijft de body, het event en de handtekening die rel
 test('docs: sleutel alleen in de header, ct/log leest from en publiceert geen device_hash, de relay vult niet op', () => {
   const relay = repo('relay/relay.js');
   assert.match(relay, /API key must be sent in the X-Api-Key header, not as a query parameter/);
-  assert.match(relay, /const from\s*=\s*parseInt\(query\.from/);
+  // ct/log leest from (offset mag sinds API-31-B ook, de docs noemen from).
+  assert.match(relay, /parseInt\(query\.from !== undefined \? query\.from/);
   for (const rel of ['frontend/docs.html', 'frontend/en/docs.html']) {
     const html = repo(rel);
     assert.doesNotMatch(html, /check-key\?k=/, `${rel}: ?k= wordt geweigerd`);

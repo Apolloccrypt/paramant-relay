@@ -1004,6 +1004,20 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       // The address comes back from the server and is the reader's own: it is
       // the only address the mail could have gone to.
       button.textContent = body && body.sent_to ? nlEn('Verstuurd naar ', 'Sent to ') + body.sent_to : nlEn('Verstuurd', 'Sent');
+      // The resent link opens the request, not the document: the key half is
+      // on no server. sender_notified means the sender was asked to send the
+      // full link (admin/server.js, COSIGN-46). Say that next to the button.
+      if (body && body.opens_document === false) {
+        var note = document.createElement('p');
+        note.className = 'dh-inbox-note';
+        note.setAttribute('role', 'status');
+        note.textContent = body.sender_notified
+          ? nlEn('Deze link opent het verzoek, niet het document. We hebben de afzender gevraagd u de volledige link te sturen.', 'This link opens the request, not the document. We have asked the sender to send you the full link.')
+          : nlEn('Deze link opent het verzoek, niet het document. Vraag de afzender om de volledige link.', 'This link opens the request, not the document. Ask the sender for the full link.');
+        var prev = button.parentNode && button.parentNode.querySelector('.dh-inbox-note');
+        if (prev) prev.remove();
+        if (button.parentNode) button.parentNode.appendChild(note);
+      }
     }).catch(function (err) {
       button.textContent = err.message === 'rate_limited'
         ? nlEn('Al verstuurd, probeer het over een uur opnieuw', 'Already sent, try again in an hour')

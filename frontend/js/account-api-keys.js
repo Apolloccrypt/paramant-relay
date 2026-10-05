@@ -48,7 +48,17 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       var code = document.createElement('code');
       code.textContent = k.key_masked || k.masked || k.kid || '';
       var mode = document.createElement('span');
-      mode.textContent = (k.mode === 'test' ? 'test' : 'live');
+      // ACCT-34: a revoked key stays in the list (active:false from
+      // relay.js GET /v2/user/parasign-keys) and must not read "live".
+      var revoked = k.active === false;
+      mode.textContent = revoked ? nlEn('ingetrokken', 'revoked') : (k.mode === 'test' ? 'test' : 'live');
+      if (revoked) {
+        li.style.opacity = '0.7';
+        code.style.textDecoration = 'line-through';
+        li.appendChild(code); li.appendChild(mode);
+        ul.appendChild(li);
+        return;
+      }
       var revoke = document.createElement('button');
       revoke.type = 'button';
       revoke.className = 'btn btn-secondary btn-small';
@@ -59,8 +69,20 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         fetch('/api/user/parasign-keys', {
           method: 'DELETE', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kid: k.kid }),
-        }).then(function () { say(nlEn('Sleutel ingetrokken.', 'Key revoked.')); load(); })
-          .catch(function () { say(nlEn('Die sleutel kon niet worden ingetrokken.', 'Could not revoke that key.')); });
+        }).then(function (r) {
+          // Only a 2xx revoked anything. A 404/503 left the key working, and
+          // "Sleutel ingetrokken" then was a false all-clear (ACCT-34).
+          if (!r.ok) {
+            say(r.status === 503
+              ? nlEn('Intrekken lukte nu niet door een storing bij ons. De sleutel werkt nog. Probeer het zo opnieuw.', 'Revoking did not work right now because of a fault on our side. The key still works. Please try again shortly.')
+              : nlEn('Die sleutel kon niet worden ingetrokken. Hij werkt nog.', 'Could not revoke that key. It still works.'));
+            load();
+            return;
+          }
+          say(nlEn('Sleutel ingetrokken.', 'Key revoked.'));
+          load();
+        })
+          .catch(function () { say(nlEn('Die sleutel kon niet worden ingetrokken. Hij werkt nog.', 'Could not revoke that key. It still works.')); });
       });
       li.appendChild(code); li.appendChild(mode); li.appendChild(revoke);
       ul.appendChild(li);

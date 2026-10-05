@@ -65,11 +65,32 @@ for (const route of ['/setup', '/en/setup']) {
 test('/setup: na het toepassen staat "Bezig met instellen" er niet meer', async () => {
   const page = await browser.newPage();
   await page.route('**/v2/setup/check', (r) => json(r, { setupMode: true }));
-  await page.route('**/v2/setup/apply', (r) => json(r, { ok: true }));
+  let sentToken = null;
+  await page.route('**/v2/setup/apply', (r) => { sentToken = r.request().headers()['x-setup-token'] || null; return json(r, { ok: true }); });
   await page.goto(ORIGIN + '/setup', { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => { document.querySelectorAll('.step').forEach((s) => { s.hidden = s.dataset.step !== '6'; }); });
+  // The relay refuses an anonymous apply (setup_token_required): the
+  // installation code goes along in X-Setup-Token.
+  await page.fill('#setup-token', 'pst_' + 'b'.repeat(48));
   await page.evaluate(() => document.getElementById('apply').click());
   await page.locator('.step[data-step="done"]').waitFor({ state: 'visible', timeout: 5000 });
   assert.equal((await page.locator('#apply-status').textContent()).trim(), '');
+  assert.equal(sentToken, 'pst_' + 'b'.repeat(48));
   await page.close();
 });
+
+for (const [route, re] of [['/setup', /installatiecode/i], ['/en/setup', /setup code/i]]) {
+  test(`${route}: zonder installatiecode gaat er niets naar de relay`, async () => {
+    const page = await browser.newPage();
+    let calls = 0;
+    await page.route('**/v2/setup/check', (r) => json(r, { setupMode: true }));
+    await page.route('**/v2/setup/apply', (r) => { calls++; return json(r, { ok: true }); });
+    await page.goto(ORIGIN + route, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => { document.querySelectorAll('.step').forEach((s) => { s.hidden = s.dataset.step !== '6'; }); });
+    await page.evaluate(() => document.getElementById('apply').click());
+    await page.waitForTimeout(300);
+    assert.equal(calls, 0);
+    assert.match(await page.locator('#apply-status').textContent(), re);
+    await page.close();
+  });
+}

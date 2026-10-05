@@ -265,7 +265,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2>How machine authentication works</h2>
 
-  <p>Every API call to Paramant authenticates with an <code>Authorization</code> header containing your API key. The key is a 64-character hex string that identifies your account. For machines that is enough. Paramant only asks for a TOTP code when you sign in to the web dashboard.</p>
+  <p>Every API call to Paramant authenticates with the <code>X-Api-Key</code> header containing your API key. The key starts with <code>pgp_</code>, followed by 64 hex characters, and identifies your account. An <code>Authorization: Bearer</code> header does not work for a <code>pgp_</code> key: on these routes the relay only reads short-lived web dashboard session tokens (<code>pst_</code>) from it. Never put the key in the URL either; a request with <code>?k=</code> is refused. For machines that is enough. Paramant only asks for a TOTP code when you sign in to the web dashboard.</p>
 
   <div class="tip"><p>Generate a <strong>dedicated API key</strong> for each device or device class so you can revoke individual keys without affecting other integrations. Dashboard &rarr; API keys &rarr; <strong>Generate new key</strong>.</p></div>
 
@@ -291,7 +291,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <p>With curl, which is available on all Pi and gateway images:</p>
 
   <div class="code-block">curl -X POST https://api.paramant.app/v1/upload \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Api-Key: pgp_YOUR_API_KEY" \
   -F "file=@/path/to/sensor-log.csv" \
   -F "recipient=recipient@example.com" \
   -F "ttl=3600"</div>
@@ -304,7 +304,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="code-block">import urequests, uos
 
-API_KEY = "YOUR_API_KEY"
+API_KEY = "pgp_YOUR_API_KEY"
 FILE_PATH = "/sd/reading.bin"
 
 with open(FILE_PATH, "rb") as f:
@@ -312,7 +312,7 @@ with open(FILE_PATH, "rb") as f:
 
 resp = urequests.post(
     "https://api.paramant.app/v1/upload",
-    headers={"Authorization": "Bearer " + API_KEY,
+    headers={"X-Api-Key": API_KEY,
              "Content-Type": "application/octet-stream",
              "X-Filename": "reading.bin",
              "X-Recipient": "ops@example.com"},
@@ -345,7 +345,7 @@ print(resp.json()["url"])</div>
 
   <div class="troubleshoot-item">
     <div class="q">My device gets a 401 on every request.</div>
-    <div class="a">Check that the Authorization header is exactly <code>Bearer YOUR_KEY</code> with a space after "Bearer". Also check in the dashboard that the key has not been revoked.</div>
+    <div class="a">Check that the key is in the <code>X-Api-Key</code> header (for example <code>X-Api-Key: pgp_...</code>), not in <code>Authorization: Bearer</code> and not in the URL. Also check in the dashboard that the key has not been revoked.</div>
   </div>
 
   <div class="troubleshoot-item">

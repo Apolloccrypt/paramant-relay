@@ -4622,7 +4622,7 @@ async function handleRelayRequest(req, res) {
     res.writeHead(402, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       error: 'This relay has reached its user limit. Please contact the relay operator.',
-      operator_hint: 'Relay operators: add PARAMANT_LICENSE=plk_... to .env to unlock unlimited users. See https://paramant.app/pricing',
+      operator_hint: 'Relay operators: add PLK_KEY=plk_... to .env to unlock unlimited users. See https://paramant.app/pricing',
       docs: 'https://github.com/Apolloccrypt/paramant-relay#license--pricing'
     }));
   }
@@ -6127,7 +6127,8 @@ async function handleRelayRequest(req, res) {
       // Store (server-side pk_hash computation — never trust client)
       let result;
       try {
-        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label });
+        // A code-bound key is made for one signature and lapses by itself (36-K).
+        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label, expiresInMs: userSigning.CODE_KEY_TTL_MS });
       } catch (e) {
         res.writeHead(400, { "Content-Type": "application/json" });
         return res.end(J({ error: e.message }));
@@ -6166,12 +6167,16 @@ async function handleRelayRequest(req, res) {
       const user_id = query.user_id;
       if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
       const arr = await userSigning.getSigningPks(redisClient, user_id);
+      const _now = Date.now();
       const projected = arr.map(e => ({
         alg: e.alg,
         pk_hash_sha3: e.pk_hash_sha3,
         label: e.label,
         enrolled_at: e.enrolled_at,
         revoked_at: e.revoked_at,
+        expires_at: e.expires_at || null,
+        expired: userSigning.isExpired(e, _now),
+        active: userSigning.isActive(e, _now),
       }));
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, keys: projected, total: projected.length }));
@@ -11998,7 +12003,7 @@ function checkLicense() {
 
 // ── Community Edition key-limit enforcement ───────────────────────────────────
 // Free self-hosters: max 5 active API keys. Keys 6+ receive 402 on every request.
-// Licensed (plk_*): no limit. Set PARAMANT_LICENSE=plk_... in .env to unlock.
+// Licensed (plk_*): no limit. Set PLK_KEY=plk_... in .env to unlock (docker-compose passes PLK_KEY).
 // ─────────────────────────────────────────────────────────────────────────────
 function applyKeyLimitEnforcement() {
   // Per-account cap (ACCOUNT_KEY_LIMIT) OR'd with the self-host relay-total cap

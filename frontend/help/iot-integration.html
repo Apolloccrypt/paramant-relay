@@ -267,7 +267,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2>Hoe een machine zich aanmeldt</h2>
 
-  <p>Elk API-verzoek aan Paramant meldt zich aan met een <code>Authorization</code>-header met uw API-sleutel. De sleutel is een hexadecimale reeks van 64 tekens die uw account aanwijst. Voor machines is dat genoeg. Buiten het inloggen op het webdashboard wordt nergens om een TOTP-code gevraagd.</p>
+  <p>Elk API-verzoek aan Paramant meldt zich aan met de header <code>X-Api-Key</code> met uw API-sleutel. De sleutel begint met <code>pgp_</code>, gevolgd door 64 hexadecimale tekens, en wijst uw account aan. Een <code>Authorization: Bearer</code>-header werkt niet voor een <code>pgp_</code>-sleutel: op deze routes leest de relay daar alleen kortlevende sessietokens (<code>pst_</code>) van het webdashboard uit. Zet de sleutel ook nooit in de URL; een verzoek met <code>?k=</code> wordt geweigerd. Voor machines is dat genoeg. Buiten het inloggen op het webdashboard wordt nergens om een TOTP-code gevraagd.</p>
 
   <div class="tip"><p>Maak een <strong>eigen API-sleutel</strong> per apparaat of soort apparaat. Dan kunt u losse sleutels intrekken zonder dat andere koppelingen last hebben. Dashboard &rarr; API-sleutels &rarr; <strong>Nieuwe sleutel maken</strong>.</p></div>
 
@@ -293,7 +293,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <p>Met curl (aanwezig op alle images voor de Pi en voor gateways):</p>
 
   <div class="code-block">curl -X POST https://api.paramant.app/v1/upload \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Api-Key: pgp_YOUR_API_KEY" \
   -F "file=@/path/to/sensor-log.csv" \
   -F "recipient=recipient@example.com" \
   -F "ttl=3600"</div>
@@ -306,7 +306,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="code-block">import urequests, uos
 
-API_KEY = "YOUR_API_KEY"
+API_KEY = "pgp_YOUR_API_KEY"
 FILE_PATH = "/sd/reading.bin"
 
 with open(FILE_PATH, "rb") as f:
@@ -314,7 +314,7 @@ with open(FILE_PATH, "rb") as f:
 
 resp = urequests.post(
     "https://api.paramant.app/v1/upload",
-    headers={"Authorization": "Bearer " + API_KEY,
+    headers={"X-Api-Key": API_KEY,
              "Content-Type": "application/octet-stream",
              "X-Filename": "reading.bin",
              "X-Recipient": "ops@example.com"},
@@ -347,7 +347,7 @@ print(resp.json()["url"])</div>
 
   <div class="troubleshoot-item">
     <div class="q">Mijn apparaat krijgt bij elk verzoek een 401.</div>
-    <div class="a">Controleer of de Authorization-header precies <code>Bearer YOUR_KEY</code> is, met een spatie na "Bearer". Kijk ook in het dashboard of de sleutel niet is ingetrokken.</div>
+    <div class="a">Controleer of de sleutel in de header <code>X-Api-Key</code> staat (bijvoorbeeld <code>X-Api-Key: pgp_...</code>), niet in <code>Authorization: Bearer</code> en niet in de URL. Kijk ook in het dashboard of de sleutel niet is ingetrokken.</div>
   </div>
 
   <div class="troubleshoot-item">

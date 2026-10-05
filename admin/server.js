@@ -2177,7 +2177,10 @@ api.post("/user/envelopes", authUser, idempotency.middleware({ redis: () => redi
     }
   }
   const parties = includeRequester
-    ? [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }]
+    // The sender's own name, as given. The old " (you)" suffix ended up in the
+    // envelope for every co-signer to read ("Mick (you)"), in English on a Dutch
+    // page too (COSIGN-02). /co-sign still strips it from envelopes made before.
+    ? [{ label: String(req.body?.signer_label || "").trim(), email }]
     : [];
   // Audit 1.1: every envelope is binding_mode:"email", so a co-signer slot with
   // an empty/invalid email hashes to a value the co-signer can never match ->

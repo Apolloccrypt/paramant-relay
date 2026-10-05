@@ -99,7 +99,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         document.getElementById('totp').value = '';
         document.getElementById('totp').focus();
       } else if (res.status === 403) {
-        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. <a href="/auth/request-reset">Stuur mij een instellink</a>, of <a href="/signup">maak een account</a>.', 'This account has no authenticator app linked to it yet. <a href="/auth/request-reset">Email me a setup link</a>, or <a href="/signup">create an account</a>.');
+        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. Heeft u een back-upcode, <a href="/auth/request-reset">koppel dan een nieuwe app</a>. Zonder back-upcode: mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf uw accountadres.', 'This account has no authenticator app linked to it yet. If you have a backup code, <a href="/en/auth/request-reset">link a new app</a>. Without a backup code: email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.');
         errorDiv.classList.add('visible');
       } else if (res.status === 428) {
         errorDiv.textContent = nlEn('De extra controle voor deze inlogpoging lukte niet. Vernieuw de pagina en probeer het opnieuw.', 'We could not run the extra verification this sign-in needs. Refresh the page and try again.');

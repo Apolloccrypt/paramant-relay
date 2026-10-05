@@ -44,9 +44,13 @@ async function loadEnrolledKeys() {
       const fp = escHtml((k.pk_hash_sha3 || '').slice(0, 16));
       const lbl = k.label ? escHtml(k.label) : nlEn('<em>geen label</em>', '<em>no label</em>');
       const enrolled = escHtml(fmtTs(k.enrolled_at));
-      const revoked = k.revoked_at ? nlEn(' &middot; ingetrokken ', ' &middot; revoked ') + escHtml(fmtTs(k.revoked_at)) : '';
+      // A key bound with a 6-digit code was made for one signature and lapses
+      // by itself (relay user-signing.js, expires_at): history, like a revoked one.
+      const revoked = k.revoked_at ? nlEn(' &middot; ingetrokken ', ' &middot; revoked ') + escHtml(fmtTs(k.revoked_at))
+        : k.expired ? nlEn(' &middot; verlopen ', ' &middot; expired ') + escHtml(fmtTs(k.expires_at))
+        : k.expires_at ? nlEn(' &middot; vervalt ', ' &middot; lapses ') + escHtml(fmtTs(k.expires_at)) : '';
       const alg = escHtml(k.alg || '?');
-      const btn = k.revoked_at
+      const btn = (k.revoked_at || k.expired)
         ? ''
         : '<button type="button" class="btn btn-secondary btn-small" data-revoke="' + escHtml(k.pk_hash_sha3) + nlEn('">Intrekken</button>', '">Revoke</button>');
       return '<li style="padding:12px 0;border-bottom:1px solid var(--border-soft, #e5e7eb)">' +

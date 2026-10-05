@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key.">
+<meta name="description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.1.0, so your IT team can check how it works. Our servers never hold a decryption key.">
 <meta property="og:title" content="API documentation and self-hosting guide | Paramant">
-<meta property="og:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key.">
+<meta property="og:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.1.0, so your IT team can check how it works. Our servers never hold a decryption key.">
 <meta property="og:url" content="https://paramant.app/en/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="API documentation and self-hosting guide | Paramant">
-<meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key.">
+<meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.1.0, so your IT team can check how it works. Our servers never hold a decryption key.">
 <link rel="canonical" href="https://paramant.app/en/docs">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key."
+      "description": "API reference, SDK guide, self-hosting and compliance docs for Paramant v3.1.0, so your IT team can check how it works. Our servers never hold a decryption key."
     },
     {
       "@type": "BreadcrumbList",
@@ -282,7 +282,7 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">REFERENCE</span>
     <h1>Documentation</h1>
     <p class="docs-buyer">Evaluating Paramant? Your IT can check everything here. Plans and prices are on <a href="/en/pricing">Pricing</a>.</p>
-    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from Firm upwards; see <a href="/en/pricing">pricing</a>.</p>
+    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.1.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from Firm upwards; see <a href="/en/pricing">pricing</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Quick start</a>
       <a href="/en/pricing" class="docs-hero-btn docs-hero-btn-secondary">See plans and prices</a>
@@ -575,10 +575,17 @@ ws.onmessage = e => {
     <h2 id="webhook">POST /v2/webhook</h2>
     <pre>{ "device_id": "scanner-01", "url": "https://you.com/hook", "secret": "your-own-secret" }
 
-<span class="cm">Relay POSTs to your url when a blob for that device arrives (POST /v2/inbound):
+<span class="cm">Response (secret only when you sent none; shown once):
+{ "ok": true, "events": ["blob_ready", "blob_downloaded"], "secret": "whsec_..." }
+
+Relay POSTs to your url when a blob for that device arrives (POST /v2/inbound):
 { "event": "blob_ready", "device_id": "scanner-01", "ts": "2026-04-14T...",
-  "hash": "...", "size": 5242880, "ttl_ms": 3600000, "sig_valid": true }</span></pre>
-    <p>Pro plan and up. <code>X-Paramant-Sig</code> is the HMAC-SHA256 of the body keyed with the <code>secret</code> you registered. Without a <code>secret</code> the header is empty, so always register one and reject callbacks whose signature does not match. The registration lives only in that relay's memory: after a restart it is gone and you register again. The relay tries once (5-second timeout) and does not retry.</p>
+  "hash": "...", "size": 5242880, "ttl_ms": 3600000, "sig_valid": true }
+
+And when it is downloaded (via the link or GET /v2/outbound):
+{ "event": "blob_downloaded", "device_id": "scanner-01", "ts": "...",
+  "hash": "...", "size": 5242880, "via": "link" }   // or "api"</span></pre>
+    <p>Pro plan and up. Every webhook is signed. If you send a <code>secret</code>, the relay signs with it. If you leave it out, the relay makes one (<code>whsec_</code>…) and returns it once in the response; store it right away, it is not shown again. Each call carries the headers <code>X-Paramant-Event</code> (the event name) and <code>X-Paramant-Sig</code>: the hex HMAC-SHA256 of the raw body, keyed with the secret. Recompute it over the unparsed body, compare in constant time and reject callbacks whose signature does not match. The registration is stored in redis (memory is only a cache), so it survives a restart and holds on every sector; the last 20 registrations per device are kept. The relay tries once (5-second timeout) and does not retry.</p>
 
     <h2 id="health">GET /health</h2>
     <pre><span class="cm">{
@@ -603,6 +610,7 @@ POST   /v1/envelopes/:id/void       Void an open envelope (owner only)</pre>
     <pre><span class="cm"># Create an envelope. The document travels base64; signers get hosted pages.</span>
 curl -X POST https://paramant.app/v1/envelopes \
   -H "Authorization: Bearer psk_live_..." \
+  -H "Idempotency-Key: quote-8842-v1" \
   -H "Content-Type: application/json" \
   -d '{
         "document": { "content_base64": "JVBERi0xLjc..." },
@@ -614,6 +622,7 @@ curl -X POST https://paramant.app/v1/envelopes \
 curl https://paramant.app/v1/envelopes/env_.../receipt \
   -H "Authorization: Bearer psk_live_..." --output quote-8842.psign</pre>
     <p>Quota: 50 envelope creations per key per hour; an envelope is kept for 30 days by default (set <code>ttl_days</code>, up to 365). While it exists the relay also keeps the PDF itself, encrypted in redis, because the signers have to open it and the stamped PDF is made from it. When it expires it is gone. Webhooks: set <code>webhook_url</code> and <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> and <code>envelope.voided</code> arrive signed with HMAC-SHA256 in the <code>X-Paramant-Sig</code> header. There is one delivery attempt and no retry, so also check the status yourself with <code>GET /v1/envelopes/:id</code>. Receipts verify offline against the public CT log; see <a href="/en/verify">/verify</a>.</p>
+    <p>Safe retries: send an <code>Idempotency-Key</code> header with <code>POST /v1/envelopes</code> (8 to 128 characters of <code>A-Z a-z 0-9 _ . : -</code>). When the same key comes again from the same API key within 24 hours, you get the first <code>201</code> response back with <code>Idempotent-Replay: true</code>, with no second envelope and no quota spent. Only a successful <code>201</code> is stored. The relay checks the body before the hourly quota, so <code>400 ambiguous_document</code> (both <code>content_base64</code> and <code>url</code>), <code>400 invalid_binding_mode</code> (not <code>email</code> or <code>open</code>), <code>400 invalid_signer_email</code> (with <code>email</code> binding every signer needs a valid address; <code>signer_index</code> names the first bad one) and <code>400 invalid_idempotency_key</code> cost no creation. A <code>429 rate_limited</code> carries <code>Retry-After</code> with the seconds until the current hour ends.</p>
 
     <!-- ── Account & billing API ────────────────────────────────── -->
     <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
@@ -748,15 +757,19 @@ cd paramant-relay
 
 <span class="cm"># 2. Configure</span>
 cp .env.example .env
-echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
-nano .env   <span class="cm"># set TOTP_SECRET and RESEND_API_KEY if desired</span>
+nano .env   <span class="cm"># fill in the required secrets:</span>
+<span class="cm">#   ADMIN_TOKEN, REDIS_PASSWORD, INTERNAL_AUTH_TOKEN: openssl rand -hex 32</span>
+<span class="cm">#   RELAY_REDIS_URL=redis://:&lt;REDIS_PASSWORD&gt;@redis:6379</span>
+<span class="cm">#   PARAMANT_TOTP_MASTER_KEY: openssl rand -base64 32</span>
+<span class="cm">#   PARASIGN_PUBLIC_ORIGIN, RELAY_SELF_URL_&lt;SECTOR&gt;: your own public URL</span>
+<span class="cm">#   (install.sh writes all of these for you)</span>
 
 <span class="cm"># 3. Launch</span>
 docker compose up -d
 
 <span class="cm"># 4. Verify</span>
 curl http://localhost:3000/health
-<span class="cm"># → {"ok":true,"version":"3.0.0","sector":"relay"}</span></pre>
+<span class="cm"># → {"ok":true,"version":"3.1.0","sector":"relay"}</span></pre>
     </div>
 
     <h3>Container port map</h3>
@@ -774,6 +787,12 @@ curl http://localhost:3000/health
     <table>
       <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
       <tr><td>ADMIN_TOKEN</td><td>Yes</td><td>Admin panel password (min 32 chars, hex)</td></tr>
+      <tr><td>REDIS_PASSWORD</td><td>Yes</td><td>Password for the redis container; empty, redis refuses to start</td></tr>
+      <tr><td>RELAY_REDIS_URL</td><td>Yes</td><td><code>redis://:&lt;REDIS_PASSWORD&gt;@redis:6379</code></td></tr>
+      <tr><td>PARAMANT_TOTP_MASTER_KEY</td><td>Yes</td><td>Encrypts users' TOTP secrets at rest (32 bytes, base64); never change it on a running install</td></tr>
+      <tr><td>INTERNAL_AUTH_TOKEN</td><td>Yes</td><td>Second gate on the relays' internal routes (admin plane to relay)</td></tr>
+      <tr><td>PARASIGN_PUBLIC_ORIGIN</td><td>No</td><td>Your own public site; checkout returns here instead of paramant.app</td></tr>
+      <tr><td>RELAY_SELF_URL_&lt;SECTOR&gt;</td><td>No</td><td>Per relay (MAIN, HEALTH, FINANCE, LEGAL, IOT) its own public URL; without it signed heads and receipts name a paramant.app host</td></tr>
       <tr><td>TOTP_SECRET</td><td>Recommended</td><td>Base32 TOTP secret: enables MFA on admin login</td></tr>
       <tr><td>PLK_KEY</td><td>No</td><td>Licence key: allows more than 5 users (Community is free, max 5)</td></tr>
       <tr><td>RESEND_API_KEY</td><td>No</td><td>Email provider key (for key delivery notifications)</td></tr>
@@ -838,15 +857,24 @@ open https://your-domain.com/admin/</pre>
     <div class="callout"><span class="callout-label">New in 3.0.0</span>
       <p><strong style="color:var(--lime)">Guided setup:</strong> a first-run web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: generating the admin token, enrolling TOTP and minting the first key from the browser. The wizard is gated to first boot (no keys yet) or an explicit <code>SETUP_MODE</code> flag, and runs deeper <code>/v2/health/deep</code> and DNS checks before it reports that everything is ready (design: ADR R005). Once the relay is running, <code>/admin/settings</code> shows the relay configuration in the panel, so you no longer edit <code>.env</code> by hand, and <code>/admin/cli</code> gives admins a browser terminal for debugging without SSH.</p>
     </div>
+    <div class="callout"><span class="callout-label">Setup code</span>
+      <p><strong style="color:var(--lime)">Finishing setup is not anonymous:</strong> <code>POST /v2/setup/apply</code> needs the one-time setup token in the <code>X-Setup-Token</code> header (or your <code>ADMIN_TOKEN</code> in <code>X-Admin-Token</code>), otherwise it answers <code>401 setup_token_required</code>. On first start the relay writes the token (<code>pst_...</code>) to its log (line <code>setup_token</code>) and to the file <code>setup-token</code> next to <code>users.json</code>. Paste it into the <strong>Setup code</strong> field of the wizard. After setup it is deleted and stops working. Find it with <code>docker compose logs relay-main | grep setup_token</code>.</p>
+    </div>
     <div class="callout"><span class="callout-label">New in 3.0.0</span>
-      <p><strong style="color:var(--lime)">Plug-and-play serving:</strong> set <code>SERVE_FRONTEND=1</code> to have a single relay serve its own UI from a read-only static handler, so a fresh self-host needs no separate web server (opt-in, default off; ADR R011). Set <code>CRYPTO_MODE</code> to choose the algorithm set the relay advertises on <code>/v2/capabilities</code>: <code>core</code> (the default: ML-KEM-768 + ML-DSA-65) or <code>extended</code> for the full opt-in set (ADR R006).</p>
+      <p><strong style="color:var(--lime)">Plug-and-play serving:</strong> set <code>SERVE_FRONTEND=true</code> to have a single relay serve its own UI from a read-only static handler, so a fresh self-host needs no separate web server (opt-in, default off; ADR R011). Set <code>CRYPTO_MODE</code> to choose the algorithm set the relay advertises on <code>/v2/capabilities</code>: <code>core</code> (the default: ML-KEM-768 + ML-DSA-65) or <code>extended</code> for the full opt-in set (ADR R006).</p>
     </div>
 
     <h2 id="selfhost-upgrade">Upgrade</h2>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
-      <pre>cd /opt/paramant-relay
-git pull --ff-only
+      <pre><span class="cm"># Installed with install.sh: fetches the newest v* release tag</span>
+<span class="cm"># (or $PARAMANT_VERSION), rebuilds and restarts</span>
+paramant upgrade
+
+<span class="cm"># By hand: the clone is pinned to a tag, so git pull does not move it</span>
+cd /opt/paramant
+git fetch --depth 1 origin tag v3.1.0
+git checkout v3.1.0
 docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>

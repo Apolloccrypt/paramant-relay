@@ -96,6 +96,9 @@
       <h2>Stap 6 van 6: controleren en starten</h2>
       <p>Controleer uw instellingen voordat u ze toepast.</p>
       <div id="review-summary" aria-live="polite"></div>
+      <label for="setup-token" style="display:block;margin-top:16px">Installatiecode</label>
+      <input type="text" id="setup-token" name="setup-token" autocomplete="off" spellcheck="false" placeholder="pst_..." style="font-family:monospace">
+      <p class="hint">De relay schrijft deze eenmalige code bij de eerste start in zijn log en in het bestand <code>setup-token</code> naast <code>users.json</code>. Zo kan alleen wie de server beheert de installatie afronden.</p>
       <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
         <button class="back btn btn-secondary" type="button">Terug</button>
         <button id="apply" class="btn btn-primary" type="button">Instellingen toepassen</button>
@@ -112,6 +115,6 @@
     </div>
   </main>
 
-  <script src="/setup.js?v=6"></script>
+  <script src="/setup.js?v=8"></script>
 </body>
 </html>

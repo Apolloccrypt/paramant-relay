@@ -161,6 +161,7 @@ window.paSecondFactorError = paSecondFactorError;
       if (!res.ok) {
         // Only a 401 means signed out. A 429 from an empty nginx bucket, or a
         // 5xx, told a signed-in customer "U bent niet ingelogd" (hertest r2 R2-a).
+        // 503 with authenticated:null (admin/server.js) is an outage, never "signed out".
         if (res.status === 401 || res.status === 403) { show('state-unauth'); return; }
         show('state-busy');
         if (res.status !== 429) {
@@ -373,10 +374,23 @@ window.paSecondFactorError = paSecondFactorError;
   });
 
   document.getElementById('sign-out-all').addEventListener('click', async function() {
-    await fetch('/api/user/account/sessions/revoke-others', {
-      method: 'POST',
-      credentials: 'include',
-    });
+    // A 503 (relay or session store down, admin/server.js) is not "done" and
+    // not "signed out" either: say what happened and leave the session alone.
+    var res = null;
+    try {
+      res = await fetch('/api/user/account/sessions/revoke-others', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (e) { res = null; }
+    if (!res || !res.ok) {
+      var st = res ? res.status : 0;
+      if (st === 401) { show('state-unauth'); return; }
+      alert(st === 429
+        ? nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.')
+        : nlEn('Dit lukte nu niet door een storing bij ons. De andere sessies zijn nog actief en u bent nog ingelogd. Probeer het zo opnieuw.', 'This did not work right now because of a fault on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
+      return;
+    }
     alert(nlEn('De andere sessies zijn uitgelogd.', 'Other sessions signed out.'));
     loadAccount();
   });

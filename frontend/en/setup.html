@@ -96,6 +96,9 @@
       <h2>Step 6 of 6: Review and start</h2>
       <p>Review your configuration before applying it.</p>
       <div id="review-summary" aria-live="polite"></div>
+      <label for="setup-token" style="display:block;margin-top:16px">Setup code</label>
+      <input type="text" id="setup-token" name="setup-token" autocomplete="off" spellcheck="false" placeholder="pst_..." style="font-family:monospace">
+      <p class="hint">On first start the relay writes this one-time code to its log and to the file <code>setup-token</code> next to <code>users.json</code>. That way only whoever runs the server can finish the setup.</p>
       <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
         <button class="back btn btn-secondary" type="button">Back</button>
         <button id="apply" class="btn btn-primary" type="button">Apply configuration</button>
@@ -112,6 +115,6 @@
     </div>
   </main>
 
-  <script src="/setup.en.js?v=2"></script>
+  <script src="/setup.en.js?v=4"></script>
 </body>
 </html>
