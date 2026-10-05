@@ -2308,8 +2308,13 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel, part
   const to = senderLabelOf(accountId);
   if (!to || !redisClient || !redisClient.isReady) return false;
   const k = 'paramant:sign:link-request:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
+  // The NX key reserves the hour before the mail goes out, so two requests at
+  // once send one mail. It only stays when the mail was delivered: a failed
+  // mail gives the hour back (review-574 L1), otherwise a retry within the hour
+  // would answer "asked the sender" while nothing went out.
   const first = await redisClient.set(k, '1', { NX: true, EX: 3600 });
   if (first !== 'OK') return true; // told already within the hour
+  const giveBack = async () => { try { await redisClient.del(k); } catch (_) { /* expires within the hour */ } };
   const who = veiligeBestandsnaam(partyLabel || '') || 'Een ondertekenaar';
   const whoEn = veiligeBestandsnaam(partyLabel || '') || 'A signer';
   const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
@@ -2317,28 +2322,33 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel, part
              + '&p=' + encodeURIComponent(String(Number(partyIndex) || 0));
   const knopHtml = (tekst) => '<p><a href="' + escHtml(knop) + '" style="display:inline-block;padding:11px 18px;'
              + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">' + tekst + '</a></p>';
-  const r = await mailer.stuur({
-    to,
-    subject: 'Een ondertekenaar vraagt de uitnodiging opnieuw',
-    text: tweetaligTekst('nl',
-      `${who} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.`
-      + '\n\nOpen deze link in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen:\n' + knop
-      + '\n\nDe ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.',
-      `${whoEn} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.`
-      + '\n\nOpen this link in the browser you sent the request from and click Send the invitation again:\n' + knop
-      + '\n\nThe signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.'),
-    html: tweetaligHtml('nl',
-      `<p>${escHtml(who)} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.</p>`
-      + '<p>Open deze knop in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen.</p>'
-      + knopHtml('Uitnodiging opnieuw sturen')
-      + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
-      `<p>${escHtml(whoEn)} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.</p>`
-      + '<p>Open this button in the browser you sent the request from and click Send the invitation again.</p>'
-      + knopHtml('Send the invitation again')
-      + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.</p>'),
-  });
-  log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
-  return !!(r && r.ok);
+  let r = null;
+  try {
+    r = await mailer.stuur({
+      to,
+      subject: 'Een ondertekenaar vraagt de uitnodiging opnieuw',
+      text: tweetaligTekst('nl',
+        `${who} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.`
+        + '\n\nOpen deze link in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen:\n' + knop
+        + '\n\nDe ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.',
+        `${whoEn} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.`
+        + '\n\nOpen this link in the browser you sent the request from and click Send the invitation again:\n' + knop
+        + '\n\nThe signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.'),
+      html: tweetaligHtml('nl',
+        `<p>${escHtml(who)} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.</p>`
+        + '<p>Open deze knop in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen.</p>'
+        + knopHtml('Uitnodiging opnieuw sturen')
+        + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
+        `<p>${escHtml(whoEn)} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.</p>`
+        + '<p>Open this button in the browser you sent the request from and click Send the invitation again.</p>'
+        + knopHtml('Send the invitation again')
+        + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.</p>'),
+    });
+  } catch (_) { r = null; }
+  const delivered = !!(r && r.ok);
+  if (!delivered) await giveBack();
+  log('info', 'sender_link_request_notice', { delivered });
+  return delivered;
 }
 
 function senderLabelOf(accountId) {

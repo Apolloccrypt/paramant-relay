@@ -58,3 +58,35 @@ test('the mail to the sender: one button to the resend action, else withdraw and
   assert.match(dash, /Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw\./);
   assert.match(dash, /data-pa-action="document-resend-invite"/);
 });
+
+// review-574 L1: the hour-key goes on before the mail, so two requests at once
+// send one mail, but only a delivered mail keeps it. A failed (or throwing)
+// mail gives the hour back, so a retry is not told "asked the sender" while
+// nothing went out. Run against stub redis and mailer.
+test('the once-an-hour key to the sender stays only after a delivered mail', async () => {
+  const relay = read('relay/relay.js');
+  const src = relay.slice(relay.indexOf('async function notifySenderLinkRequested'), relay.indexOf('function senderLabelOf'));
+  const keys = new Map();
+  const redisClient = {
+    isReady: true,
+    async set(k, v, o) { if (o && o.NX && keys.has(k)) return null; keys.set(k, v); return 'OK'; },
+    async del(k) { keys.delete(k); return 1; },
+  };
+  let mode = 'fail'; let sent = 0;
+  const mailer = { async stuur() { sent++; if (mode === 'throw') throw new Error('smtp down'); return { ok: mode === 'ok' }; } };
+  const make = new Function('redisClient', 'mailer', 'crypto', 'senderLabelOf', 'veiligeBestandsnaam', 'escHtml',
+    'tweetaligTekst', 'tweetaligHtml', 'planExpiry', 'log', src + '\nreturn notifySenderLinkRequested;');
+  const fn = make(redisClient, mailer, (await import('node:crypto')).default, () => 'owner@example.org', (s) => s,
+    (s) => s, (_l, a) => a, (_l, a) => a, { DEFAULT_SITE_URL: 'https://paramant.app' }, () => {});
+  assert.equal(await fn('env1', 'acc', 'Bob', 0), false, 'failed mail is reported as not delivered');
+  assert.equal(keys.size, 0, 'failed mail gives the hour back');
+  mode = 'throw';
+  assert.equal(await fn('env1', 'acc', 'Bob', 0), false, 'throwing mailer is not delivered');
+  assert.equal(keys.size, 0, 'throwing mailer gives the hour back');
+  mode = 'ok';
+  assert.equal(await fn('env1', 'acc', 'Bob', 0), true);
+  assert.equal(keys.size, 1, 'delivered mail keeps the hour');
+  const before = sent;
+  assert.equal(await fn('env1', 'acc', 'Bob', 0), true, 'within the hour: told already');
+  assert.equal(sent, before, 'no second mail within the hour');
+});
