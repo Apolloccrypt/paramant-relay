@@ -67,15 +67,23 @@ must carry the one-time setup token in the `X-Setup-Token` header, or your
 `ADMIN_TOKEN` in `X-Admin-Token`. Without either the relay answers
 `401 setup_token_required`.
 
-On first start the relay makes the token (`pst_...`), prints it in its log (log
-line `setup_token`) and writes it to the file `setup-token` next to `users.json`
-(mode 600). A `PARAMANT_SETUP_TOKEN` in the relay's own environment pins it instead (`docker-compose.yml` does not pass that variable on). In the wizard,
-paste it into the **Setup code** field (Dutch: **Installatiecode**). After a
-successful setup the token is deleted and stops working.
+On every start that still needs setup, the relay makes a fresh token (`pst_...`
+from random bytes) and writes it to the file `setup-token` next to `users.json`
+(mode 600). The log line `setup_token_ready` only names that file; the token
+itself is never logged. A `setup-token` file that is already there is never
+read, only replaced, so a restart gives a new token. A `PARAMANT_SETUP_TOKEN` in
+the relay's own environment pins it instead (`docker-compose.yml` does not pass
+that variable on). In the wizard, paste it into the **Setup code** field
+(Dutch: **Installatiecode**). After a successful setup the token is deleted and
+stops working.
 
 ```bash
-docker compose logs relay-main | grep setup_token
+docker compose exec relay-main cat /data/setup-token
+# bare metal, run from relay/ with the default USERS_FILE=./users.json:
+cat relay/setup-token
 ```
+
+The file is in `.gitignore`; never commit it.
 
 ---
 

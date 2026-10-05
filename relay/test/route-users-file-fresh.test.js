@@ -43,7 +43,9 @@ test('fresh relay: users.json is created, setup needs the token, the admin key s
 
   const tokenFile = path.join(dir, 'data', 'setup-token');
   const token = fs.readFileSync(tokenFile, 'utf8').trim();
-  assert.match(srv.log(), new RegExp(token), 'the token is in the relay log for the operator');
+  assert.ok(!srv.log().includes(token), 'the token is never written to the log, only its file is named');
+  assert.match(srv.log(), /setup_token_ready/, 'the log says the token file exists');
+  assert.strictEqual(fs.statSync(tokenFile).mode & 0o777, 0o600, 'the token file is mode 0600');
   const ok = await srv.post('/v2/setup/apply', { headers: { 'X-Setup-Token': token }, body: setupBody });
   assert.strictEqual(ok.status, 200, JSON.stringify(ok.json));
   const adminKey = ok.json.admin_api_key;
@@ -56,6 +58,39 @@ test('fresh relay: users.json is created, setup needs the token, the admin key s
   const again = await srv.post('/v2/setup/apply', { headers: { 'X-Setup-Token': token }, body: setupBody });
   assert.strictEqual(again.status, 409);
   await srv.stop();
+  did();
+});
+
+// Review #555 B3: a setup-token was committed to git, and the relay READ an
+// existing file before making one. Anyone running a checkout from relay/
+// (USERS_FILE=./users.json) then accepted a public token. A file that is
+// already there must never be loaded, whatever its mode.
+test('a setup-token file that was already there is never accepted', async () => {
+  const dir = scratch('planted');
+  const dataDir = path.join(dir, 'data');
+  fs.mkdirSync(dataDir, { recursive: true });
+  const usersFile = path.join(dataDir, 'users.json');
+  const planted = 'pst_a561b67c50a0a502321eb9af48d13506819342c35e9a0faf';
+  const tokenFile = path.join(dataDir, 'setup-token');
+  fs.writeFileSync(tokenFile, planted + '\n', { mode: 0o600 });
+  const env = { USERS_FILE: usersFile, USERS_JSON: '', SETUP_ENV_FILE: path.join(dir, 'setup.env') };
+  const srv = await boot({ tag: 'uplanted', dir, captureLog: true, env });
+  const r = await srv.post('/v2/setup/apply', { headers: { 'X-Setup-Token': planted }, body: setupBody });
+  assert.strictEqual(r.status, 401, 'a planted token is refused: ' + JSON.stringify(r.json));
+  const fresh = fs.readFileSync(tokenFile, 'utf8').trim();
+  assert.notStrictEqual(fresh, planted, 'the planted file is replaced by a fresh token');
+  assert.match(fresh, /^pst_[0-9a-f]{48}$/);
+  assert.strictEqual(fs.statSync(tokenFile).mode & 0o777, 0o600);
+  assert.ok(!srv.log().includes(fresh) && !srv.log().includes(planted), 'no token in the log');
+  await srv.stop();
+  did();
+});
+
+test('no setup-token is tracked in git', () => {
+  const { execFileSync } = require('child_process');
+  let tracked = '';
+  try { tracked = execFileSync('git', ['ls-files', '--', ':(glob)**/setup-token'], { cwd: path.join(__dirname, '..', '..'), encoding: 'utf8' }); } catch (_) { return; }
+  assert.strictEqual(tracked.trim(), '', 'setup-token files in git: ' + tracked);
   did();
 });
 

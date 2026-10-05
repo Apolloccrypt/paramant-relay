@@ -16,15 +16,19 @@ function middleware({ redis, scope, windowSec = 120, waitMs = 10000 }) {
     const who = (req.userSession && req.userSession.user_id) || '';
     if (!who) return next();
     const given = String(req.get('idempotency-key') || '').trim();
+    // The key is bound to the body (review #555, LAAG): the same key with a
+    // different body is a client bug or a replay attempt, never "the same
+    // request", and gets 422 instead of the first request's answer.
+    const bodyHash = crypto.createHash('sha256').update(JSON.stringify(req.body || {})).digest('hex');
     const basis = given && /^[A-Za-z0-9_.:-]{8,128}$/.test(given)
       ? `k:${given}`
-      : `b:${crypto.createHash('sha256').update(JSON.stringify(req.body || {})).digest('hex')}`;
+      : `b:${bodyHash}`;
     const id = crypto.createHash('sha256').update(`${scope}|${who}|${req.originalUrl.split('?')[0]}|${basis}`).digest('hex').slice(0, 40);
     const key = `paramant:idem:${id}`;
     let r;
     try { r = redis(); } catch { return next(); }
     let claimed;
-    try { claimed = await r.set(key, JSON.stringify({ state: 'running' }), { NX: true, EX: windowSec }); }
+    try { claimed = await r.set(key, JSON.stringify({ state: 'running', bh: bodyHash }), { NX: true, EX: windowSec }); }
     catch { return next(); } // no redis: behave as before rather than refuse
     if (claimed) {
       const json = res.json.bind(res);
@@ -36,7 +40,7 @@ function middleware({ redis, scope, windowSec = 120, waitMs = 10000 }) {
         // (fase-1 herrun COSIGN-11-A).
         const whole = status >= 200 && status < 300 && status !== 207 && !(body && body.partial_failure);
         const store = whole
-          ? r.set(key, JSON.stringify({ state: 'done', status, body }), { EX: windowSec })
+          ? r.set(key, JSON.stringify({ state: 'done', status, body, bh: bodyHash }), { EX: windowSec })
           : r.del(key);
         Promise.resolve(store).catch(() => {});
         return json(body);
@@ -49,6 +53,9 @@ function middleware({ redis, scope, windowSec = 120, waitMs = 10000 }) {
       let rec = null;
       try { rec = JSON.parse((await r.get(key)) || 'null'); } catch { rec = null; }
       if (!rec) return next(); // the first one failed and gave the key back
+      if (rec.bh && rec.bh !== bodyHash) {
+        return res.status(422).json({ error: 'idempotency_key_reused', message: 'This Idempotency-Key was used for a different request.' });
+      }
       if (rec.state === 'done') {
         res.set('Idempotent-Replay', 'true');
         return res.status(rec.status).json(rec.body);

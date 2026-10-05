@@ -856,7 +856,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-field">
       <label class="ds-label">Cryptographic key (ML-DSA-65)</label>
       <p class="ds-hint" id="ds-signing-identity">Checking your signing key...</p>
-      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your signing key (ML-DSA-65), unlocked with Face ID, Touch ID or a security key the moment you sign, and never exported. Recipients you add sign at <code>/co-sign</code> with their own signing key.</p>
+      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your signing key (ML-DSA-65), unlocked the moment you sign with your passkey (Face ID, Touch ID or a security key) or, without a passkey, with the code from your authenticator app, and never exported. Recipients you add sign at <code>/co-sign</code> with their own signing key.</p>
     </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-identity-back" type="button">Back</button>
@@ -867,7 +867,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Review and sign</h2>
-    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, you confirm with Face ID, Touch ID or your security key. That unlocks your signing key for this one document, and the signature is created on your device.</p>
+    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, you confirm with your passkey (Face ID, Touch ID or a security key) or, if you have no passkey, with the code from your authenticator app. That unlocks your signing key for this one document, and the signature is created on your device.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
@@ -1063,10 +1063,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=14" defer></script>
+<script src="/js/nav-auth.js?v=16" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=8" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=71"></script>
+<script type="module" src="/sign-flow.js?v=73"></script>
 </body>
 </html>

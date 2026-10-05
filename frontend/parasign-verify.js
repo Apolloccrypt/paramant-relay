@@ -43,9 +43,8 @@ const T = {
     missingMpId: 'multiparty.envelope_id ontbreekt',
     missingSignedHash: 'de hash van het ondertekende document ontbreekt (stamped_hash of document_hash)',
     hashMismatch: 'documenthash klopt niet: dit document is niet het document dat is ondertekend',
-    originalFile: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Dit is het bestand van vóór het ondertekenen. Controleer met de ondertekende versie.</strong> De handtekening in het .psign-bestand klopt, maar geldt voor de versie met de zegel erop ({name}). Volgens het bewijs is dit het bestand waaruit die versie is gemaakt. Kies het ondertekende bestand om de handtekening te controleren.</div>',
+    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> De handtekening in het .psign-bestand geldt voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Bij een pdf of afbeelding is dat de versie met de zegel erop, die u na het ondertekenen kreeg. Wat u koos, is niet wat er is ondertekend. Kies dat bestand en controleer opnieuw.</div>',
     partyNamesHead: 'Namen zoals de afzender ze opgaf (niet gecontroleerd; de handtekeningen zelf zijn wel gecontroleerd):',
-    hashIsOriginal: 'Dit is het bestand van voor het ondertekenen. De handtekening geldt voor de ondertekende versie met de zegel erop ({name}). Kies dat bestand.',
     missingSignerPk: 'signer_public_key ontbreekt',
     missingEmailHash: 'party_email_hash ontbreekt (het ondertekende bericht is offline niet na te bouwen)',
     appearanceMismatch: 'hash van de weergave klopt niet',
@@ -57,12 +56,11 @@ const T = {
     missingDocHash: 'document_hash ontbreekt',
     hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. De pdf met de zichtbare handtekeningen en parafen (onder elke handtekening de regel "Paramant ParaSign · PQ …") is ook niet het origineel. Kies het originele bestand dat ter ondertekening is aangeboden.',
     missingParties: 'partijen ontbreken',
-    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> Het .psign-bestand is in orde, maar de handtekeningen gelden voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Wat u koos, is dus niet wat er is ondertekend. Kies het originele bestand dat ter ondertekening is aangeboden en controleer opnieuw.</div>',
+    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> Het .psign-bestand is in orde, maar de handtekeningen gelden voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Wat u koos, is dus niet wat er is ondertekend. Kies het originele bestand dat ter ondertekening is aangeboden en controleer opnieuw. Bij &quot;Samen ondertekenen&quot; is dat de pdf met het zegel van de afzender, zoals de afzender die na zijn eigen handtekening kreeg; een pdf met de handtekeningen van iedereen is een leesbare kopie en nooit het ondertekende bestand.</div>',
     lookupFailed: '<p class="ps-help">Het opzoeken lukte nu niet; Paramant gaf geen antwoord. De controle hierboven blijft gelden. Probeer het later opnieuw.</p>',
     lookupRetry: 'Opnieuw opzoeken',
     qesNote: '<p class="ps-help">Volgens dit bewijs staat er in de pdf ook een gekwalificeerde handtekening (PAdES) van {provider}, certificaat <code class="mono">{fp}</code>{when}. Die tweede handtekening controleert deze pagina niet: open de ondertekende pdf in een PAdES-lezer, zoals Adobe Acrobat of de EU-validatiedienst DSS.</p>',
     qesWhen: ', gezet op {v}',
-    stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Dit is niet het ondertekende bestand. Is het de pdf met de zichtbare handtekeningen? Controleer dan met het origineel.</strong> De handtekeningen in het .psign-bestand kloppen, maar ze gelden voor het originele document (SHA3-256-vingerafdruk {hash}…). De pdf met de handtekeningen en parafen erin, met onder elke handtekening de regel "Paramant ParaSign · PQ …", is daar een leesbare kopie van en geeft altijd deze melding. Kies het originele bestand; u kunt het downloaden op de pagina waar u tekende.</div>',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>De handtekening klopt met dit document.</strong> Wie tekende, staat niet in de handtekening: de naam hieronder is niet gecontroleerd.</div>',
     fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekening klopt, maar dit bestand is aangepast.</strong> De gegevens over de ondertekenaar horen niet bij de sleutel die tekende. Vertrouw de naam in dit bestand niet.</div>',
     lookupBtn: 'Wie hoort bij deze sleutel? (vraagt het aan Paramant)',
@@ -125,9 +123,8 @@ const T = {
     missingMpId: 'missing multiparty.envelope_id',
     missingSignedHash: 'missing signed document hash (stamped_hash or document_hash)',
     hashMismatch: 'document hash mismatch: this document does not match the one that was signed',
-    originalFile: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>This is the file as it was before signing. Check with the signed version.</strong> The signature in the .psign file is correct, but it covers the version with the seal on it ({name}). According to the proof, this is the file that version was made from. Choose the signed file to check the signature.</div>',
+    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. Check with the original file.</strong> The signature in the .psign file covers a different file (SHA3-256 fingerprint {hash}…). For a PDF or image that is the version with the seal on it, which you received after signing. What you chose is not what was signed. Choose that file and check again.</div>',
     partyNamesHead: 'Names as the sender entered them (not checked; the signatures themselves were checked):',
-    hashIsOriginal: 'This is the file as it was before signing. The signature covers the signed version with the seal on it ({name}). Choose that file.',
     missingSignerPk: 'missing signer_public_key',
     missingEmailHash: 'missing party_email_hash (cannot reconstruct the signed message offline)',
     appearanceMismatch: 'appearance hash mismatch',
@@ -139,12 +136,11 @@ const T = {
     missingDocHash: 'missing document_hash',
     hashMismatchMulti: 'This is not the document that was signed. The signatures cover the original file, with SHA3-256 fingerprint {hash}…. The PDF with the visible signatures and initials (the line "Paramant ParaSign · PQ …" under each signature) is not the original either. Choose the original file that was put up for signing.',
     missingParties: 'missing parties',
-    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. Check with the original file.</strong> The .psign file is in order, but the signatures cover a different file (SHA3-256 fingerprint {hash}…). What you chose is therefore not what was signed. Choose the original file that was put up for signing and check again.</div>',
+    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. Check with the original file.</strong> The .psign file is in order, but the signatures cover a different file (SHA3-256 fingerprint {hash}…). What you chose is therefore not what was signed. Choose the original file that was put up for signing and check again. With &quot;Sign together&quot; that is the PDF with the seal of the sender, as the sender received it after signing; a PDF that shows all signatures is a readable copy and never the signed file.</div>',
     lookupFailed: '<p class="ps-help">The lookup did not work just now; Paramant did not answer. The check above still stands. Please try again later.</p>',
     lookupRetry: 'Look up again',
     qesNote: '<p class="ps-help">According to this proof, the PDF also carries a qualified signature (PAdES) from {provider}, certificate <code class="mono">{fp}</code>{when}. This page does not check that second signature: open the signed PDF in a PAdES reader, such as Adobe Acrobat or the EU validation service DSS.</p>',
     qesWhen: ', made on {v}',
-    stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>This is not the signed file. Is it the PDF with the visible signatures? Then check with the original.</strong> The signatures in the .psign file are correct, but they cover the original document (SHA3-256 fingerprint {hash}…). The PDF with the signatures and initials in it, with the line "Paramant ParaSign · PQ …" under each signature, is a reading copy of it and always gives this message. Choose the original file; you can download it on the page where you signed.</div>',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>The signature matches this document.</strong> Who signed is not part of the signature: the name below has not been checked.</div>',
     fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>The signature is correct, but this file has been altered.</strong> The signer details do not belong to the key that signed. Do not trust the name in this file.</div>',
     lookupBtn: 'Who does this key belong to? (asks Paramant)',
@@ -401,17 +397,12 @@ function verifyV3Client(docHashHex) {
   // pdf/image sign the stamped document; other documents sign document_hash.
   const signedHash = env.stamped_hash || env.document_hash;
   if (!signedHash) errors.push(t('missingSignedHash'));
-  let isOriginal = false;
-  if (docHashHex && signedHash && signedHash !== docHashHex) {
-    // A pdf or image signs its stamped version. The file it was made from has
-    // original_hash; recognise it and name the file that does verify.
-    if (env.stamped_hash && env.original_hash === docHashHex) {
-      isOriginal = true;
-      errors.push(t('hashIsOriginal', { name: String(env.stamped_filename || 'signed-…') }));
-    } else {
-      errors.push(t('hashMismatch'));
-    }
-  }
+  // original_hash and stamped_filename are not inside the signature
+  // (buildDocSignMessage signs stamped_hash), so they can never make a file
+  // "the original" here: anyone can edit them. Any file that is not the
+  // signed one is red, without names (review #555, B2).
+  const docMismatch = !!(docHashHex && signedHash && signedHash !== docHashHex);
+  if (docMismatch) errors.push(t('hashMismatch'));
   if (!env.signer_public_key) errors.push(t('missingSignerPk'));
   if (env.party_email_hash == null) {
     errors.push(t('missingEmailHash'));
@@ -424,11 +415,11 @@ function verifyV3Client(docHashHex) {
     } catch { errors.push(t('appearanceInvalid')); }
   }
 
-  // The original next to its proof: the signature is still checked (it covers
-  // the stamped version, not this file), so the page can say "right pair, wrong
-  // file" in orange, the way the co-sign copy is treated (acceptance r2, 5).
+  // A wrong file next to an intact proof: the signature is still checked
+  // (against the hash in the proof), so the page can say "the proof is fine,
+  // this is not the signed file" in red instead of "forged".
   let sigOk = false;
-  if (errors.length === 0 || (isOriginal && errors.length === 1)) {
+  if (errors.length === 0 || (docMismatch && errors.length === 1)) {
     try {
       const msg = buildDocSignMessage(
         String(mp.envelope_id),
@@ -446,8 +437,8 @@ function verifyV3Client(docHashHex) {
   if (env.expires_at && new Date(env.expires_at) < new Date()) {
     errors.push(t('expired', { v: env.expires_at }));
   }
-  const originalOnly = isOriginal && sigOk && errors.length === 1;
-  return { valid: errors.length === 0, errors, originalOnly };
+  const wrongFile = docMismatch && sigOk && errors.length === 1;
+  return { valid: errors.length === 0, errors, wrongFile, docHash: signedHash };
 }
 
 function verifyMultiClient(docHashHex) {
@@ -513,22 +504,13 @@ function verifyMultiClient(docHashHex) {
   // mode/sandbox sit inside the notary signature (parasign-open-api.js
   // buildEnvelopePsign), so on a valid receipt they are facts, not claims.
   const test = env.mode === 'test' || env.sandbox === true;
-  // Every signature holds and only the file differs: the reader most likely
-  // chose the stamped copy. That is not "INVALID" (retest A8/T5-7).
-  // Orange only when the file PROVES it is Paramant's reading copy of this
-  // very envelope and original: the marker co-sign.js writes into the stamped
-  // pdf. Any other wrong file (one byte changed, another envelope) is INVALID
-  // (hertest r2 R1).
-  const stamp = stampedMarker;
-  const provenCopy = !!(stamp && stamp.env === String(env.envelope_id || '') && stamp.doc === String(env.document_hash || ''));
-  const copyOnly = docMismatch && errors.length === 1 && provenCopy;
-  // Every signature holds, only the file differs, and the file carries no
-  // marker of this envelope: a changed file, another envelope's file, or a
-  // reading copy stamped before the marker existed. Those cannot be told
-  // apart, so no reassurance and no green, but also no "INVALID" as if the
-  // proof were forged: the proof is fine, the file is not the signed one.
-  const wrongFile = docMismatch && errors.length === 1 && !provenCopy;
-  return { valid: errors.length === 0, errors, anchor, test, copyOnly, wrongFile, docHash: env.document_hash };
+  // Every signature holds and only the file differs. No signature covers the
+  // stamped reading copy, and a marker in the file's bytes is not evidence
+  // (anyone can paste it into any file), so every file that is not the signed
+  // one is red, without party names or QES as facts (review #555, B1). The
+  // proof itself is fine, so it is not called forged either.
+  const wrongFile = docMismatch && errors.length === 1;
+  return { valid: errors.length === 0, errors, anchor, test, wrongFile, docHash: env.document_hash };
 }
 
 async function verify() {
@@ -608,51 +590,12 @@ function relayErrors(list) {
 const SLICE = 8 * 1024 * 1024;
 const PIECE = 1024 * 1024;
 const breathe = () => new Promise((r) => setTimeout(r, 0));
-// The stamped-copy marker co-sign.js writes: /ParamantStampedCopy (env=..;doc=..)
-// It is looked for while hashing, so the file is read once.
-const MARKER = new TextEncoder().encode('/ParamantStampedCopy (');
-let stampedMarker = null;
-function parseMarker(bytes) {
-  // bytes start right after the marker; read up to ')' (max 200 bytes, ASCII).
-  let s = '';
-  for (let i = 0; i < bytes.length && i < 200; i++) {
-    const c = bytes[i];
-    if (c === 0x29) {
-      const m = /^env=([A-Za-z0-9_-]{1,64});doc=([0-9a-f]{64})$/.exec(s);
-      return m ? { env: m[1], doc: m[2] } : null;
-    }
-    if (c < 0x20 || c > 0x7e) return null;
-    s += String.fromCharCode(c);
-  }
-  return null;
-}
-function scanMarker(buf) {
-  const first = MARKER[0];
-  for (let i = buf.indexOf(first); i !== -1 && i <= buf.length - MARKER.length; i = buf.indexOf(first, i + 1)) {
-    let ok = true;
-    for (let k = 1; k < MARKER.length; k++) if (buf[i + k] !== MARKER[k]) { ok = false; break; }
-    if (ok) {
-      const found = parseMarker(buf.subarray(i + MARKER.length, i + MARKER.length + 200));
-      if (found) return found;
-    }
-  }
-  return null;
-}
 async function hashFileInSlices(file, onProgress) {
   const h = sha3_256.create();
   const total = file.size || 0;
   let lastPct = -1;
-  stampedMarker = null;
-  let tail = new Uint8Array(0);
   for (let off = 0; off < total; off += SLICE) {
     const buf = new Uint8Array(await file.slice(off, Math.min(total, off + SLICE)).arrayBuffer());
-    if (isMulti && !stampedMarker) {
-      // Look across the slice boundary too: keep the last 256 bytes.
-      const joined = new Uint8Array(tail.length + buf.length);
-      joined.set(tail, 0); joined.set(buf, tail.length);
-      stampedMarker = scanMarker(joined);
-      tail = buf.subarray(Math.max(0, buf.length - 256)).slice();
-    }
     for (let i = 0; i < buf.length; i += PIECE) {
       h.update(buf.subarray(i, Math.min(buf.length, i + PIECE)));
       if (total > PIECE) {
@@ -746,13 +689,11 @@ async function renderResult(r) {
   const solo = r.valid && isV3 && !isMulti && envelope;
   const fpBad = solo && claimFingerprintBad(envelope);
   const banner = !r.valid
-    ? (r.copyOnly ? t('stampedCopy', { hash: esc(String(r.docHash || '').slice(0, 16)) })
-      : r.wrongFile ? t('wrongFile', { hash: esc(String(r.docHash || '').slice(0, 16)) })
-      : r.originalOnly ? t('originalFile', { name: esc(String((envelope && envelope.stamped_filename) || 'signed-…')) })
+    ? (r.wrongFile ? t(isV3 && !isMulti ? 'wrongFileSolo' : 'wrongFile', { hash: esc(String(r.docHash || '').slice(0, 16)) })
       : t('invalid'))
     : r.test ? t('validTest') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
   out.push(banner);
-  if (r.errors && r.errors.length && !r.copyOnly && !r.wrongFile && !r.originalOnly) {
+  if (r.errors && r.errors.length && !r.wrongFile) {
     out.push('<ul style="margin-top:var(--space-3)">');
     r.errors.forEach(e => out.push('<li class="ps-help">' + esc(e) + '</li>'));
     out.push('</ul>');
@@ -767,11 +708,11 @@ async function renderResult(r) {
       const vars = { name, host: esc(a.host), fp: esc(String(a.fingerprint).slice(0, 16)), when: esc(a.retired_at || '') };
       out.push(a.retired_at ? t('notaryByRetired', vars) : t('notaryBy', vars));
     }
-    if ((r.valid || r.originalOnly) && !isMulti) out.push(v3ScopeHtml(envelope));
+    if (r.valid && !isMulti) out.push(v3ScopeHtml(envelope));
     // The names in a multi-party proof are labels the sender typed: shown,
     // and said for what they are (acceptance r2, 5).
-    if ((r.valid || r.copyOnly) && isMulti) out.push(partyNamesHtml(envelope));
-    if ((r.valid || r.copyOnly) && isMulti) out.push(qesHtml(envelope));
+    if (r.valid && isMulti) out.push(partyNamesHtml(envelope));
+    if (r.valid && isMulti) out.push(qesHtml(envelope));
   } else {
     const idx = envelope && envelope.notary && envelope.notary.ct_log_index;
     if (idx != null) out.push(t('ctIndex', { idx: esc(String(idx)) }));

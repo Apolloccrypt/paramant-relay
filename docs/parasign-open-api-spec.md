@@ -191,6 +191,7 @@ Set `webhook_url` at create. Events POST a JSON body with headers:
 
 - `X-Paramant-Event`: event name.
 - `X-Paramant-Sig`: hex `HMAC_SHA256(webhook_secret, raw_body)` — verify this.
+- `X-Paramant-Timestamp` and `X-Paramant-Signature: t=<unix seconds>,v1=<hex HMAC_SHA256(webhook_secret, "<t>.<raw_body>")>`. The time is inside this signature: reject a delivery whose `t` is more than 300 seconds from your clock, so a captured delivery cannot be replayed later (`relay/lib/webhook-sign.js` `verifySignature`).
 - `X-Paramant-Delivery`: unique id for replay dedupe.
 
 Delivery uses the SSRF-guarded fetcher, so an internal/non-HTTPS `webhook_url`

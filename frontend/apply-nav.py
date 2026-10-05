@@ -307,7 +307,7 @@ LEGAL_STRIP_NL = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=32">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=28">'
 NAV_JS    = '<script src="/nav.js?v=16" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=14" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=16" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,

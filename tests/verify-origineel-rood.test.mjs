@@ -1,10 +1,9 @@
-// Acceptatie ronde 2, punt 5: een solo-bewijs met het ORIGINEEL (van voor de
-// zegel) gaf rood ONGELDIG, terwijl co-sign met de gestempelde kopie oranje
-// geeft. Nu gelijk en eerlijk: oranje "controleer met de ondertekende versie"
-// alleen als de handtekening zelf klopt en het bewijs dit bestand als het
-// origineel noemt; elk ander bestand, of een kapotte handtekening, blijft rood.
-// En de naam staat erbij als "opgegeven, niet gecontroleerd".
-// Run: node --test tests/verify-origineel-oranje.test.mjs
+// original_hash en stamped_filename vallen buiten de handtekening van een
+// v3-solobewijs (buildDocSignMessage tekent stamped_hash). Iedereen kan ze dus
+// aanpassen, en ze mogen een bestand nooit tot "het origineel" maken (review
+// #555, B2). Elk bestand dat niet het ondertekende is: rood "Dit is niet het
+// ondertekende bestand", zonder naam of sleutelgegevens als feit.
+// Run: node --test tests/verify-origineel-rood.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -73,16 +72,29 @@ async function check(doc, psign) {
   return { text: await page.locator('#vf-result').innerText(), cls: await page.locator('#vf-result .ps-banner').first().getAttribute('class') };
 }
 
-test('het origineel naast een kloppend bewijs: oranje, met de naam als opgegeven', async () => {
+const RED_HEAD = /Dit is niet het ondertekende bestand\. Controleer met het originele bestand\./;
+
+test('het origineel naast een kloppend bewijs: rood, zonder naam', async () => {
   const r = await check(fx.original, fx.psign);
-  assert.match(r.cls, /\bwarn\b/, r.cls + ' ' + r.text);
-  assert.match(r.text, /vóór het ondertekenen/);
-  assert.match(r.text, /contract-getekend\.pdf/);
-  assert.match(r.text, /Ayşe Yılmaz/);
-  assert.doesNotMatch(r.text, /ONGELDIG/);
+  assert.match(r.cls, /\berr\b/, r.cls + ' ' + r.text);
+  assert.match(r.text, RED_HEAD);
+  assert.doesNotMatch(r.text, /Ayşe Yılmaz/);
+  assert.doesNotMatch(r.text, /contract-getekend\.pdf/);
+  assert.doesNotMatch(r.text, /vóór het ondertekenen/);
 });
 
-test('het origineel met een kapotte handtekening: rood', async () => {
+test('vervalst: willekeurig bestand met aangepaste original_hash blijft rood', async () => {
+  const forged = Array.from(Buffer.from('%PDF-1.4 VERVALST contract: B betaalt A 1 miljoen'));
+  const h = await page.evaluate(async (bytes) => { const pqc = await import('/vendor/paramant-pqc.js'); return Array.from(pqc.sha3_256(new Uint8Array(bytes)), (x) => x.toString(16).padStart(2, '0')).join(''); }, forged);
+  const r = await check(forged, { ...fx.psign, original_hash: h });
+  assert.match(r.cls, /\berr\b/, r.cls + ' ' + r.text);
+  assert.doesNotMatch(r.cls, /\bwarn\b/);
+  assert.match(r.text, RED_HEAD);
+  assert.doesNotMatch(r.text, /Ayşe Yılmaz/);
+  assert.doesNotMatch(r.text, /handtekening in het \.psign-bestand klopt/);
+});
+
+test('het origineel met een kapotte handtekening: rood ONGELDIG', async () => {
   const r = await check(fx.original, fx.broken);
   assert.match(r.cls, /\berr\b/, r.text);
   assert.match(r.text, /ONGELDIG/);
@@ -92,6 +104,7 @@ test('een ander bestand: rood', async () => {
   const other = fx.original.slice(); other[5] ^= 1;
   const r = await check(other, fx.psign);
   assert.match(r.cls, /\berr\b/, r.text);
+  assert.doesNotMatch(r.text, /Ayşe Yılmaz/);
 });
 
 test('de ondertekende versie zelf: klopt', async () => {

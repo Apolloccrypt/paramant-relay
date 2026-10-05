@@ -39,6 +39,11 @@ test('a retry for the same party slot is not counted twice; a release hands the 
   assert.strictEqual(b.allowed, true);
   assert.strictEqual(b.counted, false, 'the retry finds the hold');
   assert.strictEqual((await quota.readUsage(rc, acct)).signs_this_month, 1);
+  // Both requests hold a reference on the one unit (review #555, H4): the
+  // first release gives nothing back, the last one does.
+  const first = await quota.releaseSign(rc, acct, () => {}, { holdKey: hold });
+  assert.strictEqual(first.released, false);
+  assert.strictEqual((await quota.readUsage(rc, acct)).signs_this_month, 1);
   await quota.releaseSign(rc, acct, () => {}, { holdKey: hold });
   assert.strictEqual(await rc.exists(hold), 0);
   assert.strictEqual((await quota.readUsage(rc, acct)).signs_this_month, 0);

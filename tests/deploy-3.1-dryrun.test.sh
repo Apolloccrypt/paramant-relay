@@ -2442,18 +2442,13 @@ fi
 # Every zone is per client IP. /help/iot-integration says so in those words and
 # tests/site-claims.test.mjs holds it there, so a key change here would make
 # the site lie.
-# One exception, by name: user_session (signed-in account pages) is keyed per
-# session cookie with the address as fallback ($user_session_key), because an
-# office behind one NAT address ran out at about seventeen people (sweep-chaos 6).
-# It covers /api/user/ reads behind a session, nothing the IoT page describes.
+# No exception: user_session was keyed on the session cookie for a while, and
+# a cookie is the client's choice (review #555, H1).
 if [ -n "$SNIP_DEF" ] \
    && [ "$(grep -cE '^[[:space:]]*limit_req_zone[[:space:]]+\$binary_remote_addr' "$SNIPPET")" \
       = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET" | awk '{print $1}')" ] \
-   || { [ "$(grep -cE '^[[:space:]]*limit_req_zone[[:space:]]+\$binary_remote_addr' "$SNIPPET")" \
-          = "$(( $(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET") - 1 ))" ] \
-        && grep -qE '^[[:space:]]*limit_req_zone[[:space:]]+\$user_session_key[[:space:]]+zone=user_session:' "$SNIPPET" \
-        && grep -qE '""[[:space:]]+\$binary_remote_addr;' "$SNIPPET"; }; then
-  pass "every zone in the snippet is keyed per IP, user_session per session with the IP as fallback"
+   && ! grep -vE '^[[:space:]]*#' "$SNIPPET" | grep -q '\$cookie_'; then
+  pass "every zone in the snippet is keyed per IP, none on a cookie"
 else
   fail "a zone in the snippet is keyed on something other than \$binary_remote_addr"
 fi

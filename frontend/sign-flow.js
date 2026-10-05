@@ -388,7 +388,7 @@ function loadTextBoxes(bytes) {
   entry.promise = (async () => {
     try {
       const pdfjs = await waitForPdfjs();
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
       const out = [];
       // The same cap as the pages shown, and the page free between pages: a
       // pdf of 2.000 empty pages was rendered page after page (review r2 (g)).
@@ -708,6 +708,24 @@ function noticeUrl(signPath) {
   return (location.origin + signPath).split('#')[0] + (state.keyShareFragment || '');
 }
 
+// The same links, kept in THIS browser only, so the dashboard can hand a
+// signer the full link again (acceptatie r3, A3): a resent invitation opens
+// the request, not the document. Only the #ks= half travels in them, which
+// opens nothing without the invited mailbox's login and the relay's half.
+// Kept until the request expires (at most eight days), wiped on sign-out and
+// on an account switch (nav-auth.js), never sent to a server.
+function rememberSignerLinks(envelopeId, partyLinks, expiresAt) {
+  if (!state.keyShareFragment || !Array.isArray(partyLinks)) return;
+  try {
+    const cap = Date.now() + 8 * 864e5;
+    const until = Date.parse(expiresAt || '');
+    const links = partyLinks
+      .filter((p) => recipientOfParty(p.party_index))
+      .map((p) => ({ i: p.party_index, label: recipientOfParty(p.party_index)?.label || recipientOfParty(p.party_index)?.email || '', url: noticeUrl(p.sign_path) }));
+    localStorage.setItem('paramant.cosign.links.v1:' + envelopeId, JSON.stringify({ exp: Number.isFinite(until) ? Math.min(until, cap) : cap, links }));
+  } catch { /* storage off: the dashboard says the links are not here */ }
+}
+
 // Where each party is asked to sign: the sender's box for the first party and
 // a slot of its own beside or under it for every next one, plus (with "every
 // page" on) a paraaf per party side by side in the margin. One box for all
@@ -811,11 +829,12 @@ async function shareEncryptedDocument({ envelopeId, bytes, filename, mime, docHa
   state.keyShareFragment = keyShareFragment(shares.a);
   const keyShareB = keyB64url(shares.b);
   shares.a.fill(0); shares.b.fill(0);
-  // Kept only as long as needed: until the request has run its course (the
-  // result page shortens it once everyone signed), wiped on sign-out or when
-  // another account signs in here (nav-auth.js; security review r2 a3).
+  // Kept only as long as needed and never longer than 24 hours: wiped once
+  // the request is complete, on sign-out, when the session runs out, or when
+  // another account signs in here (nav-auth.js; security review r2 a3, review
+  // #555 M4).
   try {
-    const exp = Date.now() + 31 * 864e5;
+    const exp = Date.now() + 864e5;
     localStorage.setItem('paramant.cosign.key.v1:' + envelopeId, JSON.stringify({ f: encrypted.fragment, exp }));
   } catch { /* storage off: the sender opens the original file instead */ }
   let upload;
@@ -908,6 +927,7 @@ async function sendForSignature() {
       sign_path: p.sign_path + encrypted.fragment,
     }));
     state.envelope = envelope;
+    rememberSignerLinks(envelope.id, envelope.party_links, envelope.expires_at);
     state.result = {
       stampedBytes: null,
       fingerprint: '',
@@ -958,6 +978,7 @@ async function shareCosignDocument(env, mp, bytes, docHash) {
       onUpload: () => status(L('Het versleutelde document wordt geüpload…', 'Uploading the encrypted document…')),
     });
     mp.party_links = (mp.party_links || []).map((p) => ({ ...p, sign_path: p.sign_path + encrypted.fragment }));
+    rememberSignerLinks(env.id, mp.party_links, env.expires_at || mp.expires_at);
     if (state.deliveryMode !== 'copy') {
       status(L('De persoonlijke uitnodigingen worden gemaild…', 'Sending personal email invitations…'));
       state.inviteDelivery = await deliverInviteEmails();
@@ -1328,7 +1349,7 @@ async function renderPdfForPlacement() {
   applyPlaceChromeForMode();
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
   // Encrypted (an owner password, "no changes"): pdf.js can show it, but a
   // visible signature means writing into the file, which pdf-lib cannot do to
   // an encrypted PDF and which the author's lock forbids anyway. That used to
@@ -2516,7 +2537,7 @@ function stampPageInkBoxes(bytes, pageIndex) {
   const pr = (async () => {
     try {
       const pdfjs = await waitForPdfjs();
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
       try { return await inkBoxesOfPage(await pdf.getPage(pageIndex + 1)); }
       finally { try { pdf.destroy(); } catch (e) { /* best effort */ } }
     } catch (e) { return null; }
@@ -2784,6 +2805,20 @@ async function showSigningIdentity() {
   } catch (e) {
     el.className = 'ds-hint';
     if (e && e.code === 'no_signing_passkey') {
+      // An account without a passkey, or a browser without WebAuthn, signs
+      // with the code: say that, not Face ID (same rule as /co-sign,
+      // acceptatie r3 A4).
+      let passkeys = null;
+      try {
+        if (window.PublicKeyCredential && navigator.credentials && typeof navigator.credentials.get === 'function') {
+          const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include', cache: 'no-store' });
+          if (r.ok) { const d = await r.json(); passkeys = d && Array.isArray(d.passkeys) ? d.passkeys.length : Number(d && d.total); }
+        } else passkeys = 0;
+      } catch { passkeys = null; }
+      if (passkeys === 0) {
+        el.textContent = L('U ondertekent met de code uit uw authenticator-app.', 'You\'ll sign with the code from your authenticator app.');
+        return;
+      }
       const elsewhere = await serverHasSigningKey();
       el.innerHTML = (elsewhere
         ? L('U ondertekent met de passkey waarmee u inlogt. Een ondertekensleutel staat in de browser waarin u hem maakt, dus dit apparaat maakt er een aan de eerste keer dat u tekent: één tik met Face ID of Touch ID. Geen passkey hier? Dan kunt u tekenen met de code uit uw authenticator-app.', 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign, one Face ID / Touch ID tap. No passkey here? You can sign with your authenticator code instead.')
@@ -3258,7 +3293,7 @@ async function renderDocPreview() {
     pane.classList.add('has-pdf');
     const pdfjs = await waitForPdfjs();
     const copy = new Uint8Array(state.doc.bytes);
-    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
     // Let a pane that just became visible settle before it is measured.
     await nextFrame();
     if (stale()) return;
@@ -3825,8 +3860,8 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     sheet.drawText('Zichtbare handtekening', { x: 54, y: 522, size: 12, font: fontBold, color: navy });
     sheet.drawText('Visible signature', { x: 54, y: 508, size: 8.5, font, color: dim });
     await paintSeal(sheet, { x: 54, y: 355, w: 390, h: 135 });
-    sheet.drawText('Controleer de getekende pdf samen met het bijbehorende .psign-bestand. Latere medeondertekenaars staan in de envelop, niet op deze pagina.', { x: 54, y: 320, size: 9, font, color: dim, maxWidth: 487, lineHeight: 13 });
-    sheet.drawText('Verify the signed PDF together with its .psign file. Later co-signers are recorded in the envelope, not added to this PDF page.', { x: 54, y: 288, size: 8.5, font, color: dim, maxWidth: 487, lineHeight: 12 });
+    sheet.drawText('Controleer met de pdf zoals die uit deze ondertekening kwam, samen met het bijbehorende .psign-bestand. Zetten medeondertekenaars later hun handtekening, dan komt die in een leesbare kopie; die kopie zelf is niet het ondertekende bestand.', { x: 54, y: 320, size: 9, font, color: dim, maxWidth: 487, lineHeight: 13 });
+    sheet.drawText('Verify with the PDF as it came out of this signing, together with its .psign file. Signatures that co-signers add later go into a readable copy; that copy itself is not the signed file.', { x: 54, y: 276, size: 8.5, font, color: dim, maxWidth: 487, lineHeight: 12 });
   }
   // The paraaf for "sign every page": initials and one line with date and short
   // fingerprint, in the seal's navy, in a box planned by js/paraaf-place.js.
@@ -4411,10 +4446,17 @@ function showDone() {
   const inviteDetails = $('ds-invite-details'); if (inviteDetails) inviteDetails.hidden = true;
 
   const signedName = r.stampedBytes ? signedDocName() : state.doc.name;
+  // "Samen ondertekenen": everyone signs the version with the sender's seal,
+  // so that file, not the one the sender started from, is what the final
+  // proof checks against (acceptatie r3, A1). Said by name, with the button.
+  const togetherNote = (state.signingMode === 'cosign' && state.recipients.length > 0 && r.stampedBytes)
+    ? L('De medeondertekenaars tekenen precies dit bestand. Controleer het eindbewijs later op /verify met ', 'Your co-signers sign exactly this file. Later, check the final proof on /verify with ') + signedName +
+      L(', niet met ', ', not with ') + state.doc.name + L(' en niet met de leesbare kopie met alle handtekeningen. ', ' and not with the readable copy that shows every signature. ')
+    : '';
   paDone().fill('step-done', {
     title: L('Ondertekend.', 'Signed.'),
     line: r.stampedBytes
-      ? L('Uw handtekening staat op ', 'Your signature is on ') + signedName + L('. Bewaar nu beide bestanden en houd ze bij elkaar, ', '. Save both files now and keep them together, ') +
+      ? L('Uw handtekening staat op ', 'Your signature is on ') + signedName + '. ' + togetherNote + L('Bewaar nu beide bestanden en houd ze bij elkaar, ', 'Save both files now and keep them together, ') +
         L('want wij bewaren geen kopie die u later kunt ophalen.', 'because we do not hold a copy you could come back for.')
       : L('Uw handtekening geldt voor ', 'Your signature covers ') + signedName + L(', dat precies blijft zoals het was. ', ', which is left exactly as it was. ') +
         L('Bewaar nu het bewijsbestand bij het document, want wij bewaren geen kopie ', 'Save the proof file now and keep it with the document, because we do not hold a copy ') +
@@ -4729,7 +4771,7 @@ async function renderSignedPreview() {
   // signer sees their stamp in context without scrolling long documents.
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(r.stampedBytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
   await nextFrame();
   if (stale()) return;
   const firstPreviewPage = state.sealPlacement === 'sheet' ? pdf.numPages - 1 : state.stamp.pageIndex;
@@ -5099,9 +5141,10 @@ function applySignedOut() {
 // not: a scanned contract is megabytes and it holds about 5MB per origin.
 // Every signature on an invitation counts on the SENDER's month. A sender
 // with too little left could send, and the signer stranded on "the sender's
-// allowance is used up" (acceptance r2, 6). So: look first, say it, and send
-// only on a second, deliberate click. Unknown (no answer, unlimited): send.
-let _allowanceAcked = '';
+// allowance is used up" (acceptance r2, 6). The relay now refuses such a
+// request at creation (sign_quota_insufficient), so the page says so first and
+// offers no "click again to send anyway" that the server would refuse anyway
+// (acceptatie r3, A4). Unknown (no answer, unlimited): send.
 async function senderSignsLeft() {
   try {
     const r = await fetch('/api/user/dashboard/overview', { credentials: 'include', cache: 'no-store' });
@@ -5114,19 +5157,14 @@ async function senderSignsLeft() {
 }
 async function sendAfterAllowanceCheck() {
   const need = state.recipients.length;
-  const key = String(need);
-  if (_allowanceAcked !== key) {
-    const left = await senderSignsLeft();
-    if (left !== null && left < need) {
-      _allowanceAcked = key;
-      showRecipientsHint(L('Uw tegoed is bijna of helemaal op: u hebt deze maand nog ', 'Your allowance is (almost) used up: you have ') + left
-        + L(left === 1 ? ' handtekening over' : ' handtekeningen over', left === 1 ? ' signature left this month' : ' signatures left this month')
-        + L(', en dit verzoek vraagt er ', ', and this request needs ') + need
-        + L('. Elke handtekening telt op uw tegoed. Wie geen plek meer heeft, kan pas tekenen als u uw plan verhoogt of na het begin van de volgende maand. Klik nogmaals op Versturen om toch te versturen, of bekijk de plannen op /pricing.', '. Every signature counts on your allowance. Anyone past it can only sign once you upgrade or after the start of next month. Click Send again to send anyway, or see the plans on /pricing.'), true);
-      return;
-    }
+  const left = await senderSignsLeft();
+  if (left !== null && left < need) {
+    showRecipientsHint(L('Uw tegoed is bijna of helemaal op: u hebt deze maand nog ', 'Your allowance is (almost) used up: you have ') + left
+      + L(left === 1 ? ' handtekening over' : ' handtekeningen over', left === 1 ? ' signature left this month' : ' signatures left this month')
+      + L(', en dit verzoek vraagt er ', ', and this request needs ') + need
+      + L('. Elke handtekening telt op uw tegoed, dus dit verzoek kan zo niet worden verstuurd. Verhoog uw plan op /pricing, nodig minder mensen uit, of verstuur het na het begin van de volgende maand.', '. Every signature counts on your allowance, so this request cannot be sent like this. Upgrade your plan on /pricing, invite fewer people, or send it after the start of next month.'), true);
+    return;
   }
-  _allowanceAcked = '';
   sendForSignature();
 }
 

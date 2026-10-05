@@ -2141,7 +2141,7 @@ api.delete("/user/account/webauthn/credentials/:credId", authUser, async (req, r
   const credId = (req.params.credId || "").toString();
   if (!/^[A-Za-z0-9_-]{16,512}$/.test(credId)) return res.status(400).json({ error: "invalid_credential" });
   const sf = await freshSecondFactor(req, user_id);
-  if (sf) return res.status(sf.status).json({ error: sf.error });
+  if (sf) return sfReply(res, sf);
   try {
     const r = await callRelay("/v2/user/webauthn/credential", { user_id, cred_id: credId }, "DELETE");
     const body = await r.json().catch(() => ({}));
@@ -2412,7 +2412,9 @@ api.post("/user/envelopes/:id/invitations", authUser, idempotency.middleware({ r
   const checked = [];
   for (const item of invitations) {
     const email = (item?.email || "").toString().trim().toLowerCase().slice(0, 200);
-    const label = (item?.label || "").toString().trim().slice(0, 80);
+    // The label goes into "Beste <label>," from hello@ with our DKIM: same
+    // scrub as subject and message, no link and no address (review #555).
+    const label = inviteText.safeSubject(item?.label, 80);
     const inviteUrlText = (item?.invite_url || "").toString().trim();
     const partyIndex = Number(item?.party_index);
     if (!RECIPIENT_EMAIL_RE.test(email) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || inviteUrlText.length > 2048) {
@@ -3629,12 +3631,15 @@ api.get("/user/parasign/inbox", authUser, async (req, res) => {
 // created_at, so the resent link expires at the same moment as the first one and
 // the link already in the reader's mailbox keeps working.
 //
-// WHAT NO INVITATION MAIL CARRIES. The document is unlocked by a key that lives
-// in the URL fragment. Browsers never transmit a fragment, so no server has ever
-// held it; the first invitation was assembled in the sender's browser. Since the
-// key would otherwise reach a mail provider outside the EU, the first invitation
-// does not carry it either: both mails are the same notice, and the sender hands
-// the opening link over themselves.
+// WHAT THE RESENT MAIL CARRIES. The document is unlocked by a key that lives in
+// the URL fragment, and no server ever holds it. The first invitation carries
+// half of a split key (#ks=), added in the sender's browser; the relay holds
+// the other half and releases it only to the invited mailbox. This resent mail
+// is built here, from the stored invite token alone, so it carries no key half:
+// it opens the request, not the document. The full link stays in the sender's
+// browser, where the dashboard shows it per signer with a copy button
+// (frontend/js/dashboard.js signerLinksHtml); the sender is told so by mail
+// (relay.js notifySenderLinkRequested).
 //
 // One per envelope per hour, per account. The bucket is keyed on the session
 // account and the envelope together, never on the envelope alone: an id the
@@ -3887,6 +3892,11 @@ api.delete("/user/account/signing-key", authUser, async (req, res) => {
 // back-up code is accepted as well and is consumed, for the customer who
 // has lost the authenticator and signed in with one.
 // Returns null when the factor is good, else { status, error } to send.
+function sfReply(res, sf) {
+  if (sf.retry_after) res.set("Retry-After", String(sf.retry_after));
+  return res.status(sf.status).json({ error: sf.error, ...(sf.retry_after ? { retry_after: sf.retry_after } : {}) });
+}
+
 async function freshSecondFactor(req, user_id) {
   const b = req.body || {};
   const totp = (b.totp == null ? "" : String(b.totp)).trim();
@@ -3895,8 +3905,12 @@ async function freshSecondFactor(req, user_id) {
   try {
     if (totp) {
       if (!/^\d{6}$/.test(totp)) return { status: 400, error: "second_factor_required" };
-      const vr = await callRelay("/v2/user/verify-totp", { user_id, totp });
+      // fresh_factor: the relay counts wrong codes per account and locks with
+      // a growing backoff, the same counter as the signing-key routes (review
+      // #555, H2). Without it a stolen session could guess TOTP codes here.
+      const vr = await callRelay("/v2/user/verify-totp", { user_id, totp, fresh_factor: true });
       const vb = await vr.json().catch(() => ({}));
+      if (vr.status === 429) return { status: 429, error: "totp_locked", retry_after: Number(vb.retry_after) || undefined };
       return (vr.ok && vb.valid === true) ? null : { status: 403, error: "invalid_second_factor" };
     }
     if (!(await webauthn.rateHit(redis(), `sf:acct:${webauthn.scopeHash(user_id)}`, 5, 900))) return { status: 429, error: "rate_limited" };
@@ -3911,7 +3925,7 @@ async function freshSecondFactor(req, user_id) {
 // POST /api/user/account/backup-codes/regenerate  (authUser + fresh 2FA)
 api.post("/user/account/backup-codes/regenerate", authUser, async (req, res) => {
   const sf = await freshSecondFactor(req, req.userSession.user_id);
-  if (sf) return res.status(sf.status).json({ error: sf.error });
+  if (sf) return sfReply(res, sf);
   const relayRes = await callRelay("/v2/user/regenerate-backup", { user_id: req.userSession.user_id });
   if (!relayRes.ok) return res.status(500).json({ error: "regenerate_failed" });
   res.json(await relayRes.json());
@@ -3924,7 +3938,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
   if (req.userSession.via !== "backup_code") {
     const sf = await freshSecondFactor(req, user_id);
-    if (sf) return res.status(sf.status).json({ error: sf.error });
+    if (sf) return sfReply(res, sf);
   }
 
   await callRelay("/v2/user/delete-totp", { user_id });
@@ -3956,7 +3970,7 @@ api.post("/user/account/sessions/revoke-others", authUser, async (req, res) => {
 api.delete("/user/account", authUser, async (req, res) => {
   const { user_id } = req.userSession;
   const sf = await freshSecondFactor(req, user_id);
-  if (sf) return res.status(sf.status).json({ error: sf.error });
+  if (sf) return sfReply(res, sf);
 
   // Open envelopes go first, while the key still resolves: a deleted account's
   // requests stayed signable, counted on the dead account, and "everyone

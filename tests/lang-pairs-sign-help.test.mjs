@@ -103,7 +103,7 @@ test('the signature sheet in the PDF is bilingual and the seal keeps its fixed t
   for (const pair of [
     ["'ParaSign-handtekeningblad'", "'ParaSign signature sheet'"],
     ["'Bronbestand', 'Source file'", "'Ondertekend op', 'Signed at'"],
-    ["'Controleer de getekende pdf samen met het bijbehorende .psign-bestand.", "'Verify the signed PDF together with its .psign file."],
+    ["'Controleer met de pdf zoals die uit deze ondertekening kwam, samen met het bijbehorende .psign-bestand.", "'Verify with the PDF as it came out of this signing, together with its .psign file."],
   ]) for (const s of pair) assert.ok(sf.includes(s), `sign-flow.js must draw ${s} on the sheet`);
   assert.equal((sf.match(/'POST-QUANTUM SIGNED'/g) || []).length, 2, 'the seal badge is one fixed text in both languages');
   // Since 2026-10-04 the co-sign mark is the signer's own handwriting with a

@@ -112,7 +112,7 @@ if (process.env.PARAMANT_DASHBOARD_SCREENSHOT_PATH) await stableScreenshot(page,
 
 await page.locator('[data-doc-filter="completed"]').click();
 ok('completed filter shows only completed work', await page.locator('.dh-document').count() === 1 && /Completed contract/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
-await page.locator('.dh-document').click();
+await page.locator('.dh-document .dh-document-open').click();
 const completedDialogMetrics = await page.locator('#dh-document-dialog').evaluate((node) => {
   const box = node.getBoundingClientRect();
   const style = getComputedStyle(node);
@@ -122,7 +122,7 @@ const completedDialogMetrics = await page.locator('#dh-document-dialog').evaluat
 });
 const completedDialogInViewport = !completedDialogMetrics.hidden && completedDialogMetrics.top >= -5 && completedDialogMetrics.left >= -5 && completedDialogMetrics.bottom <= completedDialogMetrics.innerHeight + 5 && completedDialogMetrics.right <= completedDialogMetrics.innerWidth + 5;
 console.error('[n]', await page.locator('.dh-document').count(), '[body]', (await page.locator('#dh-document-dialog-body').innerText().catch(()=>'-')).slice(0,80));
-ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
+ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('#dh-document-dialog a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
 if (process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH) {
   await page.waitForTimeout(100);
   await stableScreenshot(page.locator('#dh-document-dialog'), { path:process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH });

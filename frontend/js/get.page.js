@@ -184,7 +184,7 @@ async function renderPdfPreview(bytes) {
   // PDF.js mutates the input buffer. Pass a copy so the original stays intact
   // for the save path.
   const copy = new Uint8Array(bytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
 
   const container = document.createElement('div');
   container.className = 'done-preview';
