@@ -100,7 +100,10 @@ ok('dashboard leads with three plain-language actions', await page.locator('.dh-
 ok('signing actions enter the intended workflow', await page.locator('.dh-start-card').nth(0).getAttribute('href') === '/en/sign?mode=invite' && await page.locator('.dh-start-card').nth(1).getAttribute('href') === '/en/parashare' && await page.locator('.dh-start-card').nth(2).getAttribute('href') === '/en/sign?mode=alone', await page.locator('.dh-start').innerText());
 ok('open filter shows waiting and in-progress documents', await page.locator('.dh-document').count() === 2 && /Waiting for signatures/.test(await page.locator('#dh-documents').innerText()) && /In progress/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
 ok('relay document counts fill every filter', await page.locator('[data-doc-count="open"]').innerText() === '2' && await page.locator('[data-doc-count="completed"]').innerText() === '1' && await page.locator('[data-doc-count="cancelled"]').innerText() === '1' && await page.locator('[data-doc-count="all"]').innerText() === '4', await page.locator('.dh-filters').innerText());
-ok('normal dashboard no longer loads developer operations', overviewRequests === 0 && !/API keys|More tools|Operations/.test(mainText), overviewRequests);
+// One read of the overview per page load is the 80% usage band every account
+// gets (eindmatrix DASH-27-N); what must not come back is the five-second
+// polling operations panel (DASH-27-A), so more than one request fails.
+ok('normal dashboard no longer loads developer operations', overviewRequests <= 1 && !/API keys|More tools|Operations/.test(mainText), overviewRequests);
 await page.locator('.dh-document').first().click();
 ok('open document has actionable owner controls', await page.locator('#dh-document-dialog').isVisible() && await page.locator('[data-pa-action="document-cancel"]').isVisible() && /not recoverable from the relay dashboard/i.test(await page.locator('#dh-document-dialog-body').innerText()), await page.locator('#dh-document-dialog-body').innerText());
 page.once('dialog', (dialog) => dialog.accept());
