@@ -1,5 +1,5 @@
 import {
-  loginWithApiKey, verifySession, logout, uploadAttachment,
+  getCapabilities, loginWithApiKey, loginWithTotp, verifySession, logout, uploadAttachment,
 } from '../shared/paramant-api.js';
 import { getAttachments, removeAttachments, insertIntoBody } from '../shared/office-helpers.js';
 import { buildLinkHtml } from '../../../shared/link-block.js';
@@ -20,6 +20,9 @@ Office.onReady(async (info) => {
     return;
   }
   showLogin();
+  // The e-mail + code form only where the relay says user sign-in is on.
+  const caps = await getCapabilities();
+  document.getElementById('show-totp').classList.toggle('hidden', !caps.user_totp);
 });
 
 // ── Login state ───────────────────────────────────────────────────────────────────
@@ -32,6 +35,31 @@ let formsWired = false;
 function wireLoginForms() {
   if (formsWired) return;
   formsWired = true;
+
+  document.getElementById('show-totp').addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('form-apikey').classList.add('hidden');
+    document.getElementById('form-totp').classList.remove('hidden');
+  });
+  document.getElementById('show-apikey').addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('form-totp').classList.add('hidden');
+    document.getElementById('form-apikey').classList.remove('hidden');
+  });
+
+  document.getElementById('form-totp').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email    = document.getElementById('email').value.trim();
+    const code     = document.getElementById('totp').value.trim();
+    const errorDiv = document.getElementById('error-totp');
+    const btn      = e.target.querySelector('button[type="submit"]');
+    errorDiv.classList.remove('visible'); errorDiv.textContent = '';
+    btn.disabled = true;
+
+    const result = await loginWithTotp(email, code);
+    if (result.success) { showStatus(result); await refreshAttachments(); }
+    else { showFormError(errorDiv, result.message || 'Invalid e-mail or code.'); btn.disabled = false; }
+  });
 
   document.getElementById('form-apikey').addEventListener('submit', async e => {
     e.preventDefault();

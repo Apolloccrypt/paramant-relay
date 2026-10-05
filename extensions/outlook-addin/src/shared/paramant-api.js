@@ -11,6 +11,7 @@ import { setAuth, getAuth, clearAuth } from './state.js';
 import { getAttachmentContent } from './office-helpers.js';
 
 const SESSION_HOURS = 8;
+const ADMIN_BASE = 'https://paramant.app/api/user';
 
 // ── Capabilities ──────────────────────────────────────────────────────────────────
 export async function getCapabilities() {
@@ -42,13 +43,70 @@ export async function loginWithApiKey(apikey) {
   }
 }
 
-// ── No email + code sign-in here ─────────────────────────────────────────────────────
-// The pane runs on addin.paramant.app. paramant.app answers a sign-in from that
-// origin without CORS headers, so a POST /api/user/login from here never gets an
-// answer the pane may read ("Network error", fase 1, EXT-20-A), and a session
-// would still hold no API key to upload with. Until the account server accepts
-// this origin, the pane offers the API key only. A TOTP session left over from an
-// older build is cleared below.
+// ── E-mail + authenticator code ─────────────────────────────────────────────────────
+// The pane runs on addin.paramant.app. The account server answers that origin,
+// with credentials, on exactly the routes used here: /user/login,
+// /user/session/verify, /user/parasend/token and /user/logout (admin/server.js
+// ADDIN_CORS_PATHS). Until that existed the sign-in ended in "Network error"
+// (fase 1, EXT-20-A). The session itself is the paramant.app cookie; the pane
+// keeps only the e-mail address and the end time.
+//
+// A session holds no API key and must not. Uploads ask the account for the same
+// fifteen-minute ParaSend session token /parashare uses and send it as a Bearer
+// to the relay of the account's sector (mintSessionToken says which).
+export async function loginWithTotp(email, totp) {
+  const e = String(email || '').trim();
+  const code = String(totp || '').replace(/\s+/g, '');
+  if (!e || !/^\d{6}$/.test(code)) return { success: false, message: 'Enter your e-mail address and the 6-digit code.' };
+  let res;
+  try {
+    res = await fetch(`${ADMIN_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: e, totp: code }),
+      credentials: 'include',
+    });
+  } catch {
+    return { success: false, message: 'Network error. Check your connection.' };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 429) return { success: false, message: RATE_LIMITED_MESSAGE };
+  if (!res.ok) {
+    if (data.error === 'pow_required') return { success: false, message: 'Too many attempts from this address. Sign in once on paramant.app, then try again here.' };
+    return { success: false, message: data.message || 'Invalid e-mail or code.' };
+  }
+  const until = data.session_expires_at ? new Date(data.session_expires_at).getTime() : Date.now() + 3600e3;
+  setAuth({ mode: 'totp', email: data.email || e, until });
+  return { success: true, mode: 'totp', email: data.email || e, expires_at: new Date(until).toISOString() };
+}
+
+const SECTOR_RELAYS = {
+  health: 'https://health.paramant.app', legal: 'https://legal.paramant.app',
+  finance: 'https://finance.paramant.app', iot: 'https://iot.paramant.app',
+  main: 'https://relay.paramant.app', relay: 'https://relay.paramant.app',
+};
+export function relayForSector(sector) {
+  return SECTOR_RELAYS[String(sector || '').toLowerCase()] || 'https://health.paramant.app';
+}
+let cachedToken = null; // { token, relay, exp } in memory only
+
+// A fresh ParaSend session token for the signed-in account, or null when the
+// session is gone. Throws with a readable message on anything else.
+export async function sessionToken() {
+  if (cachedToken && Date.now() < cachedToken.exp - 60_000) return cachedToken;
+  let res;
+  try {
+    res = await fetch(`${ADMIN_BASE}/parasend/token`, { method: 'POST', credentials: 'include' });
+  } catch {
+    throw new Error('Network error. Check your connection.');
+  }
+  if (res.status === 401) { cachedToken = null; clearAuth(); return null; }
+  if (!res.ok) throw new Error(res.status === 429 ? RATE_LIMITED_MESSAGE : 'Upload failed. Please try again.');
+  const d = await res.json().catch(() => ({}));
+  if (!d.token) throw new Error('Upload failed. Please try again.');
+  cachedToken = { token: d.token, relay: relayForSector(d.sector), exp: Date.now() + (Number(d.expires_in_s) || 900) * 1000 };
+  return cachedToken;
+}
 
 // ── Session ──────────────────────────────────────────────────────────────────────────
 export async function verifySession() {
@@ -59,11 +117,26 @@ export async function verifySession() {
   if (auth.mode === 'apikey') {
     return { authenticated: true, mode: 'apikey', plan: auth.plan || null, expires_at: new Date(auth.until).toISOString() };
   }
+  if (auth.mode === 'totp') {
+    try {
+      const res = await fetch(`${ADMIN_BASE}/session/verify`, { credentials: 'include' });
+      if (!res.ok) { clearAuth(); return { authenticated: false }; }
+      const d = await res.json().catch(() => ({}));
+      return { authenticated: true, mode: 'totp', email: d.email || auth.email, expires_at: new Date(auth.until).toISOString() };
+    } catch {
+      return { authenticated: false };
+    }
+  }
   clearAuth();
   return { authenticated: false };
 }
 
 export async function logout() {
+  const auth = getAuth();
+  cachedToken = null;
+  if (auth?.mode === 'totp') {
+    try { await fetch(`${ADMIN_BASE}/logout`, { method: 'POST', credentials: 'include' }); } catch {}
+  }
   clearAuth();
 }
 
@@ -71,7 +144,20 @@ export async function logout() {
 // opts: { ttlMs, deviceId?, onProgress? }
 export async function uploadAttachment(att, opts) {
   const auth = getAuth();
-  if (auth?.mode !== 'apikey' || !auth.apikey) return { success: false, message: 'not_authenticated' };
+  let creds;
+  if (auth?.mode === 'apikey' && auth.apikey) {
+    creds = { apiKey: auth.apikey, relay: auth.relay || DEFAULT_RELAY };
+  } else if (auth?.mode === 'totp') {
+    try {
+      const tok = await sessionToken();
+      if (!tok) return { success: false, message: 'not_authenticated' };
+      creds = { relay: tok.relay, getBearer: async () => (await sessionToken())?.token };
+    } catch (err) {
+      return { success: false, message: String(err?.message || err) };
+    }
+  } else {
+    return { success: false, message: 'not_authenticated' };
+  }
 
   let bytes;
   try {
@@ -83,7 +169,7 @@ export async function uploadAttachment(att, opts) {
   try {
     const result = await encryptAndUpload({
       bytes, fileName: att.name, fileSize: bytes.length,
-      apiKey: auth.apikey, relay: auth.relay || DEFAULT_RELAY,
+      ...creds,
       ttlMs: opts.ttlMs, deviceId: opts.deviceId || 'paramant-outlook',
       onProgress: opts.onProgress,
     });

@@ -151,14 +151,58 @@ test('EXT-03-A: after an e-mail + code sign-in an upload goes out with a session
   assert.equal(tokenMints, 1, 'one token per transfer, reused across its chunks');
 });
 
-test('EXT-09-A: a self-hosted relay is refused before anything is uploaded', async () => {
+test('EXT-09-A: a self-hosted relay uploads, and its link opens on that relay, not on paramant.app', async () => {
   for (const k of Object.keys(store)) delete store[k];
   Object.assign(store, { auth_mode: 'apikey', auth_apikey: 'pgp_test', auth_relay: 'https://relay.mijnbedrijf.nl', auth_until: Date.now() + 3600e3 });
-  const begin = await sendThroughChrome({ type: 'TRANSFER_BEGIN', file: { name: 'x.bin', size: 10 } });
-  assert.equal(begin.ok, false);
-  assert.match(begin.error, /self-hosted relay is not supported/);
-  assert.equal(core.isReceivableRelay('https://legal.paramant.app/'), true);
-  assert.equal(core.isReceivableRelay('https://relay.mijnbedrijf.nl'), false);
+  uploads.length = 0;
+  const file = crypto.randomBytes(500);
+  const begin = await sendThroughChrome({ type: 'TRANSFER_BEGIN', file: { name: 'x.bin', size: file.length } });
+  assert.equal(begin.ok, true, 'a self-hosted relay got: ' + JSON.stringify(begin));
+  const res = await sendThroughChrome({ type: 'TRANSFER_CHUNK', transferId: begin.transferId, index: 0, b64: core.encodeChunkMessage(file) });
+  assert.equal(res.ok, true, JSON.stringify(res));
+  assert.equal(uploads[0].url, 'https://relay.mijnbedrijf.nl/v2/inbound');
+  const fin = await sendThroughChrome({ type: 'TRANSFER_FINISH', transferId: begin.transferId });
+  assert.equal(fin.ok, true, JSON.stringify(fin));
+  const url = new URL(fin.shareUrl);
+  assert.equal(url.origin + url.pathname, 'https://relay.mijnbedrijf.nl/get', 'the receiver must open the link on the relay itself');
+  assert.equal(url.searchParams.get('r'), 'https://relay.mijnbedrijf.nl');
+  // A Paramant relay still opens on paramant.app/get.
+  assert.equal(core.receiveBaseFor('https://legal.paramant.app/'), 'https://paramant.app/get');
+  assert.equal(core.isReceivableRelay('https://relay.mijnbedrijf.nl'), true);
+  // Only an https origin: no http, no path, no query, no user info.
+  for (const bad of ['http://relay.mijnbedrijf.nl', 'https://relay.mijnbedrijf.nl/x', 'https://a@relay.mijnbedrijf.nl', 'https://relay.mijnbedrijf.nl/?a=1', 'javascript:alert(1)', 'relay.mijnbedrijf.nl']) {
+    assert.equal(core.isReceivableRelay(bad), false, bad);
+  }
+});
+
+test('EXT-09-A: the link block keeps a self-hosted /get link and still blocks anything else', async () => {
+  const { buildLinkHtml } = await import('../extensions/shared/link-block.js');
+  const at = new Date().toISOString();
+  const own = 'https://relay.mijnbedrijf.nl/get?t=abc&c=1&r=https%3A%2F%2Frelay.mijnbedrijf.nl#k=K';
+  assert.ok(buildLinkHtml({ url: own, filename: 'a.pdf', expiresAt: at, format: 'block' }).includes('href="https://relay.mijnbedrijf.nl/get?t=abc&amp;c=1'));
+  for (const bad of ['javascript:alert(1)', 'http://relay.mijnbedrijf.nl/get?t=a', 'https://relay.mijnbedrijf.nl/elders', 'https://a:b@relay.mijnbedrijf.nl/get?t=a']) {
+    assert.match(buildLinkHtml({ url: bad, filename: 'a.pdf', expiresAt: at, format: 'block' }), /href="#"/, bad);
+  }
+});
+
+test('EXT-09-A: /get opens a FileLink from its own origin and from Paramant relays, nothing else', () => {
+  const src = read('frontend/js/get.page.js');
+  const m = src.match(/function parseLink\(\) \{[\s\S]*?\n\}/);
+  assert.ok(m, 'parseLink not found');
+  const set = src.match(/const FILELINK_RELAYS = new Set\(\[[\s\S]*?\]\);/)[0];
+  const run = (href) => {
+    const u = new URL(href);
+    const fn = new Function('location', 'TOKEN_RE', 'fromB64url', 'RELAY_SECTORS', 'DEFAULT_RELAY',
+      set + '\n' + m[0] + '\nreturn parseLink();');
+    return fn({ search: u.search, hash: u.hash, origin: u.origin }, /^[0-9a-f]{48}$/,
+      (x) => Buffer.from(x.replace(/-/g, '+').replace(/_/g, '/'), 'base64'), {}, 'https://health.paramant.app');
+  };
+  const tok = 'a'.repeat(48), key = Buffer.alloc(32, 1).toString('base64url');
+  const q = (origin, r) => `${origin}/get?t=${tok}&c=1&r=${encodeURIComponent(r)}#k=${key}`;
+  assert.equal(run(q('https://relay.mijnbedrijf.nl', 'https://relay.mijnbedrijf.nl')).kind, 'filelink', 'own origin');
+  assert.equal(run(q('https://paramant.app', 'https://legal.paramant.app')).kind, 'filelink', 'Paramant relay');
+  assert.equal(run(q('https://paramant.app', 'https://relay.mijnbedrijf.nl')).kind, 'invalid', 'paramant.app must not fetch from a foreign host');
+  assert.equal(run(q('https://relay.mijnbedrijf.nl', 'https://evil.example')).kind, 'invalid', 'a self-host must not fetch from a third host');
 });
 
 test('EXT-19-A / SEND-03-A: a 429 on check-key is "too many attempts", never "invalid key"', async () => {
@@ -177,10 +221,56 @@ test('EXT-19-A: taskpane.js and commands.js are loaded once (webpack injects the
   }
 });
 
-test('EXT-20-A: the taskpane offers no e-mail + code sign-in it cannot complete', () => {
+test('EXT-20-A: the taskpane signs in with e-mail + code and uploads with a session token', async () => {
   const html = read('extensions/outlook-addin/src/taskpane/taskpane.html');
-  assert.doesNotMatch(html, /id="form-totp"/);
-  assert.doesNotMatch(read('extensions/outlook-addin/src/shared/paramant-api.js'), /\/login`/);
+  assert.match(html, /id="form-totp"/);
+  assert.match(html, /id="show-totp"/);
+  // Drive the add-in's own module against a fake paramant.app.
+  const ls = {};
+  globalThis.localStorage = { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } };
+  globalThis.Office = { context: { mailbox: { item: { getAttachmentContentAsync: (id, cb) =>
+    cb({ status: 'succeeded', value: { format: 'base64', content: Buffer.from('hallo outlook').toString('base64') } }) } } },
+    AsyncResultStatus: { Succeeded: 'succeeded' }, MailboxEnums: { AttachmentContentFormat: { Base64: 'base64' } } };
+  const seen = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    seen.push({ u, init });
+    if (u === 'https://paramant.app/api/user/login') {
+      assert.equal(init.credentials, 'include');
+      return new Response(JSON.stringify({ ok: true, email: 'demo@example.com', session_expires_at: new Date(Date.now() + 3600e3).toISOString() }), { status: 200 });
+    }
+    if (u === 'https://paramant.app/api/user/session/verify') return new Response(JSON.stringify({ email: 'demo@example.com' }), { status: 200 });
+    if (u === 'https://paramant.app/api/user/parasend/token') {
+      assert.equal(init.credentials, 'include');
+      return new Response(JSON.stringify({ token: 'pst_' + 'b'.repeat(40), expires_in_s: 900, sector: 'legal' }), { status: 200 });
+    }
+    if (u.endsWith('/v2/inbound')) return new Response(JSON.stringify({ download_token: crypto.randomBytes(24).toString('hex'), ttl_ms: 3600e3 }), { status: 200 });
+    throw new Error('unexpected fetch ' + u);
+  };
+  try {
+    const api = await import('../extensions/outlook-addin/src/shared/paramant-api.js');
+    const login = await api.loginWithTotp('demo@example.com', '123456');
+    assert.equal(login.success, true, JSON.stringify(login));
+    assert.equal((await api.verifySession()).authenticated, true);
+    const up = await api.uploadAttachment({ id: 'att1', name: 'a.txt' }, { ttlMs: 3600e3 });
+    assert.equal(up.success, true, JSON.stringify(up));
+    const inbound = seen.find((x) => x.u.endsWith('/v2/inbound'));
+    assert.equal(inbound.u, 'https://legal.paramant.app/v2/inbound', 'the token works on the sector the admin named');
+    assert.match(inbound.init.headers.Authorization || '', /^Bearer pst_/);
+    assert.equal(inbound.init.headers['X-Api-Key'], undefined);
+    assert.match(up.shareUrl, /^https:\/\/paramant\.app\/get\?/);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('EXT-20-A: the account server answers the taskpane origin on exactly its routes', () => {
+  const srv = read('admin/server.js');
+  const m = srv.match(/const ADDIN_CORS_PATHS = new Set\(\[([^\]]+)\]\)/);
+  assert.ok(m);
+  for (const r of ['/user/login', '/user/session/verify', '/user/parasend/token', '/user/logout']) assert.ok(m[1].includes(`'${r}'`), r);
+  assert.match(srv, /new Set\(\['https:\/\/addin\.paramant\.app'/);
 });
 
 test('EXT-18-A: the manifest asks Mailbox 1.8, which getAttachmentsAsync needs', () => {
