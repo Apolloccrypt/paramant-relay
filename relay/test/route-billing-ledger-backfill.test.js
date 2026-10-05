@@ -55,10 +55,12 @@ test('settled ids from redis markers and paid_by pointers land in the ledger at 
   assert.strictEqual(byId.get(OLD_MARKER), 'granted');
   assert.strictEqual(byId.get(OLD_REVOKED), 'revoked');
   assert.strictEqual(byId.get(POINTER), 'granted');
-  const n = ledgerLines(ledgerFile).length;
   srv = await srv.restart();
   await new Promise((r) => setTimeout(r, 1500));
-  assert.strictEqual(ledgerLines(ledgerFile).length, n, 'a second boot writes nothing new');
+  // Other suites share this redis and may add their own markers between the
+  // two boots, so the check is on OUR ids: each one is in the ledger once.
+  const mine = ledgerLines(ledgerFile).filter((r) => [OLD_MARKER, OLD_REVOKED, POINTER].includes(r.id));
+  assert.strictEqual(mine.length, 3, 'a second boot writes none of them again: ' + JSON.stringify(mine));
   await srv.stop();
   checks++;
 });
