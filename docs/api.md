@@ -873,11 +873,13 @@ hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
 
 # Receive: returns (data, receipt); burn-on-read
 data, receipt = gp.receive(hash_)
-
-# Anonymous drop (BIP39 mnemonic)
-mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data = gp.pickup(mnemonic)    # pickup by mnemonic returns the bytes
 ```
+
+`gp.drop()` and `gp.pickup()` (the anonymous BIP39 drop) do not work in 3.0.0
+against the current relay. The relay checks that an upload's `hash` is the
+SHA-256 of the payload and answers `400 hash_mismatch` otherwise; a mnemonic
+drop addresses the blob by a hash derived from the phrase, so the upload is
+refused. For an anonymous transfer use ParaShare (`/parashare`).
 
 This is `paramant-sdk` 3.0.0 on PyPI. In 3.0.0 `receipt` is usually `None`: the
 SDK reads it only from the inline `X-Paramant-Receipt` header, which the relay

@@ -129,8 +129,24 @@ test('API-35-A: the Python SDK examples are the 3.0.0 calling convention', () =>
   }
   const py = API.slice(API.indexOf('## Python SDK'), API.indexOf('## CLI tools'));
   assert.match(py, /gp\.receive_setup\(\)/);
-  assert.match(py, /data = gp\.pickup\(mnemonic\)/);
   assert.doesNotMatch(py, /receipt\["burn_confirmed"\]/, 'the SDK 3.0.0 receipt is usually None');
+});
+
+test('API-35-A: no Python example calls the mnemonic drop the relay refuses', () => {
+  // SDK 3.0.0 drop() posts to /v2/inbound with a hash derived from the phrase,
+  // not sha256(payload). The relay binds hash to the bytes on both inbound
+  // routes, so the drop comes back 400 hash_mismatch. As long as that binding
+  // stands, no runnable Python block may call drop() or pickup().
+  const inbound = RELAY.slice(RELAY.indexOf("path === '/v2/inbound'"));
+  assert.match(inbound, /createHash\('sha256'\)\.update\(blob\)\.digest\('hex'\) !== hash\) \{[^}]*hash_mismatch/,
+    'relay /v2/inbound binds hash to sha256(payload)');
+  const blocks = (txt) => [...txt.matchAll(/```python\n([\s\S]*?)```/g)].map((m) => m[1]);
+  for (const [name, txt] of [['docs/api.md', API], ['README.md', read('README.md')]]) {
+    const py = blocks(txt);
+    assert.ok(py.some((b) => /gp\.send\(/.test(b)), `${name}: has the send example`);
+    for (const b of py) assert.doesNotMatch(b, /gp\.(drop|pickup)\(/, `${name}: a Python block calls drop/pickup`);
+    assert.match(txt, /hash_mismatch/, `${name}: says why drop is left out`);
+  }
 });
 
 test('API-36-A: every command the CLI reference names exists in the repository', () => {

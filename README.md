@@ -515,26 +515,20 @@ pip install paramant-sdk
 ```
 
 ```python
-from paramant import GhostPipe
+from paramant_sdk import GhostPipe
 
 gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
+gp.receive_setup()            # register this device's keys first (once per device)
 
-# Send — returns (hash, inclusion_proof)
+# Send: returns (hash, inclusion_proof)
 hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
-# proof contains leaf_hash, leaf_index, tree_size, audit_path, root, sth
 
-# Receive — returns (data, receipt)
+# Receive: returns (data, receipt); burn-on-read
 data, receipt = gp.receive(hash_)
-# receipt contains blob_hash, burn_confirmed, tree_size_at_retrieval, ML-DSA-65 signature
-
-# Verify receipt (calls POST /v2/verify-receipt)
-result = gp.verify_receipt(receipt)
-assert result["valid"]
-
-# Anonymous drop with 12-word mnemonic
-mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data, _  = gp.receive(mnemonic)
 ```
+
+The anonymous drop (`gp.drop()` / `gp.pickup()`) does not work in 3.0.0 against
+the current relay (`400 hash_mismatch`); see [docs/api.md](docs/api.md#python-sdk).
 
 ---
 
