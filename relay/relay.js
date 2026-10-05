@@ -2679,7 +2679,7 @@ const envCreateLimits = new Map();        // apiKey  -> { count, resetAt }
 const envViewLimits   = new Map();        // ip      -> { count, resetAt }
 const envSignLimits   = new Map();        // ip      -> { count, resetAt }
 function envCreateRateOk(apiKey) {
-  return rateLimit.fixedWindowAllow(envCreateLimits, apiKey, 50, 3600_000);
+  return rateLimit.slidingWindowAllow(envCreateLimits, apiKey, ENV_CREATE_LIMIT, 3600_000);
 }
 function envViewRateOk(ip) {
   return rateLimit.fixedWindowAllow(envViewLimits, ip, 30, 60_000);
@@ -2707,25 +2707,25 @@ function verifyRateOk(ip) {
 setInterval(() => { const now = Date.now(); for (const [k, v] of verifyLimits) if (now > v.resetAt + 60_000) verifyLimits.delete(k); }, 120_000);
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of envCreateLimits) if (now > v.resetAt + 60_000) envCreateLimits.delete(k);
+  for (const [k, v] of envCreateLimits) if (!Array.isArray(v) || !v.length || now > v[v.length - 1] + 3600_000) envCreateLimits.delete(k);
   for (const [k, v] of envViewLimits)   if (now > v.resetAt + 60_000) envViewLimits.delete(k);
   for (const [k, v] of envSignLimits)   if (now > v.resetAt + 60_000) envSignLimits.delete(k);
 }, 120_000);
 
 // Fleet-wide envelope-create rate limit. The per-process envCreateLimits above
 // only bound ONE relay instance; behind the multi-instance deployment a client
-// got N times the intended 50/hour. This shares the counter in redis: INCR a
-// per-key hourly bucket, EXPIRE it on first hit. Fails OPEN to the per-process
-// limiter when redis is down, so an outage never hard-blocks paying integrators
-// (they still get the local 50/hour cap). The bucket rolls hourly by wall clock.
+// got N times the intended 50/hour. This shares the window in redis. Fails OPEN
+// to the per-process limiter when redis is down, so an outage never hard-blocks
+// paying integrators (they still get the local 50/hour cap).
+// A sliding hour, not the clock hour (matrix API-20-N): the bucket rolled at
+// :00, so 50 creates at 10:59 and 50 more at 11:00 all passed against a docs
+// promise of 50 per hour. Answers { ok, retryAfterMs }.
 const ENV_CREATE_LIMIT = 50;
 async function envCreateRateOkShared(apiKey) {
   if (!redisClient || !redisClient.isReady) return envCreateRateOk(apiKey);
   try {
-    const bucket = Math.floor(Date.now() / 3600_000);
-    const rk = `paramant:rl:envcreate:${bucket}:${apiKey}`;
-    const n = await redisCounter.incrInWindow(redisClient, rk, 3600);
-    return n <= ENV_CREATE_LIMIT;
+    const rk = `paramant:rl:envcreate:sw:${crypto.createHash('sha256').update(String(apiKey)).digest('hex').slice(0, 32)}`;
+    return await rateLimit.slidingWindowAllowRedis(redisClient, rk, ENV_CREATE_LIMIT, 3600_000);
   } catch (e) {
     log('warn', 'env_create_rl_redis_fail', { err: e.message });
     return envCreateRateOk(apiKey);
@@ -2852,6 +2852,86 @@ function zeroBuffer(buf) {
     try { crypto.randomFillSync(buf); } catch {}
     try { buf.fill(0); } catch {}
   }
+}
+
+// ── Burn after delivery, never on the request ───────────────────────────────
+// A download without a claim (old SDKs, scripts, curl) used to be burned when
+// the request came in (/v2/outbound) or on 'finish' (/v2/dl), and a receiver
+// whose line broke lost the file (matrix API-24-K, API-30-K, API-35-K).
+// 'finish' only says the last byte left this process. What tells a complete
+// delivery from a broken one is the socket afterwards: a client that read
+// every byte closes cleanly (FIN) or keeps the connection for its next
+// request; a client that stopped early closes with unread bytes in its
+// buffer, and its kernel answers with a reset (ECONNRESET / EPIPE here).
+// So the bytes are hidden on 'finish' (a second reader gets 404 at once) and
+// only destroyed once the socket has stayed clean for DELIVERY_SETTLE_MS or
+// closed without an error. A reset before that puts the blob back.
+// The claim mode (?claim= + ack on /v2/dl) stays the exact path.
+// hash -> { entry, key, until, timer }: see onCleanCloseEarly on GET /v2/outbound.
+const outboundRetryHold = new Map();
+const DELIVERY_SETTLE_MS = Math.max(0, parseInt(process.env.DELIVERY_SETTLE_MS || '3000', 10) || 0);
+function afterDelivery(req, res, { onFinish, onDelivered, onAborted, onCleanCloseEarly }) {
+  const sock = req.socket;
+  let state = 'sending'; // sending -> settling -> delivered | aborted
+  let timer = null;
+  const cleanup = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (sock) { sock.removeListener('error', onSockError); sock.removeListener('close', onSockClose); }
+  };
+  const abort = (why) => {
+    if (state === 'delivered' || state === 'aborted') return;
+    const wasSettling = state === 'settling';
+    state = 'aborted'; cleanup();
+    try { onAborted(why, wasSettling); } catch (e) { log('warn', 'delivery_abort_handler_failed', { err: e.message }); }
+  };
+  const deliver = () => {
+    if (state !== 'settling') return;
+    state = 'delivered'; cleanup();
+    try { onDelivered(); } catch (e) { log('warn', 'delivery_handler_failed', { err: e.message }); }
+  };
+  function onSockError(e) { abort((e && e.code) || 'socket_error'); }
+  function onSockClose(hadError) {
+    if (hadError || state === 'sending') return abort(hadError ? 'reset' : 'closed_before_finish');
+    // A clean close inside the window is what a complete download looks like,
+    // and also what a proxy in front of us does when ITS client gave up: the
+    // proxy had already read every byte, so no reset reaches us. A caller
+    // that can tell its own receiver apart (the API key) may hold the bytes
+    // for a retry instead.
+    if (state === 'settling' && onCleanCloseEarly) {
+      state = 'delivered'; cleanup();
+      try { onCleanCloseEarly(); } catch (e) { log('warn', 'delivery_close_handler_failed', { err: e.message }); }
+      return;
+    }
+    deliver();
+  }
+  if (sock) { sock.on('error', onSockError); sock.on('close', onSockClose); }
+  res.on('finish', () => {
+    if (state !== 'sending') return;
+    state = 'settling';
+    try { if (onFinish) onFinish(); } catch (e) { log('warn', 'delivery_finish_handler_failed', { err: e.message }); }
+    if (!sock || sock.destroyed) { if (sock && sock.errored) return abort('reset'); return deliver(); }
+    timer = setTimeout(deliver, DELIVERY_SETTLE_MS);
+    if (timer.unref) timer.unref();
+  });
+  res.on('close', () => { if (!res.writableFinished) abort('closed_before_finish'); });
+}
+// Writes a buffer in pieces, each only after the socket took the last one, so
+// 'finish' cannot fire while a reader that stopped early still has megabytes
+// to go (measured on loopback with one res.end(blob)).
+function writeInPieces(res, blob) {
+  const PIECE = 64 * 1024;
+  let off = 0;
+  const pump = () => {
+    while (off < blob.length) {
+      if (res.destroyed) return;
+      const end = Math.min(blob.length, off + PIECE);
+      const more = res.write(blob.subarray(off, end));
+      off = end;
+      if (!more) { res.once('drain', pump); return; }
+    }
+    res.end();
+  };
+  pump();
 }
 
 // ── HKDF-SHA256 — compatible met Python cryptography library ──────────────────
@@ -4850,6 +4930,7 @@ async function handleRelayRequest(req, res) {
       req, res, method: req.method, path, query, clientIp,
       authHeader: req.headers['authorization'] || '',
       publicOrigin: _publicOrigin,
+      relayId: RELAY_SELF_URL || _publicOrigin,
       apiKeys,
       // The ACCOUNT's right to start new work, asked before every new envelope
       // and not only when a key is minted: the scope on a psk_ key outlives a
@@ -6145,20 +6226,26 @@ async function handleRelayRequest(req, res) {
         text: tweetaligTekst(taal3,
               'Er staat nog een bestand voor u klaar.\n\nGebruik de link uit de eerdere mail '
             + 'van Paramant. Die werkt nog en is nog steeds alleen voor u. '
-            + 'Beschikbaar tot ' + tot + '.',
+            + 'Beschikbaar tot ' + tot + '.\n\nDeze herinnering bevat bewust geen link: '
+            + 'de sleutel van het bestand zit alleen in de eerste mail. '
+            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.',
               'A file is still waiting for you.\n\nUse the link in the earlier mail '
             + 'from Paramant; it still works and it is still yours alone. '
-            + 'Available until ' + totEn + '.'),
+            + 'Available until ' + totEn + '.\n\nThis reminder carries no link on purpose: '
+            + 'the key to the file is only in the first mail. '
+            + 'Cannot find that mail? Ask the sender to send the file again.'),
         html: tweetaligHtml(taal3,
               '<p>Er staat nog een bestand voor u klaar.</p>'
             + '<p>Gebruik de link uit de eerdere mail van Paramant. Die werkt nog '
             + 'en is nog steeds alleen voor u.</p>'
             + '<p style="color:#666;font-size:13px">Beschikbaar tot ' + escHtml(tot) + '. '
+            + 'Deze herinnering bevat bewust geen link: de sleutel van het bestand zit alleen in de eerste mail. '
             + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.</p>',
               '<p>A file is still waiting for you.</p>'
             + '<p>Use the link in the earlier mail from Paramant. It still works, '
             + 'and it is still yours alone.</p>'
             + '<p style="color:#666;font-size:13px">Available until ' + escHtml(totEn) + '. '
+            + 'This reminder carries no link on purpose: the key to the file is only in the first mail. '
             + 'Cannot find that mail? Ask the sender to send the file again.</p>')
             + VOET(wie3, out.sender_email, taal3),
       });
@@ -7594,50 +7681,38 @@ async function handleRelayRequest(req, res) {
       'Content-Disposition': 'attachment; filename="paramant-encrypted-payload"',
       'Cache-Control': 'no-store',
       'Content-Length': blob.length,
-      'X-Burned': 'true',
+      // Not 'true' any more: nothing is burned yet. It burns once the whole
+      // body is delivered (afterDelivery), and a broken line keeps the file.
+      'X-Burned': 'on-delivery',
       'X-Hash': blobHash,
       // No proxy buffer in between: nginx would take the whole file at once
       // and 'finish' would mean "nginx has it", not "the client has it".
       'X-Accel-Buffering': 'no',
     });
-    // Burn on 'finish': Node has handed the last byte to the socket. Behind
-    // nginx that means "nginx has it"; X-Accel-Buffering above stops nginx
-    // from buffering the whole response first, so a client that stops reading
-    // holds the relay's write up instead of nginx's disk buffer. Measured
-    // (hertest r2 T4-3): directly against the relay a 5 MB download broken off
-    // after 80 KB no longer burns; through a local nginx it still did, because
-    // the socket buffers on that path swallow a few MB at once. That cannot be known
-    // on this side of TCP; only a claimed download with an ack (?claim=, the
-    // web page and the relay's own confirm page) is exact.
-    res.on('finish', () => {
-      _notifyDownloaded(entry, blobHash, { via: 'link' });
-      dlBurn(token, td, 'downloaded');
-      blobDrop(blobHash);
-      try { blob.fill(0); } catch {}
-    });
-    // Fix 4: on socket error before finish, allow retry
-    res.on('close', () => {
-      if (!td.used) {
+    // Burned only after delivery (matrix API-30-K): hidden on 'finish' so a
+    // second GET answers 410 at once, destroyed once the connection stayed
+    // clean, put back when the receiver's side reset it.
+    afterDelivery(req, res, {
+      onFinish: () => {
+        td.used = true; td.gone = 'downloaded'; td.claim = null;
+        blobDrop(blobHash, false);
+      },
+      onDelivered: () => {
+        dlMarkGone(token, td, 'downloaded');
         if (td.in_progress_by === legacyTag) td.in_progress = false;
-        log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
-      }
+        _notifyDownloaded(entry, blobHash, { via: 'link' });
+        zeroBuffer(blob);
+      },
+      onAborted: (why, afterFinish) => {
+        if (td.in_progress_by === legacyTag) td.in_progress = false;
+        if (afterFinish) {
+          td.used = false; td.gone = null;
+          if (Date.now() < td.expires_ms && !blobStore.has(blobHash)) blobPut(blobHash, entry);
+        }
+        log('warn', 'dl_aborted_before_delivery', { token: token.slice(0,8), hash: blobHash.slice(0,16), why, after_finish: !!afterFinish });
+      },
     });
-    // In pieces, each one only after the socket took the last (backpressure):
-    // one res.end(blob) let 'finish' fire while a reader that had stopped
-    // after 80 KB still had megabytes to go (measured on loopback).
-    const DL_PIECE = 64 * 1024;
-    let off = 0;
-    const pump = () => {
-      while (off < blob.length) {
-        if (res.destroyed) return;
-        const end = Math.min(blob.length, off + DL_PIECE);
-        const more = res.write(blob.subarray(off, end));
-        off = end;
-        if (!more) { res.once('drain', pump); return; }
-      }
-      res.end();
-    };
-    return pump();
+    return writeInPieces(res, blob);
   }
 
   // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
@@ -8995,7 +9070,20 @@ async function handleRelayRequest(req, res) {
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
   const outm = path.match(/^\/v2\/outbound\/([a-f0-9]{64})$/);
   if (outm && req.method === 'GET') {
-    const entry = blobStore.get(outm[1]);
+    let entry = blobStore.get(outm[1]);
+    // The same key coming back right after a download whose connection closed
+    // within DELIVERY_SETTLE_MS of the last byte: that download may have been
+    // broken off behind a proxy. It gets the blob once more (matrix API-35-K).
+    if (!entry) {
+      const held = outboundRetryHold.get(outm[1]);
+      if (held && held.key && held.key === apiKey && Date.now() < held.until) {
+        outboundRetryHold.delete(outm[1]);
+        clearTimeout(held.timer);
+        held.entry.views_remaining = (held.entry.views_remaining ?? 0) + 1;
+        if (Date.now() - held.entry.ts < held.entry.ttl) { blobPut(outm[1], held.entry); entry = held.entry; }
+        log('info', 'outbound_retry_after_close', { hash: outm[1].slice(0,16) });
+      }
+    }
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     // Per-key outbound rate limit (finding #12)
@@ -9032,11 +9120,9 @@ async function handleRelayRequest(req, res) {
     if (burned) {
       // Unlisted immediately so a concurrent reader cannot find it, but NOT
       // wiped: `blob` below is the buffer being served. Wiping here handed the
-      // downloader five megabytes of zeroes.
+      // downloader five megabytes of zeroes. It is only destroyed after the
+      // delivery (afterDelivery below); a broken download puts it back.
       blobDrop(outm[1], false);
-      res.on('finish', () => zeroBuffer(blob));
-      res.on('close',  () => zeroBuffer(blob));
-      incMetric('blobs_burned'); stats.burned++;
     }
     incMetric('bytes_out_total', blob.length);
     stats.outbound++; stats.bytes_out += blob.length;
@@ -9044,9 +9130,6 @@ async function handleRelayRequest(req, res) {
       { hash: outm[1].slice(0,16)+'...', bytes: blob.length, views_left: entry.views_remaining });
     log('info', burned ? 'blob_burned' : 'blob_served',
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
-    // ParaSend Pro download notification. Notify the transfer OWNER (the uploader),
-    // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
-    _notifyDownloaded(entry, outm[1], { via: 'api' });
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
@@ -9113,9 +9196,37 @@ async function handleRelayRequest(req, res) {
       if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
       else outHeaders['X-Paramant-Receipt-Deprecated'] = `removed 2026-12-01; GET /v2/transfers/${receiptId}/receipt`;
     }
+    outHeaders['X-Accel-Buffering'] = 'no';
     res.writeHead(200, outHeaders);
-    if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
-    return res.end(blob);
+    // Nothing is lost on a broken line (matrix API-24-K, API-35-K): the read
+    // only counts, and a burning read only destroys the blob, once the whole
+    // body was delivered. Until then the entry is unlisted, so a second
+    // reader gets 404 as before.
+    const outHash = outm[1];
+    const delivered = () => {
+      if (burned) { zeroBuffer(blob); incMetric('blobs_burned'); stats.burned++; }
+      // ParaSend Pro download notification. Notify the transfer OWNER (the
+      // uploader), whose key is on the blob entry, not the downloader.
+      _notifyDownloaded(entry, outHash, { via: 'api' });
+    };
+    afterDelivery(req, res, {
+      onDelivered: delivered,
+      onCleanCloseEarly: () => {
+        if (!burned || !apiKey) return delivered();
+        const timer = setTimeout(() => {
+          const h = outboundRetryHold.get(outHash);
+          if (h && h.entry === entry) { outboundRetryHold.delete(outHash); delivered(); }
+        }, DELIVERY_SETTLE_MS);
+        if (timer.unref) timer.unref();
+        outboundRetryHold.set(outHash, { entry, key: apiKey, until: Date.now() + DELIVERY_SETTLE_MS, timer });
+      },
+      onAborted: (why) => {
+        entry.views_remaining = (entry.views_remaining ?? 0) + 1;
+        if (burned && Date.now() - entry.ts < entry.ttl && !blobStore.has(outHash)) blobPut(outHash, entry);
+        log('warn', 'outbound_aborted_before_delivery', { hash: outHash.slice(0,16), why, restored: burned });
+      },
+    });
+    return writeInPieces(res, blob);
   }
 
   // ── GET /v2/transfers/:receipt_id/receipt ─ the delivery receipt, by reference ─
@@ -11261,7 +11372,8 @@ async function handleRelayRequest(req, res) {
   // POST /v2/envelopes -- create a new envelope.
   if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
-    if (!(await envCreateRateOkShared(apiKey))) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
+    const _rl = await envCreateRateOkShared(apiKey);
+    if (!_rl.ok) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil((_rl.retryAfterMs || 3600_000) / 1000)) }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable (redis or crypto not ready)' })); }
     try {

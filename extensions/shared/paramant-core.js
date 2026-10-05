@@ -55,13 +55,42 @@ export const SECTOR_RELAYS = Object.freeze([
   'https://iot.paramant.app',
 ]);
 
-// The receiver opens every link on paramant.app/get, and that page fetches only
-// from the relays above. A link to any other relay cannot be opened there
-// (fase 1, EXT-09-A), so the integrations upload to these relays only.
-export function isReceivableRelay(url) {
-  return SECTOR_RELAYS.includes(String(url || '').replace(/\/+$/, ''));
+// Where the receiver opens a link, per relay.
+//
+// A Paramant relay: on paramant.app/get, which fetches only from the relays
+// above (its CSP names them). A self-hosted relay: on that relay's own /get,
+// which the relay serves itself (SERVE_FRONTEND=true, the install.sh default)
+// and which fetches from its own origin only. paramant.app/get never fetches
+// from a host it does not know, and a self-host never depends on paramant.app
+// (fase 1, EXT-09-A: the link used to point at paramant.app/get, which refused
+// the foreign relay, so the receiver saw "invalid link").
+//
+// A relay is accepted as an https origin and nothing more: no path, no query,
+// no user info, no plain http. That is what keeps r= from carrying anything
+// but a host to fetch from.
+export function relayOrigin(url) {
+  const raw = String(url || '').trim().replace(/\/+$/, '');
+  if (!raw) return null;
+  let u;
+  try { u = new URL(raw); } catch { return null; }
+  if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash) return null;
+  if (u.pathname && u.pathname !== '/') return null;
+  return u.origin;
 }
-export const SELF_HOST_UNSUPPORTED = 'A self-hosted relay is not supported here yet: the receiver opens the link on paramant.app, which only fetches from Paramant relays. Clear the relay setting in the options.';
+export function isParamantRelay(url) {
+  return SECTOR_RELAYS.includes(relayOrigin(url) || '');
+}
+export function isReceivableRelay(url) {
+  return relayOrigin(url) !== null;
+}
+export function receiveBaseFor(relay) {
+  const o = relayOrigin(relay);
+  if (!o || SECTOR_RELAYS.includes(o)) return RECEIVE_BASE;
+  return `${o}/get`;
+}
+export const RELAY_NOT_HTTPS = 'Enter the relay as an https:// address without a path, for example https://relay.example.com.';
+/** @deprecated the old name: a self-hosted relay is supported now, only a non-https one is refused. */
+export const SELF_HOST_UNSUPPORTED = RELAY_NOT_HTTPS;
 
 const UPLOAD_TIMEOUT_MS = 120_000;
 const MAX_UPLOAD_RETRIES = 4;     // for 503 (capacity) / 429 (rate)
@@ -351,7 +380,10 @@ export async function sealAndUploadChunk({ relay, apiKey, bearer, chunkU8, fileM
 
 // ── Share URL ───────────────────────────────────────────────────────────────────
 // Format (read by frontend/js/get.page.js, the FileLink branch):
-//   {RECEIVE_BASE}?t=T1,T2&c=N&r=RELAY#k=K1,K2
+//   {receiveBaseFor(RELAY)}?t=T1,T2&c=N&r=RELAY#k=K1,K2
+//
+// For a Paramant relay that is paramant.app/get; for a self-hosted relay the
+// relay's own /get (see receiveBaseFor).
 //
 // No file name in the URL (hertest T4-9). The query of a link is sent to the
 // server on every open and ends up in mail logs, proxies and scanners; the
@@ -360,8 +392,8 @@ export async function sealAndUploadChunk({ relay, apiKey, bearer, chunkU8, fileM
 // accepted so existing callers keep working; it is not used.
 export function buildShareUrl({ tokens, name, chunks, relay, keys }) {
   const t = tokens.map(encodeURIComponent).join(',');
-  const r = encodeURIComponent(relay);
-  return `${RECEIVE_BASE}?t=${t}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
+  const r = encodeURIComponent(relayOrigin(relay) || relay);
+  return `${receiveBaseFor(relay)}?t=${t}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
 }
 
 // ── High-level orchestration (whole file already in memory) ──────────────────────
@@ -372,6 +404,10 @@ export function buildShareUrl({ tokens, name, chunks, relay, keys }) {
 
 export async function encryptAndUpload({
   bytes, fileName, fileSize, apiKey, relay, ttlMs, deviceId = 'paramant-mail', onProgress, signal,
+  // An e-mail + code session holds no API key: it uploads with a short-lived
+  // ParaSend session token as a Bearer. getBearer() is asked before every
+  // chunk, so a token that runs out halfway through a large file is renewed.
+  getBearer,
 }) {
   const total  = chunkCount(fileSize);
   const fileId = randomFileId();
@@ -386,8 +422,9 @@ export async function encryptAndUpload({
 
     onProgress?.({ phase: 'upload', chunkIndex: i, totalChunks: total, fraction: i / total });
 
+    const bearer = getBearer ? await getBearer() : undefined;
     const res = await sealAndUploadChunk({
-      relay, apiKey, chunkU8, ttlMs, signal,
+      relay, apiKey, bearer, chunkU8, ttlMs, signal,
       // Encrypted metadata (inside the blob, for the receiver). Never seen by the relay.
       fileMeta: { file_id: fileId, file_name: fileName, file_size: fileSize, chunk_index: i, total_chunks: total, chunk_size: chunkU8.length },
       // Cleartext metadata sent to the relay: only what it needs (dedup + routing). No filename, no size.

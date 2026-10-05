@@ -5313,8 +5313,8 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
     return res.end();
   }
 
-  // Hard timeout so no command can run away.
-  const TIMEOUT_MS = 60_000;
+  // Hard timeout so no command can run away (a follow gets ten minutes).
+  const TIMEOUT_MS = cliCommands.timeoutFor(cmd, v.values);
   const killGroup = () => {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} }
   };

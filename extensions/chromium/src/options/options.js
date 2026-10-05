@@ -1,5 +1,5 @@
 import { getSettings, setSettings, clearHistory, TTL_OPTIONS } from '../shared/settings.js';
-import { isReceivableRelay, SELF_HOST_UNSUPPORTED } from '../../../shared/paramant-core.js';
+import { isReceivableRelay, relayOrigin, RELAY_NOT_HTTPS } from '../../../shared/paramant-core.js';
 
 const TTL_LABELS = { ttl_1h: '1 hour', ttl_6h: '6 hours', ttl_24h: '24 hours', ttl_3d: '3 days', ttl_7d: '7 days' };
 const t = (key, fallback) => chrome.i18n.getMessage(key) || fallback || key;
@@ -56,18 +56,15 @@ async function init() {
 
   relayInput.addEventListener('change', async () => {
     const v = relayInput.value.trim();
-    if (v && !/^https:\/\/[^\s]+$/i.test(v)) {
-      relayInput.setCustomValidity('Enter a full https:// URL');
-      relayInput.reportValidity();
-      return;
-    }
+    // A Paramant relay or a self-hosted one, as an https origin. A self-hosted
+    // relay's links open on that relay's own /get (paramant-core receiveBaseFor).
     if (v && !isReceivableRelay(v)) {
-      relayInput.setCustomValidity(t('opt_relay_selfhost', SELF_HOST_UNSUPPORTED));
+      relayInput.setCustomValidity(t('opt_relay_selfhost', RELAY_NOT_HTTPS));
       relayInput.reportValidity();
       return;
     }
     relayInput.setCustomValidity('');
-    await setSettings({ relay_override: v.replace(/\/+$/, '') });
+    await setSettings({ relay_override: v ? relayOrigin(v) : '' });
     flashSaved();
   });
 

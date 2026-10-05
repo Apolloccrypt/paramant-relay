@@ -41,7 +41,7 @@
 
   <section class="card">
     <h2 data-i18n="opt_relay_title">Relay (advanced)</h2>
-    <p class="hint" data-i18n="opt_relay_hint">Leave blank to auto-detect the relay for your API key. You can pin one of the Paramant relays here. A self-hosted relay is not supported yet: the receiver opens the link on paramant.app, which only fetches from Paramant relays.</p>
+    <p class="hint" data-i18n="opt_relay_hint">Leave blank to auto-detect the relay for your API key. You can pin a Paramant relay here, or your own relay (https://relay.example.com). With your own relay the receiver opens the link on that relay, so it has to serve the Paramant pages itself (SERVE_FRONTEND=true, the default of install.sh).</p>
     <label class="field">
       <span data-i18n="opt_relay_url">Relay URL</span>
       <input type="url" id="relay" placeholder="https://relay.paramant.app" spellcheck="false">

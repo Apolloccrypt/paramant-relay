@@ -12,7 +12,10 @@ module.exports = (env, argv) => {
     },
     output: {
       path: path.resolve(__dirname, 'dist'),
-      filename: '[name].js',
+      // Content hash in the name: addin.paramant.app caches .js for 7 days
+      // (deploy/nginx/addin.paramant.app.conf), so a fixed name kept the old
+      // build in Outlook for a week after a deploy (fase 1, EXT-16-H).
+      filename: isDev ? '[name].js' : '[name].[contenthash:8].js',
       clean: true,
     },
     devtool: isDev ? 'source-map' : false,

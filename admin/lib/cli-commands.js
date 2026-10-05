@@ -34,13 +34,19 @@ const COMMANDS = {
     totp: false,
   },
   'logs': {
-    description: 'Tail logs of a service (add "follow" to keep streaming; Ctrl+C stops it, the 60 s limit too)',
+    description: 'Tail logs of a service (logs relay -f keeps streaming until Ctrl+C, at most 10 minutes)',
     handler: 'paramant-logs.sh',
     args: [
       { name: 'service', type: 'enum', options: ['relay', 'admin', 'nats', 'frontend'], required: true },
       { name: 'tail', type: 'number', default: 100, min: 1, max: 1000 },
-      { name: 'follow', type: 'enum', options: ['no', 'follow'], default: 'no' },
+      // "-f" and "--follow" are what an operator types (docker logs -f); they
+      // mean the same as the word "follow".
+      { name: 'follow', type: 'enum', options: ['no', 'follow'], default: 'no',
+        aliases: { '-f': 'follow', '--follow': 'follow' } },
     ],
+    // A follow is meant to run: it gets ten minutes instead of the 60 s that
+    // bounds every other command. Ctrl+C still ends it at once.
+    followTimeoutMs: 10 * 60_000,
     class: 'read',
     totp: false,
   },
@@ -152,6 +158,7 @@ function validateArgs(cmd, rawArgs) {
     switch (spec.type) {
       case 'enum':
         v = String(v);
+        if (spec.aliases && Object.prototype.hasOwnProperty.call(spec.aliases, v)) v = spec.aliases[v];
         if (!spec.options.includes(v)) {
           return { ok: false, error: `Arg ${spec.name} must be one of: ${spec.options.join(', ')}` };
         }
@@ -244,4 +251,10 @@ function buildChildEnv(cmd, processEnv, sectors, adminToken) {
   return env;
 }
 
-module.exports = { COMMANDS, SCRIPTS_DIR, validateArgs, buildArgv, maskArgs, SECRET_ARG_NAMES, buildChildEnv };
+// How long a command may run before the watchdog kills its process group.
+function timeoutFor(cmd, values) {
+  if (cmd && cmd.followTimeoutMs && values && values.follow === 'follow') return cmd.followTimeoutMs;
+  return 60_000;
+}
+
+module.exports = { timeoutFor, COMMANDS, SCRIPTS_DIR, validateArgs, buildArgv, maskArgs, SECRET_ARG_NAMES, buildChildEnv };

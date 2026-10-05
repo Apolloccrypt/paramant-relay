@@ -323,3 +323,4 @@ input[type="password"]:focus { outline: none; border-color: var(--cobalt); }
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+form.hidden { display: none; }

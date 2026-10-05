@@ -1123,8 +1123,24 @@ passing on an empty search.
    server against `127.0.0.1:3000`.
 3. **Drift guard** from the NUC: `scripts/check-prod-drift.sh origin/main` must
    print `OK`.
-4. Tag it: `git tag v3.1.0 <commit> && git push origin v3.1.0`, and put the live
-   date in `CHANGELOG.md`.
+4. Tag it, on the commit that is live (the merge commit on `main` that
+   `/home/paramant/backups/deployed-head` names), and put the live date in
+   `CHANGELOG.md`. Until this tag exists the one-line installer stops at
+   `git clone --branch v3.1.0` and `paramant upgrade` finds nothing newer than
+   v3.0.0 (matrix SELF-01-A, SELF-12-A, SELF-13-A):
+   ```bash
+   # [admin]
+   git fetch origin main
+   C=$(ssh <server> cat /home/paramant/backups/deployed-head)   # or the merge commit of the PR
+   git merge-base --is-ancestor "$C" origin/main && echo "on main"
+   git tag -a v3.1.0 -m "Paramant 3.1.0" "$C"
+   git push origin v3.1.0
+   git ls-remote --tags origin v3.1.0          # must print the tag
+   ```
+   The tag push also starts `docker-publish.yml` (images `3.1.0`). Then check
+   the installer and upgrade path once from a clean machine:
+   `curl -fsSL https://paramant.app/install.sh | bash` reaches "Stack healthy",
+   and on a v3.0.0 install `paramant upgrade` moves HEAD to the tag.
 5. Write the deploy down in the vault (`Sessies/2026-09/`), with the
    `billing_config` line as it was logged.
 

@@ -101,5 +101,57 @@ test('without follow, logs is still a one-shot tail', async () => {
   const v = validateArgs(COMMANDS.logs, { service: 'relay', tail: 5 });
   assert.ok(v.ok, v.error);
   assert.deepStrictEqual(buildArgv(COMMANDS.logs, v.values), ['relay', '5', 'no']);
-  assert.ok(!validateArgs(COMMANDS.logs, { service: 'relay', follow: '-f' }).ok, 'follow only takes no|follow');
+  assert.ok(!validateArgs(COMMANDS.logs, { service: 'relay', follow: 'yes' }).ok, 'follow only takes no|follow|-f|--follow');
+});
+
+// Eindmatrix ADMIN-46-A: "logs -f" did not exist. The operator types -f, as with
+// docker logs; it now means follow, and a follow is not cut off after 60 s.
+test('logs -f is a follow, with a ten minute limit instead of 60 s', () => {
+  const { COMMANDS, validateArgs, buildArgv, timeoutFor } = require('../lib/cli-commands');
+  for (const flag of ['-f', '--follow', 'follow']) {
+    const v = validateArgs(COMMANDS.logs, { service: 'relay', follow: flag });
+    assert.ok(v.ok, flag + ': ' + v.error);
+    assert.deepStrictEqual(buildArgv(COMMANDS.logs, v.values), ['relay', '100', 'follow']);
+    assert.strictEqual(timeoutFor(COMMANDS.logs, v.values), 10 * 60_000);
+  }
+  assert.strictEqual(timeoutFor(COMMANDS.logs, validateArgs(COMMANDS.logs, { service: 'relay' }).values), 60_000);
+  assert.strictEqual(timeoutFor(COMMANDS.status, {}), 60_000);
+});
+
+test('the terminal reads "logs relay -f" as service relay, follow', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'cli.js'), 'utf8');
+  const body = src.slice(src.indexOf('function parse(line)'), src.indexOf('/* -- Help'));
+  const { COMMANDS } = require('../lib/cli-commands');
+  const parse = new Function('COMMANDS', body + '\nreturn parse;')(COMMANDS);
+  assert.deepStrictEqual(parse('logs relay -f').args, { service: 'relay', follow: 'follow' });
+  assert.deepStrictEqual(parse('logs admin 50 --follow').args, { service: 'admin', tail: '50', follow: 'follow' });
+  assert.deepStrictEqual(parse('logs relay').args, { service: 'relay' });
+});
+
+test('logs -f over the API streams and stops on abort', async () => {
+  if (!srv) return;
+  const ac = new AbortController();
+  const r = await fetch(`${srv.base}/api/admin/cli/exec`, {
+    method: 'POST',
+    headers: { 'X-Session': SID, 'Content-Type': 'application/json', Origin: srv.base },
+    body: JSON.stringify({ command: 'logs', args: { service: 'relay', follow: '-f' } }),
+    signal: ac.signal,
+  });
+  if (r.status !== 200) assert.fail(`exec answered ${r.status}: ${await r.text()}`);
+  const reader = r.body.getReader();
+  let seen = '';
+  const t0 = Date.now();
+  while (!/log line/.test(seen) && Date.now() - t0 < 10000) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    seen += Buffer.from(value).toString('utf8');
+  }
+  assert.match(seen, /then following/, seen.slice(0, 300));
+  const pid = Number(fs.readFileSync(path.join(TMP, 'compose.pid'), 'utf8').trim());
+  leftovers.push(pid);
+  assert.ok(alive(pid));
+  ac.abort();
+  const deadline = Date.now() + 3000;
+  while (alive(pid) && Date.now() < deadline) await new Promise((res) => setTimeout(res, 50));
+  assert.ok(!alive(pid), 'abort left logs -f running');
 });

@@ -638,7 +638,6 @@ test('every TLS-terminating server block in the repository is TLS 1.3 only', () 
   const CONFS = [
     'deploy/nginx-paramant-public.conf',
     'deploy/nginx-selfhost.conf',
-    'nginx-selfhost.conf',
     'deploy/nginx/addin.paramant.app.conf',
   ];
   const problems = [];
@@ -660,7 +659,8 @@ test('every TLS-terminating server block in the repository is TLS 1.3 only', () 
       }
     }
   }
-  assert.ok(terminators >= 9, `expected at least 9 TLS-terminating blocks, found ${terminators}; a config was renamed or dropped and this block stopped looking at it`);
+  // Eight since the root nginx-selfhost.conf went (SELF-14-N, 2026-10-05).
+  assert.ok(terminators >= 8, `expected at least 8 TLS-terminating blocks, found ${terminators}; a config was renamed or dropped and this block stopped looking at it`);
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
   // And the page still says it, so retiring the promise retires the test.
   assert.match(read('frontend/en/dpa.html'), /TLS 1\.3 minimum on all relay endpoints/);
@@ -2270,6 +2270,23 @@ test('the hardening figures on /dpa are the ones SECURITY.md records', () => {
   assert.ok(rowNl.includes(`CIS Ubuntu ${bench[1]} L2-benchmark: ${checks[1]} controles`), `dpa (nl): the Article 32 row must say CIS Ubuntu ${bench[1]} and ${checks[1]} checks`);
   assert.ok(rowNl.includes('dagelijkse integriteitscontrole van bestanden met AIDE'), 'dpa (nl): the Article 32 row must name the daily AIDE check');
   assert.ok(rowNl.includes('AppArmor in enforcing-modus'), 'dpa (nl): the Article 32 row must name AppArmor enforcing');
+
+  // Eindmatrix SITE-48-A: the row stated the host state as a standing fact,
+  // and nothing in the repository can prove that. It now says what it is: the
+  // state at the dated CIS check SECURITY.md records, with a link to that
+  // record, and where to ask for the current output.
+  const date = /### (\d{4})-(\d{2})-(\d{2}) [^\n]*CIS Ubuntu/.exec(sec);
+  assert.ok(date, 'SECURITY.md must date the CIS check');
+  const MONTHS_NL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+  const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const day = String(Number(date[3])), m = Number(date[2]) - 1;
+  assert.ok(rowNl.includes(`CIS-controle van ${day} ${MONTHS_NL[m]} ${date[1]} op de productieserver`), 'dpa (nl): the row must name the date of the CIS check SECURITY.md records');
+  assert.ok(row.includes(`CIS check of ${day} ${MONTHS_EN[m]} ${date[1]} on the production server`), 'dpa: the row must name the date of the CIS check SECURITY.md records');
+  assert.ok(rowNl.includes('Dat is de stand bij die controle; de openbare code bewijst de serverstaat niet doorlopend.'), 'dpa (nl): the row must say it is a snapshot');
+  assert.ok(row.includes('That is the state at that check; the public code does not prove the server state continuously.'), 'dpa: the row must say it is a snapshot');
+  for (const slug of ['dpa', 'en/dpa']) {
+    assert.match(page(slug), /<td>[^<]*<a href="https:\/\/github\.com\/Apolloccrypt\/paramant-relay\/blob\/main\/SECURITY\.md">SECURITY\.md<\/a>: auditd/, `${slug}: the hardening row must link the SECURITY.md record`);
+  }
 });
 
 // 34 ── The signature level. /about and /parasign name it: a Simple Electronic
@@ -2545,7 +2562,10 @@ test('every page that promises burn-on-read says which client and which plan it 
   // on 'finish' for an old client, and on POST .../ack for /get, which confirms
   // only once it has decrypted the file. Either way the blob is deleted
   // outright and the read counter is never consulted.
-  assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(blobHash\);/,
+  // Since 2026-10-05 an old client's download burns after delivery: the
+  // token is spent and the blob unlisted on 'finish', and destroyed once the
+  // connection stayed clean (afterDelivery). Still outright, still no counter.
+  assert.match(relaySrc, /td\.used = true; td\.gone = 'downloaded'; td\.claim = null;\s*blobDrop\(blobHash, false\);/,
     'the /v2/dl download-token route no longer deletes the blob outright; /get, /ontvang and /parashare call a Paramant link single-use because it does');
   assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(td\.hash\);/,
     'the /v2/dl ack no longer deletes the blob outright; /get calls a link single-use because a confirmed download does');

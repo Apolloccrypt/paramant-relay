@@ -293,7 +293,7 @@ input:focus{border-color:var(--cobalt)}
       <tr><td>Dataminimalisatie</td><td>Bestandsnamen niet in leesbare vorm opgeslagen (alleen versleuteld in enc_meta); apparaat-ID's gehasht met SHA3-256 in de CT-log; geen logging van de inhoud</td></tr>
       <tr><td>Toegangsbeheer</td><td>Authenticatie met API-sleutel op alle relay-endpoints; beheerpaneel beveiligd met TOTP-MFA en rate limiting per IP-adres (5 pogingen per 15 minuten)</td></tr>
       <tr><td>Auditlogging</td><td>Certificate Transparency-log: hashes van overdrachten en commitments van apparaatsleutels, geen inhoud; Merkle-boom die manipulatie zichtbaar maakt</td></tr>
-      <tr><td>Integriteit en beschikbaarheid</td><td>auditd (49 CIS L2-regels), dagelijkse integriteitscontrole van bestanden met AIDE, AppArmor in enforcing-modus (119 van de 121 profielen), CIS Ubuntu 24.04 L2-benchmark: 114 controles</td></tr>
+      <tr><td>Integriteit en beschikbaarheid</td><td>Ingericht bij de CIS-controle van 13 april 2026 op de productieserver, vastgelegd in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a>: auditd (49 CIS L2-regels), dagelijkse integriteitscontrole van bestanden met AIDE, AppArmor in enforcing-modus (119 van de 121 profielen), CIS Ubuntu 24.04 L2-benchmark: 114 controles. Dat is de stand bij die controle; de openbare code bewijst de serverstaat niet doorlopend. Een klant kan de actuele uitvoer van deze controles opvragen via privacy@paramant.app.</td></tr>
       <tr><td>Hardening van infrastructuur</td><td>Docker-containers: alleen-lezen bestandssysteem, no-new-privileges, cap_drop ALL, gebruiker zonder rootrechten; HSTS max-age=63072000</td></tr>
       <tr><td>Kwetsbaarhedenbeheer</td><td>Onafhankelijke beveiligingsaudit afgerond in april 2026, zie de <a href="/docs#audits">samenvatting van de beveiligingsaudit</a></td></tr>
     </tbody>
@@ -396,6 +396,6 @@ input:focus{border-color:var(--cobalt)}
 
 <script src="/js/dpa.inline1.js?v=4"></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=19" defer></script>
 </body>
 </html>

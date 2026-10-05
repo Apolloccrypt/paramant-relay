@@ -72,7 +72,6 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | 5 MB | `MAX_BLOB` `relay/relay.js:105` | `BLOB_SIZE_MB` `:1339`, `ANON_MAX` `:5360`, `TRIAL_MAX_SIZE` `:5545`, `tiers.js:47,56,65`, `parashare.page.js:829`, `paramant-core.js:30` | acht kopieen, een instelbaar |
 | sector naar poort | `admin/server.js:39-45` (alle vijf 3000) | `docker-compose.yml:311-315` (alle vijf 3000) | nee, gepind door `tests/sector-fallback-ports.test.mjs` |
 | `RELAY_HEALTH` | `admin/server.js:41` → `:3000` | de compose-listener staat op 3000 | nee, rechtgezet; stond op `:3005`, een poort die nergens in de repo bestaat |
-| `nginx-selfhost.conf` | de kopie in de wortel: geen bodygrens, `inbound` 10r/m | `deploy/nginx-selfhost.conf`: 35M, `inbound` 5r/m | **ja, twee bestanden met dezelfde naam** |
 | `install.sh` | de kopie in de wortel, 535 regels | `frontend/install.sh`, 466 regels, dit is de kopie die op paramant.app staat | **ja, 111 regels verschil** |
 | admin-paneel JS | `admin/public/app.js`, 895 regels | `frontend/js/admin.page.js`, 742 regels | **ja, 343 regels verschil** |
 | versie | `deploy/deploy-3.1.sh:121` `3.1.0` | `install.sh:24` `v3.1.0`, `deploy/.env.example` `v3.1.0` | nee (frontend/install.sh en install-pi.sh nog wel) |
@@ -183,6 +182,7 @@ overschrijven zonder de code aan te raken.
 
 | naam | gelezen in | standaard | wat hij doet |
 |---|---|---|---|
+| `ADDIN_URL` | `deploy/addin-uitrol.sh` | `https://addin.paramant.app` | welke host de add-in-uitrol publiek nameet na het wisselen van de map |
 | `BACKUP_DIR` | `scripts/cli/paramant-backup.sh`, `scripts/rollback-3.0.0.sh` | `/var/log/paramant/backups` / `/home/paramant/backups` | back-upmap van de relay-CLI en van het terugrolscript |
 | `BACKUP_ROOT` | `deploy/ops/backup-full-state.sh`, `deploy/ops/restore-full-state.sh` | `/home/paramant/backups/full-state` / `$WORK` | waar de volledige-staatback-up landt |
 | `CACHE_BUST_BASE` | `scripts/check-cache-bust.sh` | `origin/main` | met welke ref de cache-bust-poort de inhoud van css/js vergelijkt; gewijzigde inhoud onder dezelfde `?v=` is rood |
@@ -320,11 +320,6 @@ deze regels doorbreken.
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `client_body_timeout` | `afwezig` |
-| `nginx-selfhost.conf` | `client_max_body_size` | `afwezig` |
-| `nginx-selfhost.conf` | `limit_req_zone` | `$binary_remote_addr zone=inbound:10m rate=10r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=health:10m rate=6r/m` |
-| `nginx-selfhost.conf` | `limit_conn` | `conn 20` |
-| `nginx-selfhost.conf` | `proxy_read_timeout` | `10s / 3600s / 3600s` |
-| `nginx-selfhost.conf` | `client_body_timeout` | `afwezig` |
 
 ## Constanten die instellingen zijn
 

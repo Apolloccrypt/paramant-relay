@@ -167,7 +167,7 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 
 **TLS:**
 - Handled by **system nginx** (not a Docker container). Install via Certbot / Let's Encrypt or bring your own cert.
-- See `deploy/nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling (the `nginx-selfhost.conf` in the repo root is an older copy; use the one in `deploy/`).
+- See `deploy/nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
 
 **Dockerfile — two-stage build:**
 - Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
@@ -662,7 +662,9 @@ Only enterprise keys can access `/admin/`.
 After deploying, create your first API key:
 
 ```bash
-export $(grep -v '^#' .env | xargs)
+# The admin script needs ADMIN_TOKEN; read just that one from .env
+# (exporting the whole file through xargs breaks on MAIL_FROM's space and <>).
+export ADMIN_TOKEN="$(grep '^ADMIN_TOKEN=' .env | cut -d= -f2-)"
 
 # Create an enterprise key for yourself (admin)
 python3 deploy/paramant-admin.py add \

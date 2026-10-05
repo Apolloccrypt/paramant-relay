@@ -9,7 +9,7 @@
 import {
   getCapabilities, loginWithApiKey, loginWithTotp, verifySession, logout, getUploadCredentials,
 } from './auth-client.js';
-import { sealAndUploadChunk, buildShareUrl, chunkCount, randomFileId, decodeChunkMessage, isReceivableRelay, SELF_HOST_UNSUPPORTED } from '../../../shared/paramant-core.js';
+import { sealAndUploadChunk, buildShareUrl, chunkCount, randomFileId, decodeChunkMessage, isReceivableRelay, RELAY_NOT_HTTPS } from '../../../shared/paramant-core.js';
 import { getSettings, addHistory } from '../shared/settings.js';
 
 // ── Message router ────────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ async function transferBegin(msg) {
   try { creds = await getUploadCredentials(); }
   catch (err) { return { ok: false, error: String(err?.message || err) }; }
   if (!creds) return { ok: false, error: 'not_authenticated' };
-  if (!isReceivableRelay(creds.relay)) return { ok: false, error: SELF_HOST_UNSUPPORTED };
+  if (!isReceivableRelay(creds.relay)) return { ok: false, error: RELAY_NOT_HTTPS };
 
   const { ttl_ms } = await getSettings();
   const size  = msg.file?.size ?? 0;

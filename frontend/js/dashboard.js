@@ -564,7 +564,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       if (act === 'send-remind') {
         ev.preventDefault();
         sendAction('reinvite', t.getAttribute('data-send-id'),
-                   t.getAttribute('data-email'), t, nlEn('Herinnering verstuurd. De link is niet veranderd.', 'Reminder sent. Their link is unchanged.'));
+                   t.getAttribute('data-email'), t, nlEn('Herinnering verstuurd. De link is niet veranderd. De herinnering verwijst naar de eerste mail, want alleen daarin zit de sleutel. Is die mail kwijt, stuur het bestand dan opnieuw.', 'Reminder sent. Their link is unchanged. The reminder points to the first mail, because only that one holds the key. If that mail is lost, send the file again.'));
         return;
       }
       if (act === 'send-revoke') {
@@ -829,7 +829,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return esc(p.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? nlEn('getekend', 'signed') : p.status === 'declined' ? nlEn('geweigerd', 'declined') : p.status === 'viewed' ? nlEn('geopend', 'opened') : nlEn('wacht', 'waiting'));
     }).join('<br>') : signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed');
     var help = state === 'completed'
-      ? nlEn('De relay bewaart het cryptografische bewijs, geen leesbare kopie van uw document. De complete pdf met alle handtekeningen maakt deze browser: op het apparaat waarmee u verstuurde opent hij meteen, elders kiest u uw originele bestand. Controleren doet u later met het originele document en het .psign-bewijs.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the original document and the .psign proof.')
+      ? nlEn('De relay bewaart het cryptografische bewijs, geen leesbare kopie van uw document. De complete pdf met alle handtekeningen maakt deze browser: op het apparaat waarmee u verstuurde opent hij meteen, elders kiest u uw originele bestand. Controleren doet u later met het .psign-bewijs en de complete pdf (daarin zit het origineel ingebed) of het originele document.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the .psign proof with the complete PDF (the original is embedded in it) or the original document.')
       : state === 'cancelled' && declinedBy(doc)
         ? nlEn('Een ondertekenaar heeft geweigerd te tekenen. Daarmee is dit verzoek gestopt; niemand kan er nog op tekenen. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', 'A signer declined to sign, so this request has stopped and nobody can sign it any more. To try again, send a new request.')
       : state === 'expired'
@@ -1052,6 +1052,19 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // One press, one answer, and the answer stays on the button. Capped at one an
   // hour per document by the server, so the reader is told which of the two
   // things happened rather than left pressing it again.
+  function heldShare(id) {
+    var prefix = 'paramant.cosign.share.v1:' + id + ':';
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf(prefix) !== 0) continue;
+        var rec = JSON.parse(localStorage.getItem(k) || 'null');
+        if (rec && Date.now() < Number(rec.exp)) return true;
+      }
+    } catch (e) { /* storage off */ }
+    return false;
+  }
+
   function resendInvitation(id, button) {
     if (!id || !button || button.disabled) return;
     button.disabled = true;
@@ -1082,6 +1095,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         note.textContent = body.sender_notified
           ? nlEn('Deze link opent het verzoek, niet het document. We hebben de afzender gevraagd u de link opnieuw te sturen.', 'This link opens the request, not the document. We have asked the sender to send you the link again.')
           : nlEn('Deze link opent het verzoek, niet het document. Vraag de afzender om de link opnieuw te sturen.', 'This link opens the request, not the document. Ask the sender to send you the link again.');
+        // This browser may hold the key half from the first invitation
+        // (js/cosign-share-memory.js): then the new link opens the document
+        // here, and only elsewhere does it open just the request (COSIGN-46-A).
+        if (heldShare(id)) note.textContent = (body.sender_notified
+            ? nlEn('In deze browser opent de nieuwe link het document: hij bewaarde de sleutel van uw eerste uitnodiging. Op een ander apparaat opent hij alleen het verzoek; daarvoor hebben we de afzender gevraagd u de link opnieuw te sturen.', 'In this browser the new link opens the document: it kept the key from your first invitation. On another device it opens only the request; for that we have asked the sender to send you the link again.')
+            : nlEn('In deze browser opent de nieuwe link het document: hij bewaarde de sleutel van uw eerste uitnodiging. Op een ander apparaat opent hij alleen het verzoek; vraag de afzender dan om de link opnieuw te sturen.', 'In this browser the new link opens the document: it kept the key from your first invitation. On another device it opens only the request; then ask the sender to send you the link again.'));
         var prev = button.parentNode && button.parentNode.querySelector('.dh-inbox-note');
         if (prev) prev.remove();
         if (button.parentNode) button.parentNode.appendChild(note);
@@ -1236,6 +1255,52 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // promised in code was shown to nobody (fase 1, DASH-27-N). The usage bar
   // and the warning live on /developer, which reads the same snapshot once;
   // /dashboard stays without a polling usage feed (DASH-27-A).
+  //
+  // /developer sits behind an operator allowlist, so an ordinary customer never
+  // reached that warning either (eindmatrix DASH-27-N). The overview endpoint
+  // is open to every logged-in account and carries the same quota, so the
+  // dashboard reads it once per page load and shows one band from 80% of a
+  // monthly quota, with the way up. Below 80%, or when the relay cannot say,
+  // nothing is shown: no guessed numbers.
+  var usageAsked = false;
+  function usageWarning(quota) {
+    var caps = (quota && quota.caps) || {};
+    var rows = [
+      { used: Number(quota && quota.signs || 0), cap: caps.signs,
+        nl: 'handtekeningen', en: 'signatures' },
+      { used: Number(quota && quota.transfers || 0), cap: caps.transfers,
+        nl: 'verzendingen', en: 'transfers' },
+    ];
+    var worst = null;
+    rows.forEach(function (r) {
+      if (typeof r.cap !== 'number' || !isFinite(r.cap) || r.cap <= 0) return;
+      r.pct = Math.min(100, Math.round((r.used / r.cap) * 100));
+      if (r.pct >= 80 && (!worst || r.pct > worst.pct)) worst = r;
+    });
+    if (!worst) return null;
+    var left = Math.max(0, worst.cap - worst.used);
+    if (worst.pct >= 100) {
+      return nlEn('Uw tegoed van ' + worst.cap + ' ' + worst.nl + ' is op voor deze maand. Meer nodig?',
+                  'Your ' + worst.cap + ' ' + worst.en + ' for this month are used up. Need more?');
+    }
+    return nlEn('U heeft ' + worst.used + ' van uw ' + worst.cap + ' ' + worst.nl + ' deze maand gebruikt, nog ' + left + ' over. Bijna op. Meer nodig?',
+                'You have used ' + worst.used + ' of your ' + worst.cap + ' ' + worst.en + ' this month, ' + left + ' left. Almost used up. Need more?');
+  }
+  function loadUsage() {
+    if (usageAsked) return;
+    usageAsked = true;
+    var band = root && root.querySelector('#dh-usage-warn');
+    if (!band) return;
+    fetch('/api/user/dashboard/overview', { credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var text = data && usageWarning(data.quota);
+        if (!text) { band.hidden = true; return; }
+        band.querySelector('[data-dh="usage-warn"]').textContent = text;
+        band.hidden = false;
+      })
+      .catch(function () { band.hidden = true; });
+  }
 
   // Listeners go on once. start() runs again for every poll round after a
   // payment (refreshAccount), and each round used to add another set: one click
@@ -1275,7 +1340,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         return r.json();
       })
       .then(function (data) {
-        if (data) render(data);
+        if (data) { render(data); loadUsage(); }
         // Only after render, so lastAccountIsPaid reflects this answer.
         if (isBillingReturn()) showBillingReturn(typeof tries === 'number' ? tries : RETURN_TRIES);
       })

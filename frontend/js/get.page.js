@@ -301,7 +301,12 @@ function parseLink() {
     const keys = hash.slice(2).split(',');
     let relay = (params.get('r') || '').replace(/\/+$/, '');
     if (!relay) relay = 'https://relay.paramant.app';
-    if (!FILELINK_RELAYS.has(relay)) return { kind: 'invalid' };
+    // A Paramant relay, or the relay that serves this page itself: a
+    // self-hosted relay with SERVE_FRONTEND=true serves /get on its own origin
+    // and the extension and add-in point their links there (fase 1, EXT-09-A).
+    // Any other host is refused, so r= can never make this page fetch from a
+    // server it does not already trust; the CSP's connect-src agrees.
+    if (!FILELINK_RELAYS.has(relay) && relay !== location.origin) return { kind: 'invalid' };
     if (!tokens.length || tokens.length !== keys.length) return { kind: 'invalid' };
     if (!tokens.every((x) => TOKEN_RE.test(x))) return { kind: 'invalid' };
     const rawKeys = keys.map(fromB64url);
