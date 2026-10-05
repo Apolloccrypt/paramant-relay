@@ -213,7 +213,9 @@
           rememberIntent(btn);
           /* The sign-in page in the language of this page. It was always the
            * Dutch one, also from /en/pricing (betaaltest 05-10, row 6). */
-          window.location.href = (NL ? '/auth/login' : '/en/auth/login') + '?next=' + encodeURIComponent(location.pathname + location.search);
+          var back = encodeURIComponent(location.pathname + location.search);
+          if (NL) window.location.href = '/auth/login?next=' + back;
+          else window.location.href = '/en/auth/login?next=' + back;
           return;
         }
         if (msg === 'checkout_http_409') {
