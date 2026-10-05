@@ -35,6 +35,7 @@ import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParti
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 import { stashReturn, resumeReturn } from '/js/login-return.js?v=1';
+import { rememberShare, recallShare } from '/js/cosign-share-memory.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -677,16 +678,29 @@ function keyFromFragment() {
   return share ? { share } : null;
 }
 
-async function fetchAndOpenCapsule(url, envId) {
+async function fetchAndOpenCapsule(url, envId, partyIndex) {
   let key;
   try { key = keyFromFragment(); }
   catch (e) { throw new Error(e.message); }
+  // The '#ks=' text of this link, kept so this browser can remember it once
+  // the document has opened (js/cosign-share-memory.js).
+  let ksText = '';
+  try { ksText = new URLSearchParams(String(location.hash || '').replace(/^#/, '')).get('ks') || ''; } catch { ksText = ''; }
+  // A link without the key half (sent again from the dashboard): if this
+  // browser opened the full invitation for this request and this party
+  // before, it kept that half, and the document opens here (COSIGN-46-A).
+  let fromMemory = false;
+  if (!key) {
+    const remembered = recallShare(envId, partyIndex);
+    const share = remembered ? parseKeyShareFragment('#ks=' + remembered) : null;
+    if (share) { key = { share }; fromMemory = true; }
+  }
   if (!key) {
     // A link without '#ks=' or '#doc=' (an older resend from the dashboard,
     // or a link that lost its end on the way: matrix COSIGN-46). The request
     // itself is fine; only this copy of the link cannot open the document.
     // Say so, and give the ways that do work, in order.
-    const err = new Error(L('Deze link opent het verzoek, maar niet het document: het laatste stuk van de link, met de sleutel, ontbreekt. Dat gebeurt bij een link die opnieuw is verstuurd of onderweg is ingekort. Heeft u een eerdere uitnodigingsmail voor dit verzoek, open dan de link daaruit; die opent het document wel. Anders: vraag de afzender om de link opnieuw te sturen. Heeft u het document al als bestand, kies het dan hieronder: wij controleren of het precies het document uit dit verzoek is.', 'This link opens the request, but not the document: the last part of the link, which holds the key, is missing. That happens with a link that was sent again or cut short on the way. If you have an earlier invitation email for this request, open the link from that one; it opens the document. Otherwise, ask the sender to send you the link again. If you already have the document as a file, choose it below: we check that it is exactly the document of this request.'));
+    const err = new Error(L('Deze link opent het verzoek, maar niet het document: het laatste stuk van de link, met de sleutel, ontbreekt. Dat gebeurt bij een link die opnieuw is verstuurd of onderweg is ingekort. In de browser waarin u de eerste uitnodiging al eens opende, opent deze link het document wel. Heeft u een eerdere uitnodigingsmail voor dit verzoek, open dan de link daaruit; die opent het document ook. Anders: vraag de afzender om de link opnieuw te sturen. Heeft u het document al als bestand, kies het dan hieronder: wij controleren of het precies het document uit dit verzoek is.', 'This link opens the request, but not the document: the last part of the link, which holds the key, is missing. That happens with a link that was sent again or cut short on the way. In the browser where you opened the first invitation before, this link does open the document. If you have an earlier invitation email for this request, open the link from that one; it opens the document too. Otherwise, ask the sender to send you the link again. If you already have the document as a file, choose it below: we check that it is exactly the document of this request.'));
     err.noKey = true;
     throw err;
   }
@@ -714,6 +728,10 @@ async function fetchAndOpenCapsule(url, envId) {
   try {
     const delivered = await decryptDocumentCapsule({ capsule, fragment: documentKeyFragment(docKey), envelopeId: envId, docHash: __envelope.doc_hash });
     __docKey = docKey;
+    // The half from the link opened the document: remember it for a link
+    // without one (only a half, and only after it proved to be the right one).
+    if (!fromMemory && !key.whole && ksText && partyIndex != null) rememberShare(envId, partyIndex, 'v1.' + String(ksText).replace(/^v1\./, ''), __envelope.sign_expires_at);
+    delivered.fromMemory = fromMemory;
     return delivered;
   } finally {
     capsule.fill(0);
@@ -724,10 +742,12 @@ async function loadDeliveredDocument(envId, partyIndex) {
   setDeliveryStatus('', L('Het versleutelde document wordt gedownload...', 'Downloading the encrypted document...'));
   try {
     const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
-    const delivered = await fetchAndOpenCapsule(url, envId);
+    const delivered = await fetchAndOpenCapsule(url, envId, partyIndex);
     await verifyAndRenderDocument(delivered.bytes, 'delivery');
     if (__hashMatches) {
-      setDeliveryStatus('ok', L('Het document is geopend en klopt met dit verzoek.', 'The document is open and matches this request.'));
+      setDeliveryStatus('ok', delivered.fromMemory
+        ? L('Het document is geopend met de sleutel die deze browser bewaarde van uw eerste uitnodiging, en klopt met dit verzoek.', 'The document is open with the key this browser kept from your first invitation, and matches this request.')
+        : L('Het document is geopend en klopt met dit verzoek.', 'The document is open and matches this request.'));
     }
   } catch (e) {
     setDeliveryStatus('err', (e.message || L('Het document kon niet vanzelf worden geladen.', 'Automatic document loading failed.')) + (e && e.noKey ? '' : L(' Kies het document hieronder zelf.', ' Choose the document manually below.')));

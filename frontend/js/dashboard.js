@@ -1052,6 +1052,19 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // One press, one answer, and the answer stays on the button. Capped at one an
   // hour per document by the server, so the reader is told which of the two
   // things happened rather than left pressing it again.
+  function heldShare(id) {
+    var prefix = 'paramant.cosign.share.v1:' + id + ':';
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf(prefix) !== 0) continue;
+        var rec = JSON.parse(localStorage.getItem(k) || 'null');
+        if (rec && Date.now() < Number(rec.exp)) return true;
+      }
+    } catch (e) { /* storage off */ }
+    return false;
+  }
+
   function resendInvitation(id, button) {
     if (!id || !button || button.disabled) return;
     button.disabled = true;
@@ -1082,6 +1095,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         note.textContent = body.sender_notified
           ? nlEn('Deze link opent het verzoek, niet het document. We hebben de afzender gevraagd u de link opnieuw te sturen.', 'This link opens the request, not the document. We have asked the sender to send you the link again.')
           : nlEn('Deze link opent het verzoek, niet het document. Vraag de afzender om de link opnieuw te sturen.', 'This link opens the request, not the document. Ask the sender to send you the link again.');
+        // This browser may hold the key half from the first invitation
+        // (js/cosign-share-memory.js): then the new link opens the document
+        // here, and only elsewhere does it open just the request (COSIGN-46-A).
+        if (heldShare(id)) note.textContent = (body.sender_notified
+            ? nlEn('In deze browser opent de nieuwe link het document: hij bewaarde de sleutel van uw eerste uitnodiging. Op een ander apparaat opent hij alleen het verzoek; daarvoor hebben we de afzender gevraagd u de link opnieuw te sturen.', 'In this browser the new link opens the document: it kept the key from your first invitation. On another device it opens only the request; for that we have asked the sender to send you the link again.')
+            : nlEn('In deze browser opent de nieuwe link het document: hij bewaarde de sleutel van uw eerste uitnodiging. Op een ander apparaat opent hij alleen het verzoek; vraag de afzender dan om de link opnieuw te sturen.', 'In this browser the new link opens the document: it kept the key from your first invitation. On another device it opens only the request; then ask the sender to send you the link again.'));
         var prev = button.parentNode && button.parentNode.querySelector('.dh-inbox-note');
         if (prev) prev.remove();
         if (button.parentNode) button.parentNode.appendChild(note);
