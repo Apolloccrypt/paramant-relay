@@ -134,11 +134,25 @@ function safeTextEqual(stored, provided) {
 //     page and normalized coordinates. Signer label, timestamp and key identity
 //     remain envelope data, so the placement adds no document text to the relay.
 //       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash || signer_pub || appearance_hash)
+// Manifest version 2 adds one optional flag per field: all_pages. It exists
+// because paper practice asks for an initial on EVERY sheet, and a manifest
+// capped at 8 fields cannot express that for a 20-page contract. One field with
+// all_pages:true means "this mark, at these normalised coordinates, on every
+// page of the document" -- the relay never learns the page count, so the flag
+// and not a list is what gets signed.
+//
+// Byte compatibility is the whole design. A manifest without an all_pages field
+// still normalises to exactly {"version":1,"fields":[...]} with the same key
+// order, so every signature and .psign proof made before this existed still
+// verifies byte-for-byte. The flag is only emitted when it is true, and the
+// version only rises to 2 when at least one field carries it.
 function normaliseAppearance(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  if (source.version !== undefined && source.version !== 1) throw new Error('unsupported appearance version');
+  const declared = source.version === undefined ? null : Number(source.version);
+  if (declared !== null && declared !== 1 && declared !== 2) throw new Error('unsupported appearance version');
   const input = source.fields === undefined ? [] : source.fields;
   if (!Array.isArray(input) || input.length > 8) throw new Error('invalid appearance fields');
+  let anyAllPages = false;
   const fields = input.map((field) => {
     if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error('invalid appearance field');
     const type = String(field.type || '');
@@ -154,9 +168,21 @@ function normaliseAppearance(value) {
     if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) {
       throw new Error('appearance field outside page');
     }
+    if (field.all_pages !== undefined) {
+      if (typeof field.all_pages !== 'boolean') throw new Error('invalid appearance all_pages');
+      if (field.all_pages) {
+        // A repeated mark declares one anchor page and repeats from there. A
+        // caller that repeats "from page 7" is describing something no screen
+        // offers, so it is a bug in that caller, not a silent reinterpretation.
+        if (pageIndex !== 0) throw new Error('invalid appearance all_pages page');
+        if (declared !== 2) throw new Error('all_pages requires appearance version 2');
+        clean.all_pages = true;
+        anyAllPages = true;
+      }
+    }
     return clean;
   });
-  return { version: 1, fields };
+  return { version: anyAllPages ? 2 : 1, fields };
 }
 
 // The REQUESTED position is a narrower thing than a signed appearance, and it

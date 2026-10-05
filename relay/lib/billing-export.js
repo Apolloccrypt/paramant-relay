@@ -90,10 +90,18 @@ function commaDecimal(value) {
 // customer_name is the company when the account filled one in and the email
 // address when it did not, so the column is never empty on a document that has
 // a buyer at all. The email keeps its own column either way.
+//
+// The last three are for the ICP return (opgaaf intracommunautaire
+// prestaties) and box 3b of the VAT return: whether the VAT was reverse charged
+// (lib/vat.js), the member state of the customer's VAT number, and the VIES
+// consultation number that proves the number was checked. Moneybird does not
+// book reverse-charged documents, so this file is where the bookkeeper finds
+// them. At the end, so a mapping made for the older columns still reads.
 const COLUMNS = [
   'number', 'date', 'type', 'customer_name', 'customer_email', 'customer_vat',
   'description', 'amount_net', 'vat_rate', 'amount_vat', 'amount_gross',
   'currency', 'payment_id', 'credit_for', 'moneybird_id',
+  'vat_treatment', 'customer_country', 'vat_consultation',
 ];
 
 const MONEY_COLUMNS = new Set(['amount_net', 'amount_vat', 'amount_gross']);
@@ -116,6 +124,9 @@ function rowOf(record) {
     payment_id: record.payment_id || '',
     credit_for: record.credit_for || '',
     moneybird_id: record.moneybird_id || '',
+    vat_treatment: record.vat_treatment || 'standard',
+    customer_country: buyer.country || '',
+    vat_consultation: (record.vat_check && record.vat_check.consultation) || '',
   };
 }
 

@@ -66,6 +66,7 @@ async function main() {
     const webhookCalls = [];
     const baseDeps = (over) => Object.assign({
       apiKeys, envStore, store, stamp: parasignStamp,
+      parasignEntitled: () => true,   // the account pays; see route-v1-entitlement
       publicOrigin: 'https://paramant.app',
       authHeader: 'Bearer ' + TOKEN,
       query: {},

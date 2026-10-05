@@ -129,12 +129,32 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .requested-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;border:1px solid var(--cobalt);background:rgba(var(--tint), .04);font-size:12px;line-height:1.5;color:var(--cobalt)}
 .requested-note .btn{width:auto;min-width:0;padding:11px 14px;flex:0 0 auto}
 .appearance-help{font-size:12px;line-height:1.55;color:var(--ink-dim)}
+.allpages{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:13px;cursor:pointer;min-height:44px}
+.allpages input{width:18px;height:18px;flex:0 0 auto}
 .appearance-help.active{color:var(--cobalt);font-weight:600}
 .doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
 .review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
 .blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
 .blind-link:hover{color:var(--brick-ink)}
 @media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
+/* One step at a time. Until GATE 1 passes (co-sign.js puts .needs-login on
+   <body>), an invitee can do exactly one thing: sign in. Everything that only
+   works once there is a session stays out of the way, so the page never shows
+   a disabled "sign" button under a "sign in" button, or three amber banners
+   that repeat one instruction. */
+body.needs-login #review-card,
+body.needs-login #sign-confirm,
+body.needs-login #cs-pass-panel,
+body.needs-login #review-gate,
+body.needs-login #sign-intro{display:none}
+/* Collapsed technical detail: the summary line is all an invitee sees until
+   they ask for the rest. */
+.how{border:1px solid var(--ink-hair);margin-bottom:14px;background:var(--card)}
+.how>summary{cursor:pointer;padding:10px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-dim)}
+.how>summary:hover{color:var(--ink)}
+.how-body{padding:0 14px 12px;font-size:12px;line-height:1.6;color:var(--ink-dim)}
+.how-body p{margin-bottom:8px}
+.how-body p:last-child{margin-bottom:0}
 </style>
 <script src="/js/theme.js?v=6"></script>
 </head>
@@ -162,13 +182,15 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <div class="step" id="step-cosign">
   <h1>Co-sign envelope</h1>
-  <p class="sub">Review the delivered document and add your signature. Decryption and ML-DSA-65 signing happen locally. The relay receives ciphertext, your public key, the resulting signature and signed field coordinates, never document plaintext or your private key.</p>
+  <p class="sub">Review the delivered document and add your signature.</p>
 
-  <div class="disclaimer">
-    <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
-    A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation, not a notarised legal signature under eIDAS or any qualified-trust regime (QES).
-    Verify the document hash below against the file you received separately.
-  </div>
+  <details class="how">
+    <summary>HOW THIS WORKS</summary>
+    <div class="how-body">
+      <p>Decryption and ML-DSA-65 signing happen locally. The relay receives ciphertext, your public key, the resulting signature and signed field coordinates, never document plaintext or your private key.</p>
+      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation, not a notarised legal signature under eIDAS or any qualified-trust regime (QES). Verify the document hash below against the file you received separately.</p>
+    </div>
+  </details>
 
   <div class="card">
     <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">Status: ...</div></div>
@@ -189,12 +211,17 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     <div class="card-body" id="parties-list"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="review-card">
     <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title">Review what you are signing</div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">The encrypted document is retrieved only after you sign in with the invited email address, then decrypted in this browser. Its SHA3-256 hash must match the signing request before signing is enabled. The relay does not receive the document key or plaintext.</p>
+      <details class="how">
+        <summary>WHERE THE DOCUMENT COMES FROM</summary>
+        <div class="how-body">
+          <p>The encrypted document is decrypted in this browser. Its SHA3-256 hash must match the signing request before signing is enabled. The relay does not receive the document key or plaintext.</p>
+        </div>
+      </details>
       <div class="banner" id="document-delivery-status">Loading the encrypted document...</div>
-      <label class="file-cta" for="verify-file" id="verify-file-cta">Choose the document manually if automatic loading fails</label>
+      <label class="file-cta" for="verify-file" id="verify-file-cta" hidden>Choose the document manually if automatic loading fails</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
       <div class="requested-note" id="requested-note" hidden>
@@ -208,6 +235,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
           <button class="btn btn-outline" id="appearance-date" type="button">Place date</button>
           <button class="btn btn-outline" id="appearance-clear" type="button">Clear my fields</button>
         </div>
+        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Repeat on every page</label>
+        <p class="appearance-help">Places the same signature at the same spot on every page of the document: the per-page initial.</p>
         <p class="appearance-help" id="appearance-help">Choose a field, then click the page where it should appear. These positions are covered by your cryptographic signature.</p>
       </div>
     </div>
@@ -216,7 +245,12 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Sign as <span id="me-label">party</span></div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">You sign with your signing key (ML-DSA-65). It opens with Face ID / Touch ID / a security key at the moment you sign, and it is never exported. The signature is bound to the email address this invite was sent to.</p>
+      <details class="how" id="sign-intro">
+        <summary>WHAT YOU SIGN WITH</summary>
+        <div class="how-body">
+          <p>You sign with your signing key (ML-DSA-65). It opens with Face ID / Touch ID / a security key at the moment you sign, and it is never exported. The signature is bound to the email address this invite was sent to.</p>
+        </div>
+      </details>
       <div class="banner" id="sign-status" hidden></div>
       <div id="sign-cta" style="margin-bottom:12px" hidden></div>
       <button class="btn" id="sign-confirm" type="button" disabled>Sign this document</button>
@@ -271,6 +305,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=24"></script>
+<script type="module" src="/co-sign.js?v=26"></script>
 </body>
 </html>

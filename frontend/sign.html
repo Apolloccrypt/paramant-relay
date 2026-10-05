@@ -627,7 +627,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-modes">
       <button type="button" class="ds-mode-card primary" data-mode="invite">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-badge">Aanbevolen voor organisaties</span><span class="ds-mode-t">Handtekeningen vragen</span><span class="ds-mode-d">Stuur een beveiligd document naar een of meer mensen en volg wie al getekend heeft.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-badge">Aanbevolen voor organisaties</span><span class="ds-mode-t">Handtekeningen vragen</span><span class="ds-mode-d">Stuur een beveiligd document naar een of meer mensen en volg wie al getekend heeft. Elke ondertekenaar kan ook een paraaf op elke pagina zetten.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="alone">
@@ -637,7 +637,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </button>
       <button type="button" class="ds-mode-card" data-mode="cosign">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 19c.5-4 2-6 5-6s4.5 2 5 6"/><path d="M14 14c3-1 5 1 6 4"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-t">Samen ondertekenen</span><span class="ds-mode-d">Teken eerst zelf en nodig daarna anderen uit om mee te tekenen.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Samen ondertekenen</span><span class="ds-mode-d">Teken eerst zelf en nodig daarna anderen uit om mee te tekenen, ieder met een paraaf op elke pagina als u dat wilt.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
     </div>
@@ -668,6 +668,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     </div>
     <div class="ds-invite-tools" id="ds-invite-tools" hidden>
       <button class="ds-edit-btn" id="ds-invite-place" type="button">Plaats het handtekeningvak</button>
+      <span class="ds-edit-tip" id="ds-invite-paraaf-tip">Moet elke pagina ook geparafeerd worden? Dat doet elke ondertekenaar zelf bij het tekenen, met het vinkje Ook op elke andere pagina.</span>
     </div>
     <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>Dit bestand is een afbeelding, dus u kunt alleen uw stempel plaatsen. De volledige editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) werkt op pdf-bestanden: kies een pdf om die te gebruiken.</p>
     <div class="ds-edit-tools" id="ds-edit-tools" hidden>
@@ -689,7 +690,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> Voeg een apart handtekeningblad toe</label>
         <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-both" value="both"> Zet de stempel en voeg het blad toe</label>
       </div>
-      <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Onderteken elke pagina met deze handtekening</label>
+      <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Onderteken elke pagina met deze handtekening (paraaf)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Opgeslagen positie gebruiken</button>
       <span class="ds-edit-tip" id="ds-seal-tip">Herhaalt uw stempel op dezelfde plek op elke pagina. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).</span>
     </div>
@@ -1021,6 +1022,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=60"></script>
+<script type="module" src="/sign-flow.js?v=61"></script>
 </body>
 </html>

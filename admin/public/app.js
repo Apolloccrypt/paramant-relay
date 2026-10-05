@@ -725,7 +725,13 @@ async function doSetProductPlan(){
   const tier=document.getElementById('pp-tier').value;
   const notify=document.getElementById('pp-notify').checked;
   const btn=document.getElementById('pp-btn');btn.disabled=true;
-  const r=await api('/admin/set-product-plan',{method:'POST',body:JSON.stringify({key,product,tier,notify})});
+  let r=await api('/admin/set-product-plan',{method:'POST',body:JSON.stringify({key,product,tier,notify})});
+  // A refusal is not a partial failure: every sector said no and nothing moved.
+  // Lowering a running plan is a separate, explicit act that keeps its end date.
+  if(r.data?.error==='lower_than_running'){
+    if(!confirm((r.data.message||'This account has a higher plan running.')+'\n\nMove the running term to '+tier+' and keep its end date?')){btn.disabled=false;toast('Nothing changed','warn');return;}
+    r=await api('/admin/set-product-plan',{method:'POST',body:JSON.stringify({key,product,tier,notify,downgrade:true})});
+  }
   btn.disabled=false;
   const label=(product==='parasign'?'ParaSign':'ParaSend')+' → '+tier;
   showEntitlementReadback(r.data);
