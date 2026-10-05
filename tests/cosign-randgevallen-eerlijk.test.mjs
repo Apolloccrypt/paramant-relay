@@ -100,7 +100,7 @@ async function openCosign({ bytes, fragment = 'auto', account = 200, envelope = 
   await page.waitForFunction(() => {
     const s = document.getElementById('sign-status');
     const d = document.getElementById('document-delivery-status');
-    return (s && !s.hidden && /storing/i.test(s.textContent)) || (d && !d.hidden && d.textContent && !/wordt gedownload|Downloading/.test(d.textContent));
+    return (s && !s.hidden && /storing/i.test(s.textContent)) || (d && !d.hidden && d.textContent && !/wordt gedownload|wordt opgehaald|Downloading|Fetching the document/.test(d.textContent)) /* Mick 05-10: taalronde */;
   }, null, { timeout: 30000 });
   await page.waitForTimeout(800);
   return { page, ctx, errors };

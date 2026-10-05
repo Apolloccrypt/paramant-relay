@@ -160,7 +160,8 @@ await ctx2.close();
 
 test('een verlopen sessie biedt inloggen aan zonder dat het werk verloren gaat', () => {
   assert.ok(lost, `geen knop om in te loggen en verder te gaan; de pagina zei: ${lostText}`);
-  assert.match(lostText, /verlopen/);
+  // Mick 05-10: taalronde
+  assert.match(lostText, /uitgelogd/);
   assert.ok(stored && stored.has, 'het concept staat in deze browser');
   assert.equal(stored.plainPdf, false, 'het document staat niet leesbaar in IndexedDB');
   assert.equal(stored.keyStored, false, 'de sleutel staat niet naast het concept');
