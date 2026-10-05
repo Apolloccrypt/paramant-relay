@@ -35,7 +35,7 @@ async function loadEnrolledKeys() {
     const data = await res.json();
     const keys = (data.keys || []);
     if (!keys.length) {
-      emptyEl.textContent = nlEn('Nog geen ondertekensleutels geregistreerd. Maak er een via "Uw ondertekensleutel instellen" hieronder.', 'No signing keys enrolled yet. Use "Set up your signing key" below to create one.');
+      emptyEl.textContent = nlEn('U heeft geen vaste ondertekensleutel, en dat hoeft ook niet: u tekent met de code uit uw authenticator-app. Liever tekenen met uw passkey? Stel het hieronder in.', 'You have no stored signing key, and you do not need one: you sign with the code from your authenticator app. Rather sign with your passkey? Set it up below.');
       listEl.innerHTML = '';
       return;
     }
@@ -117,7 +117,7 @@ async function loadVaultStatus() {
   try {
     const list = await vaultList();
     if (!list.length) {
-      el.textContent = nlEn('Nog geen ondertekensleutel in deze browser. Gebruik "Uw ondertekensleutel instellen" hieronder.', 'No signing key in this browser yet. Use "Set up your signing key" below.');
+      el.textContent = nlEn('Geen ondertekensleutel in deze browser. Niet nodig om te tekenen; wilt u er een, gebruik dan "Uw ondertekensleutel instellen" hieronder.', 'No signing key in this browser. You do not need one to sign; if you want one, use "Set up your signing key" below.');
       return;
     }
     const fmt = e => (e.label ? e.label : nlEn('(geen label)', '(no label)')) + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';
@@ -126,7 +126,7 @@ async function loadVaultStatus() {
       + (last ? nlEn('. Laatst gebruikt ', '. Last used ') + fmtTs(last) : nlEn('. Nog nooit geopend', '. Never unlocked yet'))
       + nlEn('. Sleutels: ', '. Keys: ') + list.map(fmt).join(', ');
   } catch (e) {
-    el.textContent = nlEn('We konden de kluis in deze browser niet lezen: ', 'Could not read the vault in this browser: ') + e.message;
+    el.textContent = nlEn('We konden de sleutel in deze browser niet lezen: ', 'Could not read the key in this browser: ') + e.message;
   }
 }
 

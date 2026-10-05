@@ -71,6 +71,34 @@
     return out;
   }
 
+  // The one sentence above the product lines, on /account and /dashboard
+  // alike. It names the plan that runs now and ITS end, and what takes over
+  // after it, so it can never contradict the lines under it. After a Firm to
+  // Business upgrade it used to say "Paid until 6 December" (the Firm date)
+  // under a heading that said Business, while the line below said Business
+  // ends on 5 November (acceptatie 3.1.1, betalen punt 6).
+  // null when nothing paid with an end date is running.
+  var RANK = { pro: 1, business: 2, enterprise: 3 };
+  function headline(data) {
+    var head = null, headProduct = null, headTerms = null;
+    ['parasign', 'parasend'].forEach(function (product) {
+      var terms = termsOf(data, product);
+      if (!terms.length) return;
+      if (!head || (RANK[terms[0].tier] || 0) > (RANK[head.tier] || 0)) { head = terms[0]; headProduct = product; headTerms = terms; }
+    });
+    if (!head || !head.until) return null;
+    var name = tierName(headProduct, head);
+    if (data && data.auto_renews === true) {
+      return name + t(' wordt op ', ' renews automatically on ') + day(head.until) +
+        t(' automatisch verlengd. Opzeggen kan tot die dag.', '. You can cancel until that day.');
+    }
+    var text = name + t(' betaald tot ', ' paid until ') + day(head.until);
+    var next = headTerms[1];
+    if (next) text += t(', daarna ', ', then ') + part(headProduct, next);
+    return text + t('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.',
+      '. Nothing renews automatically. You can renew from today without losing a day.');
+  }
+
   // Fill a list element with one <li> per product, and hide it when there is
   // nothing paid to say. textContent only: the tier names come from the server.
   function render(el, data) {
@@ -85,5 +113,5 @@
     el.hidden = ls.length === 0;
   }
 
-  window.paPlanTerms = { lines: lines, render: render };
+  window.paPlanTerms = { lines: lines, render: render, headline: headline };
 })();

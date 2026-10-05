@@ -460,14 +460,21 @@ window.paSecondFactorError = paSecondFactorError;
       // That is today: the checkout sells a renewal of a running term at any
       // moment, and the new term starts where this one ends
       // (lib/billing.processPayment, currentTermEnd), so no day is lost.
+      // One sentence, shared with /dashboard (plan-terms.js headline): the
+      // plan that runs now, its own end and what follows. auto_renews true
+      // means a subscription stands behind it and it WILL renew; it used to
+      // print "nothing renews automatically" in exactly that case
+      // (acceptatie 3.1.1, taal 31).
+      var said = !term.ended && window.paPlanTerms && window.paPlanTerms.headline(d);
       line.textContent = term.ended
         ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
-        : d.auto_renews
-          ? nlEn('Loopt af op ', 'Ends on ') + when + nlEn(', er wordt niets automatisch verlengd.', ', nothing renews automatically.')
-          : nlEn('Betaald tot ', 'Paid until ') + when + nlEn(', verlengen kan vanaf vandaag: de nieuwe periode sluit aan op ', ', renewing is possible from today: the new term starts on ') + when + nlEn('. Er wordt niets automatisch verlengd.', '. Nothing renews automatically.');
+        : said || (d.auto_renews
+          ? nlEn('Wordt op ', 'Renews automatically on ') + when + nlEn(' automatisch verlengd. Opzeggen kan tot die dag.', '. You can cancel until that day.')
+          : nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
       line.hidden = false;
     }
-    if (warn && term.warn) {
+    // A plan that renews by itself needs no "renew or fall back" warning.
+    if (warn && term.warn && !d.auto_renews) {
       var text = warn.querySelector('[data-term="text"]');
       if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;

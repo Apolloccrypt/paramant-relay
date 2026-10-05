@@ -119,7 +119,7 @@
       if (res.status === 403) {
         // Fallback only; the relay sends its own message. Both name Firm,
         // the plan /pricing actually sells, not the tier key behind the gate.
-        histBody.innerHTML = upsell(nlEn('De verzendgeschiedenis hoort bij Firm en hoger.', 'Send history comes with Firm and higher.'), '/pricing');
+        histBody.innerHTML = upsell(nlEn('De verzendgeschiedenis hoort bij Firm en Business.', 'Send history comes with Firm and Business.'), nlEn('/pricing', '/en/pricing'));
         return;
       }
       if (res.status === 401) {
@@ -173,7 +173,7 @@
         return;
       }
       if (res.status === 403) {
-        expBody.innerHTML = upsell(nlEn('De audit-export hoort bij Business en hoger.', 'The audit export comes with Business and higher.'), '/pricing');
+        expBody.innerHTML = upsell(nlEn('Exporteren hoort bij Business. Business is op aanvraag via privacy@paramant.app.', 'Exporting comes with Business.'), nlEn('/pricing#wat-u-kunt', '/en/pricing'));
         return;
       }
       if (res.status === 401) {

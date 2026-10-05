@@ -15,7 +15,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   'use strict';
 
   var KEYSETUP_KEY = 'paramant.keysetup.dismissed.v1';
-  var LOGIN_URL = '/auth/login?next=' + encodeURIComponent('/dashboard');
+  // Every page this script links to has an English copy under /en/, and the
+  // English dashboard used to send its reader to the Dutch ones (acceptatie
+  // 3.1.1, betalen punt 5). LP is the prefix of the page's own language.
+  var LP = nlEn('', '/en');
+  var LOGIN_URL = LP + '/auth/login?next=' + encodeURIComponent(LP + '/dashboard');
 
   var loading = document.getElementById('dh-loading');
   var root    = document.getElementById('dh-root');
@@ -172,12 +176,15 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (!term) return;
     var when = paramantDate.day(term.at);
     if (line) {
+      // The same sentence /account writes (plan-terms.js headline), so the two
+      // pages can not word one term in two ways.
+      var said = !term.ended && window.paPlanTerms && window.paPlanTerms.headline(data);
       line.textContent = term.ended
         ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
-        : nlEn('Loopt af op ', 'Ends on ') + when + nlEn(', er wordt niets automatisch verlengd.', ', nothing renews automatically.');
+        : said || (nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
       line.hidden = false;
     }
-    if (warn && term.warn) {
+    if (warn && term.warn && data.auto_renews !== true) {
       var text = warn.querySelector('[data-dh="term-warn"]');
       if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;
@@ -192,18 +199,18 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // read what he bought.
   var PRODUCT_INCLUDES = {
     parasign: {
-      pro: nlEn('Firm voor Ondertekenen: 100 handtekeningen per maand, en een koppeling met uw eigen systemen.', 'Firm on ParaSign: 100 signatures a month, and a connection you can plug into your own systems.'),
-      business: nlEn('Ondertekenen Business: 1.000 handtekeningen per maand, ondersteuning van een vast persoon die binnen één werkdag antwoordt, hulp bij de beveiligingsvragenlijsten van uw klanten, en een audittrail die u als bestand kunt exporteren.', 'ParaSign Business: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.'),
-      enterprise: nlEn('Ondertekenen Enterprise: een eigen relay, een sectorrelay voor zorg, juridisch of financieel, een SLA met compensatie, een licentie om zelf te hosten en hulp bij audits.', 'ParaSign Enterprise: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.')
+      pro: nlEn('Ondertekenen: 100 handtekeningen per maand, en een koppeling met uw eigen systemen.', 'ParaSign: 100 signatures a month, and a connection you can plug into your own systems.'),
+      business: nlEn('Ondertekenen: 1.000 handtekeningen per maand, ondersteuning van een vast persoon die binnen één werkdag antwoordt, hulp bij de beveiligingsvragenlijsten van uw klanten, en een audittrail die u als bestand kunt exporteren.', 'ParaSign: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.'),
+      enterprise: nlEn('Ondertekenen: een eigen relay, een sectorrelay voor zorg, juridisch of financieel, een SLA met compensatie, een licentie om zelf te hosten en hulp bij audits.', 'ParaSign: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.')
     },
     parasend: {
       // "and no rate limit" stood here until 2026-10-05 while tiers.js holds
       // Firm to 500 an hour (outbound_per_hour), betaaltest row 9. Every number
       // in these lines is pinned to tiers.js by tests/site-claims.test.mjs.
-      pro: nlEn('Firm voor Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'Firm on ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
+      pro: nlEn('Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
       // The same ParaSend Pro, bought as part of Business (besluit 05-10).
-      pro_business: nlEn('Versturen, inbegrepen bij Business: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'ParaSend, included with Business: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
-      enterprise: nlEn('Versturen Enterprise: links die 7 dagen open blijven, tot 100 keer te openen, onbeperkt apparaten, een eigen relay, een getekende verwerkersovereenkomst en 99,95% beschikbaarheid.', 'ParaSend Enterprise: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.')
+      pro_business: nlEn('Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
+      enterprise: nlEn('Versturen: links die 7 dagen open blijven, tot 100 keer te openen, onbeperkt apparaten, een eigen relay, een getekende verwerkersovereenkomst en 99,95% beschikbaarheid.', 'ParaSend: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.')
     }
   };
 
@@ -216,6 +223,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // anywhere on the site. So the band says which state we are in, and re-asks a
   // few times while the grant is still on its way.
   var lastAccountIsPaid = false;
+  var CAME_FROM_CHECKOUT = isBillingReturn();
   var RETURN_TRIES = 5;
   var RETURN_DELAY_MS = 2000;
 
@@ -308,7 +316,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     // still on its way: wait for it.
     if (lastAccountIsPaid && (status === 'paid' || !status || status === 'unknown')) {
       if (kicker) kicker.textContent = nlEn('Betaling ontvangen', 'Payment received');
-      if (lede) lede.textContent = nlEn('Dank u. Uw plan is actief en wat erbij hoort staat hieronder. De termijn die u kocht en de dag waarop die afloopt staan onder Plan en betaling.', 'Thank you. Your plan is active and what it includes is below. The term you bought and the day it ends are under Plan and billing.');
+      if (lede) lede.textContent = nlEn('Dank u. Uw plan is actief. Wat erbij hoort en tot wanneer het loopt, staat hieronder.', 'Thank you. Your plan is active. What it includes and how long it runs is below.');
       clearBillingParam();
       return;
     }
@@ -399,6 +407,14 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     // History and audit export: on a paid plan only (js/dashboard-history.js).
     var records = root.querySelector('#dh-records');
     if (records) records.hidden = isFree;
+    // The audit export is Business and up (the relay answers 403 below it), so
+    // Firm reads one sentence instead of two buttons that can only fail.
+    var signTier = paidProductTier(data.plan_parasign, data.paid_until_parasign);
+    var canExport = signTier === 'business' || signTier === 'enterprise' || planId === 'business' || planId === 'enterprise';
+    var exportRow = root.querySelector('#dh-export-row');
+    var exportNote = root.querySelector('#dh-export-note');
+    if (exportRow) exportRow.hidden = !canExport;
+    if (exportNote) exportNote.hidden = canExport;
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));
 
@@ -409,7 +425,9 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     show(root);
     root.classList.add('dh-loaded');
 
-    if (!keySetupChecked) { keySetupChecked = true; checkKeySetup(); }
+    // Not on the way back from the checkout: the pop-up covered the band that
+    // says whether the payment went through (acceptatie 3.1.1, betalen).
+    if (!keySetupChecked && !CAME_FROM_CHECKOUT) { keySetupChecked = true; checkKeySetup(); }
     loadInbox();
     loadSends();
     loadDocuments();
@@ -634,7 +652,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         t.disabled = true;
         fetch('/api/user/logout', { method: 'POST', credentials: 'include' })
           .catch(function () {})
-          .then(function () { try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {} location.href = '/auth/login'; });
+          .then(function () { try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {} location.href = LP + '/auth/login'; });
         return;
       }
       if (act === 'documents-refresh') {
@@ -817,7 +835,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       // to the page that starts one. Send is deliberately not offered here:
       // this list counts signing requests, not deliveries.
       list.innerHTML = '<div class="dh-empty"><strong>' + empty[0] + '</strong><span>' + empty[1] + '</span>' +
-        nlEn('<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Document laten tekenen</a></div>', '<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Get a document signed</a></div>');
+        '<a class="dh-btn dh-empty-cta" href="' + LP + '/sign?mode=invite">' + nlEn('Document laten tekenen', 'Get a document signed') + '</a></div>';
       return;
     }
     list.innerHTML = visible.map(function (doc) {
@@ -962,10 +980,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var actions = '';
     // The complete PDF next to the proof: the result page builds it in this
     // browser from the encrypted document (acceptance test 2026-10-04).
-    if (state === 'completed' && parties.length) actions += '<a class="dh-btn" href="/co-sign?owner=' + encodeURIComponent(doc.id) + nlEn('">Complete pdf openen</a>', '">Open the complete PDF</a>');
+    if (state === 'completed' && parties.length) actions += '<a class="dh-btn" href="' + LP + '/co-sign?owner=' + encodeURIComponent(doc.id) + nlEn('">Complete pdf openen</a>', '">Open the complete PDF</a>');
     if (state === 'completed') actions += '<a class="dh-btn" href="/api/user/documents/' + encodeURIComponent(doc.id) + nlEn('/receipt" download>.psign-bewijs downloaden</a>', '/receipt" download>Download .psign proof</a>');
     if (state === 'waiting' || state === 'in_progress') actions += '<button class="dh-btn danger" type="button" data-pa-action="document-cancel" data-document-id="' + esc(doc.id) + nlEn('">Verzoek annuleren</button>', '">Cancel request</button>');
-    actions += nlEn('<a class="dh-btn" href="/verify">Een document controleren</a>', '<a class="dh-btn" href="/verify">Verify a document</a>');
+    actions += '<a class="dh-btn" href="' + LP + '/verify">' + nlEn('Een document controleren', 'Verify a document') + '</a>';
     body.innerHTML = '<dl class="dh-doc-kv">' +
       '<dt>Status</dt><dd>' + esc(documentLabel(state, doc)) + '</dd>' +
       nlEn('<dt>Kenmerk</dt><dd>', '<dt>Reference</dt><dd>') + esc(doc.id || '') + '</dd>' +
@@ -1410,7 +1428,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       var canPasskey = typeof window.PublicKeyCredential === 'function';
       if (canPasskey && passkeys && Array.isArray(passkeys.passkeys) && passkeys.passkeys.length === 0) {
         items.push({
-          href: '/account#passkey-section',
+          href: LP + '/account#passkey-section',
           title: nlEn('Passkey toevoegen om in te loggen', 'Add a sign-in passkey'),
           body: nlEn('Log in met Face ID, Touch ID of een beveiligingssleutel, zonder code.', 'Use Face ID, Touch ID, or a security key to sign in without a code.')
         });
