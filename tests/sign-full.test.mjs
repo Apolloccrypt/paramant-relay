@@ -409,12 +409,32 @@ await drawPage.mouse.down();
 await drawPage.mouse.move(drawBox.x + 150, drawBox.y + 35, { steps: 12 });
 await drawPage.mouse.move(drawBox.x + 260, drawBox.y + 100, { steps: 12 });
 const inkDuringPointerDown = await countInk();
+// Time pointerup -> "Verder" enabled inside the page, on the page clock. A
+// Node-side Date.now() also counted every Playwright round trip of the poll
+// loop, and on a busy CI runner that alone crossed 200 ms (204 ms, PR #573)
+// while the page itself had no delay. The bound stays 200 ms: the old 250 ms
+// debounce this guards against still fails it.
+await drawPage.evaluate(() => {
+  const btn = document.getElementById('ds-identity-continue');
+  window.__sigExport = { up: null, enabled: null };
+  window.addEventListener('pointerup', () => { window.__sigExport.up = performance.now(); }, { capture: true, once: true });
+  const obs = new MutationObserver(() => {
+    if (!btn.disabled && window.__sigExport.up !== null && window.__sigExport.enabled === null) {
+      window.__sigExport.enabled = performance.now();
+      obs.disconnect();
+    }
+  });
+  obs.observe(btn, { attributes: true, attributeFilter: ['disabled'] });
+});
 const exportStartedAt = Date.now();
 await drawPage.mouse.up();
 while (Date.now() - exportStartedAt < 1000 && await drawPage.locator('#ds-identity-continue').isDisabled()) {
   await drawPage.waitForTimeout(10);
 }
-const exportDelayMs = Date.now() - exportStartedAt;
+const sigExport = await drawPage.evaluate(() => window.__sigExport);
+const exportDelayMs = (sigExport.up !== null && sigExport.enabled !== null)
+  ? Math.round(sigExport.enabled - sigExport.up)
+  : Infinity;
 const phase5 = {
   inkDuringPointerDown,
   exportDelayMs,
