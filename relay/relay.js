@@ -2867,8 +2867,10 @@ function zeroBuffer(buf) {
 // only destroyed once the socket has stayed clean for DELIVERY_SETTLE_MS or
 // closed without an error. A reset before that puts the blob back.
 // The claim mode (?claim= + ack on /v2/dl) stays the exact path.
+// hash -> { entry, key, until, timer }: see onCleanCloseEarly on GET /v2/outbound.
+const outboundRetryHold = new Map();
 const DELIVERY_SETTLE_MS = Math.max(0, parseInt(process.env.DELIVERY_SETTLE_MS || '3000', 10) || 0);
-function afterDelivery(req, res, { onFinish, onDelivered, onAborted }) {
+function afterDelivery(req, res, { onFinish, onDelivered, onAborted, onCleanCloseEarly }) {
   const sock = req.socket;
   let state = 'sending'; // sending -> settling -> delivered | aborted
   let timer = null;
@@ -2888,7 +2890,20 @@ function afterDelivery(req, res, { onFinish, onDelivered, onAborted }) {
     try { onDelivered(); } catch (e) { log('warn', 'delivery_handler_failed', { err: e.message }); }
   };
   function onSockError(e) { abort((e && e.code) || 'socket_error'); }
-  function onSockClose(hadError) { if (hadError || state === 'sending') abort(hadError ? 'reset' : 'closed_before_finish'); else deliver(); }
+  function onSockClose(hadError) {
+    if (hadError || state === 'sending') return abort(hadError ? 'reset' : 'closed_before_finish');
+    // A clean close inside the window is what a complete download looks like,
+    // and also what a proxy in front of us does when ITS client gave up: the
+    // proxy had already read every byte, so no reset reaches us. A caller
+    // that can tell its own receiver apart (the API key) may hold the bytes
+    // for a retry instead.
+    if (state === 'settling' && onCleanCloseEarly) {
+      state = 'delivered'; cleanup();
+      try { onCleanCloseEarly(); } catch (e) { log('warn', 'delivery_close_handler_failed', { err: e.message }); }
+      return;
+    }
+    deliver();
+  }
   if (sock) { sock.on('error', onSockError); sock.on('close', onSockClose); }
   res.on('finish', () => {
     if (state !== 'sending') return;
@@ -9055,7 +9070,20 @@ async function handleRelayRequest(req, res) {
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
   const outm = path.match(/^\/v2\/outbound\/([a-f0-9]{64})$/);
   if (outm && req.method === 'GET') {
-    const entry = blobStore.get(outm[1]);
+    let entry = blobStore.get(outm[1]);
+    // The same key coming back right after a download whose connection closed
+    // within DELIVERY_SETTLE_MS of the last byte: that download may have been
+    // broken off behind a proxy. It gets the blob once more (matrix API-35-K).
+    if (!entry) {
+      const held = outboundRetryHold.get(outm[1]);
+      if (held && held.key && held.key === apiKey && Date.now() < held.until) {
+        outboundRetryHold.delete(outm[1]);
+        clearTimeout(held.timer);
+        held.entry.views_remaining = (held.entry.views_remaining ?? 0) + 1;
+        if (Date.now() - held.entry.ts < held.entry.ttl) { blobPut(outm[1], held.entry); entry = held.entry; }
+        log('info', 'outbound_retry_after_close', { hash: outm[1].slice(0,16) });
+      }
+    }
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     // Per-key outbound rate limit (finding #12)
@@ -9175,12 +9203,22 @@ async function handleRelayRequest(req, res) {
     // body was delivered. Until then the entry is unlisted, so a second
     // reader gets 404 as before.
     const outHash = outm[1];
+    const delivered = () => {
+      if (burned) { zeroBuffer(blob); incMetric('blobs_burned'); stats.burned++; }
+      // ParaSend Pro download notification. Notify the transfer OWNER (the
+      // uploader), whose key is on the blob entry, not the downloader.
+      _notifyDownloaded(entry, outHash, { via: 'api' });
+    };
     afterDelivery(req, res, {
-      onDelivered: () => {
-        if (burned) { zeroBuffer(blob); incMetric('blobs_burned'); stats.burned++; }
-        // ParaSend Pro download notification. Notify the transfer OWNER (the
-        // uploader), whose key is on the blob entry, not the downloader.
-        _notifyDownloaded(entry, outHash, { via: 'api' });
+      onDelivered: delivered,
+      onCleanCloseEarly: () => {
+        if (!burned || !apiKey) return delivered();
+        const timer = setTimeout(() => {
+          const h = outboundRetryHold.get(outHash);
+          if (h && h.entry === entry) { outboundRetryHold.delete(outHash); delivered(); }
+        }, DELIVERY_SETTLE_MS);
+        if (timer.unref) timer.unref();
+        outboundRetryHold.set(outHash, { entry, key: apiKey, until: Date.now() + DELIVERY_SETTLE_MS, timer });
       },
       onAborted: (why) => {
         entry.views_remaining = (entry.views_remaining ?? 0) + 1;

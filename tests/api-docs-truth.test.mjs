@@ -56,7 +56,8 @@ test('API-30-C / API-30-N: /v2/dl answers as documented (403 for preview bots, a
 });
 
 test('API-24-K / API-30-K / API-35-K: nothing burns before the whole body is delivered, and the docs say so', () => {
-  assert.match(RELAY, /function afterDelivery\(req, res, \{ onFinish, onDelivered, onAborted \}\)/);
+  assert.match(RELAY, /function afterDelivery\(req, res, \{ onFinish, onDelivered, onAborted, onCleanCloseEarly \}\)/);
+  assert.match(API, /for a retry by\s+the same API key only/);
   assert.match(RELAY, /'X-Burned': 'on-delivery'/);
   assert.doesNotMatch(RELAY, /'X-Burned': 'true'/, 'no response says burned before a byte has left');
   assert.match(API, /Without a claim \(old SDKs and scripts\) nothing burns until the whole body is\s+delivered\./);

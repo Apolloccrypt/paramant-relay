@@ -232,9 +232,13 @@ The read counts, and a burning read destroys the blob, only once the whole
 response was delivered. While it is being sent and right after, the blob is
 hidden: a second `GET` answers `404`. If your client breaks off mid-download
 (it closes or resets the connection with bytes unread), the relay puts the blob
-back and the next `GET` serves it again in full. A complete download is gone
-for good after the connection stayed clean (closed normally, or open without a
-reset for three seconds). For a delivery confirmed by your own client after
+back and the next `GET` serves it again in full. A proxy in front of the relay
+(nginx, docker's port proxy) can hide that break: it has read every byte and
+closes towards the relay normally. So a connection that closes within three
+seconds of the last byte keeps the blob for three more seconds, for a retry by
+the same API key only. Any other key gets `404`. After that, or after three
+seconds on an open connection without a reset, a complete download is gone for
+good. For a delivery confirmed by your own client after
 decryption, use the share link with `?claim=` (above).
 
 ```bash

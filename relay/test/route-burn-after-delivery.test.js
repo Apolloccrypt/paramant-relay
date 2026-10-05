@@ -17,6 +17,8 @@
 const { test, before, after } = require('node:test');
 const assert = require('assert');
 const crypto = require('crypto');
+const net = require('net');
+const http = require('http');
 const { boot, killAll } = require('./_relay-server');
 const { summary } = require('./_requires');
 
@@ -104,5 +106,64 @@ test('the claimless /v2/dl link says nothing is burned yet, and a broken downloa
   assert.ok(full.buf.equals(b.payload));
   const again = await srv.get(`/v2/dl/${token}/get`, { headers: { 'User-Agent': 'curl/8.9.1' } });
   assert.equal(again.status, 410, 'a delivered link is spent');
+  did();
+});
+
+// A proxy in front that reads every byte at once (docker's userland proxy on
+// a published port, matrix API-35-K): the receiver behind it gives up, the
+// proxy closes towards the relay cleanly, and no reset ever reaches us. The
+// same key retrying right after still gets the file; later it is gone.
+test('behind a proxy that swallows the bytes, a broken download can be retried by the same key', async () => {
+  const b = bigBlob(2);
+  assert.equal((await upload(b)).status, 200);
+  const relayPort = Number(new URL(srv.base).port);
+  const socks = new Set();
+  const proxy = net.createServer((c) => {
+    const u = net.connect(relayPort, '127.0.0.1');
+    socks.add(c); socks.add(u);
+    c.pipe(u);
+    // Reads the relay as fast as it sends, whatever the receiver does, and
+    // keeps what the receiver cannot take yet in its own memory.
+    u.on('data', (d) => { if (!c.destroyed) c.write(d); });
+    c.on('error', () => {}); u.on('error', () => {});
+    // The receiver went away: close towards the relay cleanly, as docker-proxy does.
+    c.on('close', () => { u.end(); setTimeout(() => u.destroy(), 2000).unref(); });
+  });
+  await new Promise((r) => proxy.listen(0, '127.0.0.1', r));
+  const pport = proxy.address().port;
+  // A receiver that reads one chunk through the proxy and hangs up.
+  await new Promise((resolve) => {
+    const rq = http.get({ host: '127.0.0.1', port: pport, path: `/v2/outbound/${b.hash}`, headers: { 'X-Api-Key': KEY }, agent: false }, (res) => {
+      res.once('data', () => { setTimeout(() => { rq.destroy(); resolve(); }, 300); });
+    });
+    rq.on('error', () => resolve());
+  });
+  await sleep(100); // inside DELIVERY_SETTLE_MS (500 ms in this suite)
+  const again = await srv.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.equal(again.status, 200, 'the retry right after the broken download was refused');
+  assert.ok(again.buf.equals(b.payload));
+  // Now delivered for good: after the window nobody gets it.
+  await sleep(1200);
+  const gone = await srv.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.equal(gone.status, 404);
+  for (const x of socks) x.destroy();
+  proxy.close();
+  did();
+});
+
+test('a complete download on a connection that closes is gone after the window, also for the same key', async () => {
+  const b = bigBlob(1);
+  assert.equal((await upload(b)).status, 200);
+  const body = await new Promise((resolve, reject) => {
+    http.get({ host: '127.0.0.1', port: Number(new URL(srv.base).port), path: `/v2/outbound/${b.hash}`, headers: { 'X-Api-Key': KEY, Connection: 'close' }, agent: false }, (res) => {
+      const parts = []; res.on('data', (d) => parts.push(d)); res.on('end', () => resolve(Buffer.concat(parts)));
+    }).on('error', reject);
+  });
+  assert.ok(body.equals(b.payload));
+  const other = await srv.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': 'pgp_someone_else' } });
+  assert.notEqual(other.status, 200, 'another key never gets the held bytes');
+  await sleep(1200);
+  const gone = await srv.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.equal(gone.status, 404);
   did();
 });
