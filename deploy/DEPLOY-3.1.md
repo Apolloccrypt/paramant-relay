@@ -1050,7 +1050,19 @@ curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.lo
 
 # 6g. billing stance on every relay, once more, from the logs
 for c in main health finance legal iot; do printf '%-8s' $c; docker logs paramant-relay-$c 2>&1 | grep '"billing_config"' | tail -1 | grep -o '"recurring":[a-z]*'; done
+
+# 6l. the host hardening /dpa promises, read-only (deploy-3.1.sh step 6l)
+systemctl is-active auditd                       # active
+command -v aide; ls -l /var/lib/aide/aide.db* /var/log/aide/   # binary, database, a log at most 2 days old
+aa-status --enabled && aa-status | grep 'profiles are in enforce mode'   # at least 1
 ```
+
+Step 6l also runs under `--verify-only`. It writes one line per point to the
+deploy log and stops when auditd is not active, AIDE is missing, has no
+database or last checked more than 2 days ago (`PARAMANT_AIDE_MAX_AGE_DAYS`),
+or AppArmor is not enabled with at least one profile in enforce mode. /dpa
+promises exactly these three points; a miss is a stop because the page says
+it, not a rollback: the containers are fine, the host is not what /dpa says.
 
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without

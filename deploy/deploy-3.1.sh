@@ -230,6 +230,13 @@ REQUIRED_WORKFLOWS="${PARAMANT_REQUIRED_WORKFLOWS:-test.yml csp-inline-check.yml
 # them instead, then judge what they became.
 CI_WAIT_SECONDS="${PARAMANT_CI_WAIT_SECONDS:-900}"   # 15 minutes
 
+# Step 6l. /dpa promises three things about the host, and this is what holds
+# the page to them: auditd active, AIDE installed with a check that ran within
+# this many days (the check is daily, so 2 leaves room for one missed night),
+# AppArmor enabled with at least one profile in enforce mode. The page names
+# this number, and tests/site-claims.test.mjs keeps the two equal.
+HOST_AIDE_MAX_AGE_DAYS="${PARAMANT_AIDE_MAX_AGE_DAYS:-2}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -716,6 +723,37 @@ judge_seller_known() {
     expect_lines '^seller relay-[a-z]+ +name=match address=match kvk=match vat=empty kind=receipt address_lines=[2-9]$' 5 \
       "all five relays know the seller, hold no btw-id and issue payment receipts (no --seller-vat)"
   fi
+}
+
+# Step 6l. One line per promise on /dpa, in the log, before any verdict: a
+# deploy that stops on auditd still says what AIDE and AppArmor answered.
+# Returns the number of promises that did not hold; phase 6 stops on any.
+judge_host_hardening() {   # max age in days
+  local max="$1" fails=0 v age n
+  v="$(remote_field 'host auditd')"
+  if [ "$v" = active ]; then ok "host: auditd is active"
+  else printf '  FAIL  host: auditd is %s, not active\n' "${v:-not reported}"; fails=$((fails + 1)); fi
+
+  v="$(remote_field 'host aide binary')"
+  age="$(remote_field 'host aide last run age days')"
+  if [ "$v" != yes ]; then
+    printf '  FAIL  host: AIDE is not installed (no aide binary)\n'; fails=$((fails + 1))
+  elif [ "$(remote_field 'host aide db')" != yes ]; then
+    printf '  FAIL  host: AIDE is installed but has no database to check against\n'; fails=$((fails + 1))
+  elif ! printf '%s' "$age" | grep -qE '^[0-9]+$'; then
+    printf '  FAIL  host: AIDE is installed but no check run was found (no log, no timer run)\n'; fails=$((fails + 1))
+  elif [ "$age" -gt "$max" ]; then
+    printf '  FAIL  host: the last AIDE check ran %s days ago, more than %s\n' "$age" "$max"; fails=$((fails + 1))
+  else ok "host: AIDE is installed and its last check ran $age day(s) ago (at most $max)"; fi
+
+  v="$(remote_field 'host apparmor enabled')"
+  n="$(remote_field 'host apparmor enforce profiles')"
+  if [ "$v" != yes ]; then
+    printf '  FAIL  host: AppArmor is not enabled\n'; fails=$((fails + 1))
+  elif ! printf '%s' "$n" | grep -qE '^[0-9]+$' || [ "$n" -lt 1 ]; then
+    printf '  FAIL  host: AppArmor is enabled but no profile is in enforce mode (%s)\n' "${n:-not reported}"; fails=$((fails + 1))
+  else ok "host: AppArmor is enabled with $n profile(s) in enforce mode"; fi
+  return "$fails"
 }
 
 # ------------------------------------------------ the starting commit gate --
@@ -3329,6 +3367,64 @@ EOF
       2) warn "relay anchors NOT PROVEN: a relay did not answer /v2/pubkey" ;;
       *) die "a relay signs with a key /verify does not pin as current; follow RUNBOOK.md, Relay identity key rotation" ;;
     esac
+  fi
+
+  # 6l. /dpa says auditd, AIDE and AppArmor. Nothing else in the deploy looked
+  # at the host, so the page stated a server state nobody re-measured (telling
+  # SITE-48-A). Read-only: it starts, stops, writes and updates nothing; the
+  # AIDE database is only stat'ed, never checked or rebuilt here.
+  step "6l. host hardening that /dpa promises: auditd, AIDE, AppArmor (read-only)"
+  remote_soft "host hardening" /var/lib/aide /var/log/aide /sys/module/apparmor/parameters/enabled <<'EOF'
+set -euo pipefail
+aide_db_dir="$1"; aide_log_dir="$2"; aa_param="$3"
+echo "host auditd = $(systemctl is-active auditd 2>/dev/null || true)"
+if command -v aide >/dev/null 2>&1; then
+  echo "host aide binary = yes"
+else
+  echo "host aide binary = no"
+fi
+if [ -e "$aide_db_dir/aide.db" ] || [ -e "$aide_db_dir/aide.db.gz" ]; then
+  echo "host aide db = yes"
+else
+  echo "host aide db = no"
+fi
+# The last check run: the newest of the daily check's log and its systemd run.
+now="$(date +%s)"
+newest=0
+for f in "$aide_log_dir"/*.log "$aide_log_dir"/*.log.0; do
+  [ -f "$f" ] || continue
+  t="$(stat -c %Y "$f" 2>/dev/null || echo 0)"
+  if [ "$t" -gt "$newest" ]; then newest="$t"; fi
+done
+for unit in dailyaidecheck.service aidecheck.service; do
+  ts="$(systemctl show "$unit" -p ExecMainExitTimestamp --value 2>/dev/null || true)"
+  [ -n "$ts" ] || continue
+  t="$(date -d "$ts" +%s 2>/dev/null || echo 0)"
+  if [ "$t" -gt "$newest" ]; then newest="$t"; fi
+done
+if [ "$newest" -gt 0 ]; then
+  echo "host aide last run age days = $(( (now - newest) / 86400 ))"
+else
+  echo "host aide last run age days = none"
+fi
+if aa-status --enabled >/dev/null 2>&1 \
+   || [ "$(cat "$aa_param" 2>/dev/null || true)" = Y ]; then
+  echo "host apparmor enabled = yes"
+else
+  echo "host apparmor enabled = no"
+fi
+n="$(aa-status 2>/dev/null | sed -n 's/^\([0-9][0-9]*\) profiles are in enforce mode.*/\1/p' | head -1 || true)"
+echo "host apparmor enforce profiles = ${n:-unknown}"
+exit 0
+EOF
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): auditd active, AIDE ran within %s days, AppArmor enforcing\n' "$HOST_AIDE_MAX_AGE_DAYS"
+  else
+    [ "$REMOTE_RC" -eq 0 ] || die "remote step 'host hardening' exited $REMOTE_RC; the host state was not read"
+    local host_fails=0
+    judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS" || host_fails=$?
+    [ "$host_fails" -eq 0 ] \
+      || die "$host_fails of the three host promises on /dpa do not hold (auditd, AIDE, AppArmor); the FAIL lines above say which"
   fi
 }
 

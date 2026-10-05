@@ -2241,52 +2241,62 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   assert.deepEqual(gated, [], `\n  ${gated.join('\n  ')}\n`);
 });
 
-// 33 ── The host-hardening numbers. /dpa row "Integrity and availability" and
-// the CIS section of SECURITY.md quote the same audit, and nothing kept them
-// equal: either could be edited alone and stay green. Neither file proves the
-// host is in that state, and this block does not claim it does; it only forbids
-// the repository from quoting two different figures for one benchmark.
-// Verified by sabotage in both directions: 49 to 48 in SECURITY.md, or 114 to
-// 113 on /dpa, each turn this red.
-test('the hardening figures on /dpa are the ones SECURITY.md records', () => {
+// 33 ── The host hardening on /dpa. The row used to quote the figures of one
+// dated CIS check (49 auditd rules, 119 of 121 AppArmor profiles, 114 checks)
+// as a standing fact, and nothing re-measured the host (telling SITE-48-A).
+// deploy/deploy-3.1.sh step 6l now reads the host on every deploy and every
+// --verify-only: auditd active, AIDE installed with a check at most
+// HOST_AIDE_MAX_AGE_DAYS old, AppArmor enabled with profiles in enforce mode.
+// The row may promise exactly those three things and nothing the step does not
+// measure: no rule count, no profile count, no CIS figure, and CIS only as a
+// guideline. SECURITY.md keeps the dated check as history, figures included.
+// Sabotage: put "(119 of 121 profiles)" back on /dpa, drop the aide test from
+// step 6l, or change the 2 days on either side, and this turns red.
+test('the host hardening on /dpa is what deploy step 6l measures, and no more', () => {
   const sec = read('SECURITY.md');
-  const bench = /### [\d-]+ [^\n]*CIS Ubuntu ([\d.]+) benchmark/.exec(sec);
-  assert.ok(bench, 'SECURITY.md must still record the CIS Ubuntu benchmark section');
-  const checks = /^(\d+) checks applied across/m.exec(sec);
-  assert.ok(checks, 'SECURITY.md must still state how many CIS checks were applied');
-  const rules = /\|\s*auditd\s*\|\s*(\d+) CIS L2 rules loaded\s*\|/.exec(sec);
-  assert.ok(rules, 'SECURITY.md must still state the auditd rule count');
-  assert.match(sec, /\|\s*AIDE\s*\|\s*Installed, daily integrity check\s*\|/, 'SECURITY.md must still record the daily AIDE check');
-  assert.match(sec, /\|\s*AppArmor\s*\|\s*\d+\/\d+ profiles enforcing\s*\|/, 'SECURITY.md must still record AppArmor enforcing');
+  const deploy = read('deploy/deploy-3.1.sh');
+  assert.match(sec, /### 2026-04-13 [^\n]*CIS Ubuntu 24\.04 benchmark/, 'SECURITY.md keeps the dated CIS record');
 
-  // The en/ copy writes a colon where the old page had a dash.
-  const row = visible(page('en/dpa'));
-  assert.ok(row.includes(`auditd (${rules[1]} CIS L2 rules)`), `dpa: the Article 32 row must say ${rules[1]} auditd rules, the figure SECURITY.md records`);
-  assert.ok(row.includes(`CIS Ubuntu ${bench[1]} L2 benchmark: ${checks[1]} checks`), `dpa: the Article 32 row must say CIS Ubuntu ${bench[1]} and ${checks[1]} checks`);
-  assert.ok(row.includes('AIDE daily file integrity check'), 'dpa: the Article 32 row must name the daily AIDE check SECURITY.md records');
-  assert.ok(row.includes('AppArmor enforcing'), 'dpa: the Article 32 row must name AppArmor enforcing');
-  const rowNl = visible(page('dpa'));
-  assert.ok(rowNl.includes(`auditd (${rules[1]} CIS L2-regels)`), `dpa (nl): the Article 32 row must say ${rules[1]} auditd rules`);
-  assert.ok(rowNl.includes(`CIS Ubuntu ${bench[1]} L2-benchmark: ${checks[1]} controles`), `dpa (nl): the Article 32 row must say CIS Ubuntu ${bench[1]} and ${checks[1]} checks`);
-  assert.ok(rowNl.includes('dagelijkse integriteitscontrole van bestanden met AIDE'), 'dpa (nl): the Article 32 row must name the daily AIDE check');
-  assert.ok(rowNl.includes('AppArmor in enforcing-modus'), 'dpa (nl): the Article 32 row must name AppArmor enforcing');
+  // What step 6l measures, read off the script.
+  const step = deploy.slice(deploy.indexOf('step "6l. host hardening'), deploy.indexOf('judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS"'));
+  assert.ok(step.length > 200, 'deploy-3.1.sh must still have step 6l in phase 6');
+  assert.match(step, /systemctl is-active auditd/, '6l checks auditd');
+  assert.match(step, /command -v aide/, '6l checks the aide binary');
+  assert.match(step, /host aide last run age days/, '6l checks when AIDE last ran');
+  assert.match(step, /aa-status --enabled/, '6l checks AppArmor is enabled');
+  assert.match(step, /profiles are in enforce mode/, '6l counts profiles in enforce mode');
+  const judge = deploy.slice(deploy.indexOf('judge_host_hardening() {'));
+  assert.match(judge, /\$\(\(fails \+ 1\)\)/, '6l counts a miss as a failure, not a warning');
+  assert.match(deploy, /host promises on \/dpa do not hold/, 'a miss stops the deploy');
+  const days = /^HOST_AIDE_MAX_AGE_DAYS="\$\{PARAMANT_AIDE_MAX_AGE_DAYS:-(\d+)\}"$/m.exec(deploy);
+  assert.ok(days, 'deploy-3.1.sh names the AIDE age limit');
 
-  // Eindmatrix SITE-48-A: the row stated the host state as a standing fact,
-  // and nothing in the repository can prove that. It now says what it is: the
-  // state at the dated CIS check SECURITY.md records, with a link to that
-  // record, and where to ask for the current output.
-  const date = /### (\d{4})-(\d{2})-(\d{2}) [^\n]*CIS Ubuntu/.exec(sec);
-  assert.ok(date, 'SECURITY.md must date the CIS check');
-  const MONTHS_NL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
-  const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const day = String(Number(date[3])), m = Number(date[2]) - 1;
-  assert.ok(rowNl.includes(`CIS-controle van ${day} ${MONTHS_NL[m]} ${date[1]} op de productieserver`), 'dpa (nl): the row must name the date of the CIS check SECURITY.md records');
-  assert.ok(row.includes(`CIS check of ${day} ${MONTHS_EN[m]} ${date[1]} on the production server`), 'dpa: the row must name the date of the CIS check SECURITY.md records');
-  assert.ok(rowNl.includes('Dat is de stand bij die controle; de openbare code bewijst de serverstaat niet doorlopend.'), 'dpa (nl): the row must say it is a snapshot');
-  assert.ok(row.includes('That is the state at that check; the public code does not prove the server state continuously.'), 'dpa: the row must say it is a snapshot');
-  for (const slug of ['dpa', 'en/dpa']) {
-    assert.match(page(slug), /<td>[^<]*<a href="https:\/\/github\.com\/Apolloccrypt\/paramant-relay\/blob\/main\/SECURITY\.md">SECURITY\.md<\/a>: auditd/, `${slug}: the hardening row must link the SECURITY.md record`);
+  const rowOf = (html, head) => {
+    const m = new RegExp('<tr><td>' + head + '</td>[\\s\\S]*?</tr>').exec(html);
+    assert.ok(m, `the ${head} row exists`);
+    return m[0].replace(/<[^>]+>/g, '');
+  };
+  const en = rowOf(page('en/dpa'), 'Integrity and availability');
+  const nl = rowOf(page('dpa'), 'Integriteit en beschikbaarheid');
+  assert.ok(en.includes('auditd is active'), 'dpa: names auditd active');
+  assert.ok(en.includes(`AIDE is installed and the daily file integrity check ran at most ${days[1]} days ago`), 'dpa: names the AIDE age 6l checks');
+  assert.ok(en.includes('AppArmor is enabled with profiles in enforce mode'), 'dpa: names AppArmor enforcing');
+  assert.ok(en.includes('--verify-only') && en.includes('If a point does not hold, the check fails.'), 'dpa: says when it is checked and that a miss fails');
+  assert.ok(nl.includes('auditd is actief'), 'dpa (nl): names auditd active');
+  assert.ok(nl.includes(`AIDE is geïnstalleerd en de dagelijkse integriteitscontrole van bestanden draaide hooguit ${days[1]} dagen geleden`), 'dpa (nl): names the AIDE age 6l checks');
+  assert.ok(nl.includes('AppArmor staat aan met profielen in enforcing-modus'), 'dpa (nl): names AppArmor enforcing');
+  assert.ok(nl.includes('--verify-only') && nl.includes('Houdt een punt geen stand, dan faalt de controle.'), 'dpa (nl): says when it is checked and that a miss fails');
+  // More than 6l measures: figures, or CIS as a result rather than a guideline.
+  for (const [name, row, guide] of [['en', en, 'CIS Ubuntu 24.04 benchmark as a guideline; that is not a checked claim'],
+                                    ['nl', nl, 'CIS Ubuntu 24.04-benchmark als richtlijn; dat is geen getoetste claim']]) {
+    assert.ok(row.includes(guide), `dpa (${name}): CIS only as a guideline`);
+    assert.doesNotMatch(row, /\d+\s*(CIS )?L2|\d+ (of|van de) \d+|\d+ (checks|controles)|\d+ (rules|regels)|CIS[- ](check|controle) (of|van)/, `dpa (${name}): no figure 6l does not measure`);
   }
+  // No other page states host hardening at all.
+  const pages = fs.readdirSync(path.join(ROOT, 'frontend'), { recursive: true })
+    .filter((f) => /\.html$/.test(f) && !/(^|\/)dpa\.html$/.test(f));
+  const loud = pages.filter((f) => /\bauditd\b|\bAIDE\b|AppArmor/.test(read('frontend/' + f)));
+  assert.deepEqual(loud, [], 'only /dpa may describe the host hardening, and it is held to step 6l');
 });
 
 // 34 ── The signature level. /about and /parasign name it: a Simple Electronic

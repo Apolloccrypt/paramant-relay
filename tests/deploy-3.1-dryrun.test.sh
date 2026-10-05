@@ -55,12 +55,12 @@ extract_seller_snippet() {
 }
 extract_remote() {
   local label="$1" line kind
-  line="$(grep -nE "^  remote(_nginx|_seller)? \"$label\"" "$SCRIPT" | head -1)"
+  line="$(grep -nE "^  remote(_nginx|_seller|_soft)? \"$label\"" "$SCRIPT" | head -1)"
   [ -n "$line" ] || return 1
   kind="$(printf '%s' "$line" | sed -E 's/^[0-9]+:[[:space:]]*([a-z_]+).*/\1/')"
   [ "$kind" = remote_nginx ] && extract_snippet
   [ "$kind" = remote_seller ] && extract_seller_snippet
-  sed -n "/^  remote\(_nginx\|_seller\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
+  sed -n "/^  remote\(_nginx\|_seller\|_soft\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
 }
 
 # resolve_conf_slots() is the function the script sends to the server. It is
@@ -1883,10 +1883,10 @@ fi
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
 SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx|_seller)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "31" ]; then
-  pass "the scan walked all 31 remote blocks"
+if [ "$SCAN_BLOCKS" = "32" ]; then
+  pass "the scan walked all 32 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 31; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 32; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -3763,6 +3763,79 @@ for combo in "--nginx-sync --verify-only" "--nginx-sync --rollback 20260101-0000
     pass "$combo is refused"
   fi
 done
+
+# --------------------------------------------- 6l. host hardening (/dpa) --
+echo ""
+echo "6l-host. the host promises on /dpa are measured in --verify-only, per point, and a miss stops"
+VOH="$(cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only 2>&1)"
+grep -q '^\[step\] 6l\. host hardening that /dpa promises: auditd, AIDE, AppArmor (read-only)' <<< "$VOH" \
+  && pass "--verify-only reaches step 6l, the host check" || fail "--verify-only never reaches step 6l"
+grep -q '# host hardening$' <<< "$VOH" \
+  && pass "6l reads the host over the script's own ssh call" || fail "6l does not go through remote_soft"
+HH="$(mktemp -d)"
+if extract_remote "host hardening" > "$HH/6l.sh" && [ -s "$HH/6l.sh" ]; then
+  pass "the 6l remote block could be extracted"
+else
+  fail "the 6l remote block could not be extracted"
+fi
+grep -qE 'systemctl (start|stop|restart|enable|disable)|aide (--init|--update|--check|-i|-u|-C)|aa-(enforce|complain|disable)|apparmor_parser|> */(etc|var)' "$HH/6l.sh" \
+  && fail "6l changes something on the host; it must only read" \
+  || pass "6l starts, stops, writes and rebuilds nothing on the host"
+eval "$(sed -n '/^remote_field()/p' "$SCRIPT")"
+eval "$(sed -n '/^judge_host_hardening()/,/^}/p' "$SCRIPT")"
+# A host with every promise holding, and one with every promise broken.
+mkdir -p "$HH/good/bin" "$HH/good/db" "$HH/good/log" "$HH/bad/bin" "$HH/bad/db" "$HH/bad/log"
+cat > "$HH/good/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in is-active) echo active ;; show) echo "" ;; esac
+STUB
+cat > "$HH/good/bin/aa-status" <<'STUB'
+#!/usr/bin/env bash
+[ "${1:-}" = --enabled ] && exit 0
+echo "apparmor module is loaded."; echo "121 profiles are loaded."; echo "119 profiles are in enforce mode."
+STUB
+printf '#!/usr/bin/env bash\nexit 0\n' > "$HH/good/bin/aide"
+cat > "$HH/bad/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in is-active) echo inactive; exit 3 ;; show) echo "" ;; esac
+STUB
+printf '#!/usr/bin/env bash\nexit 1\n' > "$HH/bad/bin/aa-status"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$HH/bad/bin/aide"
+chmod +x "$HH"/good/bin/* "$HH"/bad/bin/*
+: > "$HH/good/db/aide.db"; : > "$HH/good/log/aide.log"
+: > "$HH/bad/db/aide.db"; : > "$HH/bad/log/aide.log"; touch -d '10 days ago' "$HH/bad/log/aide.log"
+echo N > "$HH/bad/aa-enabled"
+hh_ok() { printf '  OK    %s\n' "$*"; }
+GOOD="$(PATH="$HH/good/bin:/usr/bin:/bin" bash "$HH/6l.sh" "$HH/good/db" "$HH/good/log" "$HH/nonexistent" 2>&1)"
+BAD="$(PATH="$HH/bad/bin:/usr/bin:/bin" bash "$HH/6l.sh" "$HH/bad/db" "$HH/bad/log" "$HH/bad/aa-enabled" 2>&1)"
+for f in 'host auditd = active' 'host aide binary = yes' 'host aide db = yes' 'host aide last run age days = 0' \
+         'host apparmor enabled = yes' 'host apparmor enforce profiles = 119'; do
+  grep -qxF "$f" <<< "$GOOD" && pass "good host prints '$f'" || fail "good host does not print '$f' (got: $(tr '\n' '|' <<< "$GOOD"))"
+done
+for f in 'host auditd = inactive' 'host aide last run age days = 10' 'host apparmor enabled = no' 'host apparmor enforce profiles = unknown'; do
+  grep -qxF "$f" <<< "$BAD" && pass "broken host prints '$f'" || fail "broken host does not print '$f' (got: $(tr '\n' '|' <<< "$BAD"))"
+done
+if declare -F judge_host_hardening >/dev/null; then
+  ok() { hh_ok "$@"; }
+  REMOTE_OUT="$GOOD"; J1="$(judge_host_hardening 2)"; R1=$?
+  [ "$R1" -eq 0 ] && pass "a host that keeps all three promises passes 6l" || fail "a good host fails 6l with $R1"
+  [ "$(grep -c '^  OK    host: ' <<< "$J1")" -eq 3 ] && pass "6l logs one OK line per promise" || fail "6l did not log three OK lines: $J1"
+  REMOTE_OUT="$BAD"; J2="$(judge_host_hardening 2)"; R2=$?
+  [ "$R2" -eq 3 ] && pass "a host that breaks all three promises fails 6l three times" || fail "a broken host returned $R2, expected 3"
+  grep -q 'FAIL  host: auditd is inactive' <<< "$J2" && pass "6l names the auditd miss" || fail "6l does not name the auditd miss: $J2"
+  grep -q 'FAIL  host: the last AIDE check ran 10 days ago, more than 2' <<< "$J2" && pass "6l names the stale AIDE check" || fail "6l does not name the stale AIDE check: $J2"
+  grep -q 'FAIL  host: AppArmor is not enabled' <<< "$J2" && pass "6l names the AppArmor miss" || fail "6l does not name the AppArmor miss: $J2"
+  REMOTE_OUT="$(sed 's/^host aide binary = yes/host aide binary = no/' <<< "$GOOD")"; judge_host_hardening 2 >/dev/null; R3=$?
+  [ "$R3" -eq 1 ] && pass "a host without aide fails 6l on that point alone" || fail "a host without aide returned $R3, expected 1"
+  unset -f ok
+else
+  fail "judge_host_hardening could not be extracted"
+fi
+grep -q 'judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS" || host_fails=$?' "$SCRIPT" \
+  && grep -q 'host promises on /dpa do not hold' "$SCRIPT" \
+  && pass "phase 6 stops the deploy when a host promise does not hold" \
+  || fail "phase 6 does not stop on a broken host promise"
+rm -rf "$HH"
 
 # ------------------------------------------------------------------- result --
 echo ""

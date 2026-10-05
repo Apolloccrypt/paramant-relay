@@ -59,6 +59,13 @@ confirm through a separate channel before sending anything sensitive.
 | Firewall | UFW/nftables, default deny |
 | Login banners | Configured |
 
+This table is the state on that date, not a standing claim. What is checked
+continuously is narrower: every deploy, including `deploy/deploy-3.1.sh
+--verify-only`, reads the production host in step 6l and fails when auditd is
+not active, AIDE is missing or its daily check is more than 2 days old, or
+AppArmor is not enabled with profiles in enforce mode. /dpa promises those
+three points and no more.
+
 ### 2026-04-11 — R. Zwarts (verification review)
 
 14 findings, all resolved in commit `e6f216d`.

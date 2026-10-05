@@ -123,8 +123,12 @@ test('SITE-11: het dpa-scherm belooft geen medeondertekend exemplaar en stuurt d
 
 test('SITE-48: AppArmor met de echte telling, en geen NIS2-documentatie die niet bestaat', () => {
   assert.match(lees('SECURITY.md'), /119\/121 profiles enforcing/);
-  assert.match(tekst('frontend/dpa.html'), /AppArmor in enforcing-modus \(119 van de 121 profielen\)/);
-  assert.match(tekst('frontend/en/dpa.html'), /AppArmor enforcing \(119 of 121 profiles\)/);
+  // /dpa noemt geen telling meer: uitrolstap 6l toetst AppArmor aan, niet 119 van 121
+  // (telling SITE-48-A). De telling blijft als historie in SECURITY.md.
+  assert.doesNotMatch(tekst('frontend/dpa.html'), /119 van de 121 profielen/);
+  assert.doesNotMatch(tekst('frontend/en/dpa.html'), /119 of 121 profiles/);
+  assert.match(tekst('frontend/dpa.html'), /AppArmor staat aan met profielen in enforcing-modus/);
+  assert.match(tekst('frontend/en/dpa.html'), /AppArmor is enabled with profiles in enforce mode/);
   assert.doesNotMatch(tekst('frontend/en/pricing.html'), /IEC 62443 \/ NIS2 \/ NEN 7510 documentation|NEN 7510 \/ NIS2 compliance documentation/);
   assert.match(lees('docs/ot-guide.md'), /IEC 62443 compliance mapping/);
   assert.match(lees('docs/dicom-guide.md'), /NEN 7510/);
