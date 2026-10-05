@@ -34,7 +34,7 @@ import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentity
 import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk, paraafCoveredPages, pageListText } from '/js/cosign-layout.js?v=5';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
-import { stashReturn, resumeReturn, stashSignupReturn, SIGNUP_KEY, SIGNUP_MAX_AGE_MS } from '/js/login-return.js?v=2';
+import { stashReturn, resumeReturn, stashSignupReturn, takeSignupReturn } from '/js/login-return.js?v=2';
 import { rememberShare, recallShare } from '/js/cosign-share-memory.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
@@ -44,18 +44,61 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 const EN = document.documentElement.lang === 'en';
 const L = (nl, en) => (EN ? en : nl);
 
-// Back from signing in, or from making an account: put the full address
-// (token, key fragment) back first, so everything below reads the link as it
-// was (login-return.js). Signing in left it in this tab's sessionStorage;
-// making an account, which goes through two mails and so new tabs, left it in
-// localStorage.
+// Back from signing in: put the full address (token, key fragment) back
+// first, so everything below reads the link as it was (login-return.js); it
+// waited in this tab's sessionStorage.
+// Back from making an account, which goes through two mails and so new tabs:
+// this browser kept only which request and which party (review #566), never
+// the token or the key. The full address is asked from a tab that still shows
+// the invitation (askHandoff below, in memory, nothing stored); without one,
+// the page says to open the mail link again.
 let __localStore = null;
 try { __localStore = window.localStorage; } catch { __localStore = null; }
+let __signupResume = false;
 try {
-  if (!resumeReturn(window.sessionStorage, location, history) && __localStore) {
-    resumeReturn(__localStore, location, history, Date.now(), SIGNUP_KEY, SIGNUP_MAX_AGE_MS);
+  if (!resumeReturn(window.sessionStorage, location, history) && __localStore
+      && !new URLSearchParams(location.search).get('t')) {
+    __signupResume = takeSignupReturn(__localStore, location);
   }
 } catch { /* no storage: the link as it is */ }
+
+// Tab to tab, same origin only, nothing written anywhere: a tab with the full
+// invitation link answers a tab that came back from making an account for the
+// same request and party.
+const HANDOFF = 'paramant:cosign-handoff';
+function sameRequest(a, b) {
+  return a.get('env') === b.get('env') && a.get('p') === b.get('p') && !!a.get('env');
+}
+function answerHandoff() {
+  if (typeof BroadcastChannel !== 'function') return;
+  if (!new URLSearchParams(location.search).get('t')) return;
+  const ch = new BroadcastChannel(HANDOFF);
+  ch.onmessage = (ev) => {
+    const m = ev && ev.data;
+    if (!m || m.want !== true) return;
+    const mine = new URLSearchParams(location.search);
+    if (!sameRequest(mine, new URLSearchParams(String(m.search || '')))) return;
+    ch.postMessage({ link: location.pathname + location.search + location.hash, search: String(m.search || '') });
+  };
+}
+function askHandoff(ms = 900) {
+  return new Promise((resolve) => {
+    if (typeof BroadcastChannel !== 'function') return resolve(false);
+    const ch = new BroadcastChannel(HANDOFF);
+    const here = new URLSearchParams(location.search);
+    const done = (ok) => { clearTimeout(timer); try { ch.close(); } catch { /* closed */ } resolve(ok); };
+    const timer = setTimeout(() => done(false), ms);
+    ch.onmessage = (ev) => {
+      const m = ev && ev.data;
+      if (!m || typeof m.link !== 'string' || !m.link.startsWith(location.pathname + '?')) return;
+      const u = new URL(m.link, location.origin);
+      if (!sameRequest(here, u.searchParams) || !u.searchParams.get('t')) return;
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+      done(true);
+    };
+    ch.postMessage({ want: true, search: location.search });
+  });
+}
 
 // The language link has to carry the query (which envelope, which party, the
 // invite token) and the #fragment (the document key). A fragment never leaves
@@ -76,8 +119,8 @@ function showError(m, kind) {
   const step = $('step-error');
   const h = step && step.querySelector('h1'), sub = step && step.querySelector('.sub');
   if (step && !step.dataset.h1) { step.dataset.h1 = h ? h.textContent : ''; step.dataset.sub = sub ? sub.textContent : ''; }
-  if (h) h.textContent = kind === 'busy' ? L('Even te druk', 'Busy for a moment') : kind === 'fault' ? L('Even een storing', 'A fault for a moment') : step.dataset.h1;
-  if (sub) sub.textContent = kind === 'busy' ? L('De link is in orde. Er kwamen even te veel verzoeken tegelijk binnen.', 'The link is fine. Too many requests came in at once.') : kind === 'fault' ? L('De link is in orde. Het ligt aan ons.', 'The link is fine. The fault is ours.') : step.dataset.sub;
+  if (h) h.textContent = kind === 'busy' ? L('Even te druk', 'Busy for a moment') : kind === 'fault' ? L('Even een storing', 'A fault for a moment') : kind === 'ready' ? L('Uw account staat klaar', 'Your account is ready') : step.dataset.h1;
+  if (sub) sub.textContent = kind === 'busy' ? L('De link is in orde. Er kwamen even te veel verzoeken tegelijk binnen.', 'The link is fine. Too many requests came in at once.') : kind === 'fault' ? L('De link is in orde. Het ligt aan ons.', 'The link is fine. The fault is ours.') : kind === 'ready' ? L('Nog \u00e9\u00e9n stap naar het document.', 'One more step to the document.') : step.dataset.sub;
   showStep('step-error');
 }
 function toHex(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0'); return s; }
@@ -281,6 +324,9 @@ async function init() {
   const envId = (params.get('env') || '').trim();
   const partyIndex = parseInt(params.get('p') || '', 10);
   __inviteToken = (params.get('t') || '').trim();
+  if (__signupResume && !__inviteToken) {
+    return showError(L('Open de link uit de uitnodigingsmail nog een keer, in deze browser. U bent nu ingelogd, dus het document opent dan meteen. De link zelf bewaart deze browser niet, omdat hij de sleutel van het document bevat.', 'Open the link from the invitation email once more, in this browser. You are signed in now, so the document opens straight away. This browser does not keep the link itself, because it holds the key to the document.'), 'ready');
+  }
   if (!envId || !Number.isInteger(partyIndex) || partyIndex < 0) {
     return showError(L('Deze link is onvolledig. De gegevens van het verzoek ontbreken of kloppen niet.', 'This link is incomplete: the request details are missing or wrong.'));
   }
@@ -599,13 +645,15 @@ function loginCtaHtml() {
   try { store = window.sessionStorage; } catch { store = null; }
   const ret = encodeURIComponent(store ? stashReturn(store, location) : location.pathname);
   return '<a class="btn" href="/auth/login?return=' + ret + '">' + L('Inloggen om verder te gaan', 'Sign in to continue') + '</a>'
-    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link">Maak er gratis een</a> met het e-mailadres waarop u deze uitnodiging kreeg. Daarna komt u vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
+    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link" target="_blank" rel="noopener">Maak er gratis een</a> met het e-mailadres waarop u deze uitnodiging kreeg. Daarna komt u vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link" target="_blank" rel="noopener">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
 }
 
-// "Maak er gratis een": the address of this page waits in this browser until
-// the new account is ready, and the setup page brings the reader back here
-// (login-return.js, acceptance r5, A). Kept on the click, not on showing the
-// button, so nothing is stored for a reader who never signs up.
+// "Maak er gratis een": which request and party this is waits in this browser
+// until the new account is ready, and the setup page brings the reader back
+// here (login-return.js, acceptance r5, A; review #566). Kept on the click,
+// not on showing the button, so nothing is stored for a reader who never
+// signs up. The sign-up opens in a new tab, so this tab keeps the invitation
+// link with its token and key, and can hand it to the returning tab.
 document.addEventListener('click', (ev) => {
   const a = ev.target && ev.target.closest ? ev.target.closest('#cs-signup-link') : null;
   if (a && __localStore) stashSignupReturn(__localStore, location);
@@ -629,6 +677,13 @@ async function prepareSigning() {
     document.body.classList.add('needs-login');
     setStatus('warn', L('Log in als de ontvanger aan wie deze uitnodiging is gestuurd. Kom daarna hier terug om te tekenen.', 'Sign in as the recipient this invite was sent to, then return here to sign.'));
     showCta(loginCtaHtml());
+    // Back in this tab after making an account or signing in elsewhere: the
+    // link here still has the token and the key, so this tab just reloads.
+    const recheck = async () => {
+      if (document.visibilityState === 'hidden') return;
+      if (await loadSession()) { window.removeEventListener('focus', recheck); location.reload(); }
+    };
+    window.addEventListener('focus', recheck);
     return;
   }
   document.body.classList.remove('needs-login');
@@ -2087,4 +2142,5 @@ async function relinkSigningKey() {
 // For the browser tests: the page's own state, read-only.
 window.__cosignDebug = { appearance: () => __appearance, ink: () => __ink, seed: () => __appearanceIsSeed, pages: () => __pageSizes.length };
 
-init();
+answerHandoff();
+(__signupResume ? askHandoff() : Promise.resolve(false)).then(() => init());
