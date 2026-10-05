@@ -6,7 +6,7 @@
     "Een naam van een niet-actieve partij mag op de site alleen binnen een element met data-partner-context=\"<id> <reden>\" (reden: voorwaardelijk, historie, gepland, geen-partij). Zo is elke uitzondering zichtbaar in de html en in de diff.",
     "Geen waarden van sleutels, alleen namen. Juridische naam, land en moederbedrijf alleen met bron; anders null en 'onbekend' in bronnen."
   ],
-  "gewijzigd": "2026-09-23",
+  "gewijzigd": "2026-09-25",
   "statussen": {
     "actief": { "nl": "Actief", "en": "Active" },
     "in-code-niet-actief": { "nl": "In voorbereiding", "en": "In preparation" },
@@ -31,7 +31,8 @@
     "ai": { "nl": "AI-dienst", "en": "AI service", "woorden": ["AI", "model"] },
     "cdn": { "nl": "CDN en DNS", "en": "CDN and DNS", "woorden": ["CDN", "DNS"] },
     "edge-hosting": { "nl": "Edge-hosting", "en": "Edge hosting", "woorden": ["edge", "hosting"] },
-    "blocklist-bron": { "nl": "Bron voor de e-mailblocklist", "en": "Email blocklist source", "woorden": ["blocklist", "wegwerp", "disposable"] }
+    "blocklist-bron": { "nl": "Bron voor de e-mailblocklist", "en": "Email blocklist source", "woorden": ["blocklist", "wegwerp", "disposable"] },
+    "btw-controle": { "nl": "Controle van btw-nummers", "en": "VAT number check", "woorden": ["btw-nummer", "VAT number", "btw", "VAT"] }
   },
   "partijen": [
     {
@@ -491,6 +492,44 @@
         "status": "prod-.env heeft geen MONEYBIRD-sleutels (2026-09-23); relay/lib/moneybird.js doet niets zonder beide",
         "sinds": "code sinds e01dae1a (2026-09-03); nooit aangezet",
         "dpa_url": "onbekend; moneybird.nl/verwerkersovereenkomst gaf 404 op 2026-09-23"
+      }
+    },
+    {
+      "id": "vies",
+      "naam": "Europese Commissie",
+      "handelsnaam": "VIES",
+      "site_namen": ["\\bVIES\\b"],
+      "rol": "btw-controle",
+      "land": { "nl": "Europese Unie", "en": "European Union", "code": "EU" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Alleen als een bedrijf uit een ander EU-land met een btw-nummer afrekent en het btw-nummer van de verkoper is ingesteld: dat btw-nummer en het btw-nummer van de verkoper.",
+        "en": "Only when a business from another EU country checks out with a VAT number and the seller's VAT number is configured: that VAT number and the seller's VAT number."
+      },
+      "nooit": {
+        "nl": "Naam, e-mailadres, adres, bedragen, bestanden of sleutels.",
+        "en": "Name, email address, address, amounts, files or keys."
+      },
+      "subverwerker": true,
+      "status": "in-code-niet-actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["ec.europa.eu"],
+      "code": ["relay/lib/vat.js"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "ec.europa.eu/assets/taxud/vow-information/swagger_publicVAT.yaml (Vies on-the-Web Endpoint), gelezen 2026-09-25",
+        "land": "de Europese Commissie is een instelling van de Europese Unie",
+        "moederbedrijf": "onbekend",
+        "status": "relay/lib/vat.js vraagt VIES alleen als BILLING_SELLER_VAT staat; volgens deploy/DEPLOY-3.1.md is dat nummer nog niet bekend, en docker-compose.yml gaf het tot 2026-09-25 niet door aan de relays",
+        "sinds": "code sinds 2026-09-25",
+        "dpa_url": "geen: de relay vraagt alleen of een btw-nummer geldig is"
       }
     },
     {

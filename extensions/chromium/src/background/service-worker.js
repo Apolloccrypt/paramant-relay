@@ -93,7 +93,17 @@ async function transferChunk(msg) {
     return { ok: true, index: msg.index };
   } catch (err) {
     transfers.delete(msg.transferId);
-    return { ok: false, error: String(err?.message || err) };
+    const out = { ok: false, error: String(err?.message || err) };
+    // Preserve the 402 quota fields across the message boundary (which would
+    // otherwise flatten the error to a string) so the content script can show a
+    // real upgrade melding with plan/limit + link instead of "upload_failed".
+    if (err?.code === 'quota_reached') {
+      out.code       = 'quota_reached';
+      out.plan       = err.plan ?? null;
+      out.limit      = err.limit ?? null;
+      out.upgradeUrl = err.upgradeUrl || 'https://paramant.app/pricing';
+    }
+    return out;
   }
 }
 

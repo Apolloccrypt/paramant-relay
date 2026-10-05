@@ -17,6 +17,7 @@
 const catalog = require('./billing-catalog');
 const creditNote = require('./credit-note');
 const invoice = require('./invoice');
+const vat = require('./vat');
 
 // ── has any money gone back, and was it all of it ────────────────────────────
 // The document layer (credit-note.js) and this layer must agree about what
@@ -104,11 +105,15 @@ function keepLonger(candidate, currentPaidUntil) {
 }
 
 // deps: {
-//   setProductPlan(accountId, product, tier) -> { ok, ... }  (sync or async)
+//   setProductPlan(accountId, product, tier, paidUntil, bundle) -> { ok, ... }
+//   currentTermEnd(accountId, product, tier) -> date | null  (async; optional)
+//   currentPaidUntil(accountId, product) -> date | null      (async; optional,
+//                                  the one-date-per-product fallback)
 //   isProcessed(paymentId) -> boolean                        (async; optional)
 //   markProcessed(paymentId, value) -> void                  (async; optional)
 // }
-// Returns { result, level, account, product, tier, reason }.
+// Returns { result, level, account, product, tier, reason }, and on a grant
+// also grants and paidUntil.
 //   result: 'granted' | 'revoked' | 'refused' | 'ignored'
 //   level:  log level; 'error' marks the "paid but got nothing" alert cases.
 async function processPayment(payment, deps) {
@@ -180,13 +185,16 @@ async function processPayment(payment, deps) {
   }
 
   if (status === 'paid') {
-    // Rule 2: the amount + currency actually paid must match the catalog.
+    // Rule 2: the amount + currency actually paid must match the catalog. A
+    // reverse-charged sale (lib/vat.js; the marker is on the payment, set by
+    // our own checkout) was charged the catalog price without the VAT.
     const paid = payment.amount && payment.amount.value;
     const cur = payment.amount && payment.amount.currency;
-    if (cur !== order.currency || !catalog.amountsEqual(paid, order.amount)) {
+    const expected = vat.chargeAmount(order, vat.termsFromMetadata(md));
+    if (cur !== order.currency || !catalog.amountsEqual(paid, expected)) {
       return {
         result: 'refused', level: 'error', account: accountId, product,
-        reason: `amount_mismatch paid=${paid}/${cur} expected=${order.amount}/${order.currency}`,
+        reason: `amount_mismatch paid=${paid}/${cur} expected=${expected}/${order.currency}`,
       };
     }
     // The period this payment bought. Without it the grant never ends: Mollie is
@@ -196,10 +204,28 @@ async function processPayment(payment, deps) {
     //
     // One anchor for the whole order, so a bundle writes ONE term across the
     // products it covers instead of two dates that drift apart on every renewal.
+    //
+    // The anchor is the end of the term of the SAME tier this order buys, per
+    // product (deps.currentTermEnd). A product holds a term per tier
+    // (entitlements.termsOf) and a gate sees the highest one still running, so
+    // buying one tier never moves the term of another. Until 2026-09-25 the
+    // anchor was the product's one date, whatever tier it belonged to: a
+    // Business month bought over a Firm year then started at the end of that
+    // year and ran thirteen months (betaaltest R2), and writing it replaced the
+    // Pro year it sat on (R3). The first repair started the month now and still
+    // replaced the year, so eleven paid months of Pro were gone after it (review
+    // of #515). Now the month is a Business term of its own, the year stays a
+    // Pro term under it, and when the month ends the year is what is left.
+    //
+    // A caller that only knows one date per product (currentPaidUntil) still
+    // works, for a product that holds one tier.
     const now = d.now instanceof Date ? d.now : new Date();
     const currents = [];
     for (const g of order.grants) {
-      currents.push(typeof d.currentPaidUntil === 'function' ? await d.currentPaidUntil(accountId, g.product) : null);
+      let cur = null;
+      if (typeof d.currentTermEnd === 'function') cur = await d.currentTermEnd(accountId, g.product, g.tier);
+      else if (typeof d.currentPaidUntil === 'function') cur = await d.currentPaidUntil(accountId, g.product);
+      currents.push(cur);
     }
     const paidUntil = periodEnd(bundleExtendFrom(currents, now), interval);
     if (!paidUntil) {
@@ -207,9 +233,11 @@ async function processPayment(payment, deps) {
     }
 
     // Grant each product in the order. setProductPlan moves ONE product per
-    // call and never touches a product this order does not name, so a ParaSign
-    // Business holder buying nothing keeps what he has. `bundle` is passed on so
-    // the expiry index can tell the customer what he actually bought.
+    // call and never touches a product this order does not name, and with a
+    // date it writes the term of this tier alone, so a ParaSign Business holder
+    // buying Firm keeps his Business term and gets a Pro term under it. `bundle`
+    // is passed on so the expiry index can tell the customer what he actually
+    // bought.
     const granted = [];
     for (let i = 0; i < order.grants.length; i++) {
       const g = order.grants[i];

@@ -104,6 +104,15 @@ x-relay-env: &relay-env
   # never reaches a container.
   MONEYBIRD_TOKEN: "${MONEYBIRD_TOKEN:-}"
   MONEYBIRD_ADMINISTRATION_ID: "${MONEYBIRD_ADMINISTRATION_ID:-}"
+  # The seller on every invoice (relay/lib/invoice.js). BILLING_SELLER_VAT is
+  # the switch between a payment receipt and a VAT invoice, and the condition
+  # for reverse charge to a business in another EU country (relay/lib/vat.js).
+  # Empty means the defaults in the code. These had no line here, so a value
+  # set in .env never reached a relay.
+  BILLING_SELLER_NAME: "${BILLING_SELLER_NAME:-}"
+  BILLING_SELLER_ADDRESS: "${BILLING_SELLER_ADDRESS:-}"
+  BILLING_SELLER_KVK: "${BILLING_SELLER_KVK:-}"
+  BILLING_SELLER_VAT: "${BILLING_SELLER_VAT:-}"
   # Add your plk_ license key here to unlock unlimited users (Community Edition = max 5)
   PLK_KEY: "${PLK_KEY:-}"
   REDIS_URL: "${RELAY_REDIS_URL}"

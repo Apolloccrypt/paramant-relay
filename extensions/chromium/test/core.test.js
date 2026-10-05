@@ -196,6 +196,45 @@ describe('sealAndUploadChunk', () => {
     await expect(sealAndUploadChunk({ relay: 'r', apiKey: 'k', chunkU8: randomBytes(10), fileMeta: {}, relayMeta: {}, ttlMs: 1000 }))
       .rejects.toThrow(/Max 5MB/);
   });
+
+  it('translates a 402 monthly_transfer_quota_reached into a structured upgrade error, not upload_failed', async () => {
+    let calls = 0;
+    mockRelay(async () => {
+      calls++;
+      return new Response(
+        JSON.stringify({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: 'community', limit: 10 }),
+        { status: 402 });
+    });
+    let caught;
+    try {
+      await sealAndUploadChunk({ relay: 'r', apiKey: 'k', chunkU8: randomBytes(10), fileMeta: {}, relayMeta: {}, ttlMs: 1000 });
+    } catch (e) { caught = e; }
+    expect(caught, 'a 402 must throw').toBeDefined();
+    expect(calls).toBe(1);                       // never retried; retrying only re-hits the cap
+    expect(caught.code).toBe('quota_reached');   // not 'upload_failed'
+    expect(caught.status).toBe(402);
+    expect(caught.plan).toBe('community');
+    expect(caught.limit).toBe(10);
+    expect(caught.dimension).toBe('transfers_month');
+    expect(caught.upgradeUrl).toBe('https://paramant.app/pricing');
+    // The message is UI-ready: human, carries the limit, and points at upgrading.
+    expect(caught.message).toMatch(/limit reached/i);
+    expect(caught.message).toContain('10');
+    expect(caught.message).toContain('paramant.app/pricing');
+    expect(caught.message).not.toMatch(/upload_failed/);
+  });
+
+  it('a non-quota 402 still surfaces as a plain failure (no false upgrade melding)', async () => {
+    mockRelay(async () => new Response(JSON.stringify({ error: 'some_other_402' }), { status: 402 }));
+    let caught;
+    try {
+      await sealAndUploadChunk({ relay: 'r', apiKey: 'k', chunkU8: randomBytes(10), fileMeta: {}, relayMeta: {}, ttlMs: 1000 });
+    } catch (e) { caught = e; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('upload_failed');
+    expect(caught.code).not.toBe('quota_reached');
+    expect(caught.message).toMatch(/some_other_402/);
+  });
 });
 
 // ── Full multi-chunk round trip (mocked relay storage) ───────────────────────────

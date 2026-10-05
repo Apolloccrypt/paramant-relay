@@ -388,10 +388,30 @@ test('9. de termijn loopt af zoals de site het aankondigt', async () => {
     await new Promise((r) => setTimeout(r, 5000));
   };
 
+  // Deze stapel draait met BILLING_MODE=test, dus de aankoop opende een
+  // abonnement. Zeven dagen voor het einde zegt de waarschuwing dan wat er
+  // gebeurt: verlengen, voor welk bedrag, en waar je opzegt. Tot 25-09 pinde
+  // deze test hier "nothing is charged automatically", terwijl het abonnement
+  // zes dagen later zou incasseren.
+  await opnieuw(new Date(Date.now() + 6 * 86400000).toISOString());
+  const verlenging = S.resend.mails.filter((m) => / renews on /.test(String(m.subject)));
+  assert.ok(verlenging.length >= 1, 'er kwam geen waarschuwing voor een termijn die zichzelf verlengt');
+  for (const m of verlenging) {
+    assert.match(String(m.text), /renews automatically/, 'de waarschuwing zegt niet dat er verlengd wordt');
+    assert.doesNotMatch(String(m.text), /nothing is charged automatically/,
+      'de waarschuwing belooft dat er niets wordt afgeschreven terwijl het abonnement loopt');
+  }
+
+  // Wie opzegt, heeft daarna een termijn die gewoon afloopt.
+  const opzeg = await api(page2, '/api/user/billing/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(opzeg.status, 200, JSON.stringify(opzeg));
+  await page2.waitForTimeout(1500);
+
   // Zeven dagen voor het einde: de aangekondigde waarschuwing.
   await opnieuw(new Date(Date.now() + 6 * 86400000).toISOString());
   const waarschuwing = S.resend.mails.filter((m) => / ends on /.test(String(m.subject)));
-  assert.ok(waarschuwing.length >= 1, 'er kwam geen waarschuwing voor het einde van de termijn');
+  assert.ok(waarschuwing.length >= 1,
+    `er kwam geen waarschuwing voor het einde van de termijn (wel: ${JSON.stringify(S.resend.mails.map((m) => m.subject))})`);
   assert.match(String(waarschuwing[0].text), /nothing is charged automatically/,
     'de waarschuwing zegt iets anders dan /pricing en /terms');
   assert.equal((await rechtenOp(S.healthPort, koper2.key)).parasign.tier, 'pro',

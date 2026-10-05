@@ -8,6 +8,8 @@
   "err_network":    { "message": "Netwerkfout. Controleer je verbinding en probeer opnieuw." },
   "err_upload":     { "message": "Upload mislukt. Probeer opnieuw." },
   "err_incomplete": { "message": "Upload niet voltooid. Probeer opnieuw." },
+  "err_quota":      { "message": "Maandelijkse overdrachtslimiet bereikt. Upgrade je abonnement om meer te versturen." },
+  "cta_upgrade":    { "message": "Abonnement upgraden" },
   "success_inserted": { "message": "Versleutelde link toegevoegd" },
 
   "link_title":     { "message": "Versleutelde bijlage via Paramant" },
