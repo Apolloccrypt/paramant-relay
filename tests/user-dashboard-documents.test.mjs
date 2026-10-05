@@ -369,10 +369,15 @@ const acctPaid = await acctCase({ plan:'community', plan_parasign:'pro', paid_un
 // paidProductTier(), which walks the tier keys and fails closed on anything it
 // does not recognise. A give-back band decided by the plan NAME is exactly the
 // bug this line was written for, and it would show up here as giveBack true.
-ok('a self-serve customer gets the badge and the cancel button he pays for',
+// A one-off payment is not a subscription (besluit 05-10-2026): the badge,
+// and no cancel button, because nothing would be collected again.
+ok('a self-serve customer on a one-off payment gets the badge and no cancel button',
   acctPaid.chip === 'Firm' && acctPaid.current === 'Firm' &&
-  acctPaid.active === true && acctPaid.cancel === true &&
+  acctPaid.active === true && acctPaid.cancel === false &&
   acctPaid.giveBack === false && acctPaid.bought === true, JSON.stringify(acctPaid));
+const acctRenews = await acctCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:future, auto_renews:true });
+ok('a plan with a collection behind it keeps the cancel button',
+  acctRenews.active === true && acctRenews.cancel === true, JSON.stringify(acctRenews));
 
 const acctLapsed = await acctCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:past });
 ok('an expired paid period falls back to Community on /account too',

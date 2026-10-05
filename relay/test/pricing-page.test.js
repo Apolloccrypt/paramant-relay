@@ -994,7 +994,9 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert(body.includes(`Voor uw kantoor: ${monthlyExcl} euro per maand.`), 'the offer must name the catalog amount excl. btw: ' + monthlyExcl);
   assert(body.includes(`&euro;${nl(monthlyIncl)} per maand, inclusief 21% btw`), 'the offer must name the incl. amount the checkout charges: ' + nl(monthlyIncl));
   assert(body.includes(`&euro;${nl(yearlyIncl)} incl. btw (&euro;${yearlyExcl} excl.)`), 'the yearly line must be the catalog yearly amount');
-  assert(/Meer nodig\? Mail Mick: <a href="mailto:privacy@paramant\.app/.test(body), 'Business and Enterprise are reached through "Meer nodig?", with a way to reach Mick');
+  // Since 05-10-2026 the line says who it is for: a larger organisation, and
+  // the one address to write to. Still no Business button on this page.
+  assert(/Grotere organisatie\? Neem contact op: <a href="mailto:privacy@paramant\.app/.test(body), 'Business and Enterprise are reached through "Grotere organisatie? Neem contact op", with the contact address');
   assert(!/class="tier-card|data-billing-plan="business"|>Business<|>Enterprise</.test(body), 'no Business or Enterprise card on the Dutch /pricing');
 
   const lim = (tier, dim) => tiers.tierLimit(tier, dim);

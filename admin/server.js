@@ -2955,6 +2955,11 @@ function productPlanFields(rec) {
     plan_parasend: rec?.plan_parasend ?? null,
     paid_until_parasign: rec?.paid_until_parasign ?? null,
     paid_until_parasend: rec?.paid_until_parasend ?? null,
+    // Every term still running per product, highest first (relay
+    // _runningTermsView): what lets /account and /dashboard write one line per
+    // product, "Business until the 5th, then Firm until the 5th after".
+    terms_parasign: Array.isArray(rec?.terms_parasign) ? rec.terms_parasign : [],
+    terms_parasend: Array.isArray(rec?.terms_parasend) ? rec.terms_parasend : [],
   };
 }
 
@@ -4228,6 +4233,27 @@ api.post("/user/billing/checkout/:token/confirm", authUser, billingStubGone);
 
 api.post("/user/billing/cancel", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
+  // A ONE-OFF PAYMENT IS NOT A SUBSCRIPTION (besluit 05-10-2026). With nothing
+  // collecting again there is nothing to cancel: the term simply ends. This
+  // route used to write a cancel date equal to that end anyway and mail
+  // "Opzegging gepland ... Bedacht? Beantwoord deze mail, dan zetten we het
+  // terug" about a plan that was never going to renew (betaaltest 05-10, row
+  // 3). The account page shows no button then; this refuses the call too, and
+  // sends no mail. Whether something collects is relay-main's answer, the
+  // same one GET /user/billing/status reads.
+  try {
+    const mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+    const mainKey = (mainRes.body?.keys || []).find(k => k.key === user_id);
+    if (mainKey && !mainKey.auto_renews) {
+      return res.status(409).json({
+        error: "nothing_to_cancel",
+        message: "Dit plan is een eenmalige betaling. Er loopt geen abonnement, dus er is niets op te zeggen: het plan stopt vanzelf op de einddatum.",
+        message_en: "This plan is a one-off payment. No subscription is running, so there is nothing to cancel: the plan stops by itself on its end date.",
+      });
+    }
+  } catch (err) {
+    console.error("[billing] cancel precheck failed:", err.message);
+  }
   const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
   // "You keep access until the end of your billing period" is a promise about a
@@ -4334,6 +4360,26 @@ api.get("/user/billing/status", authUser, async (req, res) => {
 // reverses one. Both are served by the relay from the same document keyspace,
 // which checks the number belongs to this account.
 const INVOICE_NUMBER_RE = /^(?:PS|CN)-\d{4}-\d{4,}$/;
+
+// What became of the checkout this account started last: paid, open,
+// canceled, failed or expired, straight from Mollie through the relay that
+// created it (relay GET /v2/billing/last-payment). The dashboard asks it when
+// Mollie sends the buyer back, so it can stop saying "being confirmed" about a
+// payment that was cancelled. SECTORS.main for the same reason as the invoices.
+api.get("/user/billing/last-payment", authUser, async (req, res) => {
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/last-payment`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return res.status(r.status === 401 ? 401 : 502).json({ error: "last_payment_unavailable" });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(await r.json());
+  } catch (err) {
+    console.error("[user/billing/last-payment]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
 
 api.get("/user/billing/invoices", authUser, async (req, res) => {
   try {

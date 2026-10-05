@@ -161,9 +161,16 @@ const COPY = {
     noCharge: /Nothing is charged automatically\./, renew: 'Renew', pricing: /^\/(en\/)?pricing$/,
   },
 };
+// /account words the same date as what a one-off payment is (besluit
+// 05-10-2026): paid until that day, and renewing is possible today.
+const ACCOUNT_ENDS = {
+  nl: (d) => `Betaald tot ${d}, verlengen kan vanaf vandaag: de nieuwe periode sluit aan op ${d}. Er wordt niets automatisch verlengd.`,
+  en: (d) => `Paid until ${d}, renewing is possible from today: the new term starts on ${d}. Nothing renews automatically.`,
+};
 const samePricing = (want, href) => (typeof want === 'string' ? href === want : want.test(href || ''));
-for (const [name, run, prefix, copy] of [['account', account, '', COPY.nl], ['dashboard', dashboard, '', COPY.nl],
+for (const [name, run, prefix, base] of [['account', account, '', COPY.nl], ['dashboard', dashboard, '', COPY.nl],
   ['en/account', account, '/en', COPY.en], ['en/dashboard', dashboard, '/en', COPY.en]]) {
+  const copy = name.endsWith('account') ? { ...base, ends: ACCOUNT_ENDS[base.lang] } : base;
   // Far out: the date is stated, and nothing shouts. A warning band on a term
   // with six weeks left is noise, and noise is what makes the real one invisible.
   const far = term(40);

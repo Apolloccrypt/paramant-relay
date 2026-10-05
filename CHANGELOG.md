@@ -31,6 +31,18 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lying turns the gate red.
 
 ### Fixed
+- **What a buyer reads around paying matches what he gets** (betaaltest
+  2026-10-05). Business now carries the ParaSend half of Firm, written by the
+  payment and floored at read time for older Business accounts, so /parashare
+  no longer sends a Business customer to Firm. The dashboard says what Mollie
+  says became of the last checkout (cancelled, failed, expired) with a button
+  to pay again, instead of "being confirmed". A one-off payment shows "paid
+  until, renewing possible from today" and no cancel button, and the cancel
+  route refuses it without a mail. /account writes one line per product. The
+  101st signature counts signatures and names Business. The English checkout
+  stays English from sign-in to dashboard. /pricing (NL and EN) shows per plan
+  what you can do afterwards, pinned to `tiers.js` and to the dashboard lines,
+  and says when VAT is reverse charged; so do the terms.
 - **A business in another EU country paid 21% Dutch VAT.** A service to a
   business established in another member state is taxed where that business is,
   and the VAT is reverse charged (Directive 2006/112/EC art. 44 and 196). The

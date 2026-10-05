@@ -3578,7 +3578,9 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   says('index', `Voor uw kantoor: ${excl} euro per maand, excl. btw.`);
   says('pricing', `Voor uw kantoor: ${excl} euro per maand.`);
   says('about', `Voor uw kantoor: ${excl} euro per maand`);
-  for (const slug of ['index', 'pricing', 'about']) says(slug, 'Meer nodig? Mail Mick: privacy@paramant.app');
+  for (const slug of ['index', 'about']) says(slug, 'Meer nodig? Mail Mick: privacy@paramant.app');
+  // /pricing since 05-10-2026: who the line is for, and the same address.
+  says('pricing', 'Grotere organisatie? Neem contact op: privacy@paramant.app');
   const lim = (tier, dim) => tiers.tierLimit(tier, dim);
   for (const slug of ['index', 'pricing', 'about']) {
     says(slug, `${lim('community', 'signs_month')} handtekeningen per maand`);
@@ -3868,4 +3870,132 @@ test('no page promises a signing order the relay does not enforce, and /parasign
     if (m) offenders.push(`${slug}: "${m[0]}"`);
   }
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
+});
+
+// 53 ── What you can do after paying, 5 October 2026.
+//
+// The betaaltest of that day found that paying worked and the rights were
+// right, and that the words around them were not: Business kept ParaSend
+// Community while the page sold it as the step up from Firm, the dashboard
+// promised Firm "no rate limit" against 500 an hour, and reverse-charged VAT
+// was on the invoice and nowhere on the site. The question was whether you
+// can pay, get the right rights, and read exactly that on the site.
+//
+// So /pricing (NL and EN) now carries one table of what each plan can do,
+// every cell is read here from the module the relay gates on, and /dashboard
+// has to say the same numbers in the lines it shows after paying. The VAT
+// sentence is held to lib/vat.js and the invoice mention in lib/invoice.js.
+test('what /pricing says each plan can do is what the relay enforces and what /dashboard shows', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const tiers = require('../relay/lib/tiers.js');
+  const ent = require('../relay/lib/entitlements.js');
+  const catalog = require('../relay/lib/billing-catalog.js');
+  const vatSrc = read('relay/lib/vat.js');
+  const invoiceSrc = read('relay/lib/invoice.js');
+  const problems = [];
+  const rows = (slug) => {
+    const h = visible(page(slug));
+    const out = new Map();
+    for (const tr of h.matchAll(/<tr><th scope="row">([^<]+)<\/th>((?:<td>[^<]*<\/td>)+)<\/tr>/g)) {
+      out.set(tr[1], [...tr[2].matchAll(/<td>([^<]*)<\/td>/g)].map((m) => m[1]));
+    }
+    return out;
+  };
+  const cell = (slug, row, want) => {
+    const got = rows(slug).get(row);
+    if (JSON.stringify(got) !== JSON.stringify(want)) problems.push(`${slug} "${row}": ${JSON.stringify(got)} must be ${JSON.stringify(want)}`);
+  };
+
+  // What each sold plan grants, asked of the catalog and the entitlement
+  // layer exactly as the webhook writes it, not restated from tiers.js names.
+  const after = (product, plan) => {
+    const acct = { plan: 'community', plan_parasign: 'free', plan_parasend: 'community' };
+    for (const g of catalog.grantsOf(product, plan) || []) ent.applyProductTier(acct, g.product, g.tier);
+    return ent.getEntitlements(acct);
+  };
+  const free = ent.getEntitlements({ plan: 'community', plan_parasign: 'free', plan_parasend: 'community' });
+  const firm = after('firm', 'firm');
+  const biz = after('parasign', 'business');
+  // Business is more than Firm: the whole ParaSend half of Firm is in it.
+  for (const k of ['transfers_month', 'outbound_per_hour', 'view_ttl_ms', 'max_views', 'devices', 'tier']) {
+    const pick = (e) => (k === 'transfers_month' ? e.parasend.quotas[k] : k === 'tier' ? e.parasend.tier : e.parasend.limits[k]);
+    if (pick(biz) !== pick(firm)) problems.push(`Business must carry Firm's ParaSend ${k}: ${pick(biz)} vs ${pick(firm)}`);
+  }
+  const sendQ = (e) => e.parasend.quotas.transfers_month;
+  // max_recipients is a tiers.js row read on the ParaSend tier (tier-gate),
+  // max_parties one on the ParaSign tier; neither is on the entitlement view.
+  const L = (e, k) => (k === 'max_recipients' ? tiers.tierLimit(e.parasend.tier, k) : e.parasend.limits[k]);
+  const parties = (e) => tiers.tierLimit(e.parasign.tier === 'free' ? 'community' : e.parasign.tier, 'max_parties');
+  const audit = (e) => !!e.parasign.features.audit_export;
+  const signs = (e) => e.parasign.quotas.signs_month;
+  const hours = (ms) => ms / 3600000;
+  const nlNum = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const enNum = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const oneTimeMb = 5; // tests/site-claims block 1 holds the one-time-link ceiling; the table repeats it
+  const hr = (n, lang) => (lang === 'nl' ? `${n} uur` : `${n} hour${n === 1 ? '' : 's'}`);
+
+  cell('pricing', 'Handtekeningen per maand', [nlNum(signs(free)), nlNum(signs(firm))]);
+  cell('pricing', 'Verzendingen per maand', [String(sendQ(free)), `${sendQ(firm)}, hooguit ${L(firm, 'outbound_per_hour')} per uur`]);
+  cell('pricing', 'Ontvangers per verzending', [String(L(free, 'max_recipients')), String(L(firm, 'max_recipients'))]);
+  cell('pricing', 'Een link blijft geldig', [hr(hours(L(free, 'view_ttl_ms')), 'nl'), hr(hours(L(firm, 'view_ttl_ms')), 'nl')]);
+  cell('pricing', 'Keer openen per link via de API', [String(L(free, 'max_views')), String(L(firm, 'max_views'))]);
+  cell('pricing', 'Geregistreerde apparaten', [String(L(free, 'devices')), String(L(firm, 'devices'))]);
+  cell('pricing', 'Bestand via een eenmalige link', [`${oneTimeMb} MB`, `${oneTimeMb} MB`]);
+  cell('pricing', 'API-sleutel voor ondertekenen', ['nee', 'ja']);
+  cell('pricing', 'Audittrail exporteren', [audit(free) ? 'ja' : 'nee', audit(firm) ? 'ja' : 'nee']);
+
+  cell('en/pricing', 'Signatures a month', [enNum(signs(free)), enNum(signs(firm)), enNum(signs(biz))]);
+  cell('en/pricing', 'Signers per document (API)', [free, firm, biz].map((e) => String(parties(e))));
+  cell('en/pricing', 'Transfers a month', [String(sendQ(free)), `${sendQ(firm)}, at most ${L(firm, 'outbound_per_hour')} an hour`, `${sendQ(biz)}, at most ${L(biz, 'outbound_per_hour')} an hour`]);
+  cell('en/pricing', 'Recipients per send', [free, firm, biz].map((e) => String(L(e, 'max_recipients'))));
+  cell('en/pricing', 'A link stays valid', [free, firm, biz].map((e) => hr(hours(L(e, 'view_ttl_ms')), 'en')));
+  cell('en/pricing', 'Reads per link through the API', [free, firm, biz].map((e) => String(L(e, 'max_views'))));
+  cell('en/pricing', 'Registered devices', [free, firm, biz].map((e) => String(L(e, 'devices'))));
+  cell('en/pricing', 'File over a one-time link', [`${oneTimeMb} MB`, `${oneTimeMb} MB`, `${oneTimeMb} MB`]);
+  cell('en/pricing', 'ParaSign API key', ['no', 'yes', 'yes']);
+  cell('en/pricing', 'Audit log export', [free, firm, biz].map((e) => (audit(e) ? 'yes' : 'no')));
+  // The one-time-link ceiling the table repeats, from the relay itself.
+  if (!/5\s*\*\s*1024\s*\*\s*1024|5_242_880|5242880/.test(read('relay/relay.js'))) problems.push('the 5 MB one-time-link ceiling is no longer in relay.js; the pricing tables repeat it');
+
+  // /dashboard after paying says the same numbers, and no longer "no rate limit".
+  const dash = read('frontend/js/dashboard.js');
+  const firmSend = (dash.match(/pro: nlEn\('(Firm voor Versturen:[^']+)', '([^']+)'\)/) || []);
+  if (!firmSend[1]) problems.push('dashboard.js: the Firm ParaSend line is gone');
+  else {
+    for (const [lang, text] of [['nl', firmSend[1]], ['en', firmSend[2]]]) {
+      const want = lang === 'nl'
+        ? [`${sendQ(firm)} verzendingen per maand`, `hooguit ${L(firm, 'outbound_per_hour')} per uur`, `tot ${L(firm, 'max_recipients')} ontvangers`, `${hours(L(firm, 'view_ttl_ms'))} uur`, `tot ${L(firm, 'max_views')} keer`, `tot ${L(firm, 'devices')} geregistreerde apparaten`]
+        : [`${sendQ(firm)} transfers a month`, `at most ${L(firm, 'outbound_per_hour')} an hour`, `up to ${L(firm, 'max_recipients')} recipients`, `${hours(L(firm, 'view_ttl_ms'))} hours`, `up to ${L(firm, 'max_views')} reads`, `up to ${L(firm, 'devices')} registered devices`];
+      for (const w of want) if (!text.includes(w)) problems.push(`dashboard.js ${lang} Firm ParaSend line must say "${w}": ${text}`);
+    }
+  }
+  if (/geen snelheidslimiet|no rate limit/i.test(dash.replace(/^\s*\/\/.*$/gm, ''))) problems.push('dashboard.js promises no rate limit; tiers.js holds Firm to outbound_per_hour');
+  if (!/pro_business: nlEn\('Versturen, inbegrepen bij Business/.test(dash)) problems.push('dashboard.js: a Business customer reads his ParaSend half under the name Business');
+  const firmSign = dash.match(/pro: nlEn\('(Firm voor Ondertekenen:[^']+)'/);
+  if (!firmSign || !firmSign[1].includes(`${signs(firm)} handtekeningen per maand`)) problems.push('dashboard.js: the Firm ParaSign line must say the signs ceiling');
+
+  // Business on the English page: more than Firm, in words.
+  const en = visible(page('en/pricing'));
+  if (!en.includes(`ParaSend as on Firm: ${sendQ(biz)} transfers a month, up to ${L(biz, 'max_recipients')} recipients per send, ${hours(L(biz, 'view_ttl_ms'))} hour links`)) problems.push('en/pricing: the Business card must say it carries ParaSend as on Firm');
+  if (!en.includes('Business is one payment for its own term, and includes ParaSend on the same terms as Firm.')) problems.push('en/pricing: how payment works must say what Business includes');
+
+  // Reverse-charged VAT, as lib/vat.js decides it and lib/invoice.js prints it.
+  const mentionNl = (invoiceSrc.match(/REVERSE_CHARGE_NL = '([^']+)'/) || [])[1];
+  const mentionEn = (invoiceSrc.match(/REVERSE_CHARGE_EN = '([^']+)'/) || [])[1];
+  if (mentionNl !== 'Btw verlegd' || mentionEn !== 'VAT reverse charged') problems.push(`invoice.js mention moved: ${mentionNl} / ${mentionEn}`);
+  if (!/const HOME = 'NL'/.test(vatSrc)) problems.push('vat.js: the home member state moved; the sentence says "another EU member state"');
+  if (!/VIES/.test(vatSrc) || !/company name and an address/.test(vatSrc)) problems.push('vat.js: the conditions the sentence names (VIES, name and address) are no longer there');
+  // Written the way every other excl. amount on these pages is: 29, not 29.00.
+  const monthlyExcl = String(Math.round(Number(catalog.priceOf('firm', 'firm', 'monthly')) / 1.21 * 100) / 100);
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/&euro;/g, '€').replace(/&ldquo;|&rdquo;/g, '"').replace(/\s+/g, ' ');
+  const vatSays = {
+    pricing: ['Bent u een bedrijf in een ander EU-land, dan wordt de btw verlegd.', `€${monthlyExcl.replace('.', ',')} per maand zonder btw`, `0% btw, "${mentionNl}"`, 'btw-nummer, bedrijfsnaam en adres', '(VIES)', 'betaalt u 21% btw'],
+    'en/pricing': ['A business established in another EU member state pays no Dutch VAT: it is reverse charged.', `Firm €${monthlyExcl} a month`, `0% VAT, "${mentionNl} / ${mentionEn}"`, 'VAT number, company name and address', '(VIES)', 'you pay 21% VAT'],
+    terms: ['dan wordt de btw verlegd', `0% btw, "${mentionNl} / ${mentionEn}"`, 'bedrijfsnaam en adres', '(VIES)', 'rekenen wij 21% btw'],
+    'en/terms': ['the VAT is reverse charged', `0% VAT, "${mentionNl} / ${mentionEn}"`, 'company name and address', '(VIES)', 'we charge 21% VAT'],
+  };
+  for (const [slug, phrases] of Object.entries(vatSays)) for (const ph of phrases) if (!flat(slug).includes(ph)) problems.push(`${slug}: the VAT sentence must say "${ph}"`);
+
+  assert.deepEqual(problems, [], problems.join('\n'));
 });

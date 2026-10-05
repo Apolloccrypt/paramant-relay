@@ -428,7 +428,12 @@ window.paSecondFactorError = paSecondFactorError;
       .filter(function (t) { return !isNaN(t); });
     if (!ends.length) return null;
     var ahead = ends.filter(function (t) { return t > now; });
-    var at = ahead.length ? Math.min.apply(null, ahead) : Math.max.apply(null, ends);
+    // The LAST end still ahead: the day the account actually stops having
+    // what it paid for. It used to be the nearest one, so after a Firm to
+    // Business upgrade one page said the 5th of one month and the row under it
+    // the 6th of the next (betaaltest 05-10, row 8). What runs out earlier on
+    // one product is said per product, in the lines under it (plan-terms.js).
+    var at = ahead.length ? Math.max.apply(null, ahead) : Math.max.apply(null, ends);
     var days = (at - now) / 86400000;
     return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
   }
@@ -446,12 +451,20 @@ window.paSecondFactorError = paSecondFactorError;
     var warn = document.getElementById('billing-term-warn');
     if (line) line.hidden = true;
     if (warn) warn.hidden = true;
+    if (window.paPlanTerms) window.paPlanTerms.render(document.getElementById('billing-products'), d);
     if (!term) return;
     var when = termDate(term.at);
     if (line) {
+      // A one-off payment is not a subscription (besluit 05-10-2026): no
+      // "cancel", but the day it is paid until and when renewing is possible.
+      // That is today: the checkout sells a renewal of a running term at any
+      // moment, and the new term starts where this one ends
+      // (lib/billing.processPayment, currentTermEnd), so no day is lost.
       line.textContent = term.ended
         ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
-        : nlEn('Loopt af op ', 'Ends on ') + when + nlEn(', er wordt niets automatisch verlengd.', ', nothing renews automatically.');
+        : d.auto_renews
+          ? nlEn('Loopt af op ', 'Ends on ') + when + nlEn(', er wordt niets automatisch verlengd.', ', nothing renews automatically.')
+          : nlEn('Betaald tot ', 'Paid until ') + when + nlEn(', verlengen kan vanaf vandaag: de nieuwe periode sluit aan op ', ', renewing is possible from today: the new term starts on ') + when + nlEn('. Er wordt niets automatisch verlengd.', '. Nothing renews automatically.');
       line.hidden = false;
     }
     if (warn && term.warn) {
@@ -481,12 +494,11 @@ window.paSecondFactorError = paSecondFactorError;
       const free = isFreeAccount(d, d.current_plan);
       if (!free) {
         document.getElementById('billing-active-badge').classList.remove('hidden');
-        // A customer who pays gets a way to stop paying. What was wrong here was
-        // never the button but the date behind it: cancel used to schedule the
-        // downgrade at now plus 30 days, so someone who had bought a YEAR was
-        // told his plan ended next month. It now schedules on the term he
-        // actually paid for, the same date shown below.
-        document.getElementById('billing-cancel-btn').classList.remove('hidden');
+        // A way to stop paying, only where something would be paid again. On
+        // a one-off payment there is nothing to stop: the button scheduled a
+        // "cancellation" on the day the term ended anyway and mailed about it
+        // (betaaltest 05-10, row 3). The term line says what is true instead.
+        if (d.auto_renews) document.getElementById('billing-cancel-btn').classList.remove('hidden');
       }
       // One calm line about what this plan is. On Community it says whose gift
       // it is and what the paid plans add, with a single way up. On a paid plan
@@ -498,10 +510,11 @@ window.paSecondFactorError = paSecondFactorError;
       // access_until is the end of the term that was paid for and is the honest
       // date on a one-off; next_billing_date only means something once
       // something actually collects again.
+      // One date, in the term line: the day the last paid term ends, which is
+      // access_until. A second "Access until" row stood here with its own
+      // date and disagreed with the line above it after an upgrade (row 8).
       const until = d.access_until || d.next_billing_date;
       if (until) {
-        document.getElementById('billing-next-row').style.display = 'flex';
-        document.getElementById('billing-next').textContent = paramantDate.day(until);
         const note = document.getElementById('billing-renew-note');
         if (note) note.hidden = !!d.auto_renews;
       }

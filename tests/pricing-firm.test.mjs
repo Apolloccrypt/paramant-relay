@@ -172,13 +172,14 @@ test('the Firm buttons check out the bundle, and the no-JS fallback is sign-in',
   }
   assert.ok(firm.some((b) => /35\.09\/mo incl/.test(b.label)), 'the monthly Firm button names the amount that will be charged');
 
-  // ParaSign Business is untouched and still sold on its own.
+  // Business is still sold under its ParaSign key, and since 05-10-2026 it is
+  // more than Firm: it carries the ParaSend half of Firm as well.
   const business = buys.filter((b) => b.plan === 'business');
   assert.equal(business.length, 2);
   for (const b of business) {
     assert.equal(b.product, 'parasign');
     const order = catalog.resolveOrder(b);
-    assert.deepEqual(order.grants.map((g) => `${g.product}:${g.tier}`), ['parasign:business']);
+    assert.deepEqual(order.grants.map((g) => `${g.product}:${g.tier}`), ['parasign:business', 'parasend:pro']);
   }
 });
 

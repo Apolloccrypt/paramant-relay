@@ -196,7 +196,7 @@ async function processPayment(payment, deps) {
       // read as running for the rest of a day where periods resolve per day.
       if (per && Number.isFinite(span) && span > 0 && Number.isFinite(curMs) && curMs - span > nowR.getTime() + 60_000) {
         const left = new Date(curMs - span);
-        try { await d.setProductPlan(accountId, g.product, g.tier, left, order.bundle || null, { shorten: true }); } catch { /* logged by caller */ }
+        try { await d.setProductPlan(accountId, g.product, g.tier, left, g.included ? undefined : (order.bundle || null), { shorten: true }); } catch { /* logged by caller */ }
         revoked.push({ product: g.product, tier: left.getTime() > nowR.getTime() ? g.tier : floor, paidUntil: left.toISOString(), partial: true });
         continue;
       }
@@ -276,7 +276,14 @@ async function processPayment(payment, deps) {
       else if (typeof d.currentPaidUntil === 'function') cur = await d.currentPaidUntil(accountId, g.product);
       currents.push(cur);
     }
-    const paidUntil = periodEnd(bundleExtendFrom(currents, now), interval);
+    // An INCLUDED grant (the ParaSend half of Business, billing-catalog
+    // BUNDLES.business) does not anchor the term: the price is for the grant
+    // it rides on. Otherwise a Business customer from before Business carried
+    // ParaSend, renewing early, would anchor on the ParaSend term he never had
+    // (now) instead of on the end of his Business term, and lose the days in
+    // between.
+    const anchoring = currents.filter((_, i) => !order.grants[i].included);
+    const paidUntil = periodEnd(bundleExtendFrom(anchoring.length ? anchoring : currents, now), interval);
     if (!paidUntil) {
       return { result: 'refused', level: 'error', account: accountId, product, reason: `no_period_for_interval:${interval}` };
     }
@@ -287,12 +294,36 @@ async function processPayment(payment, deps) {
     // buying Firm keeps his Business term and gets a Pro term under it. `bundle`
     // is passed on so the expiry index can tell the customer what he actually
     // bought.
+    const anchor = bundleExtendFrom(anchoring.length ? anchoring : currents, now);
+    const span = paidUntil.getTime() - anchor.getTime();
+    // Where each grant's term starts and ends. An anchoring grant: the term
+    // above. An included grant whose own term already runs past the anchor
+    // (the ParaSend Pro of a Firm that runs on under a new Business month):
+    // that time is paused, exactly as pauseLowerTerms pauses a lower tier, so
+    // the span is added to its own end. Without this a Firm customer who
+    // bought a Business month kept ParaSign Pro a month longer and lost the
+    // ParaSend half of the same Firm on the original day: two end dates on
+    // /account for one purchase (betaaltest 05-10, row 8).
+    // It is a pause, so it happens where pausing does: a caller that pauses
+    // lower terms (deps.pauseLowerTerms, the relay) pauses this one too, and
+    // a caller that does not, pauses neither.
+    const pauses = typeof d.pauseLowerTerms === 'function';
+    const spans = order.grants.map((g, i) => {
+      const cur = currents[i] ? new Date(currents[i]) : null;
+      const runsOn = g.included && cur && !Number.isNaN(cur.getTime()) && cur.getTime() > anchor.getTime();
+      if (pauses && runsOn) return { from: cur, until: new Date(cur.getTime() + span), extends: true };
+      return { from: anchor, until: keepLonger(paidUntil, currents[i]), extends: false, keepsBundle: !!runsOn };
+    });
     const granted = [];
     for (let i = 0; i < order.grants.length; i++) {
       const g = order.grants[i];
-      const until = keepLonger(paidUntil, currents[i]);
+      const until = spans[i].until;
+      // An included grant that extends a running term keeps that term's
+      // bundle (undefined leaves it alone): the expiry mail is about what the
+      // customer bought for the LAST day, and that is still his Firm.
+      const bundle = (spans[i].extends || spans[i].keepsBundle) ? undefined : (order.bundle || null);
       let set;
-      try { set = await d.setProductPlan(accountId, g.product, g.tier, until, order.bundle || null); }
+      try { set = await d.setProductPlan(accountId, g.product, g.tier, until, bundle); }
       catch (e) { set = { ok: false, reason: e.message }; }
       if (!set || !set.ok) {
         return {
@@ -305,8 +336,9 @@ async function processPayment(payment, deps) {
     }
     // The period this payment bought, per product, so a later chargeback can
     // take back exactly this and nothing paid before it.
-    const anchor = bundleExtendFrom(currents, now);
-    const bought = order.grants.map((g) => ({ product: g.product, tier: g.tier, from: anchor.toISOString(), until: paidUntil.toISOString() }));
+    const bought = order.grants.map((g, i) => ({ product: g.product, tier: g.tier,
+      from: spans[i].from.toISOString(),
+      until: (spans[i].extends ? spans[i].until : paidUntil).toISOString() }));
     // An UPGRADE pauses what runs under it. A Firm customer who buys a month
     // of ParaSign Business holds a ParaSign Pro term under it; without this
     // the Pro weeks under the Business month were paid for and never used.
@@ -314,7 +346,6 @@ async function processPayment(payment, deps) {
     // product out by the span this payment bought, and says what it moved so
     // a chargeback can move it back.
     if (typeof d.pauseLowerTerms === 'function') {
-      const span = paidUntil.getTime() - anchor.getTime();
       for (const b of bought) {
         try {
           const moved = await d.pauseLowerTerms(accountId, b.product, b.tier, span);
