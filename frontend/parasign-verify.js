@@ -45,6 +45,9 @@ const T = {
     missingSignedHash: 'de hash van het ondertekende document ontbreekt (stamped_hash of document_hash)',
     embeddedOriginal: 'Gecontroleerd met het ondertekende origineel dat ongewijzigd in deze pdf is ingebed. De handtekeningen die op de pagina\u2019s van deze kopie zijn getekend, vallen zelf niet onder het bewijs; wat er is ondertekend, is het ingebedde origineel.',
     embeddedSave: 'Ingebed origineel opslaan',
+    // Review #565, M1: a pdf whose visible pages say something else, with the
+    // real signed original attached, verified with the full green banner.
+    embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Het ingebedde origineel is geldig ondertekend. De pagina\u2019s die u in dit bestand ziet, zijn niet gecontroleerd.</strong> Dit bestand draagt het ondertekende origineel als bijlage, en alleen dat origineel komt overeen met de ondertekende hash. Wat er op de zichtbare pagina\u2019s staat, kan afwijken. Sla het ingebedde origineel op en lees dat.</div>',
     hashMismatch: 'documenthash klopt niet: dit document is niet het document dat is ondertekend',
     wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. {pick}</strong> De handtekening in het .psign-bestand geldt voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Bij een pdf of afbeelding is dat de versie met de zegel erop, die u na het ondertekenen kreeg. Wat u koos, is niet wat er is ondertekend. Kies dat bestand en controleer opnieuw.</div>',
     partyNamesHead: 'Namen zoals de afzender ze opgaf (niet gecontroleerd; de handtekeningen zelf zijn wel gecontroleerd):',
@@ -130,6 +133,7 @@ const T = {
     missingSignedHash: 'missing signed document hash (stamped_hash or document_hash)',
     embeddedOriginal: 'Checked against the signed original embedded unchanged in this pdf. The signatures drawn on the pages of this copy are not covered by the proof themselves; what was signed is the embedded original.',
     embeddedSave: 'Save the embedded original',
+    embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>The embedded original is validly signed. The pages you see in this file were not checked.</strong> This file carries the signed original as an attachment, and only that original matches the signed hash. What the visible pages say may differ. Save the embedded original and read that.</div>',
     hashMismatch: 'document hash mismatch: this document does not match the one that was signed',
     wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. {pick}</strong> The signature in the .psign file covers a different file (SHA3-256 fingerprint {hash}…). For a PDF or image that is the version with the seal on it, which you received after signing. What you chose is not what was signed. Choose that file and check again.</div>',
     partyNamesHead: 'Names as the sender entered them (not checked; the signatures themselves were checked):',
@@ -754,7 +758,7 @@ async function renderResult(r) {
   const banner = !r.valid
     ? (r.wrongFile ? t(isV3 && !isMulti ? 'wrongFileSolo' : 'wrongFile', { hash: esc(String(r.docHash || '').slice(0, 16)), pick: t(soloPick(envelope)) })
       : t('invalid'))
-    : r.test ? t('validTest') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
+    : r.test ? t('validTest') : r.embedded ? t('embeddedValid') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
   out.push(banner);
   if (r.errors && r.errors.length && !r.wrongFile) {
     out.push('<ul style="margin-top:var(--space-3)">');

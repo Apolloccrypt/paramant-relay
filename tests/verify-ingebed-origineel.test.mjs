@@ -93,6 +93,13 @@ for (const [kind, browser] of browsers) {
         copyWith: Array.from(await copyOf(signed)),
         copyWithout: Array.from(await copyOf(null)),
         copyOther: Array.from(await copyOf(other)),
+        // Review #565, M1: visible pages that say something else, with the
+        // real signed original attached.
+        forgedVisible: Array.from(await (async () => {
+          const d = await PDFDocument.load(other);
+          await d.attach(signed, 'contract.pdf', { mimeType: 'application/pdf' });
+          return new Uint8Array(await d.save({ useObjectStreams: false }));
+        })()),
       };
     });
 
@@ -112,12 +119,21 @@ for (const [kind, browser] of browsers) {
 
     const ok = await check(fx.copyWith);
     assert.doesNotMatch(ok.cls, /\berr\b/, ok.text);
+    // Never the plain green: the visible pages of this file were not checked.
+    assert.doesNotMatch(ok.cls, /\bok\b/, 'the full green banner on a copy whose visible pages are not covered');
+    assert.match(ok.cls, /\bwarn\b/, ok.text);
+    assert.match(ok.text, /Het ingebedde origineel is geldig ondertekend\. De pagina.s die u in dit bestand ziet, zijn niet gecontroleerd\./);
     assert.equal(ok.embedded, 1, ok.text);
     assert.match(ok.text, /Gecontroleerd met het ondertekende origineel dat ongewijzigd in deze pdf is ingebed/);
     assert.match(ok.text, /vallen zelf niet onder het bewijs/);
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#vf-embedded-save')]);
     const saved = fs.readFileSync(await dl.path());
     assert.deepEqual([...saved], fx.signed, 'the saved original is the signed file, byte for byte');
+
+    const forgedPages = await check(fx.forgedVisible);
+    assert.match(forgedPages.cls, /\bwarn\b/, 'other visible pages with the real original attached: amber, never green');
+    assert.match(forgedPages.text, /zijn niet gecontroleerd/);
+    assert.equal(forgedPages.embedded, 1);
 
     const plain = await check(fx.copyWithout);
     assert.match(plain.cls, /\berr\b/, 'a copy without the original stays red');
@@ -127,6 +143,7 @@ for (const [kind, browser] of browsers) {
     assert.equal(forged.embedded, 0);
     const orig = await check(fx.signed);
     assert.doesNotMatch(orig.cls, /\berr\b/, 'the original itself still verifies');
+    assert.doesNotMatch(orig.text, /De pagina.s die u in dit bestand ziet/, 'the original itself is not called unchecked');
     assert.equal(orig.embedded, 0);
     await page.close();
   });
