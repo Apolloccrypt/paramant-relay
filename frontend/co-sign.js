@@ -1590,6 +1590,18 @@ async function renderPdfWithRecords(records) {
       }
     }
   }
+  // The signed original travels inside this copy, byte for byte, as a PDF
+  // attachment. /verify takes it out and checks THAT against the proof, so
+  // this copy plus the .psign verifies without hunting for the original
+  // (eindmatrix DASH-09-L). The drawn signatures on the pages are still not
+  // covered by any signature; /verify says that next to the green.
+  try {
+    const name = String(__envelope.original_filename || 'origineel.pdf').replace(/[\r\n\t/\\]+/g, ' ').slice(0, 120) || 'origineel.pdf';
+    await pdf.attach(__documentBytes, name, {
+      mimeType: 'application/pdf',
+      description: L('Het ondertekende origineel (controleer op /verify)', 'The signed original (check it on /verify)'),
+    });
+  } catch { /* no attachment: /verify then asks for the original, as before */ }
   // Label this file as Paramant's reading copy of THIS envelope and THIS
   // original, in a plain (uncompressed) Info entry. It is a label, not
   // evidence: no signature covers it, so /verify ignores it and treats this
@@ -1685,7 +1697,7 @@ function wireResultCard({ proofUrl }) {
     note.textContent = complete
       ? L('Het bewijs (.psign) toont aan wie waar heeft getekend. Controleer het op /verify samen met het bestand dat iedereen tekende: ', 'The proof (.psign) shows who signed where. Check it on /verify together with the file everyone signed: ') +
         String(__envelope.original_filename || L('het originele document', 'the original document')) +
-        L(' (de knop voor het origineel hierboven). De pdf met alle handtekeningen is een leesbare kopie daarvan en geeft op /verify rood.', ' (the button for the original above). The pdf with every signature is a readable copy of it and shows red on /verify.')
+        L(' (de knop voor het origineel hierboven). De pdf met alle handtekeningen kan ook: daarin zit het origineel ongewijzigd ingebed, en /verify controleert dat ingebedde origineel.', ' (the button for the original above). The pdf with every signature works too: the original is embedded in it unchanged, and /verify checks that embedded original.')
       : L('Het bewijs komt beschikbaar zodra iedereen heeft getekend.', 'The proof becomes available once everyone has signed.');
   }
 }
