@@ -170,7 +170,16 @@ await anonPage.route('**/api/user/account', (route) => route.fulfill({
 await anonPage.goto(base + fixture.fragment, { waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult(anonPage);
 const returnHref = await anonPage.locator('#sign-cta a.btn').getAttribute('href');
-ok('sign-in return preserves the document-key fragment', decodeURIComponent(returnHref || '').includes(fixture.fragment), returnHref);
+// Herreview #560, N2: the key fragment and the invite token stay out of the
+// login query (a query reaches the server log). The address waits in
+// sessionStorage and comes back after sign-in through ?resume=1.
+ok('sign-in return carries neither the key fragment nor the invite token', !!returnHref && !decodeURIComponent(returnHref).includes('#') && !/[?&]t=/.test(decodeURIComponent(returnHref).split('return=')[1] || ''), returnHref);
+const stashed = await anonPage.evaluate(() => sessionStorage.getItem('paramant:login-return') || '');
+ok('the full address waits in sessionStorage', stashed.includes(fixture.fragment), stashed);
+await anonPage.goto(new URL('/co-sign?resume=1', base).href, { waitUntil: 'domcontentloaded' });
+await anonPage.waitForFunction(() => location.hash.length > 1);
+const restored = await anonPage.evaluate(() => location.hash);
+ok('after sign-in the document-key fragment is restored', restored === fixture.fragment, restored);
 ok('ciphertext is not requested before recipient sign-in', anonymousDocumentReads === 0, anonymousDocumentReads);
 await anonPage.close();
 
