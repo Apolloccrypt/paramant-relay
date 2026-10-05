@@ -53,10 +53,13 @@
           'Content-Type': 'application/json',
           Accept: 'application/json'
         },
+        /* lang: the relay sends the buyer back to /en/dashboard after paying
+         * when he bought on the English page, and to /dashboard otherwise. */
         body: JSON.stringify({
           product: btn.getAttribute('data-billing-product'),
           plan: btn.getAttribute('data-billing-plan'),
-          interval: btn.getAttribute('data-billing-interval')
+          interval: btn.getAttribute('data-billing-interval'),
+          lang: NL ? 'nl' : 'en'
         })
       });
     }).then(function (r) {
@@ -208,7 +211,11 @@
             msg === 'token_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
             msg.indexOf('checkout_http_403') === 0) {
           rememberIntent(btn);
-          window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
+          /* The sign-in page in the language of this page. It was always the
+           * Dutch one, also from /en/pricing (betaaltest 05-10, row 6). */
+          var back = encodeURIComponent(location.pathname + location.search);
+          if (NL) window.location.href = '/auth/login?next=' + back;
+          else window.location.href = '/en/auth/login?next=' + back;
           return;
         }
         if (msg === 'checkout_http_409') {

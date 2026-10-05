@@ -227,6 +227,11 @@
 .pr-faq{border-bottom:1px solid var(--ink-hair);padding:var(--space-2) 0}
 .pr-faq summary{cursor:pointer;font-weight:600;color:var(--ink);min-height:44px;display:flex;align-items:center}
 .pr-faq p{margin:var(--space-2) 0 var(--space-3)}
+.pr-table{width:100%;border-collapse:collapse;margin:0 0 var(--space-3);font-size:var(--text-base)}
+.pr-table th,.pr-table td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink-hair);vertical-align:top;color:var(--ink)}
+.pr-table thead th{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);word-break:keep-all;overflow-wrap:normal;hyphens:none}
+.pr-table tbody th{font-weight:400}
+@media(max-width:480px){.pr-table{font-size:var(--text-sm)}}
 .lang-switch{max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px}
 .lang-switch a{color:var(--ink)}
 </style>
@@ -290,7 +295,7 @@
       <p class="offer-what">E&eacute;n betaling voor versturen en ondertekenen samen: 100 handtekeningen per maand, 500 verzendingen per maand, tot 30 ontvangers per verzending, en links die 24 uur geldig blijven. Bij versturen vanuit de webapp zijn u en de ontvanger allebei online en vergelijkt u een korte code.</p>
       <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary offer-btn">Kies het kantoorplan &rarr; <span style="font-weight:400;opacity:.85">&euro;35,09 per maand incl.</span></a>
       <p class="offer-year"><a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="yearly" class="yearly-alt">Liever per jaar: &euro;350,90 incl. btw (&euro;290 excl.), twee maanden minder &rarr;</a></p>
-      <p class="offer-more">Meer nodig? Mail Mick: <a href="mailto:privacy@paramant.app?subject=Meer%20nodig">privacy@paramant.app</a></p>
+      <p class="offer-more">Grotere organisatie? Neem contact op: <a href="mailto:privacy@paramant.app?subject=Grotere%20organisatie">privacy@paramant.app</a></p>
     </div>
     <div class="free">
       <p class="offer-kicker">Community</p>
@@ -304,9 +309,33 @@
 </section>
 <section style="padding:0 0 var(--space-9)" id="plans">
   <div class="container-md">
+    <!-- WAT U DAARNA PRECIES KUNT. Elk getal hier is een grens die de relay
+         afdwingt (relay/lib/tiers.js, gemeten tot en met de grens in de
+         betaaltest van 05-10-2026) en die /dashboard na betalen in dezelfde
+         woorden noemt. tests/site-claims.test.mjs pint deze tabel aan tiers.js
+         en aan frontend/js/dashboard.js. -->
+    <div class="pr-block" id="wat-u-kunt">
+      <h2 class="pr-h">Wat u daarna precies kunt</h2>
+      <table class="pr-table">
+        <thead><tr><th scope="col"></th><th scope="col">Community</th><th scope="col">Kantoorplan</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Handtekeningen per maand</th><td>2</td><td>100</td></tr>
+          <tr><th scope="row">Verzendingen per maand</th><td>50</td><td>500, hooguit 500 per uur</td></tr>
+          <tr><th scope="row">Ontvangers per verzending</th><td>1</td><td>30</td></tr>
+          <tr><th scope="row">Een link blijft geldig</th><td>1 uur</td><td>24 uur</td></tr>
+          <tr><th scope="row">Keer openen per link via de API</th><td>1</td><td>10</td></tr>
+          <tr><th scope="row">Geregistreerde apparaten</th><td>5</td><td>50</td></tr>
+          <tr><th scope="row">Bestand via een eenmalige link</th><td>5 MB</td><td>5 MB</td></tr>
+          <tr><th scope="row">API-sleutel voor ondertekenen</th><td>nee</td><td>ja</td></tr>
+          <tr><th scope="row">Audittrail exporteren</th><td>nee</td><td>nee</td></tr>
+        </tbody>
+      </table>
+      <p>Is een grens bereikt, dan wacht het tot de nieuwe maand; er wordt nooit iets bijgerekend. Vraagt u via de API een langere link of vaker openen dan uw plan toestaat, dan krijgt u de grens van uw plan. De webapp wist een bestand op elk plan na de eerste keer openen. Het exporteren van de audittrail en 1.000 handtekeningen per maand horen bij Business; neem daarvoor contact op via <a href="mailto:privacy@paramant.app?subject=Business">privacy@paramant.app</a>.</p>
+    </div>
     <div class="pr-block">
       <h2 class="pr-h">Hoe betalen werkt</h2>
       <p>U betaalt een Nederlands bedrijf, in euro, via een Nederlandse betaaldienst (Mollie). Elke betaling is eenmalig voor de periode die u koopt: een maand, of een jaar vooruit. Automatisch verlengen staat niet aan, dus er is geen incassomachtiging en geen abonnement dat vanzelf doorloopt. Loopt de periode af? Dan valt uw account terug op het gratis Community-plan. Er wordt dan niets meer afgeschreven, tenzij u zelf de volgende periode koopt.</p>
+      <p data-partner-context="vies voorwaardelijk">Bent u een bedrijf in een ander EU-land, dan wordt de btw verlegd. U betaalt dan &euro;29 per maand zonder btw (de knop toont het bedrag met 21%), en op de factuur staan 0% btw, &ldquo;Btw verlegd&rdquo; en de btw-nummers van u en van ons. Dat gebeurt alleen als uw btw-nummer, bedrijfsnaam en adres in uw account staan en de Europese btw-controle (VIES) het nummer bij het afrekenen geldig noemt. In alle andere gevallen, ook voor een Nederlands bedrijf, een particulier of een bedrijf buiten de EU, betaalt u 21% btw.</p>
       <p>Het kantoorplan kost per account, niet per gebruiker. Een account met meerdere gebruikers komt nog. Tot dan is het &eacute;&eacute;n account per kantoor.</p>
     </div>
     <form data-redeem-form class="pr-block pr-code">
@@ -385,7 +414,7 @@
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/pricing-billing.js?v=6" defer></script>
+<script src="/js/pricing-billing.js?v=8" defer></script>
 <script src="/js/redeem-code.js?v=5" defer></script>
 </body>
 </html>

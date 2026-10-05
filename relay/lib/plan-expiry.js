@@ -185,6 +185,7 @@ function planLabelNl(product, tier) {
 // sentence is both the name on his invoice and the thing he loses.
 const BUNDLE_LABEL = Object.freeze({
   firm: 'Paramant Firm plan (ParaSign Pro and ParaSend Pro)',
+  business: 'Paramant Business plan (ParaSign Business and ParaSend Pro)',
 });
 
 function bundleLabel(bundle) {
@@ -193,6 +194,7 @@ function bundleLabel(bundle) {
 
 const BUNDLE_LABEL_NL = Object.freeze({
   firm: 'Paramant Firm-plan (Ondertekenen Pro en Versturen Pro)',
+  business: 'Paramant Business-plan (Ondertekenen Business en Versturen Pro)',
 });
 
 function bundleLabelNl(bundle) {

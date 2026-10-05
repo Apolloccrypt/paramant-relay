@@ -149,7 +149,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       .filter(function (t) { return !isNaN(t); });
     if (!ends.length) return null;
     var ahead = ends.filter(function (t) { return t > now; });
-    var at = ahead.length ? Math.min.apply(null, ahead) : Math.max.apply(null, ends);
+    // The LAST end still ahead: the day the account actually stops having
+    // what it paid for. It used to be the nearest one, so after a Firm to
+    // Business upgrade one page said the 5th of one month and the row under it
+    // the 6th of the next (betaaltest 05-10, row 8). What runs out earlier on
+    // one product is said per product, in the lines under it (plan-terms.js).
+    var at = ahead.length ? Math.max.apply(null, ahead) : Math.max.apply(null, ends);
     var days = (at - now) / 86400000;
     return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
   }
@@ -162,6 +167,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var warn = root.querySelector('#dh-term-warn');
     if (line) line.hidden = true;
     if (warn) warn.hidden = true;
+    if (window.paPlanTerms) window.paPlanTerms.render(root.querySelector('#dh-term-products'), data);
     var term = termState(data);
     if (!term) return;
     var when = paramantDate.day(term.at);
@@ -191,7 +197,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       enterprise: nlEn('Ondertekenen Enterprise: een eigen relay, een sectorrelay voor zorg, juridisch of financieel, een SLA met compensatie, een licentie om zelf te hosten en hulp bij audits.', 'ParaSign Enterprise: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.')
     },
     parasend: {
-      pro: nlEn('Firm voor Versturen: links die 24 uur open blijven, tot 10 keer te openen, tot 50 geregistreerde apparaten, een overzicht van wat u verstuurde, en geen snelheidslimiet.', 'Firm on ParaSend: links that stay open 24 hours, up to 10 reads each, up to 50 registered devices, a record of what you sent, and no rate limit.'),
+      // "and no rate limit" stood here until 2026-10-05 while tiers.js holds
+      // Firm to 500 an hour (outbound_per_hour), betaaltest row 9. Every number
+      // in these lines is pinned to tiers.js by tests/site-claims.test.mjs.
+      pro: nlEn('Firm voor Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'Firm on ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
+      // The same ParaSend Pro, bought as part of Business (besluit 05-10).
+      pro_business: nlEn('Versturen, inbegrepen bij Business: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'ParaSend, included with Business: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
       enterprise: nlEn('Versturen Enterprise: links die 7 dagen open blijven, tot 100 keer te openen, onbeperkt apparaten, een eigen relay, een getekende verwerkersovereenkomst en 99,95% beschikbaarheid.', 'ParaSend Enterprise: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.')
     }
   };
@@ -224,13 +235,78 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     } catch (e) { /* address bar is cosmetic; never break the page over it */ }
   }
 
+  // What Mollie says became of the payment the buyer just left, through the
+  // admin proxy (GET /api/user/billing/last-payment, relay
+  // /v2/billing/last-payment). null when it cannot say: then the band falls
+  // back to what the account itself shows.
+  function fetchLastPayment() {
+    return fetch('/api/user/billing/last-payment', {
+      credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return (j && j.payment) || null; })
+      .catch(function () { return null; });
+  }
+
+  // A payment that did not go through ends in one of three states, and each
+  // gets its own words: until 2026-10-05 all three read "being confirmed" and
+  // then "you get the plan by itself" (betaaltest 05-10, row 4).
+  var NOT_PAID = {
+    canceled: {
+      kicker: nlEn('Betaling geannuleerd', 'Payment cancelled'),
+      lede: nlEn('U heeft de betaling afgebroken. Er is niets afgeschreven en uw plan is niet veranderd.', 'You stopped the payment. Nothing has been charged and your plan has not changed.')
+    },
+    failed: {
+      kicker: nlEn('Betaling mislukt', 'Payment failed'),
+      lede: nlEn('De betaling is niet gelukt. Er is niets afgeschreven en uw plan is niet veranderd.', 'The payment did not go through. Nothing has been charged and your plan has not changed.')
+    },
+    expired: {
+      kicker: nlEn('Betaling verlopen', 'Payment expired'),
+      lede: nlEn('De betaling is niet op tijd afgerond en is verlopen. Er is niets afgeschreven en uw plan is niet veranderd.', 'The payment was not completed in time and has expired. Nothing has been charged and your plan has not changed.')
+    }
+  };
+
+  // "Pay again" presses the same price button again: it leaves the choice
+  // where pricing-billing.js picks it up after a sign-in, so there is one way
+  // to buy and not two. Business is only sold on the English page.
+  function retryButton(band, payment) {
+    var btn = band.querySelector('[data-dh="return-retry"]');
+    if (!btn) return;
+    if (!payment) { btn.style.display = 'none'; return; }
+    var href = (nlEn('nl', 'en') === 'en' || payment.plan === 'business') ? '/en/pricing' : '/pricing';
+    btn.setAttribute('href', href);
+    btn.style.display = '';
+    btn.onclick = function () {
+      try {
+        sessionStorage.setItem('paramant.checkout.intent.v1', JSON.stringify({
+          product: payment.product, plan: payment.plan, interval: payment.interval, at: new Date().toISOString()
+        }));
+      } catch (e) { /* private mode: the pricing page opens and the buyer clicks once more */ }
+    };
+  }
+
   function showBillingReturn(tries) {
     var band = document.querySelector('#dh-billing-return');
     if (!band) return;
+    fetchLastPayment().then(function (payment) { renderBillingReturn(band, tries, payment); });
+  }
+
+  function renderBillingReturn(band, tries, payment) {
     var kicker = band.querySelector('[data-dh="return-kicker"]');
     var lede = band.querySelector('[data-dh="return-lede"]');
+    var status = payment && payment.status;
     band.hidden = false;
-    if (lastAccountIsPaid) {
+    retryButton(band, null);
+    if (status && NOT_PAID[status]) {
+      if (kicker) kicker.textContent = NOT_PAID[status].kicker;
+      if (lede) lede.textContent = NOT_PAID[status].lede;
+      retryButton(band, payment);
+      clearBillingParam();
+      return;
+    }
+    // Paid, or no answer from Mollie and an account that shows a paid plan.
+    // A paid payment on an account that does not show it yet is the webhook
+    // still on its way: wait for it.
+    if (lastAccountIsPaid && (status === 'paid' || !status || status === 'unknown')) {
       if (kicker) kicker.textContent = nlEn('Betaling ontvangen', 'Payment received');
       if (lede) lede.textContent = nlEn('Dank u. Uw plan is actief en wat erbij hoort staat hieronder. De termijn die u kocht en de dag waarop die afloopt staan onder Plan en betaling.', 'Thank you. Your plan is active and what it includes is below. The term you bought and the day it ends are under Plan and billing.');
       clearBillingParam();
@@ -243,7 +319,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return;
     }
     if (kicker) kicker.textContent = nlEn('Betaling nog niet bevestigd', 'Payment not confirmed yet');
-    if (lede) lede.textContent = nlEn('Uw betaling is nog niet bij ons binnen. Er gaat niets verloren: zodra ze bevestigd is, krijgt u het plan vanzelf. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als het er dan nog niet staat.', 'Your payment has not reached us yet. Nothing is lost: as soon as it is confirmed the plan is granted by itself. Reload this page in a minute, and mail privacy@paramant.app if it still has not appeared.');
+    if (status === 'paid') {
+      if (lede) lede.textContent = nlEn('Uw betaling is gelukt, maar uw plan staat er nog niet. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als het er dan nog niet staat.', 'Your payment went through, but your plan is not showing yet. Reload this page in a minute, and mail privacy@paramant.app if it still has not appeared.');
+    } else {
+      if (lede) lede.textContent = nlEn('De betaaldienst heeft uw betaling nog niet afgerond. Gaat ze alsnog door, dan krijgt u het plan vanzelf. Breekt u haar af, dan wordt er niets afgeschreven. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als u twijfelt.', 'The payment provider has not finished your payment yet. If it still goes through, the plan is granted by itself. If you stop it, nothing is charged. Reload this page in a minute, and mail privacy@paramant.app if in doubt.');
+    }
     clearBillingParam();
   }
 
@@ -292,7 +372,9 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         ['parasend', paidProductTier(data.plan_parasend, data.paid_until_parasend)]
       ];
       for (var bi = 0; bi < bought.length; bi++) {
-        var copy = bought[bi][1] && PRODUCT_INCLUDES[bought[bi][0]][bought[bi][1]];
+        var key = bought[bi][1];
+        if (bought[bi][0] === 'parasend' && key === 'pro' && bought[0][1] === 'business') key = 'pro_business';
+        var copy = key && PRODUCT_INCLUDES[bought[bi][0]][key];
         if (copy) lines.push(copy);
       }
       if (!lines.length && planId !== 'community') {

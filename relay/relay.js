@@ -2367,6 +2367,25 @@ function _termView(v, product) {
   return { tier: now.tier, paidUntil: last ? last.paidUntil : null };
 }
 
+// Where the checkout an account started last is remembered (see POST
+// /v2/billing/checkout and GET /v2/billing/last-payment).
+function _lastCheckoutKey(accountId) {
+  return `paramant:billing:last-checkout:${String(accountId).slice(0, 128)}`;
+}
+
+// Every paid term one product holds that still runs, highest tier first, as
+// [{ tier, until (ISO or null), bundle }]. What /account and /dashboard need to
+// say "Business until the 5th, then Firm until the 5th of the month after" in
+// one line per product, instead of two end dates with nothing between them
+// (betaaltest 05-10, row 8).
+function _runningTermsView(v, product) {
+  const now = Date.now();
+  return entitlements.termsOf(v, product)
+    .filter((t) => t.until === null || t.until > now)
+    .sort((a, b) => entitlements.tierRank(product, b.tier) - entitlements.tierRank(product, a.tier))
+    .map((t) => ({ tier: t.tier, until: t.until === null ? null : new Date(t.until).toISOString(), bundle: t.bundle || null }));
+}
+
 function entitlementRecordOf(accountId) {
   if (!accountId) return null;
   const acct = accounts.get(accountId);
@@ -9778,6 +9797,8 @@ async function handleRelayRequest(req, res) {
       // floored it to free. The date is on the record; it just never left.
       paid_until_parasign: sign.paidUntil,
       paid_until_parasend: send.paidUntil,
+      terms_parasign: _runningTermsView(v, 'parasign'),
+      terms_parasend: _runningTermsView(v, 'parasend'),
       // Is there a collection standing behind this account. The account page
       // told every customer auto_renews:false because nothing on this
       // projection could say otherwise, and with BILLING_MODE set that is the
@@ -10239,16 +10260,33 @@ async function handleRelayRequest(req, res) {
         log('warn', 'billing_customer_unverified', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
       }
       const customerId = cust.customerId;
+      // The buyer comes back in the language he bought in. The redirect was
+      // always /dashboard, the Dutch page, so a buyer from /en/pricing read
+      // "Betaling ontvangen" (betaaltest 05-10, row 6). Only 'en' changes it;
+      // anything else is the Dutch default, never a path from the request.
+      const _en = body.lang === 'en';
       const payment = await mollie.createPayment(mode, Object.assign({
         amount: { currency: order.currency, value: vatMod.chargeAmount(order, vatTerms) },
         description: `Paramant ${billingCatalog.orderLabel(order)} (${order.interval})`,
-        redirectUrl: `${origin}/dashboard?billing=return`,
+        redirectUrl: `${origin}${_en ? '/en' : ''}/dashboard?billing=return`,
         webhookUrl: `${origin}/v2/billing/webhook`,
         // A reverse-charged sale adds its terms (lib/vat.metadataOf); a 21%
         // sale adds nothing, so its payload is what it always was.
         metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval, ...vatMod.metadataOf(vatTerms) },
       }, customerId ? { customerId, sequenceType: 'first' } : {}));
       const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
+      // Remember the checkout this account started last, so the dashboard it
+      // returns to can say what actually happened to it (GET
+      // /v2/billing/last-payment). Mollie's redirect carries no payment id,
+      // and without this the dashboard said "being confirmed" and "you get
+      // the plan by itself" after a cancelled or failed payment too
+      // (betaaltest 05-10, row 4). Best effort: a checkout never fails on it.
+      if (payment && payment.id && redisClient && redisClient.isReady) {
+        redisClient.set(_lastCheckoutKey(accountId), J({
+          id: payment.id, product: order.product, plan: order.plan, interval: order.interval,
+          lang: _en ? 'en' : 'nl', at: new Date().toISOString(),
+        }), { EX: 7 * 86400 }).catch(() => { /* the dashboard then says it does not know */ });
+      }
       log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode, recurring: !!customerId, vat: vatTerms.treatment });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, payment_id: payment && payment.id, checkout_url: checkoutUrl, mode }));
@@ -10257,6 +10295,31 @@ async function handleRelayRequest(req, res) {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'checkout_failed' }));
     }
+  }
+
+  // ── GET /v2/billing/last-payment: what became of the last checkout ─────────
+  // The dashboard asks this when Mollie sends the buyer back. The status comes
+  // from Mollie itself, fetched now with our own key, for the payment this
+  // account started (the id is ours, stored at checkout, never taken from the
+  // request). Read-only: it grants nothing, which stays the webhook's job.
+  if (path === '/v2/billing/last-payment' && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    let last = null;
+    try { last = (redisClient && redisClient.isReady) ? JSON.parse(await redisClient.get(_lastCheckoutKey(accountId)) || 'null') : null; }
+    catch { last = null; }
+    if (!last || !last.id) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, payment: null })); }
+    let status = 'unknown';
+    try {
+      const p = await mollie.getPayment(mollie.billingStance().mode, last.id);
+      if (p && typeof p.status === 'string') status = p.status;
+    } catch (e) {
+      log('warn', 'billing_last_payment_fetch_failed', { account: String(accountId).slice(0, 12), err: e.message, status: e.status });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, payment: {
+      status, product: last.product, plan: last.plan, interval: last.interval, lang: last.lang, started_at: last.at,
+    } }));
   }
 
   // ── POST /v2/billing/webhook — Mollie payment status callback ────────────────

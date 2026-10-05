@@ -161,7 +161,11 @@ ok('/account shows no slashed date anywhere on the page', accountSlash.length ==
 
 // 2. The three dates that sat side by side now read the same way.
 const pick = (s) => (s.match(ANY_DATE_LIKE) || [''])[0];
-const trio = { 'the term line': pick(shown.term), 'access until': pick(shown.accessUntil), 'the invoice row': pick(shown.invoice) };
+// Since 05-10-2026 the term line carries the date twice ("paid until X, the
+// new term starts on X") and the separate "access until" row is gone: it
+// showed a second date after an upgrade. Its slot reads the line's last date.
+const lastDate = (s) => { const all = s.match(new RegExp(ANY_DATE_LIKE.source, 'g')) || ['']; return all[all.length - 1]; };
+const trio = { 'the term line': pick(shown.term), 'access until': lastDate(shown.term), 'the invoice row': pick(shown.invoice) };
 for (const [where, value] of Object.entries(trio)) {
   ok(`${where} carries a date in the one shape, day month year`, ONE_SHAPE.test(value), `${where}: "${value}" from "${shown[Object.keys(trio).indexOf(where) === 0 ? 'term' : 'accessUntil']}"`);
 }

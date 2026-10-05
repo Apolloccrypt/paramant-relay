@@ -368,7 +368,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 
 
 <section class="acct-card" id="billing-section">
-  <div class="acct-kicker">Plan &amp; billing &middot; subscription and history</div>
+  <div class="acct-kicker">Plan &amp; billing &middot; plan and history</div>
   <h2>Plan &amp; billing.</h2>
 
   <div id="billing-loading" style="color:var(--ink-dim);font-size:var(--text-sm)">Loading billing status…</div>
@@ -409,13 +409,12 @@ main.acct input::placeholder { color: var(--ink-3); }
          landed. Filled from paid_until_*, which the relay has emitted since the
          betaalpad fixes. -->
     <p class="plan-term-line" id="billing-term-line" hidden>-</p>
+    <!-- One line per product: what runs, until when, and what takes over
+         after it (js/plan-terms.js, from terms_parasign / terms_parasend). -->
+    <ul class="plan-term-products" id="billing-products" hidden style="margin:var(--space-2) 0 0;padding-left:18px;font-size:var(--text-sm);line-height:1.6;color:var(--ink)"></ul>
     <!-- Each checkout buys one term and nothing is collected again by itself
          (see /terms), so what a customer needs is the day access stops, not a
          collection date. The renewal note under it says so in words. -->
-    <div class="info-row" id="billing-next-row" style="display:none">
-      <div class="info-label">Access until</div>
-      <div class="info-value" id="billing-next">-</div>
-    </div>
     <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">This is a one-off payment for the term you bought. Nothing is collected again by itself. Want to keep the plan? Buy another term before this date.</p>
     <div class="info-row" id="billing-cancel-row" style="display:none">
       <div class="info-label">Cancellation</div>
@@ -522,7 +521,8 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
 <script src="/js/account-api-keys.js?v=4" defer></script>
-<script src="/js/account.inline1.js?v=15"></script>
+<script src="/js/plan-terms.js?v=1"></script>
+<script src="/js/account.inline1.js?v=16"></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
 <script src="/js/redeem-code.js?v=5" defer></script>
 

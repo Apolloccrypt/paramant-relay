@@ -73,6 +73,11 @@
    what lets one unbreakable line push a track past its container.
    tests/pricing-fold.test.mjs measures this at five widths. */
 .tier-grid,.tier-card{min-width:0}
+.pr-table{width:100%;border-collapse:collapse;font-size:var(--text-base)}
+.pr-table th,.pr-table td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink-hair);vertical-align:top;color:var(--ink)}
+.pr-table thead th{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);word-break:keep-all;overflow-wrap:normal;hyphens:none}
+.pr-table tbody th{font-weight:400}
+@media(max-width:480px){.pr-table{font-size:var(--text-sm)}}
 .tier-card .btn{white-space:normal;line-height:1.45}
 @media(max-width:640px){
   .trial-cta{flex-direction:column;align-items:flex-start}
@@ -414,15 +419,16 @@
         <div class="tier-name">Business</div>
         <div class="tier-price">&euro;299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
         <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;361.79/mo incl. 21% btw</span></div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For an organisation that has to answer for its process: a named contact and an audit log you can export.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For an organisation that has to answer for its process: a named contact and an audit log you can export. Everything in Firm is included.</p>
         <ul class="tier-features">
-          <li>1,000 signatures a month</li>
+          <li>1,000 signatures a month, API access</li>
+          <li>ParaSend as on Firm: 500 transfers a month, up to 30 recipients per send, 24 hour links</li>
           <li>Named support, response within one business day</li>
           <li>We help you answer your customers' security questionnaires</li>
           <li>Exportable audit log with CT tree head (CSV or JSON)</li>
           <li>Annual: &euro;2,990 excl. &middot; 16.7% off</li>
         </ul>
-        <a href="/en/auth/login?next=/en/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Business &rarr; <span style="font-weight:400;opacity:.85">&euro;361.79/mo incl.</span></a>
+        <a href="/en/auth/login?next=/en/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get Business &rarr; <span style="font-weight:400;opacity:.85">&euro;361.79/mo incl.</span></a>
         <div style="text-align:center"><a href="/en/auth/login?next=/en/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;3,617.90/yr incl. &rarr;</a></div>
       </div>
 
@@ -445,6 +451,32 @@
       </p>
     </div>
     <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr, Business &euro;361.79/mo or &euro;3,617.90/yr.</p>
+    <!-- WHAT YOU CAN DO AFTERWARDS. Every number is a limit the relay enforces
+         (relay/lib/tiers.js, measured up to and past the limit in the payment
+         test of 2026-10-05) and the same words /dashboard uses after paying.
+         tests/site-claims.test.mjs pins this table to tiers.js and to
+         frontend/js/dashboard.js. -->
+    <div id="what-you-get" style="text-align:left;max-width:760px;margin:var(--space-6) auto 0">
+      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">What you can do afterwards</p>
+      <div style="overflow-x:auto">
+      <table class="pr-table">
+        <thead><tr><th scope="col"></th><th scope="col">Community</th><th scope="col">Firm</th><th scope="col">Business</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Signatures a month</th><td>2</td><td>100</td><td>1,000</td></tr>
+          <tr><th scope="row">Signers per document (API)</th><td>20</td><td>20</td><td>30</td></tr>
+          <tr><th scope="row">Transfers a month</th><td>50</td><td>500, at most 500 an hour</td><td>500, at most 500 an hour</td></tr>
+          <tr><th scope="row">Recipients per send</th><td>1</td><td>30</td><td>30</td></tr>
+          <tr><th scope="row">A link stays valid</th><td>1 hour</td><td>24 hours</td><td>24 hours</td></tr>
+          <tr><th scope="row">Reads per link through the API</th><td>1</td><td>10</td><td>10</td></tr>
+          <tr><th scope="row">Registered devices</th><td>5</td><td>50</td><td>50</td></tr>
+          <tr><th scope="row">File over a one-time link</th><td>5 MB</td><td>5 MB</td><td>5 MB</td></tr>
+          <tr><th scope="row">ParaSign API key</th><td>no</td><td>yes</td><td>yes</td></tr>
+          <tr><th scope="row">Audit log export</th><td>no</td><td>no</td><td>yes</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:var(--space-3) 0 0">When a limit is reached it waits for the new month; nothing is ever charged on top. Ask the API for a longer link or more reads than your plan allows and you get your plan's limit. The web app deletes a file after the first read on every plan.</p>
+    </div>
     <!-- HOW PAYMENT WORKS. Every sentence here is what the code does today.
          relay/lib/mollie.js: BILLING_MODE is unset in production, so
          billingStance().recurring is false and relay/lib/billing-recurring.js
@@ -459,7 +491,10 @@
     <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone)">
       <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">How payment works</p>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
-        You pay a Dutch company, in euros, through a Dutch payment provider (Mollie). Every payment is a one-off for the term you buy: one month, or one year paid up front. Automatic renewal is not switched on, so there is no direct debit mandate and no subscription that renews by itself. Firm is one payment for one term on both products. ParaSign Business is its own term. When a term ends, the products it paid for fall back to their free Community plan, and nothing is charged again unless you buy the next term yourself. A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.
+        You pay a Dutch company, in euros, through a Dutch payment provider (Mollie). Every payment is a one-off for the term you buy: one month, or one year paid up front. Automatic renewal is not switched on, so there is no direct debit mandate and no subscription that renews by itself. Firm is one payment for one term on both products. Business is one payment for its own term, and includes ParaSend on the same terms as Firm. When a term ends, the products it paid for fall back to their free Community plan, and nothing is charged again unless you buy the next term yourself. A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.
+      </p>
+      <p data-partner-context="vies voorwaardelijk" style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:var(--space-3) 0 0">
+        A business established in another EU member state pays no Dutch VAT: it is reverse charged. You then pay the amount excl. VAT (Firm &euro;29 a month; the button shows the amount with 21%), and the invoice shows 0% VAT, &ldquo;Btw verlegd / VAT reverse charged&rdquo; and both VAT numbers. That happens only when your VAT number, company name and address are on your account and the EU VAT check (VIES) calls the number valid at checkout. In every other case, including a Dutch business, a private buyer and a business outside the EU, you pay 21% VAT.
       </p>
     </div>
 
@@ -715,7 +750,7 @@
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/pricing-billing.js?v=6" defer></script>
+<script src="/js/pricing-billing.js?v=8" defer></script>
 <script src="/js/redeem-code.js?v=5" defer></script>
 </body>
 </html>

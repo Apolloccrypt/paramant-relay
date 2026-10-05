@@ -55,7 +55,33 @@ const BUNDLES = Object.freeze({
       Object.freeze({ product: 'parasend', tier: 'pro' }),
     ]),
   }),
+  // Business is more than Firm (besluit 05-10-2026). It is sold under its old
+  // key, product 'parasign' plan 'business', because that is what every button,
+  // payment link and Mollie metadata already carries. Until 05-10 it granted
+  // ParaSign alone: a Business customer kept ParaSend Community (one recipient,
+  // one hour, 50 a month), /parashare then told him "with Firm you send to 30",
+  // and buying Firm was refused because Business was running (betaaltest 05-10,
+  // row 1). Now it also carries the ParaSend half of Firm. That half is
+  // `included`: it is not what the price is for, so it never moves the anchor
+  // of the term (lib/billing.processPayment), it rides on it.
+  business: Object.freeze({
+    plan: 'business',
+    sold_as: 'parasign',
+    label: 'Business',
+    grants: Object.freeze([
+      Object.freeze({ product: 'parasign', tier: 'business' }),
+      Object.freeze({ product: 'parasend', tier: 'pro', included: true }),
+    ]),
+  }),
 });
+
+// The bundle a sold (product, plan) is, or null. Firm is sold under its own
+// key; Business under the ParaSign key it has always had.
+function bundleKeyOf(product, plan) {
+  if (product === 'firm' && plan === 'firm') return 'firm';
+  if (product === 'parasign' && plan === 'business') return 'business';
+  return null;
+}
 
 // The name a customer sees for what he bought: on the Mollie statement, on the
 // invoice line and in his billing history. One function, so those three can
@@ -117,7 +143,7 @@ function resolveSale(req) {
 }
 
 function isBundle(product) {
-  return Object.prototype.hasOwnProperty.call(BUNDLES, product);
+  return product === 'firm';
 }
 
 // The entitlement tier a (product, plan) grants. Here the sold plan name equals
@@ -133,8 +159,9 @@ function grantedTier(product, plan) {
 // One entry for a product plan, two for the Firm bundle. null when the plan is
 // not sold.
 function grantsOf(product, plan) {
-  const bundle = BUNDLES[product];
-  if (bundle) return bundle.plan === plan ? bundle.grants : null;
+  const key = bundleKeyOf(product, plan);
+  if (key) return BUNDLES[key].grants;
+  if (BUNDLES[product]) return null;
   const tier = grantedTier(product, plan);
   return tier ? Object.freeze([Object.freeze({ product, tier })]) : null;
 }
@@ -164,7 +191,7 @@ function resolveOrder({ product, plan, interval } = {}) {
   if (!amount || !grants) return { error: 'unknown_plan' };
   return {
     amount, currency: 'EUR', tier: grants[0].tier, grants,
-    bundle: isBundle(product) ? product : null,
+    bundle: bundleKeyOf(product, plan),
     product, plan, interval,
   };
 }
@@ -185,5 +212,5 @@ function amountsEqual(a, b) {
 module.exports = {
   CATALOG, PRODUCTS, SELLABLE, INTERVALS, BUNDLES, ON_SALE, isOnSale, resolveSale,
   PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel,
-  isBundle, grantedTier, grantsOf, floorTier, priceOf, resolveOrder, amountsEqual,
+  isBundle, bundleKeyOf, grantedTier, grantsOf, floorTier, priceOf, resolveOrder, amountsEqual,
 };

@@ -94,8 +94,25 @@ const firmStop = q.html({ error: 'monthly_sign_quota_reached', dimension: 'signs
 assert(firmStop.includes('Firm monthly limit reached.'), 'the Firm sign 402 names the tier that decided');
 assert(firmStop.includes('You have used all 100 signatures included in your plan this month.'),
   'the Firm sign 402 prints the ceiling the relay reported');
-assert(firmStop.includes('Upgrade to ParaSign Business (EUR 299/month excl. VAT) for 1000 signatures a month'),
-  'the Firm sign 402 offers the rung above');
+assert(firmStop.includes('Upgrade to Business (EUR 299/month excl. VAT) for 1,000 signatures a month'),
+  'the Firm sign 402 offers the rung above, by the name /pricing sells it under');
+assert(firmStop.includes('href="/en/pricing'), 'the English card sends the reader where Business has a button');
+// The relay's sign 402 carries no `dimension` at all (relay.js, signs gate):
+// until 05-10 that fell through to transfers, and a Firm customer stopped at
+// his 101st signature read "you have used all 100 transfers", with no word
+// about Business (betaaltest 05-10, row 5).
+for (const body of [
+  { error: 'monthly_sign_quota_reached', plan: 'pro', limit: 100, used: 100, reset_date: '2026-08-01' },
+  { error: 'sign_quota_insufficient', plan: 'pro', limit: 100, used: 100, room: 0, reset_date: '2026-08-01' },
+]) {
+  const card = q.html(body);
+  assert(card.includes('You have used all 100 signatures included in your plan this month.'), body.error + ': the sign 402 counts signatures: ' + card);
+  assert(!/transfers/.test(card), body.error + ': a sign 402 never speaks of transfers: ' + card);
+  assert(card.includes('Upgrade to Business'), body.error + ': and names the plan above Firm: ' + card);
+}
+const bizStop = q.html({ error: 'monthly_sign_quota_reached', plan: 'business', limit: 1000, used: 1000, reset_date: '2026-08-01' });
+assert(bizStop.includes('You have used all 1,000 signatures included in your plan this month.'), 'Business: ' + bizStop);
+assert(!/Upgrade to/.test(bizStop), 'Business has no self-service rung above it: ' + bizStop);
 assert(!/0\.40|overage|next invoice/i.test(firmStop), 'no sign card may price a signature the kassa never charges');
 ok('the Firm sign 402 renders one honest stop, linking to /pricing');
 
@@ -196,12 +213,12 @@ ok('free second signature renders the inline notice verbatim');
 
 const last = q.signNotice({ used: 100, included: 100, reset_date: '2026-08-01' });
 for (const s of [
-  'That uses up the 100 signatures in your Firm plan for this month. Signing starts again on 2026-08-01. Business (EUR 299/month) includes 1,000 a month.',
+  'That uses up the 100 signatures in your Firm plan for this month. Signing starts again on 2026-08-01. Business (EUR 299/month excl. VAT) includes 1,000 a month.',
   'Compare plans',
 ]) {
   assert(last.includes(s), 'Firm last-included notice misses: ' + s);
 }
-assert(last.includes('href="/pricing"'), 'Compare plans must link to /pricing');
+assert(last.includes('href="/en/pricing'), 'Compare plans must link to the page that sells Business');
 assert(!/0\.40|next invoice|overage/i.test(last), 'the notice may not price the signature after this one');
 ok('the last signature Firm includes renders the inline notice verbatim, linking to /pricing');
 
