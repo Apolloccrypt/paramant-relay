@@ -142,9 +142,16 @@ test('SITE-47 en SIGN-06/07: /parasign belooft geen niet-pdf-ondertekening en no
   assert.doesNotMatch(nl, /geen API-sleutel, en de controle zelf maakt geen verbinding met ons/);
 });
 
-test('SITE-09 en SITE-05-A-en: geen + als spatie in mailto, en de Engelse hero begint bij versturen', () => {
+// SITE-05-A-en pinde de Engelse hero op "Send securely". Sinds 5 oktober 2026
+// (Mick: de bezoeker landt meteen in het dashboard) is er geen hero meer; de
+// kop van het voorbeelddashboard draagt Create account en Try it yourself. Wat
+// van SITE-05-A blijft: versturen is er vanaf het eerste scherm, via de tegel.
+test('SITE-09 en SITE-05-A-en: geen + als spatie in mailto, en het Engelse eerste scherm is het voorbeelddashboard', () => {
   assert.doesNotMatch(lees('frontend/en/pricing.html'), /mailto:[^"]*subject=[^"]*\+/);
-  assert.match(lees('frontend/en/index.html'), /<a class="hp-btn hp-btn-fill" href="\/en\/parashare">Send securely<\/a>/);
+  const en = lees('frontend/en/index.html');
+  assert.match(en, /<a class="hp-btn hp-btn-fill" href="\/en\/signup">Create account<\/a>/);
+  assert.match(en, /<a class="hp-btn hp-btn-line" href="\/en\/sign\?mode=invite">Try it yourself<\/a>/);
+  assert.match(en, /<a class="wp-tile dh-workspace" href="\/en\/parashare" data-wp-open="send"/);
 });
 
 test('SITE-40 en SITE-35: TOTP-tolerantie en de edge-log staan eerlijk op /security', () => {

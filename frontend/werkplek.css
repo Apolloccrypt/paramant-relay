@@ -1,0 +1,398 @@
+/* PARAMANT werkplek.css
+   One visual language for the landing demo and the tools (/sign, /co-sign,
+   /parashare, /dashboard, /verify). Loaded after the page's own styles.
+
+   The rules of this file, in Mick's words of 23 September: the theme is part
+   of the app and has to help, never lie on top of it. So every Dutch object
+   here does a job:
+
+     the Schiphol sign   (yellow, black type)  says WHERE you are: the step
+                                                you are on, and "Voorbeeld"
+                                                on everything that is a demo
+     the post stamp      (red ring)            says a thing has LEFT: sent,
+                                                signed, sealed
+     the split-flap      (NS board)            shows a CODE you have to read
+                                                over to someone
+
+   Light paper, navy ink and one cobalt accent stay the ground (the light
+   theme from before PR #417). Corners are small and depth comes from
+   hairlines. Every animation communicates a state change and stops; under
+   prefers-reduced-motion the end state is shown at once and nothing loses its
+   box (tests/motion-safety.test.mjs). */
+
+:root {
+  --wp-sign: #FFC917;          /* Schiphol yellow; black on it is 13.9:1 */
+  --wp-sign-ink: #111111;
+  --wp-stamp: #B3261E;         /* post stamp red; 6.0:1 on white */
+  --wp-flap: #1B232C;          /* split-flap tile */
+  --wp-flap-ink: #F4F7FA;
+  --wp-paper: #FFFFFF;
+  --wp-ink: var(--ink-1, #0C1B2A);
+  --wp-ink-2: var(--ink-2, #40505F);
+  --wp-ink-3: var(--ink-3, #5C6A78);
+  --wp-line: var(--line, rgba(12,27,42,.11));
+  --wp-line-2: var(--line-2, rgba(12,27,42,.20));
+  --wp-accent: var(--accent, #1D4ED8);
+  --wp-ok: var(--sig-done, #1B6B45);
+  /* a numbered step tile on paper: the black overhead sign with yellow
+     type, because a yellow fill on white is 1.5:1 and a tile has to clear
+     the 3:1 of WCAG 2.1 SC 1.4.11 (tests/ui-elements-contrast.test.mjs) */
+  --wp-tile: #111111;
+  --wp-tile-ink: #FFC917;
+  --wp-ease: cubic-bezier(.2, 0, 0, 1);
+  --wp-enter: cubic-bezier(.16, 1, .3, 1);
+}
+:root[data-theme="dark"] {
+  --wp-paper: #16202B;
+  --wp-stamp: #F08A80;
+  --wp-flap: #070A0E;
+  --wp-ok: var(--sig-done, #7FCB9E);
+  --wp-tile: #FFC917;
+  --wp-tile-ink: #111111;
+}
+
+/* ── The sign: where you are ─────────────────────────────────────────────── */
+.wp-sign {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 9px 4px 8px; border-radius: 2px;
+  background: var(--wp-sign); color: var(--wp-sign-ink);
+  font: 700 12px/1.2 var(--sans, system-ui, sans-serif); letter-spacing: .02em;
+  white-space: nowrap;
+}
+.wp-sign::before { content: ""; width: 0; height: 0; border-left: 6px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.wp-sign-sm { font-size: 11px; padding: 3px 7px; vertical-align: 3px; margin-right: 6px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LANDING: the dashboard in a demo state
+   ═══════════════════════════════════════════════════════════════════════════ */
+.wp-home { min-width: 0; }
+.wp-intro h1 { max-width: 22ch; }
+.wp-price { margin: 12px 0 0; font-size: 15px; line-height: 1.5; color: var(--wp-ink-2); }
+.wp-price b { color: var(--wp-ink); font-weight: 600; }
+
+.wp-demo {
+  margin-top: 28px; border: 1px solid var(--wp-line-2); border-radius: 12px;
+  background: var(--surface-sunk, var(--wp-paper)); overflow: hidden;
+  box-shadow: 0 1px 2px rgba(12,27,42,.04), 0 18px 40px -28px rgba(12,27,42,.30);
+}
+.wp-demo-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-bottom: 1px solid var(--wp-line);
+  background: var(--wp-paper);
+}
+.wp-demo-h { margin: 0; font: 600 15px/1.35 var(--sans, system-ui, sans-serif); color: var(--wp-ink); letter-spacing: -.005em; }
+.wp-demo-h span { font-weight: 400; color: var(--wp-ink-2); }
+.wp-demo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 16px 4px; }
+.wp-demo-hi { margin: 0; font: 600 clamp(19px, 2vw, 24px)/1.2 var(--sans, system-ui, sans-serif); letter-spacing: -.02em; color: var(--wp-ink); }
+.wp-demo-tag { display: inline-block; margin-left: 6px; padding: 2px 7px; border: 1px dashed var(--wp-line-2); border-radius: 3px; font: 500 11px/1.4 var(--mono, ui-monospace, monospace); letter-spacing: .08em; text-transform: uppercase; color: var(--wp-ink-3); vertical-align: 4px; }
+.wp-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--wp-ink-3); padding: 6px 12px; border: 1px solid var(--wp-line-2); border-radius: 999px; background: var(--wp-paper); white-space: nowrap; }
+.wp-plan::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--wp-ok); }
+.wp-plan strong { color: var(--wp-ink); font-weight: 600; }
+
+/* The top of the landing IS the dashboard (Mick, 5 October): no hero above it.
+   The bar carries the sign and a quiet copy of the workspace tabs, so it reads
+   as the app; the head carries the title, the price and the two actions, the
+   way /dashboard carries its title and plan. */
+.wp-demo-top { margin-top: 0; }
+.wp-appnav { display: none; margin: 0 0 0 auto; padding: 0; list-style: none; gap: 2px; }
+.wp-appnav li { padding: 6px 10px; border-radius: 6px; font: 500 13.5px/1.2 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); }
+.wp-appnav li.on { color: var(--wp-ink); background: var(--line-ghost, rgba(12,27,42,.06)); font-weight: 600; }
+@media (min-width: 980px) { .wp-appnav { display: flex; } }
+.wp-demo-hero { display: grid; gap: 16px; padding: 20px 16px 18px; border-bottom: 1px solid var(--wp-line); background: var(--wp-paper); }
+.wp-demo .wp-demo-hero h1 { margin: 0; max-width: 30ch; font: 650 clamp(22px, 1.6vw + 14px, 36px)/1.14 var(--sans, system-ui, sans-serif); letter-spacing: -.022em; color: var(--wp-ink); text-wrap: balance; }
+.wp-demo .wp-demo-hero .hero-note { margin: 10px 0 0; max-width: none; font-size: 15px; line-height: 1.5; color: var(--wp-ink-2); }
+.wp-demo-hero .hero-note b { color: var(--wp-ink); }
+.wp-demo .wp-demo-hero .home-actions { margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 420px) { .wp-demo-hero .home-actions .hp-btn { flex: 1 1 0; padding: 0 12px; } }
+@media (min-width: 900px) {
+  .wp-demo-hero { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 28px; padding: 28px 24px 24px; }
+  .wp-demo-head, .wp-tiles { padding-left: 24px; padding-right: 24px; }
+  .wp-tiles { padding-bottom: 24px; }
+}
+/* On arrival the rows fill in to where they stand and the status lands after:
+   the first thing the demo says is "this is how far each document is". */
+@keyframes wp-fill { from { transform: scaleX(0); } to { transform: none; } }
+.wp-demo-top .wp-tile .dh-progress i { transform-origin: left center; animation: wp-fill .9s var(--wp-enter) .35s both; }
+.wp-demo-top .wp-tile .dh-status { animation: wp-rise .4s var(--wp-enter) 1.05s both; }
+.wp-demo-top .wp-tile:nth-child(2) .dh-progress i { animation-delay: .5s; }
+.wp-demo-top .wp-tile:nth-child(2) .dh-status { animation-delay: 1.2s; }
+.wp-demo-top .wp-tile:nth-child(3) .dh-progress i { animation-delay: .65s; }
+.wp-demo-top .wp-tile:nth-child(3) .dh-status { animation-delay: 1.35s; }
+@media (prefers-reduced-motion: reduce) {
+  .wp-demo-top .wp-tile .dh-progress i, .wp-demo-top .wp-tile .dh-status { animation: none !important; }
+}
+
+.wp-tiles { display: grid; gap: 12px; padding: 12px 16px 16px; }
+@media (min-width: 900px) { .wp-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* A tile is the dashboard's register card with one row in it, and the whole
+   card is the control. It lifts and its arrow moves on hover, because that is
+   the answer to "can I press this". */
+.wp-tile {
+  position: relative; display: flex; flex-direction: column; min-width: 0;
+  margin: 0; padding: 16px 16px 14px; text-decoration: none; color: inherit;
+  border: 1px solid var(--wp-line); border-radius: 10px; background: var(--wp-paper);
+  box-shadow: 0 1px 2px rgba(12,27,42,.04);
+  transition: transform .18s var(--wp-ease), border-color .18s var(--wp-ease), box-shadow .18s var(--wp-ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.wp-tile:hover { transform: translateY(-2px); border-color: var(--wp-accent); box-shadow: 0 14px 30px -20px rgba(29,78,216,.45); }
+.wp-tile:active { transform: translateY(0); }
+.wp-tile:focus-visible { outline: 3px solid var(--accent-ring, rgba(29,78,216,.32)); outline-offset: 2px; }
+.wp-tile-k { font: 600 11px/1.2 var(--mono, ui-monospace, monospace); letter-spacing: .14em; text-transform: uppercase; color: var(--wp-ink-3); }
+.wp-tile-t { margin: 6px 0 10px; font: 600 16px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); letter-spacing: -.01em; }
+.wp-tile .wp-row { display: block; border: 1px solid var(--wp-line); border-radius: 6px; background: var(--surface-sunk, var(--wp-paper)); }
+.wp-tile .wp-row:hover { background: transparent; }
+.wp-tile .dh-document-open, .wp-tile .dh-send-open {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; cursor: inherit;
+}
+.wp-tile .dh-document-name strong, .wp-tile .dh-send-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14.5px/1.35 var(--sans, system-ui, sans-serif); color: var(--wp-ink); }
+.wp-tile .dh-document-name > span, .wp-tile .dh-send-name > span { display: block; margin-top: 3px; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .04em; color: var(--wp-ink-3); }
+.wp-tile .dh-document-progress > span:first-child, .wp-tile .dh-send-progress > span:first-child { display: block; margin-bottom: 6px; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .04em; color: var(--wp-ink-2); }
+.wp-tile .dh-progress { display: block; width: 100%; height: 3px; background: var(--wp-line); overflow: hidden; }
+.wp-tile .dh-progress i { display: block; height: 100%; background: var(--wp-accent); }
+.wp-tile .dh-status { justify-self: start; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; font: 600 12px/1.35 var(--sans, system-ui, sans-serif); white-space: nowrap; }
+.wp-tile .dh-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.wp-tile .dh-status.in_progress { color: var(--sig-move, #1D4ED8); background: var(--sig-move-bg, rgba(29,78,216,.09)); }
+.wp-tile .dh-status.completed { color: var(--sig-done, #1B6B45); background: var(--sig-done-bg, rgba(27,107,69,.09)); }
+.wp-tile-go { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 8px; font: 600 14px/1 var(--sans, system-ui, sans-serif); color: var(--wp-accent); }
+.wp-tile-go::after { content: "\2192"; transition: transform .18s var(--wp-ease); }
+.wp-tile:hover .wp-tile-go::after { transform: translateX(4px); }
+
+/* the tile that was opened last keeps a quiet mark, so a reader who closes
+   the stage sees where he was */
+.wp-tile[data-wp-seen] .wp-tile-go { color: var(--wp-ink-2); }
+.wp-tile[data-wp-seen] .wp-tile-go::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--wp-ok); }
+
+/* ── The stage: the dashboard's detail dialog with a mini-flow in it ───────── */
+.wp-stage { position: fixed; inset: 0; z-index: 10001; display: grid; place-items: center; padding: 14px; background: rgba(12, 22, 34, .58); }
+.wp-stage[hidden] { display: none !important; }
+.wp-stage .dh-doc-dialog-panel { width: min(640px, 100%); max-height: calc(100dvh - 28px); overflow: auto; border-radius: 12px; background: var(--wp-paper); border: 1px solid var(--wp-line); color: var(--wp-ink); box-shadow: 0 24px 64px -24px rgba(12,27,42,.35); animation: wp-rise .26s var(--wp-enter) both; }
+.wp-stage .dh-doc-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 20px 14px; border-bottom: 1px solid var(--wp-line); }
+.wp-stage .dh-doc-dialog-head h2 { margin: 0; font: 600 18px/1.3 var(--sans, system-ui, sans-serif); letter-spacing: -.015em; }
+.wp-stage .dh-doc-close { flex: 0 0 auto; width: 44px; height: 44px; margin: -8px -8px 0 0; border: 0; border-radius: 6px; background: transparent; color: var(--wp-ink-2); font-size: 26px; line-height: 1; cursor: pointer; }
+.wp-stage .dh-doc-close:hover { background: var(--line-ghost, rgba(12,27,42,.05)); color: var(--wp-ink); }
+.wp-stage .dh-doc-dialog-body { padding: 18px 20px 20px; }
+@keyframes wp-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) {
+  /* a bottom sheet on a phone: the thumb is at the bottom */
+  .wp-stage { place-items: end stretch; padding: 0; }
+  .wp-stage .dh-doc-dialog-panel { width: 100%; max-height: 92dvh; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+}
+
+.wp-play { position: relative; display: grid; gap: 16px; align-items: center; min-height: 210px; padding: 16px; border-radius: 8px; background: var(--surface-sunk, #F6F7F9); border: 1px solid var(--wp-line); overflow: hidden; }
+:root:not([data-theme="dark"]) .wp-play { background: #F5F6F8; }
+@media (min-width: 560px) { .wp-play { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+
+/* the steps under the stage: the one being shown is on the sign */
+.wp-steps { list-style: none; counter-reset: wp; margin: 16px 0 0; padding: 0; display: grid; gap: 4px; }
+.wp-steps li { counter-increment: wp; position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 6px 0; font: 15px/1.45 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); transition: color .2s var(--wp-ease); }
+.wp-steps li::before { content: counter(wp); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; border: 1px solid var(--wp-line-2); font: 700 12px/1 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); transition: background .2s var(--wp-ease), color .2s var(--wp-ease), border-color .2s var(--wp-ease); }
+.wp-steps li.is-now { color: var(--wp-ink); }
+.wp-steps li.is-now::before { background: var(--wp-tile); border-color: var(--wp-tile); color: var(--wp-tile-ink); }
+.wp-steps li.is-past { color: var(--wp-ink-2); }
+.wp-steps li.is-past::before { content: "\2713"; color: var(--wp-ok); border-color: var(--wp-ok); }
+
+.wp-end { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--wp-line); display: grid; gap: 8px; justify-items: start; }
+.wp-try { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 0 26px; border-radius: 8px; background: var(--wp-accent); color: var(--accent-ink, #FFFFFF); border: 1px solid var(--wp-accent); font: 600 16px/1 var(--sans, system-ui, sans-serif); text-decoration: none; transition: transform .18s var(--wp-ease), box-shadow .3s var(--wp-ease), background .15s; }
+.wp-try::after { content: "\2192"; transition: transform .18s var(--wp-ease); }
+.wp-try:hover { background: var(--accent-hov, #1A43BE); }
+.wp-try:hover::after { transform: translateX(4px); }
+.wp-try:focus-visible { outline: 3px solid var(--accent-ring, rgba(29,78,216,.32)); outline-offset: 2px; }
+.wp-play-done .wp-end .wp-try, .wp-stage.is-done .wp-try { box-shadow: 0 0 0 4px var(--accent-ring, rgba(29,78,216,.25)); }
+.wp-end-note { margin: 0; font: 14px/1.5 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); }
+.wp-replay { min-height: 44px; padding: 0; border: 0; background: none; font: 600 14px/1 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.wp-replay:hover { color: var(--wp-ink); }
+@media (max-width: 640px) { .wp-end .wp-try { width: 100%; } }
+
+/* ── Flow 1: a contract, two signers, initials on every page ──────────────── */
+.wp-pages { display: flex; justify-content: center; gap: 0; padding: 6px 0; }
+.wp-page { position: relative; width: 33%; max-width: 132px; aspect-ratio: 1 / 1.38; padding: 11% 9% 0 9%; background: #FFFFFF; border: 1px solid rgba(12,27,42,.16); border-radius: 2px; box-shadow: 0 10px 20px -14px rgba(12,27,42,.5); display: flex; flex-direction: column; gap: 7%; }
+.wp-page + .wp-page { margin-left: -6%; }
+.wp-page:nth-child(1) { transform: rotate(-4deg) translateY(4px); }
+.wp-page:nth-child(3) { transform: rotate(3deg); z-index: 2; }
+.wp-page i { display: block; height: 4px; border-radius: 1px; background: rgba(12,27,42,.13); }
+.wp-page i.t { width: 58%; height: 6px; background: rgba(12,27,42,.62); }
+.wp-page i.s { width: 70%; }
+.wp-par { position: absolute; bottom: 4%; width: 24px; height: 15px; display: grid; place-items: center; border: 1px dashed rgba(29,78,216,.6); border-radius: 2px; font: 700 8px/1 var(--mono, ui-monospace, monospace); color: transparent; background: rgba(29,78,216,.05); transition: color .25s var(--wp-ease), background .25s var(--wp-ease), border-color .25s; }
+.wp-par.p1 { left: 9%; }
+.wp-par.p2 { left: calc(9% + 28px); }
+.wp-field { position: absolute; left: 9%; width: 70%; height: 15%; border-bottom: 1px solid rgba(12,27,42,.4); background: rgba(29,78,216,.05); outline: 1px dashed rgba(29,78,216,.55); outline-offset: 1px; }
+.wp-field.f1 { top: 38%; }
+.wp-field.f2 { top: 60%; }
+.wp-field svg { width: 100%; height: 100%; overflow: visible; }
+.wp-field path { fill: none; stroke: #173FB3; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 260; stroke-dashoffset: 260; transition: stroke-dashoffset 1s ease-in-out; }
+.wp-seal { position: absolute; right: -14%; top: 6%; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--wp-stamp); color: var(--wp-stamp); font: 800 7.5px/1 var(--mono, ui-monospace, monospace); letter-spacing: .1em; text-transform: uppercase; transform: rotate(-14deg) scale(0); opacity: 0; box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 4px var(--wp-stamp); background: rgba(255,255,255,.7); transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), opacity .15s; }
+/* step 1: the fields appear */
+.wp-play.s1 .wp-par, .wp-play.s2 .wp-par, .wp-play.s3 .wp-par, .wp-play.s4 .wp-par { border-color: rgba(29,78,216,.9); }
+/* step 2: the first signer initials every page, then signs */
+.wp-play.s2 .wp-par.p1, .wp-play.s3 .wp-par.p1, .wp-play.s4 .wp-par.p1 { color: #173FB3; border-style: solid; background: rgba(29,78,216,.10); }
+.wp-play.s2 .wp-page:nth-child(2) .wp-par.p1 { transition-delay: .25s; }
+.wp-play.s2 .wp-page:nth-child(3) .wp-par.p1 { transition-delay: .5s; }
+.wp-play.s2 .f1 path, .wp-play.s3 .f1 path, .wp-play.s4 .f1 path { stroke-dashoffset: 0; }
+.wp-play.s2 .f1 path { transition-delay: .7s; }
+/* step 3: the second signer */
+.wp-play.s3 .wp-par.p2, .wp-play.s4 .wp-par.p2 { color: #173FB3; border-style: solid; background: rgba(29,78,216,.10); }
+.wp-play.s3 .wp-page:nth-child(2) .wp-par.p2 { transition-delay: .25s; }
+.wp-play.s3 .wp-page:nth-child(3) .wp-par.p2 { transition-delay: .5s; }
+.wp-play.s3 .f2 path, .wp-play.s4 .f2 path { stroke-dashoffset: 0; }
+.wp-play.s3 .f2 path { transition-delay: .7s; }
+/* step 4: sealed */
+.wp-play.s4 .wp-seal { transform: rotate(-14deg) scale(1); opacity: 1; }
+
+.wp-people { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.wp-who { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--wp-line); border-radius: 8px; background: var(--wp-paper); transition: border-color .25s var(--wp-ease), box-shadow .25s var(--wp-ease); }
+.wp-who strong { display: block; font: 600 14px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); }
+.wp-ini { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--line-ghost, rgba(12,27,42,.06)); font: 700 12px/1 var(--mono, ui-monospace, monospace); color: var(--wp-ink-2); transition: background .25s, color .25s; }
+.wp-state { position: relative; display: block; font: normal 13px/1.4 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); }
+.wp-state .b { display: none; color: var(--wp-ok); font-weight: 600; }
+.wp-play.s2 .w1, .wp-play.s3 .w2 { border-color: var(--wp-accent); box-shadow: 0 0 0 3px var(--accent-soft, rgba(29,78,216,.08)); }
+.wp-play.s3 .w1 .a, .wp-play.s4 .w1 .a, .wp-play.s4 .w2 .a { display: none; }
+.wp-play.s3 .w1 .b, .wp-play.s4 .w1 .b, .wp-play.s4 .w2 .b { display: inline; }
+.wp-play.s3 .w1 .wp-ini, .wp-play.s4 .wp-ini { background: var(--sig-done-bg, rgba(27,107,69,.12)); color: var(--wp-ok); }
+.wp-state .c { display: none; }
+.wp-play:not(.s2):not(.s3):not(.s4) .w1 .a { display: none; }
+.wp-play:not(.s2):not(.s3):not(.s4) .w1 .c { display: inline; }
+
+/* ── Flow 2: a file, locked, stamped, collected, wiped ───────────────────── */
+.wp-play-send { grid-template-columns: 1fr !important; }
+.wp-lane { display: grid; grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr); align-items: center; gap: 8px; }
+@media (max-width: 420px) { .wp-lane { grid-template-columns: 1fr; } .wp-track { height: 26px; width: 3px; justify-self: center; } }
+.wp-file { position: relative; display: grid; grid-template-columns: 30px 1fr 22px; align-items: center; gap: 10px; padding: 12px; background: #FFFFFF; border: 1px solid rgba(12,27,42,.16); border-radius: 6px; color: #0C1B2A; transition: transform .7s var(--wp-ease), opacity .5s; }
+.wp-file-ic { width: 26px; height: 32px; border-radius: 2px; background: linear-gradient(135deg, transparent 72%, rgba(12,27,42,.25) 72%) , #E8ECF2; border: 1px solid rgba(12,27,42,.2); }
+.wp-file-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 13px/1.3 var(--sans, system-ui, sans-serif); }
+.wp-lock { position: relative; width: 18px; height: 14px; margin-top: 6px; border-radius: 2px; background: rgba(12,27,42,.2); transition: background .3s; }
+.wp-lock::before { content: ""; position: absolute; left: 3px; bottom: 11px; width: 8px; height: 9px; border: 2.4px solid rgba(12,27,42,.3); border-bottom: 0; border-radius: 6px 6px 0 0; transform: translateX(5px); transition: transform .35s var(--wp-ease), border-color .3s; }
+.wp-stamp { position: absolute; right: -8px; top: -14px; padding: 6px 8px; border: 2px solid var(--wp-stamp); border-radius: 50%; color: var(--wp-stamp); font: 800 9px/1 var(--mono, ui-monospace, monospace); letter-spacing: .12em; text-transform: uppercase; transform: rotate(12deg) scale(0); opacity: 0; background: rgba(255,255,255,.85); transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), opacity .15s; }
+.wp-track { height: 3px; background: var(--wp-line-2); position: relative; overflow: hidden; border-radius: 2px; }
+.wp-track i { position: absolute; inset: 0; background: var(--wp-accent); transform: scaleX(0); transform-origin: left; transition: transform .8s var(--wp-ease); }
+.wp-to { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--wp-line); border-radius: 6px; background: var(--wp-paper); }
+.wp-to strong { font: 600 14px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); }
+.wp-to > span { font: 500 11px/1.3 var(--mono, ui-monospace, monospace); letter-spacing: .1em; text-transform: uppercase; color: var(--wp-ink-3); }
+.wp-flap { display: flex; gap: 3px; margin-top: 4px; }
+.wp-flap b { position: relative; display: grid; place-items: center; width: 22px; height: 30px; border-radius: 3px; background: var(--wp-flap); color: transparent; font: 700 16px/1 var(--mono, ui-monospace, monospace); overflow: hidden; }
+.wp-flap b::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0,0,0,.6); }
+.wp-receipt { display: flex; justify-content: space-between; gap: 10px; margin: 0; padding: 10px 12px; border: 1px dashed var(--wp-line-2); border-radius: 4px; font: 600 12px/1.3 var(--mono, ui-monospace, monospace); letter-spacing: .04em; color: var(--wp-ink-2); opacity: .35; transition: opacity .3s, border-color .3s, color .3s; }
+/* step 1: locked in the browser */
+.wp-play-send.s1 .wp-lock, .wp-play-send.s2 .wp-lock, .wp-play-send.s3 .wp-lock { background: var(--wp-accent); }
+.wp-play-send.s1 .wp-lock::before, .wp-play-send.s2 .wp-lock::before, .wp-play-send.s3 .wp-lock::before { transform: none; border-color: var(--wp-accent); }
+/* step 2: stamped and on its way; the code flips in */
+.wp-play-send.s2 .wp-stamp, .wp-play-send.s3 .wp-stamp { transform: rotate(12deg) scale(1); opacity: 1; }
+.wp-play-send.s2 .wp-track i, .wp-play-send.s3 .wp-track i { transform: scaleX(1); }
+.wp-play-send.s2 .wp-flap b, .wp-play-send.s3 .wp-flap b { color: var(--wp-flap-ink); animation: wp-flip .5s var(--wp-ease) both; }
+.wp-play-send.s2 .wp-flap b:nth-child(2) { animation-delay: .08s; } .wp-play-send.s2 .wp-flap b:nth-child(3) { animation-delay: .16s; }
+.wp-play-send.s2 .wp-flap b:nth-child(4) { animation-delay: .24s; } .wp-play-send.s2 .wp-flap b:nth-child(5) { animation-delay: .32s; }
+.wp-play-send.s2 .wp-flap b:nth-child(6) { animation-delay: .40s; }
+@keyframes wp-flip { 0% { transform: scaleY(.1); } 60% { transform: scaleY(1.06); } 100% { transform: none; } }
+/* step 3: collected; the file is gone, the receipt stays */
+.wp-play-send.s3 .wp-file { opacity: .28; transform: scale(.96); }
+.wp-play-send.s3 .wp-receipt { opacity: 1; border-color: var(--wp-ok); color: var(--wp-ok); border-style: solid; }
+
+/* ── Flow 3: a proof, checked on your own device ─────────────────────────── */
+.wp-drop { display: grid; gap: 8px; padding: 14px; border: 2px dashed var(--wp-line-2); border-radius: 8px; background: var(--wp-paper); transition: border-color .3s; }
+.wp-chip { display: block; padding: 9px 11px; border-radius: 4px; background: var(--line-ghost, rgba(12,27,42,.05)); border: 1px solid var(--wp-line); font: 600 13px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); opacity: .25; transform: translateY(-6px); transition: opacity .3s, transform .35s var(--wp-enter); }
+.wp-chip.c2 { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; }
+.wp-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.wp-checks li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center; font: 14px/1.35 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); transition: color .25s; }
+.wp-checks li::before { content: ""; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--wp-line-2); box-sizing: border-box; display: grid; place-items: center; font: 700 13px/1 var(--sans, system-ui, sans-serif); color: #fff; transition: background .25s, border-color .25s; }
+.wp-ok { position: absolute; right: 14px; bottom: 12px; padding: 7px 12px; border: 2.5px solid var(--wp-ok); border-radius: 4px; color: var(--wp-ok); font: 800 15px/1 var(--mono, ui-monospace, monospace); letter-spacing: .16em; text-transform: uppercase; transform: rotate(-8deg) scale(0); opacity: 0; transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), opacity .15s; background: var(--wp-paper); }
+.wp-play-verify.s1 .wp-chip, .wp-play-verify.s2 .wp-chip, .wp-play-verify.s3 .wp-chip { opacity: 1; transform: none; }
+.wp-play-verify.s1 .wp-chip.c2 { transition-delay: .2s; }
+.wp-play-verify.s1 .wp-drop, .wp-play-verify.s2 .wp-drop, .wp-play-verify.s3 .wp-drop { border-color: var(--wp-accent); border-style: solid; }
+.wp-play-verify.s2 .wp-checks li, .wp-play-verify.s3 .wp-checks li { color: var(--wp-ink); }
+.wp-play-verify.s2 .wp-checks li::before, .wp-play-verify.s3 .wp-checks li::before { content: "\2713"; background: var(--wp-ok); border-color: var(--wp-ok); }
+.wp-play-verify.s2 .wp-checks li.k2::before { transition-delay: .35s; }
+.wp-play-verify.s2 .wp-checks li.k3::before { transition-delay: .7s; }
+.wp-play-verify.s2 .wp-checks li.k2 { transition-delay: .35s; }
+.wp-play-verify.s2 .wp-checks li.k3 { transition-delay: .7s; }
+.wp-play-verify.s3 .wp-ok { transform: rotate(-8deg) scale(1); opacity: 1; }
+
+/* reduced motion: the end state at once, every box kept */
+@media (prefers-reduced-motion: reduce) {
+  .wp-tile, .wp-tile-go::after, .wp-stage .dh-doc-dialog-panel,
+  .wp-play *, .wp-steps li, .wp-steps li::before { transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; }
+  .wp-tile:hover { transform: none; }
+}
+
+/* ── Below the demo: the rest of the story, folded ───────────────────────── */
+.wp-more-kicker { margin: 8px 0 6px; font: 600 12px/1.3 var(--mono, ui-monospace, monospace); letter-spacing: .14em; text-transform: uppercase; color: var(--wp-ink-3); }
+.wp-more { margin: 0; border-top: 1px solid var(--wp-line); }
+.wp-more > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: center; min-height: 64px; padding: 16px 0; color: var(--wp-ink); -webkit-tap-highlight-color: transparent; }
+.wp-more > summary::-webkit-details-marker { display: none; }
+.wp-more > summary::after { content: "+"; grid-column: 2; grid-row: 1 / span 2; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--wp-line-2); border-radius: 50%; font: 400 22px/1 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); transition: transform .2s var(--wp-ease), background .2s, color .2s; }
+.wp-more > summary:hover::after { background: var(--wp-ink); color: var(--wp-paper); border-color: var(--wp-ink); }
+.wp-more[open] > summary::after { transform: rotate(45deg); }
+.wp-more > summary:focus-visible { outline: 3px solid var(--accent-ring, rgba(29,78,216,.32)); outline-offset: 2px; }
+.wp-more-k { grid-column: 1; font: 600 11px/1.3 var(--mono, ui-monospace, monospace); letter-spacing: .14em; text-transform: uppercase; color: var(--wp-ink-3); margin-bottom: 4px; }
+.wp-more > summary h2, .wp-more > summary .hp-h2 { grid-column: 1; margin: 0; font-size: clamp(1.1rem, .5vw + 1rem, 1.35rem); line-height: 1.25; letter-spacing: -.012em; max-width: none; }
+.wp-more-body { padding: 0 0 32px; animation: wp-rise .26s var(--wp-enter) both; }
+.wp-more-body > .hp-lede:first-child { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .wp-more-body, .wp-more > summary::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOOLS: the same language on /sign, /co-sign, /parashare, /dashboard, /verify
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* the step you are on carries the sign */
+.ds-stepper li.active::before { background: var(--wp-tile); color: var(--wp-tile-ink); border-color: var(--wp-tile); border-radius: 2px; font-weight: 700; }
+.ds-stepper li.active { border-bottom-color: var(--wp-tile); }
+.ds-stepper li.done::before { border-radius: 2px; }
+.ps-panel-head .ps-step { display: inline-grid; place-items: center; min-width: 28px; height: 28px; background: var(--wp-tile); color: var(--wp-tile-ink); border: 1px solid var(--wp-tile); border-radius: 2px; font-weight: 700; font-size: 13px; }
+.ps-stepper .ps-step.active .ps-step-label { background: var(--wp-tile); color: var(--wp-tile-ink); padding: 3px 7px; border-radius: 2px; }
+
+/* big targets: every button on a tool page is a thumb-sized target */
+.ds-wrap .btn, .ps-wrap .btn, .ps-wrap .rv-tab, #main-content > .step .btn, .ds-mode-card, .ps-file, .rv-drop, .dh-refresh, .dh-filter { min-height: 48px; }
+.ds-mode-card, .ps-mode-card, .dh-start-card { transition: transform .18s var(--wp-ease), border-color .18s var(--wp-ease), box-shadow .18s var(--wp-ease), background .18s var(--wp-ease); }
+.ds-mode-card:hover, .ps-mode-card:hover, .dh-start-card:hover { transform: translateY(-2px); }
+.ds-mode-go, .dh-start-link { transition: transform .18s var(--wp-ease); }
+.ds-mode-card:hover .ds-mode-go, .dh-start-card:hover .dh-start-link { transform: translateX(4px); }
+.ps-file, .rv-drop, .ds-dropzone { transition: border-color .18s var(--wp-ease), background .18s var(--wp-ease); }
+.ps-file:hover, .rv-drop:hover, .ds-dropzone:hover { border-color: var(--wp-accent); background: var(--accent-soft, rgba(29,78,216,.06)); }
+@media (prefers-reduced-motion: reduce) {
+  .ds-mode-card, .ps-mode-card, .dh-start-card, .ds-mode-go, .dh-start-link, .ps-file, .rv-drop, .ds-dropzone { transition-duration: .01ms !important; }
+  .ds-mode-card:hover, .ps-mode-card:hover, .dh-start-card:hover, .ds-mode-card:hover .ds-mode-go, .dh-start-card:hover .dh-start-link { transform: none; }
+}
+
+/* the demo, small screens: one label is enough */
+@media (max-width: 640px) { .wp-demo-tag { display: none; } .wp-demo-head { padding-top: 14px; } .wp-demo-h { font-size: 14px; } }
+
+/* the technique, folded: the same disclosure everywhere */
+.wp-fold { margin: 16px 0 0; border-top: 1px solid var(--wp-line); }
+details.ps-info.wp-fold { margin-top: 24px; padding: 0; background: none; border-radius: 0; }
+details.ps-info.wp-fold[open] { padding-bottom: 12px; }
+.ds-facts-fold .ds-facts { margin-top: 0; }
+.wp-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; min-height: 48px; font: 600 14px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); }
+.wp-fold > summary::-webkit-details-marker { display: none; }
+.wp-fold > summary::before { content: "+"; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--wp-line-2); border-radius: 50%; font: 400 15px/1 var(--sans, system-ui, sans-serif); transition: transform .2s var(--wp-ease); }
+.wp-fold[open] > summary::before { transform: rotate(45deg); }
+.wp-fold > summary:hover { color: var(--wp-ink); }
+.wp-fold-body { padding: 0 0 12px; }
+
+/* /parashare: the form reads as numbered steps. A counter on the labels that
+   are rendered, so a hidden field never leaves a gap in the numbers. */
+#step-setup { counter-reset: wpf; }
+#step-setup .ps-field-label { counter-increment: wpf; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+#step-setup .ps-field-label::before { content: counter(wpf); flex: 0 0 auto; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; background: var(--wp-tile); color: var(--wp-tile-ink); border: 1px solid var(--wp-tile); font: 700 12px/1 var(--sans, system-ui, sans-serif); }
+#step-setup .ps-go { min-height: 52px; }
+
+/* the stage on a phone: compact, so the button is near the thumb */
+@media (max-width: 640px) {
+  .wp-play { min-height: 0; padding: 12px; gap: 12px; }
+  .wp-page { max-width: 96px; }
+  .wp-people { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .wp-who { grid-template-columns: 1fr; gap: 6px; padding: 8px 10px; }
+  .wp-ini { width: 28px; height: 28px; font-size: 11px; }
+  .wp-steps li { font-size: 14px; padding: 4px 0; }
+  .wp-stage .dh-doc-dialog-head h2 { font-size: 16px; }
+}
+
+/* /dashboard: the work comes up. A smaller heading and shorter start cards,
+   so the register rows are on the first screen and not under a hero. */
+.pa-main .dh-hero { padding-bottom: 18px; margin-bottom: 24px; }
+.pa-main .dh-hero h1 { font-size: clamp(24px, 2.4vw, 32px); max-width: none; }
+.pa-main .dh-mission { font-size: 15px; }
+.pa-main .dh-start { margin-bottom: 28px; }
+.pa-main .dh-start-card { min-height: 0; padding: 18px 20px; }
+.pa-main .dh-start-kicker { margin-top: 12px; }
+.pa-main .dh-start-card p { font-size: 13.5px; }
+.pa-main .dh-start-link { margin-top: 12px; }

@@ -3613,20 +3613,27 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   for (const slug of ['index', 'pricing']) {
     if (/het hele kantoor/i.test(flat(slug))) problems.push(`${slug}: "het hele kantoor" promises seats an account does not have yet`);
   }
-  // One primary button on the signed-out homepage and on /pricing.
+  // One primary button on the signed-out homepage and on /pricing. Since 5
+  // October 2026 the signed-out homepage is the demo dashboard (Mick: "Moet
+  // meteen die dashboard zijn voor users maar dan niet ingelogd"), and its one
+  // primary button is Account maken, beside Probeer het zelf.
   const homeOut = (page('index').match(/<div class="home-state" data-home="out">[\s\S]*?<\/section>/) || [''])[0];
   const homeMain = visible(page('index')).slice(visible(page('index')).indexOf('<main'), visible(page('index')).indexOf('</main>'));
   const signedIn = (homeMain.match(/<div class="home-state" data-home="in"[\s\S]*?<div class="hp-art"/) || [''])[0];
   const fills = (homeMain.replace(signedIn, '').match(/class="hp-btn hp-btn-fill"/g) || []).length;
   if (fills !== 1) problems.push(`index: ${fills} primary buttons signed out, the decision is one`);
-  if (!/<a class="hp-btn hp-btn-fill" href="\/parashare">/.test(homeOut)) problems.push('index: the one primary button goes to versturen (/parashare)');
+  if (!/<a class="hp-btn hp-btn-fill" href="\/signup">Account maken<\/a>/.test(homeOut)) problems.push('index: the one primary button is Account maken (/signup), in the demo dashboard');
+  if (!/<a class="hp-btn hp-btn-line" href="\/sign\?mode=invite">Probeer het zelf<\/a>/.test(homeOut)) problems.push('index: the second action is Probeer het zelf, in the demo dashboard');
   const pricingMain = visible(page('pricing')).slice(visible(page('pricing')).indexOf('<main'));
   if ((pricingMain.match(/class="btn btn-primary/g) || []).length !== 1) problems.push('pricing: exactly one primary button');
 
-  // 3. The headline, word for word.
-  assert.match(page('index'), /<h1>Pati&euml;ntdossiers en processtukken veilig versturen en laten tekenen\.<\/h1>/,
-    'index: the headline Mick chose');
-  says('index', 'Gemaakt in Nederland, voor praktijken en kantoren.');
+  // 3. The title line, word for word, inside the demo dashboard (Mick, 5
+  // October 2026: no hero above the dashboard; the title says what it is for).
+  assert.match(homeOut, /<div class="wp-demo wp-demo-top"[\s\S]*?<h1 id="home-h1">Veilig versturen en laten tekenen, voor praktijken en kantoren\.<\/h1>/,
+    'index: the title line sits inside the demo dashboard');
+  assert.match(homeOut, /^<div class="home-state" data-home="out">\s*(?:<!--[\s\S]*?-->\s*)?<div class="wp-demo wp-demo-top"/,
+    'index: the demo dashboard is the first thing signed out, with no hero above it');
+  says('index', 'Gratis met het Community-plan. Voor uw kantoor: 29 euro per maand, excl. btw.');
 
   // 4. Two product names outward. The Dutch bar names Versturen and
   // Ondertekenen, apply-nav.py and nav-auth.js carry the same list, and no nav

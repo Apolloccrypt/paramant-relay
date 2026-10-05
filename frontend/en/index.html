@@ -27,6 +27,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FFFFFF, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -413,6 +414,21 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 footer{background:var(--night-2);border-top:1px solid var(--line);color:var(--fg-mid)}
 footer a{color:var(--fg)}
 @media (min-width:760px){footer .footer-grid,footer .footer-grid.footer-slim{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:start}}
+/* Signed out, the hero carries the dashboard in a demo state (werkplek.css,
+   js/home-demo.js). The drawn document retired with it: the demo shows the
+   real screens instead of a picture of a document. */
+.hp-art,.hp-proof{display:none}
+/* The rest of the story, folded under the demo: one line per subject. */
+main > .hp-sec{padding:0}
+main > .hp-sec + .hp-sec{border-top:0}
+main > .hp-sec:last-of-type{padding-bottom:48px}
+main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
+.home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
+.home-hero{padding-top:12px}
+@media (min-width:900px){
+  .home-hero{padding:20px 0 40px}
+  .home-hero .hp-wrap{width:min(100% - 2*var(--pad), 1120px)}
+}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -528,14 +544,162 @@ footer a{color:var(--fg)}
 <section class="home-hero">
   <div class="hp-wrap">
     <div class="home-state" data-home="out">
-      <h1>Get documents signed and send files safely, from your browser.</h1>
-      <p class="lede">Made for <strong>small professional firms</strong> in the EU: legal, finance, health. A contract signed, or a file that deletes itself after its last read.</p>
-      <div class="home-actions">
-        <a class="hp-btn hp-btn-fill" href="/en/parashare">Send securely</a>
-        <a class="hp-btn hp-btn-line" href="/en/sign">Sign a document</a>
+      <!-- Mick, 5 October 2026: the visitor lands in the dashboard itself, not
+           under a hero. Same head, same rows as /dashboard, in a demo state
+           marked "Example" on the frame and on every row. See the Dutch page. -->
+      <div class="wp-demo wp-demo-top" role="region" aria-labelledby="home-h1" data-wp-demo>
+        <div class="wp-demo-bar">
+          <span class="wp-sign" aria-hidden="true">Example</span>
+          <p class="wp-demo-h" id="wp-demo-h">This is what your overview looks like. <span>Pick a document and watch what happens.</span></p>
+          <ul class="wp-appnav" aria-hidden="true">
+            <li class="on">Documents</li><li>Send</li><li>Sign</li><li>Verify</li>
+          </ul>
+        </div>
+        <header class="wp-demo-hero">
+          <div class="wp-demo-title">
+            <h1 id="home-h1">Send files safely and get documents signed, for small professional firms.</h1>
+            <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;29 a month.</p>
+          </div>
+          <div class="home-actions">
+            <a class="hp-btn hp-btn-fill" href="/en/signup">Create account</a>
+            <a class="hp-btn hp-btn-line" href="/en/sign?mode=invite">Try it yourself</a>
+          </div>
+        </header>
+        <div class="wp-demo-head">
+          <p class="wp-demo-hi">Your documents <span class="wp-demo-tag">example</span></p>
+          <span class="dh-plan wp-plan"><strong>Community</strong><span>plan</span></span>
+        </div>
+        <div class="wp-tiles">
+          <a class="wp-tile dh-workspace" href="/en/sign?mode=invite" data-wp-open="sign" aria-haspopup="dialog">
+            <span class="wp-tile-k">Sign</span>
+            <span class="wp-tile-t">A contract two people sign</span>
+            <span class="dh-document wp-row">
+              <span class="dh-document-open">
+                <span class="dh-document-name"><strong>Office lease.pdf</strong><span>Example &middot; 4 pages</span></span>
+                <span class="dh-document-progress"><span>1 of 2 signed</span><span class="dh-progress"><i style="width:50%"></i></span></span>
+                <span class="dh-status in_progress">Waiting for 1 signature</span>
+              </span>
+            </span>
+            <span class="wp-tile-go">See how it works</span>
+          </a>
+          <a class="wp-tile dh-workspace" href="/en/parashare" data-wp-open="send" aria-haspopup="dialog">
+            <span class="wp-tile-k">Send</span>
+            <span class="wp-tile-t">A case file, sent safely</span>
+            <span class="dh-send-row wp-row">
+              <span class="dh-send-open">
+                <span class="dh-send-name"><strong>Referral and case file.pdf</strong><span>Example &middot; to 1 recipient</span></span>
+                <span class="dh-send-progress"><span>1 of 1 collected</span><span class="dh-progress"><i style="width:100%"></i></span></span>
+                <span class="dh-status completed">Collected and deleted</span>
+              </span>
+            </span>
+            <span class="wp-tile-go">See how it works</span>
+          </a>
+          <a class="wp-tile dh-workspace" href="/en/verify" data-wp-open="verify" aria-haspopup="dialog">
+            <span class="wp-tile-k">Verify</span>
+            <span class="wp-tile-t">A proof, checked by yourself</span>
+            <span class="dh-document wp-row">
+              <span class="dh-document-open">
+                <span class="dh-document-name"><strong>Employment contract.pdf</strong><span>Example &middot; with its proof file</span></span>
+                <span class="dh-document-progress"><span>3 of 3 checks</span><span class="dh-progress"><i style="width:100%"></i></span></span>
+                <span class="dh-status completed">Genuine</span>
+              </span>
+            </span>
+            <span class="wp-tile-go">See how it works</span>
+          </a>
+        </div>
       </div>
-      <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;29 a month.</p>
-      <p class="hp-proof">When the file is gone, the proof stays. Anyone can check it without us.</p>
+
+      <!-- The stage: the dashboard's own detail dialog (dh-doc-dialog), with a
+           mini-flow inside instead of the detail list. One per tile; the
+           script shows one at a time and plays it once. -->
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-sign" role="dialog" aria-modal="true" aria-labelledby="wp-stage-sign-h" data-wp-stage="sign" hidden>
+        <div class="dh-doc-dialog-panel">
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-sign-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Example</span> Getting a contract signed</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
+          <div class="dh-doc-dialog-body">
+            <div class="wp-play" data-wp-play>
+              <div class="wp-pages" aria-hidden="true">
+                <div class="wp-page"><i class="t"></i><i></i><i></i><i class="s"></i><b class="wp-par p1">TN</b><b class="wp-par p2">LL</b></div>
+                <div class="wp-page"><i class="t"></i><i></i><i class="s"></i><i></i><b class="wp-par p1">TN</b><b class="wp-par p2">LL</b></div>
+                <div class="wp-page"><i class="t"></i><i></i><i></i><b class="wp-par p1">TN</b><b class="wp-par p2">LL</b>
+                  <span class="wp-field f1"><svg viewBox="0 0 120 34"><path d="M4 24c10-16 16-18 15-7s-6 14 2 8 13-18 13-9-4 18 5 8 10-15 15-7 2 12 9 7 12-15 16-7 4 12 13 3 14-11 24-7"/></svg></span>
+                  <span class="wp-field f2"><svg viewBox="0 0 120 34"><path d="M4 20c8-10 14-14 18-6s-2 14 6 9 10-16 16-12 0 14 8 10 12-12 18-8 6 10 14 6 12-10 20-8 8 4 12 2"/></svg></span>
+                  <span class="wp-seal">Signed</span>
+                </div>
+              </div>
+              <ol class="wp-people">
+                <li class="wp-who w1"><span class="wp-ini">TN</span><span><strong>Tenant</strong><em class="wp-state"><span class="c">Invited by email</span><span class="a">Signing now</span><span class="b">Signed, with initials</span></em></span></li>
+                <li class="wp-who w2"><span class="wp-ini">LL</span><span><strong>Landlord</strong><em class="wp-state"><span class="a">Goes next</span><span class="b">Signed, with initials</span></em></span></li>
+              </ol>
+            </div>
+            <ol class="wp-steps" data-wp-steps>
+              <li>You place a box for the signature, and one for initials on every page.</li>
+              <li>The first person opens the link in the email, initials and signs.</li>
+              <li>The second does the same. You always see who is still to sign.</li>
+              <li>Done. Everyone downloads the signed document with its proof.</li>
+            </ol>
+            <div class="wp-end">
+              <a class="wp-try" href="/en/sign?mode=invite">Try it yourself</a>
+              <p class="wp-end-note">You can prepare a document without an account. To sign, you create a free one.</p>
+              <button class="wp-replay" type="button" data-wp-replay>Play it again</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-send" role="dialog" aria-modal="true" aria-labelledby="wp-stage-send-h" data-wp-stage="send" hidden>
+        <div class="dh-doc-dialog-panel">
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-send-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Example</span> Sending a case file safely</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
+          <div class="dh-doc-dialog-body">
+            <div class="wp-play wp-play-send" data-wp-play>
+              <div class="wp-lane" aria-hidden="true">
+                <div class="wp-file"><span class="wp-file-ic"></span><span class="wp-file-n">Referral and case file.pdf</span><span class="wp-lock"></span><span class="wp-stamp">Sent</span></div>
+                <div class="wp-track"><i></i></div>
+                <div class="wp-to"><strong>Recipient</strong><span>Pickup code</span>
+                  <span class="wp-flap"><b data-f="4">4</b><b data-f="7">7</b><b data-f="2">2</b><b data-f="9">9</b><b data-f="1">1</b><b data-f="8">8</b></span>
+                </div>
+              </div>
+              <p class="wp-receipt" aria-hidden="true"><span>Receipt</span><span>Collected &middot; deleted</span></p>
+            </div>
+            <ol class="wp-steps" data-wp-steps>
+              <li>Your browser encrypts the file before it leaves.</li>
+              <li>The recipient gets a link and a pickup code.</li>
+              <li>Once collected, the file is deleted. You keep a receipt.</li>
+            </ol>
+            <div class="wp-end">
+              <a class="wp-try" href="/en/parashare">Try it yourself</a>
+              <p class="wp-end-note">With a free account: 50 transfers a month.</p>
+              <button class="wp-replay" type="button" data-wp-replay>Play it again</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-verify" role="dialog" aria-modal="true" aria-labelledby="wp-stage-verify-h" data-wp-stage="verify" hidden>
+        <div class="dh-doc-dialog-panel">
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-verify-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Example</span> Checking a proof yourself</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
+          <div class="dh-doc-dialog-body">
+            <div class="wp-play wp-play-verify" data-wp-play>
+              <div class="wp-drop" aria-hidden="true"><span class="wp-chip c1">Employment contract.pdf</span><span class="wp-chip c2">proof.psign</span></div>
+              <ul class="wp-checks" aria-hidden="true">
+                <li class="k1">The document has not changed</li>
+                <li class="k2">The signatures are valid</li>
+                <li class="k3">Paramant has countersigned it</li>
+              </ul>
+              <span class="wp-ok" aria-hidden="true">Genuine</span>
+            </div>
+            <ol class="wp-steps" data-wp-steps>
+              <li>You pick the document and the proof file that belongs to it.</li>
+              <li>Your own browser checks everything. The file stays on your computer.</li>
+              <li>You see at once whether it is genuine. That works without us, too.</li>
+            </ol>
+            <div class="wp-end">
+              <a class="wp-try" href="/en/verify">Try it yourself</a>
+              <p class="wp-end-note">Checking needs no account and no invitation.</p>
+              <button class="wp-replay" type="button" data-wp-replay>Play it again</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="home-state" data-home="in" hidden>
       <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
@@ -648,8 +812,10 @@ footer a{color:var(--fg)}
 
 <section class="hp-sec check-sec" aria-labelledby="check-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Do not take our word for it</p>
-    <h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2>
+    <p class="wp-more-kicker">Before you start</p>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Do not take our word for it</span><h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Trust is not something a website can claim. These five facts are on public record outside this page, and each one comes with a link to where you can look it up.</p>
     <ul class="check-grid">
       <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register (the Dutch Chamber of Commerce) lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
@@ -658,13 +824,16 @@ footer a{color:var(--fg)}
       <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/en/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
       <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/en/rules">The nine rules &rarr;</a></li>
     </ul>
+      </div>
+    </details>
   </div>
 </section>
 
 <section class="hp-sec why-nl-sec" aria-labelledby="why-nl-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Why Dutch matters</p>
-    <h2 id="why-nl-h" class="hp-h2">Dutch is a fact here, not a flag.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Why Dutch matters</span><h2 id="why-nl-h" class="hp-h2">Dutch is a fact here, not a flag.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Where a supplier's owner is based decides which law reaches your client files, and who can be ordered to hand them over. That makes it a purchasing question. Here are the three answers.</p>
     <ul class="check-grid why-grid">
       <li data-partner-context="digicert geen-partij"><span class="ck-fact">The Dutch names were sold</span><p class="ck-how">The parent of WeTransfer has been Bending Spoons in Milan since July 2024. Zivver has been part of Kiteworks in California since June 2025. Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands. The names stayed Dutch. The owners did not.</p></li>
@@ -673,13 +842,16 @@ footer a{color:var(--fg)}
     </ul>
     <p class="why-proud">We are Dutch, and we would rather say so than hide behind a Delaware address.</p>
     <p class="why-src" data-partner-context="digicert geen-partij">Ownership sources: the Kiteworks announcement of the Zivver acquisition (17 June 2025); the Bending Spoons announcement of the WeTransfer acquisition (31 July 2024); Entrust on Signhost (2022); Box on SignRequest (2021); the RDI trust service status list, which carries QuoVadis as DigiCert Europe Netherlands B.V. Checked 3 September 2026. The parent of Paramant is named on paramantis.nl, checked 23 September 2026.</p>
+      </div>
+    </details>
   </div>
 </section>
 
 <section class="hp-sec home-split-sec" aria-labelledby="split-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Why there are two kinds of plan</p>
-    <h2 id="split-h" class="hp-h2">One half is a gift. The other half pays for it.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Why there are two kinds of plan</span><h2 id="split-h" class="hp-h2">One half is a gift. The other half pays for it.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">That split is the whole idea, so it comes first. Everything further down this page is either the free half or the paid half.</p>
     <div class="gift-grid">
       <article class="panel panel-night">
@@ -711,13 +883,16 @@ footer a{color:var(--fg)}
         <div class="split-cta"><a class="hp-btn hp-btn-fill" href="/en/pricing">See the business plans</a></div>
       </article>
     </div>
+      </div>
+    </details>
   </div>
 </section>
 
 <section class="hp-sec" id="products" aria-labelledby="products-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Two products</p>
-    <h2 id="products-h" class="hp-h2">One for signing. One for sending.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Two products</span><h2 id="products-h" class="hp-h2">One for signing. One for sending.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Both run on the same core, and both work in a plain browser. Nothing to install, for you or for the other side.</p>
     <ul class="prod-grid">
       <li>
@@ -747,13 +922,16 @@ footer a{color:var(--fg)}
         <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/en/parasend">What ParaSend is</a><a class="hp-btn hp-btn-fill" href="/en/parashare">Send a file</a></div>
       </li>
     </ul>
+      </div>
+    </details>
   </div>
 </section>
 
 <section class="hp-sec" aria-labelledby="how-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">How it works</p>
-    <h2 id="how-h" class="hp-h2">Three steps, and you are done.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">How it works</span><h2 id="how-h" class="hp-h2">Three steps, and you are done.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">No plugin, no client software, no onboarding call. The whole thing happens in the tab you already have open.</p>
     <ol class="step-grid">
       <li>
@@ -772,13 +950,16 @@ footer a{color:var(--fg)}
         <p>You get a receipt that can be checked without us, and a line in a public log that shows when it happened.</p>
       </li>
     </ol>
+      </div>
+    </details>
   </div>
 </section>
 
 <section class="hp-sec" aria-labelledby="cost-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">What it costs</p>
-    <h2 id="cost-h" class="hp-h2">Free to start. Then a flat price a month.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">What it costs</span><h2 id="cost-h" class="hp-h2">Free to start. Then a flat price a month.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Prices are per month, excluding VAT (btw). You can stay on the Community plan as long as you like; there is no card and no time limit.</p>
     <ul class="price-grid">
       <li>
@@ -806,13 +987,16 @@ footer a{color:var(--fg)}
     <div class="sec-more">
       <a class="sec-link" href="/en/pricing">See the full pricing page <span aria-hidden="true">&rarr;</span></a>
     </div>
+      </div>
+    </details>
   </div>
 </section>
 
 <section class="hp-sec" aria-labelledby="trust-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Why you can trust it</p>
-    <h2 id="trust-h" class="hp-h2">Rules you can check. Every one has a proof.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Why you can trust it</span><h2 id="trust-h" class="hp-h2">Rules you can check. Every one has a proof.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Everyone has a privacy policy. Each of our rules comes with a link where you can check it: a log, a header, a repo. Four of the nine are below.</p>
     <ol class="rules-grid">
       <li><h3>We never had it</h3><p>Encrypted in your browser before it leaves your device, never written to a disk, gone after its last read.</p><a class="r-verify" href="/en/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
@@ -825,6 +1009,8 @@ footer a{color:var(--fg)}
     </div>
     <p class="pq-core">For the technically minded: the core uses ML-KEM-768 for encryption and ML-DSA-65 for signatures, the two standards NIST published in 2024. <a href="/en/crypto-agility">How we keep that current</a></p>
     <p class="home-dev" style="margin-top:40px">For developers there is an SDK, a signing API and a self-host installer: <a href="/en/docs">read the developer docs &rarr;</a></p>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -863,5 +1049,6 @@ footer a{color:var(--fg)}
 <script src="/js/nav-auth.js?v=19" defer></script>
 <script src="/js/format-date.js?v=3" defer></script>
 <script src="/js/home-auth.js?v=9" defer></script>
+<script src="/js/home-demo.js?v=1" defer></script>
 </body>
 </html>

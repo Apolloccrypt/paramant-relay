@@ -162,31 +162,35 @@ const measure = (page, claims) => page.evaluate((specs) => {
 // proof the right element was measured; the geometry is the assertion.
 const PAGES = [
   {
-    // The Dutch homepage (23 September 2026): the headline Mick chose, the line
-    // under it, the one offer beside the free plan, and the one button, which
-    // goes to versturen.
+    // The Dutch homepage (5 October 2026). Mick: "Moet meteen die dashboard
+    // zijn voor users maar dan niet ingelogd, waardoor je meteen ziet wat het
+    // kan, waarvoor en de feel hebt." So the first screen IS the demo
+    // dashboard: its "Voorbeeld" bar, the title line inside it that says what
+    // it is for, the price in one line, its two actions, and the start of the
+    // register. There is no hero above it any more (the 23 September headline
+    // retired with it; the price and the free plan stay on the first screen).
     slug: '/',
     claims: [
-      { name: 'the H1', css: '[data-home="out"] h1', text: 'Patiëntdossiers en processtukken veilig versturen en laten tekenen' },
-      { name: 'the line under it', css: '[data-home="out"] p.lede', text: 'Gemaakt in Nederland, voor' },
-      { name: 'the Community plan and the one offer', css: '[data-home="out"] p.hero-note', text: 'Community-plan', also: ['Voor uw kantoor: 29 euro per maand'] },
-      { name: 'the one primary action', css: '[data-home="out"] .home-actions a.hp-btn-fill', href: '/parashare' },
+      { name: 'the demo bar, marked as an example', css: '[data-home="out"] .wp-demo-top #wp-demo-h', text: 'Zo ziet uw overzicht eruit' },
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Veilig versturen en laten tekenen, voor praktijken en kantoren' },
+      { name: 'the Community plan and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'Community-plan', also: ['Voor uw kantoor: 29 euro per maand'] },
+      { name: 'the primary action, Account maken', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/signup', text: 'Account maken' },
+      { name: 'the second action, Probeer het zelf', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/sign?mode=invite', text: 'Probeer het zelf' },
+      { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Uw documenten' },
     ],
   },
   {
     slug: '/en',
     claims: [
-      { name: 'the H1', css: '[data-home="out"] h1', text: 'Get documents signed and send files safely' },
-      { name: 'the line that says who it is for', css: '[data-home="out"] p.lede', text: 'small professional firms' },
+      { name: 'the demo bar, marked as an example', css: '[data-home="out"] .wp-demo-top #wp-demo-h', text: 'This is what your overview looks like' },
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Send files safely and get documents signed, for small professional firms' },
       // The split the whole homepage argues from. It has to be readable as a
       // split, so both halves are checked in one line: free tier named, paid
       // tier named, on the first screen.
-      { name: 'the Community and business plans split', css: '[data-home="out"] p.hero-note', text: 'Community plan', also: ['business plans from'] },
-      { name: 'the first action', css: '[data-home="out"] .home-actions a', href: '/en/parashare' },
-      // Mick, 4 September: one note is enough. The founder line left both hero
-      // states; the letter signature further down the page is the one place the
-      // homepage still names him, and tests/ui-truthfulness pins that block.
-      { name: 'the heading of the five facts, which now come before the gift (panel of 4 September: facts convince, the letter can wait)', css: '#check-h', text: 'Five things you can check' },
+      { name: 'the Community and business plans split', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'Community plan', also: ['business plans from'] },
+      { name: 'the primary action, Create account', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/en/signup', text: 'Create account' },
+      { name: 'the second action, Try it yourself', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/en/sign?mode=invite', text: 'Try it yourself' },
+      { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Your documents' },
     ],
   },
   {
