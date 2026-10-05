@@ -1,15 +1,19 @@
 # PARAMANT — Post-Quantum Encrypted File Relay
 
-[![Version](https://img.shields.io/badge/version-v3.0.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.1.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 [![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
-[![Jurisdiction](https://img.shields.io/badge/jurisdiction-EU%2FDE%20only-blue.svg)](https://paramant.app/compliance/nis2)
+[![Jurisdiction](https://img.shields.io/badge/jurisdiction-EU%2FDE%20only-blue.svg)](https://paramant.app/security)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 
 **Post-quantum encrypted file relay. Burn-on-read. EU jurisdiction. Self-hostable in 2 minutes.**
 
 Data is encrypted client-side with ML-KEM-768 + AES-256-GCM, relayed through RAM only, and destroyed after one download. Nothing is ever written to disk. Every transfer is recorded in a public Merkle tree — proving delivery without storing content.
+
+**New here?** Read [`docs/ONBOARDING.md`](docs/ONBOARDING.md) first: what Paramant is, the
+repo map with the test that guards each directory, local setup with the commands and
+the counts they print, the rules of the house, and the traps of the first week.
 
 ---
 
@@ -28,7 +32,7 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3001/health
-# {"ok":true,"version":"3.0.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.1.0","sector":"health","edition":"licensed"}
 ```
 
 Or on a Raspberry Pi / fresh VPS:
@@ -38,7 +42,7 @@ curl -fsSL https://paramant.app/install-pi.sh | bash
 ```
 
 Or via the browser — no install:
-**[Try ParaShare →](https://paramant.app/parashare)** (no account, no key needed)
+**[Try the ParaSend web app →](https://paramant.app/parashare)** (no account, no key needed)
 
 **[Create a free account →](https://paramant.app/signup)** (TOTP, no password)
 
@@ -67,7 +71,7 @@ Why a separate repo:
 - **Compliance:** 325 KAT vectors, 21 ADRs, byte-equivalence proven across three
   implementations (oqs server-side, RustCrypto browser-side, `@noble` reference).
 
-Browser-side crypto (parashare, paradrop, ontvang) lives vendored in
+Browser-side crypto (parashare, ontvang) lives vendored in
 [`crypto-wasm/`](crypto-wasm/) (RustCrypto, compiled to wasm32). It is validated
 against paramant-core via the cross-impl-validator crate there (ADR-0020,
 ADR-0021). See
@@ -91,8 +95,8 @@ admin features landing in the 3.0.0 release.
   scripts — admin token, TOTP and first key from the browser (ADR R005).
 - **Visual admin config + in-browser CLI.** `/admin/settings` edits relay config
   without touching `.env`; `/admin/cli` is a web terminal for debugging without SSH.
-- **Cards-per-product dashboard.** The user dashboard is rebuilt around per-product
-  cards with dark mode, real-time updates and a mobile layout.
+- **Document workspace.** The user dashboard starts signing and delivery flows,
+  lists account-owned envelopes and exposes lifecycle actions on desktop and mobile.
 - **Crypto-mode negotiation.** `/v2/capabilities` advertises a compact `core` mode
   (2 algorithms) by default; extended sets are opt-in via `CRYPTO_MODE` (ADR R006).
 - **Add-on architecture (spec).** Container-isolated integrations that work on
@@ -122,13 +126,12 @@ Full set: [`docs/adrs/`](docs/adrs/) (R001–R011).
 | User accounts with TOTP (no password required) | Live — [paramant.app/signup](https://paramant.app/signup) |
 | Admin dashboard (Overview, Users, Audit, Billing, Relay) | Live — `/admin/` |
 | Resend TOTP setup link | Live — admin panel |
-| Developer API keys | Live — [paramant.app/request-key](https://paramant.app/request-key) |
-| Billing (Stripe integration) | Scaffold — Stripe connect pending |
+| ParaSign developer settings and API keys | Live at [paramant.app/developer](https://paramant.app/developer) |
+| Billing | Operator-managed. Hosted paramant.app uses Mollie; bundled admin tool has Stripe device-sync hooks |
 | Chromium browser extension | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 | Outlook Add-in | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
-| Thunderbird FileLink extension | Source in repo |
 
-**Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the WebApp tools (ParaShare, ParaDrop), and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished — until that lands, treat extension uploads as relay-side, not zero-knowledge.
+**Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the ParaSend web app, and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished. Until that lands, treat extension uploads as relay-side, not zero-knowledge.
 
 ---
 
@@ -151,6 +154,91 @@ Every transfer is hashed into a SHA3-256 Merkle tree. The relay signs each tree 
 
 ---
 
+## ParaSign - Post-quantum document signing
+
+ParaSign is the second product on the PARAMANT relay: post-quantum document signing, alongside the encrypted file transfer described above. Same relay, same notary invariant, a different job. Instead of moving a file and burning it, ParaSign proves who signed what, and when, with a signature that survives the arrival of quantum computers.
+
+For PDF files, the browser can place the visible seal on one page, repeat it on every page, or append a separate signature sheet. The sheet includes the visible signer seal, source filename, source page count, signing time and SHA3-256 source hash. Later co-signers remain part of the cryptographic `.psign` envelope and are not retroactively painted into the PDF.
+
+- Post-quantum signatures. Every signature is ML-DSA-65 (NIST FIPS 204). No RSA and no ECDSA on the signing path.
+- Envelopes. A signing request is an envelope: one document, one or more signers, an optional signing order, and a TTL.
+- Multi-signer. Route a single document to several signers; the envelope completes only when every party has signed.
+- Hosted signing ceremony. Each signer gets a hosted browser page and signs there. The signing key is generated and used client-side, so a private key never reaches the relay.
+
+Signature level: ParaSign produces advanced electronic signatures (AES) as understood under eIDAS. It is explicitly NOT an eIDAS-qualified signature (QES). There is no qualified trust service provider and no qualified certificate on this path, and ParaSign makes no qualified-signature claim.
+
+### The .psign proof
+
+When an envelope completes, ParaSign issues a .psign receipt: a compact, canonical-JSON proof that is self-contained and verifiable offline. It binds together:
+
+| Field | What it proves |
+|-------|----------------|
+| Signer public key | who signed |
+| Timestamp | when they signed |
+| ML-DSA-65 signature per party | that this signer, and only this signer, signed this document |
+| Document hash (SHA3-256) | which document, without ever revealing its contents |
+| Relay notary countersignature | that the relay witnessed the ceremony and logged it |
+
+A .psign is independently verifiable with no call back to the relay: re-check each ML-DSA-65 signature against the signer public key, verify the notary countersignature against the relay public key, and confirm the envelope's inclusion in the public CT log (the same SHA3-256 Merkle tree that backs file transfers). You verify the math, not the operator.
+
+The signed-in document workspace reads account-scoped envelope metadata. An owner
+can cancel an open request and download the `.psign` proof for a completed request.
+Cancellation removes the encrypted document capsule immediately. The workspace
+does not claim to recover plaintext. Users keep the signed document and proof
+together and can verify them later in Paramant.
+
+### Zero-knowledge scope
+
+The relay is a notary, not a reader. What it retains for an envelope is the SHA3-256 document hash, never the document content, and it never holds a signing private key. In the hosted /v1 ceremony the relay does hold the raw document blob, but only for the lifetime of that ceremony, and it is dropped on TTL expiry. Nothing but the hash persists.
+
+### /v1 developer API
+
+A thin, public /v1 layer lets any application create envelopes and collect signatures without a browser session, using an API key. It wraps the internal envelope machinery.
+
+Authentication is a Bearer token: an API key with the psk_ prefix (psk_live_ for production, psk_test_ for the sandbox) that carries the parasign scope. A key without that scope is rejected.
+
+| Method and path | Purpose |
+|-----------------|---------|
+| POST /v1/envelopes | Create an envelope from a PDF plus a signer list; returns the envelope id and one hosted sign_url per signer. |
+| GET /v1/envelopes/:id | Read envelope status and per-signer progress. |
+| GET /v1/envelopes/:id/receipt | Download the full .psign proof once the envelope is complete. |
+| GET /v1/envelopes/:id/document | Download the signed PDF once the envelope is complete. |
+| POST /v1/envelopes/:id/void | Void an open envelope (owner only). |
+
+```bash
+# 1. Create an envelope. The document is sent as base64; signers are routed to
+#    hosted signing pages.
+curl -X POST https://paramant.app/v1/envelopes \
+  -H "Authorization: Bearer psk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+        "document": { "content_base64": "JVBERi0xLjc..." },
+        "original_filename": "quote-8842.pdf",
+        "signers": [
+          { "name": "Signer One", "email": "signer@example.com", "order": 1 }
+        ],
+        "webhook_url": "https://app.example.com/hooks/parasign"
+      }'
+# 201 -> { "id": "env_...", "status": "sent",
+#          "signers": [ { "sign_url": "https://paramant.app/..." } ],
+#          "webhook_secret": "..." }   # returned once, for HMAC verification
+
+# 2. The signer opens sign_url and signs ML-DSA-65 client-side (hosted ceremony).
+
+# 3. On completion, pull the full .psign proof.
+curl https://paramant.app/v1/envelopes/env_.../receipt \
+  -H "Authorization: Bearer psk_live_..." \
+  --output quote-8842.psign
+```
+
+Webhooks: point webhook_url at your endpoint and the relay posts envelope lifecycle events (for example envelope.sent and envelope.voided), each signed with HMAC-SHA256 in the X-Paramant-Sig header, so you do not have to poll. The webhook secret is returned once, in the create response.
+
+Pricing for signing volume lives with everything else at https://paramant.app/pricing.
+
+Licensing: ParaSign runs on the same source-available relay (BUSL-1.1). The client SDKs are open source (Apache-2.0).
+
+---
+
 ## Use cases
 
 ### Healthcare — DICOM / HL7 FHIR (NEN 7510)
@@ -168,7 +256,7 @@ python3 paramant-receiver.py \
 paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg
 ```
 
-→ [NEN 7510 compliance](https://paramant.app/compliance/nen7510) · [DICOM setup guide](docs/dicom-guide.md)
+→ [DICOM setup guide](docs/dicom-guide.md)
 
 ---
 
@@ -182,7 +270,7 @@ paramant-notary deed.pdf --sign --receipt
 paramant-legal summons.pdf --case ROT-2026-1234 --proof
 ```
 
-→ [Legal compliance](https://paramant.app/compliance/nis2)
+→ [Compliance in the docs](https://paramant.app/docs#compliance-nis2)
 
 ---
 
@@ -198,7 +286,7 @@ paramant-firmware update-v2.1.bin \
   --sign --device-group bodycams.txt --version 2.1
 ```
 
-→ [IEC 62443 compliance](https://paramant.app/compliance/iec62443)
+→ [IEC 62443 in the docs](https://paramant.app/docs#compliance-iec62443)
 
 ---
 
@@ -321,7 +409,7 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
 ```bash
 curl https://health.paramant.app/health
-# {"ok":true,"version":"3.0.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.1.0","sector":"health","edition":"licensed"}
 ```
 
 ### CT log (public)
@@ -340,7 +428,7 @@ curl https://relay.paramant.app/v2/pubkey
 
 # Verify a delivery receipt
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
-  -d '{"receipt":"<base64url from X-Paramant-Receipt header>"}'
+  -d '{"receipt":"<base64url from GET /v2/transfers/:receipt_id/receipt>"}'
 # {"valid":true,"blob_hash":"a3f2…","burn_confirmed":true}
 ```
 
@@ -427,7 +515,7 @@ pip install paramant-sdk
 ```
 
 ```python
-from paramant_sdk import GhostPipe
+from paramant import GhostPipe
 
 gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
 
@@ -468,14 +556,15 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | Hybrid KEM (browser path) | ML-KEM-768 + ECDH P-256, combined via HKDF-SHA256 |
 | Symmetric | AES-256-GCM · NIST SP 800-38D |
 | Signatures (relay STH / receipts) | ML-DSA-65 · NIST FIPS 204 |
-| Signatures (client, SDK only) | ML-DSA-65 over `ctKem ‖ senderPub ‖ nonce ‖ ct ‖ aad` (Node/Python SDK; browser ParaShare path does not yet sign client-side) |
+| Signatures (client, SDK only) | ML-DSA-65 over `ctKem ‖ senderPub ‖ nonce ‖ ct ‖ aad` (Node/Python SDK; the browser web app path does not yet sign client-side) |
 | Key derivation | HKDF-SHA256 · RFC 5869 |
 | Password blobs | Argon2id · RFC 9106 |
 | Crypto runtime | Rust/WASM — browser-side encryption runs in native code |
 | Storage | RAM only — never written to disk |
 | Padding | 5 MB fixed — all transfers look identical (DPI masking) |
 | Audit log | SHA3-256 Merkle tree — tamper-evident, public |
-| Infrastructure | Hetzner Frankfurt DE — EU jurisdiction only, no US CLOUD Act |
+| Infrastructure | Hetzner Nuremberg DE (NBG1), EU jurisdiction only, no US CLOUD Act |
+| Outside parties | every one, with status: [deploy/partners.json](deploy/partners.json), public at [paramant.app/partners](https://paramant.app/partners). Mail goes through Resend in the US |
 | Docker | cap_drop ALL, no-new-privileges, read-only rootfs |
 
 **Security audits (April 2026):**
@@ -498,7 +587,7 @@ Every transfer is appended to a public SHA3-256 Merkle tree. The trust model mir
 | What you can prove | How |
 |-------------------|-----|
 | A specific blob was uploaded | `merkle_proof` in `POST /v2/inbound` response |
-| A specific blob was delivered and burned | `X-Paramant-Receipt` header on `GET /v2/outbound` |
+| A specific blob was delivered and burned | `GET /v2/transfers/:receipt_id/receipt`, referenced by `X-Paramant-Receipt-Id` on `GET /v2/outbound` |
 | Receipt is genuine and unmodified | `POST /v2/verify-receipt` |
 | Log has not been forked | `GET /v2/sth/consistency?from=N&to=M` |
 | Peer relays agree on the tree | `GET /v2/sth/peers` |
@@ -523,12 +612,14 @@ open https://relay.paramant.app/ct/
 
 | Regulation | Status | Details |
 |------------|--------|---------|
-| NIS2 (EU 2022/2555) | Ready | [Compliance page](https://paramant.app/compliance/nis2) |
-| NEN 7510 (Healthcare NL) | Ready* | [Compliance page](https://paramant.app/compliance/nen7510) |
-| IEC 62443 (Industrial IoT) | Ready | [Compliance page](https://paramant.app/compliance/iec62443) |
-| DORA (Finance EU) | Ready | NIS2 compliance covers DORA Art. 6 |
+| NIS2 (EU 2022/2555) | Self-assessed | [Docs](https://paramant.app/docs#compliance-nis2) |
+| NEN 7510 (Healthcare NL) | Self-assessed* | [Docs](https://paramant.app/docs#compliance-nen7510) |
+| IEC 62443 (Industrial IoT) | Self-assessed | [Docs](https://paramant.app/docs#compliance-iec62443) |
+| DORA (Finance EU) | Partial | Transit encryption supports DORA Art. 6 (ICT risk management); broader DORA scope not covered |
 | EU CRA 2027 | Designed for | paramant-cra tool + CT log |
-| GDPR Art. 28 | Ready | [DPA](https://paramant.app/dpa) |
+| GDPR Art. 28 | Available | [DPA](https://paramant.app/dpa) |
+
+"Self-assessed" means Paramant's own architectural mapping to the framework, not a certification or audit by an accredited third party.
 
 *NEN 7510: finding #4 (filename in transit RAM) patched in v2.4.5 — filename encrypted in relay RAM and never written to disk.
 

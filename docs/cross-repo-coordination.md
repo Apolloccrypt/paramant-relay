@@ -21,7 +21,7 @@ paramant-core/docs/ARCHITECTURE.md (the authoritative cross-repo overview).
 | Crypto primitives + KATs        | core       | relay      | core ADR-0005/12 |
 | Wire format (bytes on the wire) | relay      | core       | core ADR-0014    |
 | Algorithm registry / IDs        | core       | relay      | core ADR-0007    |
-| Send/ParaShare/ParaDrop envel.  | core       | relay      | core envelope-*  |
+| Send/ParaShare envel.  | core       | relay      | core envelope-*  |
 | Operator tooling / deployment   | relay      | --         | R009             |
 
 Rule of thumb: anything that is "what bytes does a client see" is decided in the

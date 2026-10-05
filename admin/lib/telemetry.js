@@ -1,9 +1,9 @@
 'use strict';
-const { redis } = require('./redis');
+const { redis, scanKeys } = require('./redis');
 
 async function countActiveSessions() {
   let count = 0;
-  for await (const _ of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 200 })) count++;
+  for await (const _ of scanKeys(redis(), { MATCH: 'paramant:user:session:*', COUNT: 200 })) count++;
   return count;
 }
 
@@ -17,7 +17,7 @@ async function getRecentAuditEvents(limit = 20) {
   }
   // Fallback: SCAN (first run before any events written to global ZSET)
   const events = [];
-  for await (const key of redis().scanIterator({ MATCH: 'paramant:user:audit:*', COUNT: 100 })) {
+  for await (const key of scanKeys(redis(), { MATCH: 'paramant:user:audit:*', COUNT: 100 })) {
     const userId = key.split(':').pop();
     const entries = await redis().zRange(key, 0, -1, { REV: true }).catch(() => []);
     for (const entry of entries.slice(0, limit)) {
@@ -30,7 +30,9 @@ async function getRecentAuditEvents(limit = 20) {
 
 async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
   let r;
-  try { r = await relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN); }
+  // reveal=1: k.key is used as the raw Redis id (totp_active/totp/meta) and
+  // surfaced as key_id for per-user actions, so this needs the full value.
+  try { r = await relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN); }
   catch (e) { console.error('[telemetry] relay unavailable:', e.message); return []; }
   const keys = r.body?.keys || [];
   const users = await Promise.all(keys.map(async k => {
@@ -54,10 +56,17 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       key_id: k.key, // internal id for actions (not exposed in list response)
       email: meta.email || k.email || null, label: k.label || null,
       plan: k.plan || 'community', sectors: k.sectors || [],
+      parasign: k.parasign === true, /*MARK:parasign_user*/
+      // Per-product tiers so the panel shows the ParaSign/ParaSend truth, not just
+      // the coarse unified plan. Relay always fills these (stored or derived).
+      plan_parasign: k.plan_parasign || null,
+      plan_parasend: k.plan_parasend || null,
       active: k.active !== false, revoked_at: k.revoked_at || null,
       created, totp_status,
       totp_required: meta.totp_required === true,
       totp_required_at: meta.totp_required_at || null,
+      usage_purpose: k.usage_purpose || null,
+      usage_purpose_at: k.usage_purpose_at || null,
     };
   }));
   return users.filter(Boolean);

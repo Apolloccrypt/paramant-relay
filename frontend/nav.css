@@ -1,5 +1,9 @@
 /* PARAMANT shared navbar v4 — design-system.css v4 tokens only */
 
+/* --nav-paper / --nav-paper-blur: the paper the bar, the drawer and the drawer
+   tail paint themselves in. A page sets them when its own paper is not the
+   cool bone; every page that sets nothing renders exactly as before. */
+
 /* ════════════════════════════════════════
    NAV BAR
    ════════════════════════════════════════ */
@@ -7,9 +11,14 @@ nav.nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* space-between hands all slack to one place, so the last two children end
+     up shoulder to shoulder. On a 390px phone that put the account button
+     against the hamburger, both starting at x=330. A gap is the floor: no two
+     elements in this bar are ever closer than 16px, 12px on a phone. */
+  gap: var(--space-4);
   padding: 0 40px;
   height: 56px;
-  background: rgba(248,250,252,.92);
+  background: var(--bone-blur);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--ink-hair);
@@ -26,6 +35,9 @@ nav.nav .nav-logo {
   letter-spacing: .04em;
   text-decoration: none;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 nav.nav .nav-logo .logo-para { font-weight: 400; color: var(--ink); }
 nav.nav .nav-logo .logo-mant { font-weight: 700; color: var(--cobalt); }
@@ -34,7 +46,7 @@ nav.nav .nav-logo .logo-mant { font-weight: 700; color: var(--cobalt); }
 nav.nav .nav-links {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 2px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -155,9 +167,9 @@ nav.nav .nav-dropdown-menu li a {
 }
 nav.nav .nav-dropdown-menu li a:hover,
 nav.nav .nav-dropdown-menu li a:focus {
-  color: #0B3A6A;
-  background: rgba(178,255,63,0.15);
-  border-left: 2px solid #B2FF3F;
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.15);
+  border-left: 2px solid var(--ochre);
   padding-left: calc(var(--space-5) - 2px);
   outline: none;
 }
@@ -165,20 +177,24 @@ nav.nav .nav-dropdown-menu li a:focus {
 /* ════════════════════════════════════════
    STANDALONE NAV LINKS
    ════════════════════════════════════════ */
+/* PRODUCT SECURITY PRICING DOCS was four words of mono capitals over a page
+   set in sentences. Mono plus uppercase plus letter-spacing is the voice of a
+   terminal, and it read as louder than the headline underneath it. Same four
+   destinations, same order, written the way the page writes. */
 nav.nav .nav-link {
-  color: var(--ink);
-  font-size: var(--text-xs);
-  font-family: var(--mono);
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  padding: var(--space-2) var(--space-3);
+  color: var(--ink-2);
+  font-size: 14px;
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0 var(--space-3);
   text-decoration: none;
-  transition: color var(--duration-base) var(--ease-sharp),
-              box-shadow var(--duration-base) var(--ease-out);
+  transition: color var(--duration-base) var(--ease-sharp);
   white-space: nowrap;
   display: flex;
   align-items: center;
-  height: 32px;
+  min-height: 40px;
   position: relative;
 }
 nav.nav .nav-link::after {
@@ -186,7 +202,7 @@ nav.nav .nav-link::after {
   position: absolute;
   left: var(--space-3);
   right: var(--space-3);
-  bottom: 4px;
+  bottom: 8px;
   height: 2px;
   background: var(--cobalt);
   transform: scaleX(0);
@@ -200,31 +216,71 @@ nav.nav .nav-link.active {
 }
 nav.nav .nav-link.active::after { transform: scaleX(1); }
 
+/* One secondary navigation for account, billing and developer settings. */
+.settings-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 0 24px;
+  padding: 4px;
+  border: 1px solid var(--ink-hair);
+  border-radius: 12px;
+  background: var(--card);
+}
+.settings-tabs a {
+  flex: 0 0 auto;
+  padding: 9px 13px;
+  border-radius: 8px;
+  color: var(--ink-dim);
+  font: 600 12px/1 var(--sans);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.settings-tabs a:hover { color: var(--cobalt); background: rgba(29, 78, 216, .05); }
+.settings-tabs a[aria-current="page"] { color: var(--cobalt); background: rgba(29, 78, 216, .1); }
+.settings-tabs a:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+@media (max-width:520px) {
+  .settings-tabs { gap:2px; padding:3px; }
+  .settings-tabs a { padding:8px; font-size:11px; }
+}
+
 /* ════════════════════════════════════════
    HAMBURGER
    ════════════════════════════════════════ */
 nav.nav .nav-hamburger {
   display: none;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   gap: 5px;
   background: none;
   border: 1px solid var(--ink-hair);
+  border-radius: 3px;
   cursor: pointer;
-  padding: var(--space-2);
-  height: 36px;
-  width: 36px;
+  padding: 0;
+  height: 44px;
+  width: 44px;
+  flex-shrink: 0;
   transition: border-color var(--duration-base) var(--ease-sharp),
               background var(--duration-base) var(--ease-sharp);
 }
 nav.nav .nav-hamburger:hover {
-  border-color: #B2FF3F;
-  background: rgba(178,255,63,0.1);
+  border-color: var(--cobalt);
+  background: rgba(29, 78, 216, .05);
+}
+nav.nav .nav-hamburger:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
 }
 nav.nav .nav-hamburger span {
   display: block;
   width: 22px;
   height: 2px;
+  /* The three bars are the whole button: it has no label. They were painted in
+     --invert, which on the bone site was the navy slab and read as ink, and
+     which the night edition turned into #0C0F11, a shade DEEPER than the bar
+     it sits on. That is 1.09:1 against the nav on a phone, on every page of
+     the site, for the one control that opens the menu. It is the ink now. */
   background: var(--ink);
   transition: transform var(--duration-base) var(--ease-out),
               opacity var(--duration-fast) var(--ease-out);
@@ -250,10 +306,12 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
   display: none;
   position: fixed;
   top: 56px;
+  /* the tail (sign in + help) is pinned to the bottom of the drawer */
+  padding-bottom: 132px;
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bone);
+  background: var(--nav-paper, var(--bone));
   border-top: 1px solid var(--ink-hair);
   z-index: 299;
   overflow-y: auto;
@@ -298,11 +356,11 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
   transition: color var(--duration-base) var(--ease-sharp);
 }
 .nav-mobile-group-btn:hover {
-  background: rgba(178,255,63,0.08);
-  color: #0B3A6A;
+  background: rgba(29, 78, 216, 0.08);
+  color: var(--ink);
 }
-.nav-mobile-group.open .nav-mobile-group-btn { color: #0B3A6A; }
-.nav-mobile-group.open .nav-mobile-group-btn::after { content: '\2212'; color: #B2FF3F; }
+.nav-mobile-group.open .nav-mobile-group-btn { color: var(--ink); }
+.nav-mobile-group.open .nav-mobile-group-btn::after { content: '\2212'; color: var(--lime); }
 
 /* Group items — animated reveal using max-height + opacity */
 .nav-mobile-group-items {
@@ -335,58 +393,95 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
 }
 .nav-mobile-group-items a:hover,
 .nav-mobile-group-items a:focus-visible {
-  color: #0B3A6A;
-  border-left-color: #B2FF3F;
-  background: rgba(178,255,63,0.1);
+  color: var(--ink);
+  border-left-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.1);
   outline: none;
 }
 .nav-mobile-group-items a[aria-current="page"] {
-  color: #0B3A6A;
-  border-left-color: #B2FF3F;
-  background: rgba(178,255,63,0.12);
+  color: var(--ink);
+  border-left-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.12);
   font-weight: 600;
 }
 
 /* Standalone direct link */
 .nav-mobile-standalone {
-  display: block;
-  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 var(--space-5);
   padding-left: calc(var(--space-5) - 2px);
   color: var(--ink);
   text-decoration: none;
-  font-family: var(--mono);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
   border-bottom: 1px solid var(--ink-hair);
   border-left: 2px solid transparent;
   transition: color var(--duration-base) var(--ease-sharp),
               border-left-color var(--duration-base) var(--ease-sharp),
               background var(--duration-base) var(--ease-sharp);
 }
+/* Where you are, and where you would go, are said in the same colour as on the
+   desktop bar: cobalt. The lime wash that used to fill the current row was the
+   loudest thing in a drawer that is otherwise four words. */
 .nav-mobile-standalone:hover,
 .nav-mobile-standalone:focus-visible {
-  color: #0B3A6A;
-  border-left-color: #B2FF3F;
-  background: rgba(178,255,63,0.08);
+  color: var(--cobalt);
+  border-left-color: var(--cobalt);
+  background: rgba(29, 78, 216, .04);
   outline: none;
 }
 .nav-mobile-standalone[aria-current="page"] {
-  color: #0B3A6A;
-  border-left-color: #B2FF3F;
-  background: rgba(178,255,63,0.12);
-  font-weight: 700;
+  color: var(--cobalt);
+  border-left-color: var(--cobalt);
+  background: rgba(29, 78, 216, .06);
+  font-weight: 600;
 }
 
 /* Body scroll lock */
-body.nav-locked { overflow: hidden; }
+body.nav-locked {
+  position: fixed;
+  top: var(--nav-lock-top, 0);
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* When the mobile menu is open, make the top strip + nav fully opaque so the
+   page content behind them cannot bleed through the top. On iOS Safari the nav's
+   backdrop-filter over the dark hero renders see-through, which showed the hero
+   at the top of the open menu. Matches the drawer's --bone so the top and the
+   menu form one continuous opaque surface. */
+body.nav-locked .meta-bar,
+body.nav-locked .nav {
+  background: var(--nav-paper, var(--bone));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body.nav-locked .nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+}
 
 /* ════════════════════════════════════════
    RESPONSIVE
    ════════════════════════════════════════ */
 @media (max-width: 1023px) {
-  nav.nav { padding: 0 24px; }
+  .meta-bar { display: none; }
+  nav.nav {
+    padding: 0 16px;
+    gap: var(--space-3);
+    background: var(--nav-paper, var(--bone));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
   nav.nav .nav-links { display: none !important; }
   nav.nav .nav-hamburger { display: flex; }
 }
@@ -432,7 +527,7 @@ body.nav-locked { overflow: hidden; }
   color: var(--ink-dim);
   line-height: 1.35;
 }
-.nmpl-featured { border-left-color: rgba(29,78,216,.25); }
+.nmpl-featured { border-left-color: rgba(29, 78, 216, .25); }
 .nmpl-featured .nmpl-title { color: var(--cobalt); }
 
 /* Desktop Products dropdown — title + tagline */
@@ -460,7 +555,7 @@ body.nav-locked { overflow: hidden; }
   letter-spacing: 0;
   font-weight: 400;
 }
-.nav-product-item:hover .npi-title { color: #0B3A6A; }
+.nav-product-item:hover .npi-title { color: var(--ink); }
 
 /* Plain-link "buttons" — Compare and Pricing */
 nav.nav .nav-link-btn {
@@ -482,20 +577,20 @@ nav.nav .nav-link-btn:hover {
   position: absolute;
   top: -200px;
   left: 0;
-  background: var(--navy, #0B3A6A);
-  color: #F8FAFC;
+  background: var(--invert);
+  color: var(--bone-on-navy, #FFFFFF);   /* --ink is the navy itself: text on its own ground */
   padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;
   font-family: var(--mono);
   font-size: var(--text-xs);
   letter-spacing: .04em;
-  border: 2px solid #B2FF3F;
+  border: 2px solid var(--ochre);
   transition: top 120ms ease;
 }
-.skip-link:focus,
-.skip-link:focus-visible { top: 0; outline: none; }
-.skip-link:focus:hover { background: #1D4ED8; }
+.skip-link:focus { top: 0; outline: none; }
+.skip-link:focus-visible { top: 0; outline: 3px solid var(--cobalt); outline-offset: 2px; }
+.skip-link:focus:hover { background: var(--ochre); }
 
 /* ════════════════════════════════════════
    MOBILE NAV CTA + META
@@ -531,8 +626,8 @@ nav.nav .nav-link-btn:hover {
               color var(--duration-base) var(--ease-sharp);
 }
 .btn-ghost-dark:hover {
-  background: var(--ink);
-  color: #F8FAFC;
+  background: var(--invert);
+  color: var(--ink);
 }
 .nav-mobile-meta {
   padding: var(--space-3) var(--space-5) var(--space-5);
@@ -544,4 +639,343 @@ nav.nav .nav-link-btn:hover {
   gap: var(--space-2);
   letter-spacing: .04em;
 }
-.nav-mobile-meta .meta-sep { color: #B2FF3F; }
+.nav-mobile-meta .meta-sep { color: var(--lime); }
+
+/* Beeldmerk-logo: de blauwe P met lime stip als de P van Paramant. */
+nav.nav .nav-logo { display: inline-flex; align-items: center; gap: 0; color: var(--ink); font-weight: 600; }
+nav.nav .nav-logo-mark { height: 20px; width: 20px; border-radius: 4px; margin-right: 1px; display: block; }
+
+/* ════════════════════════════════════════
+   THE RIGHT-HAND SIDE: HELP, SIGN IN, ONE BUTTON
+   Moved here out of design-system.css. The bar used to live in two
+   stylesheets, and the half in design-system.css answered a narrow phone by
+   shrinking: 9px type, 5px padding, the Help border dropped. Small is not the
+   same as roomy. Below 1024px the two text links step aside instead, and what
+   stays is one action a thumb can hit.
+   ════════════════════════════════════════ */
+nav.nav .nav-auth {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+}
+
+nav.nav .nav-help,
+nav.nav .nav-signin {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-1);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: none;
+  background: none;
+  white-space: nowrap;
+  transition: color var(--duration-base) var(--ease-sharp);
+}
+nav.nav .nav-help:hover,
+nav.nav .nav-signin:hover { color: var(--cobalt); }
+nav.nav .nav-help:focus-visible,
+nav.nav .nav-signin:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
+}
+
+/* The one filled button on the page is cobalt, on the homepage and here. It
+   was lime, which is the punctuation colour of this brand and not the colour
+   of its primary action; next to a cobalt hero button it read as a second,
+   competing offer. */
+nav.nav .nav-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  background: var(--cobalt);
+  color: var(--on-ochre);
+  border: 1px solid var(--cobalt);
+  border-radius: 3px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--duration-base) var(--ease-sharp),
+              border-color var(--duration-base) var(--ease-sharp);
+}
+nav.nav .nav-cta:hover {
+  background: var(--cobalt-2);
+  border-color: var(--cobalt-2);
+  color: var(--ink);
+}
+nav.nav .nav-cta:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
+}
+
+/* Signed in: the email is the control, so it is set in the reading face. */
+nav.nav .nav-user { position: relative; flex-shrink: 0; }
+nav.nav .nav-user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 1px solid var(--ink-hair);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  transition: border-color var(--duration-base) var(--ease-sharp);
+}
+nav.nav .nav-user-trigger:hover { border-color: var(--cobalt); }
+nav.nav .nav-user-trigger:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
+}
+nav.nav .nav-user-email {
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+nav.nav .nav-user-chevron { font-size: 10px; color: var(--ink-2); }
+
+nav.nav .nav-user-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  background: var(--bone);
+  border: 1px solid var(--ink-hair);
+  border-radius: 3px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .08);
+  padding: var(--space-1) 0;
+  z-index: 400;
+}
+nav.nav .nav-user-menu[hidden] { display: none; }
+nav.nav .nav-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+nav.nav .nav-menu-item:hover { background: rgba(29, 78, 216, .06); color: var(--cobalt); }
+nav.nav .nav-menu-signout { color: var(--brick-ink); }
+nav.nav .nav-menu-signout:hover { background: rgba(196, 96, 79, .06); color: var(--brick-ink); }
+nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: var(--space-1) 0; }
+
+@media (max-width: 420px) {
+  nav.nav .nav-user-email { max-width: 12ch; }
+}
+
+/* ════════════════════════════════════════
+   DRAWER TAIL: SIGN IN AND HELP ON A PHONE
+   It sits outside #nav-mobile on purpose. js/nav-auth.js rewrites the whole
+   inside of that drawer after the session check, and tests/navigation-shell
+   pins its contents to exactly the four destinations of the desktop bar. So
+   the two secondary routes hang under it as their own strip, pinned to the
+   bottom edge where a thumb reaches.
+
+   Signed in the strip is still here and carries Help alone. It used to be
+   deleted, and since the bar drops .nav-help below 700px and the drawer is
+   pinned to the five workspace links, that left a paying customer on a phone
+   with no route to support anywhere.
+   ════════════════════════════════════════ */
+.nav-mobile-tail {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 301;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--nav-paper, var(--bone));
+  border-top: 1px solid var(--ink-hair);
+}
+.nav-mobile-tail.open { display: flex; }
+.nav-mobile-tail a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  font-family: var(--sans);
+  font-size: 15px;
+  text-decoration: none;
+  border-radius: 3px;
+}
+.nav-mobile-tail .nav-tail-btn {
+  color: var(--ink);
+  font-weight: 600;
+  border: 1px solid var(--ink-hair);
+}
+.nav-mobile-tail .nav-tail-btn:hover { border-color: var(--cobalt); color: var(--cobalt); }
+.nav-mobile-tail .nav-tail-link {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.nav-mobile-tail .nav-tail-link:hover { color: var(--cobalt); }
+.nav-mobile-tail a:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
+}
+
+/* ════════════════════════════════════════
+   THE PHONE BAR
+   Last block in the file on purpose: it overrides the rules above it, which
+   have the same specificity, and CSS settles a tie by order.
+
+   The hamburger appears below 1024px, but the crowding it was hiding is a
+   phone problem, not a tablet one: at 820px five elements have room to
+   breathe, at 390px they had 60px of slack between them and the button ended
+   up against the hamburger. So the bar sheds its two text links at 700px, not
+   at 1024px. A tablet keeps Help and Sign in where they were.
+   ════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  nav.nav .nav-auth { gap: var(--space-3); }
+  nav.nav .nav-cta,
+  nav.nav .nav-user-trigger,
+  nav.nav .nav-help,
+  nav.nav .nav-signin { min-height: 44px; }
+}
+@media (max-width: 700px) {
+  /* One primary action beside the menu button. Sign in and Help are one tap
+     away, at the bottom of the drawer, where there is room to hit them. */
+  nav.nav .nav-help,
+  nav.nav .nav-signin { display: none; }
+}
+/* The drawer tail carries what the bar handed over, so it exists exactly where
+   the bar handed something over. */
+@media (min-width: 701px) {
+  .nav-mobile-tail { display: none !important; }
+}
+
+/* ════════════════════════════════════════
+   LANGUAGE SWITCH  (NL | EN, stamped by apply-nav.py)
+   The current language is marked with aria-current and drawn solid; the
+   other is a plain link to the same page in that language. In the bar from
+   701px up. Below that the phone bar keeps one action beside the menu button,
+   and the same switch sits in the strip under the drawer, where Sign in and
+   Help already went.
+   ════════════════════════════════════════ */
+.nav-lang {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+.nav-lang a,
+.nav-mobile-tail .nav-lang a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 44px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: none;
+}
+.nav-lang a:hover { color: var(--cobalt); }
+.nav-lang a[aria-current] {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.nav-lang a:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
+}
+.nav-lang-sep { color: var(--ink-2); padding: 0 2px; }
+@media (max-width: 700px) {
+  nav.nav .nav-lang { display: none; }
+}
+
+/* ════════════════════════════════════════
+   THEME SWITCH  (sun | moon, stamped by apply-nav.py beside NL | EN)
+   Same form and weight as the language switch: two halves and a bar, the
+   current edition drawn in the ink and underlined, the other in --ink-2.
+   One button; aria-pressed="true" means the dark edition is on. The marking
+   follows <html data-theme>, which /js/theme.js writes before the first
+   paint, so the switch never shows the wrong half, not even for a frame.
+   In the bar from 701px up; below that it sits with NL | EN in the strip
+   under the drawer.
+   ════════════════════════════════════════ */
+.nav-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.nav-theme-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 44px;
+  color: var(--ink-2);
+}
+.nav-theme-opt .nav-theme-icon {
+  padding-bottom: 3px;
+  border-bottom: 1.5px solid transparent;
+  box-sizing: content-box;
+}
+.nav-theme-sep { color: var(--ink-2); padding: 0 2px; }
+:root:not([data-theme="dark"]) .nav-theme-light,
+:root[data-theme="dark"] .nav-theme-dark { color: var(--ink); }
+:root:not([data-theme="dark"]) .nav-theme-light .nav-theme-icon,
+:root[data-theme="dark"] .nav-theme-dark .nav-theme-icon { border-bottom-color: currentColor; }
+.nav-theme:hover .nav-theme-opt { color: var(--cobalt); }
+.nav-theme:focus-visible {
+  outline: 3px solid var(--accent-ring, rgba(29, 78, 216, .35));
+  outline-offset: 2px;
+}
+/* In the strip the two switches share one row. */
+.nav-mobile-tail .nav-prefs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+@media (max-width: 700px) {
+  nav.nav .nav-theme { display: none; }
+}

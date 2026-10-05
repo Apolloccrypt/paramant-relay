@@ -1,20 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Privacy Policy — PARAMANT</title>
-<meta name="description" content="PARAMANT privacy policy. No personal data collected. RAM-only storage. GDPR/EU. No US CLOUD Act.">
-<meta property="og:title" content="Privacy Policy — PARAMANT">
-<meta property="og:description" content="PARAMANT privacy policy. No personal data collected. RAM-only storage. GDPR/EU. No US CLOUD Act.">
+<title>Privacybeleid · Wat we bewaren en wat niet · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU).">
+<meta property="og:title" content="Privacybeleid · Wat we bewaren en wat niet · Paramant">
+<meta property="og:description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU).">
 <meta property="og:url" content="https://paramant.app/privacy">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Privacy Policy — PARAMANT">
-<meta name="twitter:description" content="PARAMANT privacy policy. No personal data collected. RAM-only storage. GDPR/EU. No US CLOUD Act.">
+<meta name="twitter:title" content="Privacybeleid · Wat we bewaren en wat niet · Paramant">
+<meta name="twitter:description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU).">
 <link rel="canonical" href="https://paramant.app/privacy">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/privacy">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/privacy">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/privacy">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -22,8 +29,9 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 .content{max-width:800px;margin:80px auto;padding:0 48px}
@@ -55,9 +63,9 @@ footer a{color:var(--ink);text-decoration:none}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -68,26 +76,26 @@ footer a{color:var(--ink);text-decoration:none}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -96,311 +104,269 @@ footer a{color:var(--ink);text-decoration:none}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/privacy#webpage",
+      "url": "https://paramant.app/privacy",
+      "name": "Privacybeleid · Wat we bewaren en wat niet · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU)."
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/privacy" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/privacy" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/privacy" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/privacy" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
+</div>
+<main id="main-content" tabindex="-1">
 
 <div class="content">
 
-<h1>Privacy Policy</h1>
-<p class="updated">Last updated: April 2, 2026</p>
+<h1>Privacybeleid</h1>
+<p class="updated">Laatst bijgewerkt: 4 september 2026</p>
+<p class="lang-prevails">Bij verschil tussen de Nederlandse en de Engelse tekst geldt de Nederlandse versie. De Engelse tekst staat op <a href="/en/privacy" hreflang="en" lang="en">/en/privacy</a>.</p>
 
-<h2>Core principle</h2>
-<p><strong>PARAMANT collects only what is strictly required to operate your account.</strong></p>
-<p>An email address is required to create an account and recover access. No phone number. No IP logging (beyond what Cloudflare handles in transit). Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements.</p>
+<h2>Uitgangspunt</h2>
+<p><strong>PARAMANT verzamelt alleen wat strikt nodig is om uw account te beheren en de dienst te leveren.</strong></p>
+<p>Voor het aanmaken van een account en het herstellen van de toegang is een e-mailadres nodig; dat is een persoonsgegeven, en het wordt opgeslagen. Geen telefoonnummer. Wij loggen geen IP-adressen voor analyse of profilering. Een IP-adres wordt alleen verwerkt voor beveiliging en het voorkomen van misbruik (rate limiting, het sessierecord, een auditlog en de registratie van ondertekeningen van de verwerkersovereenkomst). Het audittrail bewaart een gemaskeerd adres tot 400 dagen, en één log bewaart een volledig adres langer dan welke timer ook; beide worden hieronder genoemd. Alleen een strikt noodzakelijke sessiecookie (geen trackingcookies). Geen trackingpixels. Geen analytics. Geen advertenties. Wij verkopen uw gegevens nooit.</p>
 
-<h2>How Ghost Pipe &amp; ParaShare work</h2>
-<p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. The only data persisted to disk is cryptographic hashes in the public Certificate Transparency log — no file content, no keys, no plaintext.</p>
-<p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
+<h2>Hoe versturen werkt (de webapp Versturen)</h2>
+<p>Bestanden die u via de webapp verstuurt, worden <strong>aan de clientzijde in uw browser</strong> versleuteld met post-kwantumcryptografie (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256), voordat ze onze servers bereiken. Op die route ziet de relay nooit plaintext. De enige plek waar dat wel gebeurt, is de gehoste ondertekenprocedure via de <code>/v1</code>-API: daar wordt het document naar ons gestuurd, zodat wij de procedure kunnen uitvoeren. Wij bewaren het, in rust verzegeld onder onze eigen sleutel, tot die envelop afloopt.</p>
+<p>Bestanden worden opgesplitst in versleutelde blokken van 5 MB. Elk blok bestaat alleen in het RAM-geheugen van onze relayserver. Op het Community-plan wordt het na de eerste download permanent en onherroepelijk vernietigd (<strong>burn-on-read</strong>); een betaald plan geeft via de API meer leesbeurten per link vóór diezelfde vernietiging, tot 10 op Firm en 100 op Enterprise. Versleutelde payloaddata wordt nooit naar schijf geschreven. Van een <em>overdracht</em> wordt alleen dit op schijf bewaard: cryptografische hashes in het openbare Certificate Transparency-log. Geen bestandsinhoud, geen sleutels, geen plaintext. (Accountgegevens, hieronder vermeld, worden apart opgeslagen om uw account te beheren.)</p>
+<p>Blobs op het Community-plan verlopen na maximaal 1 uur. Firm-blobs na 24 uur. Enterprise-blobs na 7 dagen. Alle blobs worden eerder vernietigd zodra de laatste leesbeurt van de link is gebruikt.</p>
 
-<h2>What we process</h2>
+<h2>Hoe documenten bij Ondertekenen worden bezorgd</h2>
+<p>Als u om handtekeningen vraagt, versleutelt uw browser het document met AES-256-GCM voordat het wordt geüpload. De ondertekenrelay bewaart de versleutelde capsule bij de envelop tot die verloopt: 30 dagen, tenzij het verzoek om een andere termijn vraagt, en nooit langer dan 365 dagen. De relay ontvangt geen plaintext van het document en niet de documentsleutel. De persoonlijke ondertekenlink bevat de sleutel in het fragment van de URL; browsers sturen dat fragment niet naar de relay.</p>
+<p>Als een ondertekenaar een zichtbaar zegel of een datum plaatst, bewaart de relay in de envelop het type van het ondertekende veld, het paginanummer en genormaliseerde coördinaten. De relay ontvangt geen documenttekst, geen getekende handtekeningafbeelding en geen vrije veldinhoud. De plaatsing valt onder de ML-DSA-65-handtekening van de ondertekenaar.</p>
+<p>De ontvanger moet ook inloggen met precies het uitgenodigde e-mailadres. Met alleen de link kan de ciphertext niet worden opgehaald. Kiest u voor bezorging per e-mail via Paramant, dan verwerkt Resend Inc. (Verenigde Staten) het adres van de ontvanger, het bericht en de volledige ondertekenlink. Resend ontvangt geen plaintext van het document en geen sleutel. U kunt ook links aanmaken zonder e-mail te versturen.</p>
+
+<h2>Wat wij verwerken</h2>
 <table>
-<thead><tr><th>Data</th><th>Purpose</th><th>Storage</th><th>Shared</th></tr></thead>
+<thead><tr><th>Gegevens</th><th>Doel</th><th>Opslag</th><th>Gedeeld met</th></tr></thead>
 <tbody>
-<tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
-<tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
-<tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
-<tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
-<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA-256 one-way hash only</td><td>Never</td></tr>
-<tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
+<tr><td>Versleutelde blob (opgevulde blokken van 5 MB)</td><td>Eenmalige beveiligde overdracht</td><td>Alleen RAM &middot; burn-on-read</td><td>Nooit</td></tr>
+<tr><td>Versleutelde documentcapsule van Ondertekenen</td><td>Het document bezorgen bij een ondertekenverzoek</td><td>Redis &middot; verloopt met de envelop</td><td>Hostingprovider slaat alleen ciphertext op</td></tr>
+<tr><td>Persoonlijke uitnodigingslink van Ondertekenen</td><td>Eén ontvanger koppelen aan één versleuteld document en één ondertekenplek</td><td>Verwerkt tijdens de bezorging; niet in applicatielogs geschreven</td><td>Resend (Verenigde Staten), alleen als u kiest voor bezorging per e-mail</td></tr>
+<tr><td>SHA-256-hash van de blob</td><td>Routering en bevestiging van bezorging</td><td>Alleen RAM &middot; verwijderd na de laatste leesbeurt</td><td>Nooit</td></tr>
+<tr><td>API-sleutel (Firm/Enterprise)</td><td>Authenticatie en rate limiting</td><td>Bij het opstarten uit de configuratie geladen</td><td>Nooit</td></tr>
+<tr><td>Apparaat-ID (SDK-gebruikers)</td><td>Sleutelroutering tussen verzender en ontvanger</td><td>Alleen RAM &middot; gewist bij herstart</td><td>Nooit</td></tr>
+<tr><td>Hash van apparaat-ID (CT-log)</td><td>Openbaar, manipulatiebestendig auditlog</td><td>Schijf &middot; /data/ct-log.json &middot; alleen een eenrichtingshash (SHA3-256)</td><td>Nooit</td></tr>
+<tr><td>Ondertekend bezorgbewijs</td><td>Bewijs dat een overdracht is bezorgd</td><td>Redis &middot; 15 minuten, daarna verwijderd</td><td>Nooit</td></tr>
+<tr><td>Geaggregeerde relaystatistieken</td><td>Bewaking van de systeemgezondheid</td><td>Alleen tellers in het proces</td><td>Nooit</td></tr>
+<tr><td>E-mailadres</td><td>Accountidentiteit, inloggen, herstel, bezorging van ondertekenuitnodigingen</td><td>Opgeslagen (server) &middot; ook bewaard als hash voor rate limiting</td><td>E-mailprovider (Resend, Verenigde Staten) voor berichten die wij u sturen</td></tr>
+<tr><td>Inlogfactoren: publieke sleutels van passkeys, TOTP-geheim (versleuteld), herstelcodes (gehasht)</td><td>Authenticatie van het account</td><td>Opgeslagen (server)</td><td>Nooit</td></tr>
+<tr><td>Publieke ondertekensleutel + vingerafdruk voor Ondertekenen</td><td>Verifieerbare ondertekenidentiteit</td><td>Opgeslagen (server) &middot; alleen de publieke helft; de privésleutel verlaat uw browser nooit</td><td>Openbaar (de hash staat in het CT-log)</td></tr>
+<tr><td>Plan + geanonimiseerde factuurreferentie</td><td>Facturering Firm/Enterprise</td><td>Opgeslagen (server)</td><td>Betaalverwerker (Mollie, EU)</td></tr>
+<tr><td>IP-adres van de client + user-agent</td><td>Beveiliging, rate limiting</td><td>TTL van sessie/rate limit</td><td>Nooit</td></tr>
+<tr><td>Gemaskeerd IP-adres in het auditlog (1.2.x.x)</td><td>Audittrail van het account</td><td>Redis &middot; hooguit 400 dagen, en hooguit 1000 regels per account</td><td>Nooit</td></tr>
 </tbody>
 </table>
 
-<h2>What we never do</h2>
+<h2>Wat wij nooit doen</h2>
 <ul>
-<li>Store personal data of any kind</li>
-<li>Log or store IP addresses beyond what Cloudflare handles in transit</li>
-<li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
-<li>Run advertising or tracking scripts</li>
-<li>Share any data with third parties</li>
-<li>Write file data to disk at any point</li>
+<li>Uw gegevens verkopen, of gebruiken voor advertenties of profilering</li>
+<li>IP-adressen loggen of opslaan voor analyse of profilering (een IP-adres wordt alleen gebruikt voor beveiliging en het voorkomen van misbruik, in de logs die hieronder worden genoemd)</li>
+<li>Trackingcookies of browserfingerprinting gebruiken (na het inloggen wordt alleen een strikt noodzakelijke sessiecookie geplaatst)</li>
+<li>Advertentie- of trackingscripts draaien</li>
+<li>Uw gegevens delen met derden, behalve de operationele subverwerkers die nodig zijn om de dienst te leveren (hosting, transactionele e-mail en betalingen, hieronder vermeld)</li>
+<li>Payloads van overdrachten via Ghost Pipe of Versturen (de webapp) naar schijf schrijven. Documenten van ondertekenverzoeken via Ondertekenen zijn anders: hun versleutelde capsule kan worden bewaard tot de envelop verloopt.</li>
+<li>Lettertypen, scripts, stijlen of andere bronnen laden van een derde partij. Alles wordt zelf gehost op paramant.app</li>
 </ul>
 
-<h2>Local storage in your browser</h2>
-<p>For technical functionality, the following data is stored locally in your browser only. It never leaves your device:</p>
+<h2>Geen verzoeken naar derden</h2>
+<p><strong>Elke byte die uw browser op paramant.app laadt, komt van paramant.app.</strong> Geen weblettertypen van Google, geen JavaScript of CSS van een CDN, geen analytics, geen trackingpixels, geen ingesloten widgets van derden. Open de netwerkinspector van uw browser op een willekeurige pagina: elk verzoek gaat naar één herkomst, en nergens anders heen.</p>
+<p>Dit is bewust. Eén verzoek naar een derde partij lekt uw IP-adres en de pagina die u bekijkt naar die partij, nog voordat u ergens mee hebt ingestemd. Daarom hosten wij alles zelf: lettertypen (een gewone reeks systeemlettertypen, er worden geen lettertypebestanden gedownload), scripts, stijlen en afbeeldingen komen allemaal van paramant.app.</p>
+<p>Wat de dienst laat draaien, is operationeel en nooit tracking: onze eigen edge (Caddy) beëindigt TLS rechtstreeks op onze server (zie hieronder); transactionele e-mail wordt aan de serverkant verstuurd via onze e-mailprovider; en een betaalverwerker handelt de facturering af op zijn eigen pagina's. Geen van deze wordt in de site geladen, en geen ervan volgt u door de site.</p>
+
+<h2>Lokale opslag in uw browser</h2>
+<p>Voor technische functionaliteit worden de volgende gegevens alleen lokaal in uw browser opgeslagen. Ze verlaten uw apparaat nooit:</p>
 <ul>
-<li><strong>ECDH + ML-KEM key pairs</strong> &mdash; generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
-<li><strong>Nonce registry</strong> &mdash; replay-attack protection (SDK sessions)</li>
-<li><strong>Free tier usage counter</strong> (<code>ps_free_uses</code>) &mdash; today's date and upload count, used to enforce the 10/day limit client-side</li>
-<li><strong>Docs access key</strong> (<code>pm_docs_key</code>) &mdash; stored if you authenticate to the Docs with a paid API key</li>
+<li><strong>ECDH- + ML-KEM-sleutelparen</strong>: lokaal aangemaakt voor end-to-end-versleuteling (SDK- / Ghost Pipe-sessies)</li>
+<li><strong>Nonce-register</strong>: bescherming tegen replay-aanvallen (SDK-sessies)</li>
+<li><strong>Statusgeschiedenis</strong> (<code>paramant_status_v1</code>): de controles van de relaygezondheid uit de afgelopen 24 uur die uw eigen browser op de statuspagina heeft uitgevoerd</li>
+<li><strong>Sjabloon voor de plaats van de handtekening</strong> (<code>parasign.placement.tpl.v1</code>): waar u de laatste keer een zegel op een pagina plaatste, zodat het volgende document op dezelfde manier opent</li>
+<li><strong>Geziene vingerafdrukken van ondertekensleutels</strong> (<code>paramant_fp_&hellip;</code>): een markering per ondertekensleutel die u al te zien kreeg, zodat een bekende sleutel niet als nieuw wordt gemarkeerd</li>
+<li><strong>Weggeklikte melding over het instellen van de sleutel</strong> (<code>paramant.keysetup.dismissed.v1</code>): dat u de banner over de ondertekensleutel op uw dashboard hebt gesloten</li>
+<li><strong>Een cadeaucode die u nog niet hebt gebruikt</strong> (<code>paramant.redeem.code</code>): de code die u op <a href="/redeem">/redeem</a> typte voordat u een account had. Een code geeft op zichzelf niets en is nergens een sleutel toe; hij wordt alleen bewaard zodat het aanmaken van een account, dat wordt afgerond via een link in uw e-mail, u de code niet kost. Hij wordt verwijderd zodra de code is gebruikt.</li>
+<li><strong>Weergave</strong> (<code>paramant.theme.v1</code>): of u de site uw systeem wilt laten volgen, licht wilt houden of donker wilt maken, gekozen op /account of met de zon en maan in de menubalk. Zonder deze instelling volgt de site uw systeem. Er wordt niets naar ons gestuurd; de keuze staat alleen in deze browser en op dit apparaat.</li>
+<li><strong>Passkey- / WebAuthn-inloggegevens</strong>: de privésleutel van uw passkey wordt aangemaakt en bewaard door uw apparaat of wachtwoordbeheerder. PARAMANT slaat alleen de <em>publieke</em> sleutel op, aan de serverkant; de privésleutel verlaat uw apparaat nooit.</li>
+<li><strong>Ondertekenkluis van Ondertekenen</strong> (IndexedDB): als u documenten ondertekent, wordt uw post-kwantum ondertekensleutel (ML-DSA-65) aangemaakt en bewaard in de IndexedDB van uw browser, versleuteld met uw passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) of, als uw passkeyprovider dat niet kan, met een wachtwoordzin (PBKDF2 &rarr; AES-256-GCM). De privésleutel verlaat uw apparaat nooit; alleen de publieke helft wordt aan uw account gekoppeld.</li>
 </ul>
-<p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
+<p>U kunt alle lokale gegevens op elk moment verwijderen: browserinstellingen &rarr; paramant.app &rarr; Sitegegevens wissen.</p>
 
-<h2>Servers &amp; jurisdiction</h2>
-<p>All relay servers run on <strong>Hetzner</strong> infrastructure in <strong>Frankfurt, Germany (EU/DE)</strong>. There is no infrastructure in the United States or outside the EU. No CLOUD Act exposure. All data is subject to EU/GDPR jurisdiction only.</p>
+<h2>Uw API-sleutel, en welke pagina's hem bevatten</h2>
+<p>Uw account heeft een API-sleutel. Die staat op onze servers; niets in de lijst hierboven bewaart hem in uw browser, en geen enkele pagina schrijft hem naar lokale opslag. Sommige pagina's laden hem wel in het geheugen zolang hun tabblad open is. Wij noemen die pagina's liever dan dat u moet raden.</p>
+<ul>
+<li><strong>Een bestand versturen (<code>/parashare</code>) doet dat niet.</strong> Die pagina vraagt onze server in plaats daarvan om een <em>sessietoken</em>. Dat token leeft vijftien minuten, de relay accepteert het bij de zeven verzoeken die een overdracht doet en weigert het bij al het andere, en het staat alleen in het geheugen van de pagina: als u het tabblad sluit, houdt het op. Als u uw API-sleutel intrekt, worden alle tokens die ermee zijn aangemaakt ook ingetrokken. Op een zelf gehoste relay zonder ons beheerpaneel kunt u op die pagina nog steeds met de hand een sleutel invoeren. Die staat dan in die browser zolang het tabblad open is, en daarom zegt de pagina dat op de plek waar ze die mogelijkheid biedt.</li>
+<li><strong>Uw accountpagina (<code>/account</code>) doet dat wel, maar alleen als u erom vraagt.</strong> Uw sleutel tonen is waar die pagina voor is, dus het is de enige pagina die hem nog laadt. Pas het openen van <em>Advanced account key</em> haalt hem op; bij een bezoek waarbij die sectie nooit wordt geopend, vraagt de pagina onze server helemaal niet om de sleutel, en staat er niets van op de pagina.</li>
+<li><strong>De prijspagina en het dashboard (<code>/pricing</code>, <code>/dashboard</code>) doen dat niet meer.</strong> Zij authenticeerden zich vroeger bij de relay met de sleutel zelf, om het afrekenen te starten en uw geschiedenis te lezen. Nu gebruiken zij dezelfde soort sessietoken als de verstuurpagina: een ander token, aangemaakt voor die pagina's, dat de relay accepteert bij vijf verzoeken (het afrekenen starten, een cadeaucode op uw eigen account inwisselen, uw eigen geschiedenis lezen, uw eigen ondertekenaudit exporteren, en de lijst lezen van documenten die op uw handtekening wachten) en weigert bij al het andere. Het is niet het token van de verstuurpagina en kan niet wat dat token kan, en andersom ook niet.</li>
+</ul>
+<p>Niets op deze lijst overleeft het tabblad. Als u de pagina sluit, houdt het op, en een later bezoek begint weer bij de server.</p>
 
-<h2>Cloudflare</h2>
-<p>Incoming traffic passes through a <strong>Cloudflare Tunnel</strong> for DDoS protection and SSL termination. Cloudflare acts as a reverse proxy and may log connection metadata (IP address, timestamp, bytes transferred) in accordance with their own privacy policy. PARAMANT does not receive, store, or use this metadata. No Cloudflare analytics, Workers, or tracking products are in use.</p>
+<h2>Servers en rechtsbevoegdheid</h2>
+<p>Alle relayservers draaien op infrastructuur van <strong>Hetzner</strong> in <strong>Neurenberg, Duitsland (EU/DE)</strong>. Er is geen infrastructuur in de Verenigde Staten of buiten de EU. Geen blootstelling aan de CLOUD Act voor bestanden en sleutels: die vallen uitsluitend onder de rechtsbevoegdheid van de EU en de AVG. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Zie de subverwerkers hieronder.</p>
 
-<h2>Payments (Pro / Enterprise)</h2>
-<p>Payment processing is handled by <strong>Stripe</strong>. PARAMANT never sees or stores full card numbers. Stripe's privacy policy governs the payment data they handle. Only your chosen plan and an anonymised customer reference are stored on our side.</p>
+<h2>Netwerkrand (edge)</h2>
+<p>TLS wordt beëindigd door <strong>onze eigen edge (Caddy)</strong>, die draait op dezelfde Hetzner-infrastructuur in Duitsland, met post-kwantum sleuteluitwisseling. Er staat geen reverse proxy of CDN van een derde partij voor de site: uw verbinding bereikt onze server en verder niets. Kortlevende verbindingsmetadata (IP-adres, tijdstempel) wordt kortstondig verwerkt voor beveiliging en het voorkomen van misbruik, zoals hierboven beschreven, en nooit voor analyse.</p>
 
-<h2>GDPR / AVG</h2>
-<p>Because virtually no personal data is processed, standard heavy administrative obligations under GDPR do not apply to most interactions. For Pro and Enterprise customers, we provide a <strong>Data Processing Agreement (DPA)</strong> on request.</p>
-<p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Free, 24 hours for Pro, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
+<h2>Logs die een adres bevatten</h2>
+<p>Eén log bevat een volledig clientadres, en dat log wordt niet begrensd door een timer. Wij noemen het liever met name dan dat we ons verschuilen achter het woord &ldquo;kortstondig&rdquo;.</p>
+<ul>
+<li><strong>Toegangslog van de edge.</strong> Onze eigen edge schrijft een servertoegangslog met het clientadres, het tijdstip, het pad en de user-agent. Wij lezen het om echte bezoekers te onderscheiden van scanners, nooit om een profiel van een persoon op te bouwen, en het wordt aan niemand geëxporteerd. De nginx-configuratie in deze repository logt niets; de edge die ervoor staat wel.</li>
+<li><strong>Auditlog van het account.</strong> Elke auditregel bewaart het netwerkdeel van het adres en laat het hostdeel weg, zodat er nooit een volledig adres wordt geschreven: 1.2.x.x voor IPv4 en de eerste twee groepen voor IPv6. Regels worden op twee manieren begrensd, naar leeftijd en naar aantal: niets ouder dan 400 dagen blijft bestaan, en een account bewaart hooguit zijn laatste 1000 regels. De 400 dagen zijn een standaardwaarde die een beheerder kan wijzigen.</li>
+<li><strong>Servicelog van het beheer, ter vergelijking.</strong> Drie operationele regels schrijven over een aanmeldpoging, een openstaande aanmelding en een verzoek om een tweede factor te resetten waarop een rate limit is toegepast. Die bevatten vroeger het volledige adres, en één ervan het e-mailadres van het account in leesbare tekst. Dat doen ze niet meer: een adres wordt ingekort tot het netwerk voordat het wordt geschreven (203.0.113.x voor IPv4, de eerste drie groepen voor IPv6), en van een e-mailadres blijven één teken en het domein over (d***@example.com). Wat in het containerlog terechtkomt, is wat daarna overblijft.</li>
+</ul>
+<p>Geen van deze logs wordt gebruikt voor analyse, profilering of advertenties, en geen ervan wordt gedeeld met een derde partij.</p>
 
-<h2>Children</h2>
-<p>PARAMANT is not directed at children under 13. We do not knowingly collect data from minors.</p>
+<h2>Subverwerkers</h2>
+<p>Een paar operationele providers zijn nodig om de dienst te leveren. Geen ervan wordt in de site geladen, en geen ervan wordt gebruikt voor tracking:</p>
+<ul>
+<li><strong>Hetzner</strong> (Duitsland, EU): hosting en infrastructuur.</li>
+<li><strong>Bunny.net</strong> (Slovenië, EU): DNS-hosting voor paramant.app. Het beantwoordt het opzoeken van onze naam; het is geen CDN of proxy, en er gaat geen verzoek om een pagina of een bestand doorheen.</li>
+<li><strong>Resend</strong> (Plus Five Five, Inc., Verenigde Staten): alleen transactionele e-mail (accountverificatie, ondertekenuitnodigingen, berichten over facturering, en uitnodigingen om een bestand op te halen dat naar genoemde ontvangers is verstuurd). Resend ontvangt het e-mailadres, het onderwerp en het bericht met de link. Voor een ondertekenuitnodiging is dat de volledige persoonlijke link. Voor een verzending naar genoemde ontvangers ontvangt Resend ook de bestandsnaam die de afzender koos, en een eenmalige link; de sleutel die het bestand opent, is ingepakt en blijft bij ons, dus de link alleen opent niets. Resend ontvangt nooit het document of een sleutel en wordt nooit gebruikt voor marketing. De doorgifte naar de Verenigde Staten is gedekt door de standaardcontractbepalingen (Uitvoeringsbesluit (EU) 2021/914 van de Europese Commissie). Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder.</li>
+<li><strong>Mollie</strong> (een Nederlands bedrijf, EU-rechtsbevoegdheid, vanaf het begin ingericht op de AVG): betalingsverwerking voor betaalde plannen. Het afrekenen loopt vandaag via Mollie. <strong>Elke betaling is eenmalig, voor de termijn die u koopt; er zijn geen abonnementen</strong>, omdat de laag voor terugkerende betalingen uitgeschakeld blijft tot een beheerder die instelt. De relay stuurt Mollie het bedrag, een omschrijving van het plan en betaalmetadata (accountId, product, plan, interval), en geen e-mailadres zolang de laag voor terugkerende betalingen uit staat. Alleen bij verlegde btw komen daar het btw-nummer van het bedrijf en het bewijs van de controle bij (vat, vatId, vatCheckedAt, vatConsultation). Kaartgegevens worden ingevoerd op de eigen pagina's van Mollie; PARAMANT ziet of bewaart nooit kaartnummers, alleen uw plan en een geanonimiseerde referentie.</li>
+<li data-partner-context="moneybird voorwaardelijk"><strong>Moneybird</strong> (een Nederlands bedrijf, EU-rechtsbevoegdheid): boekhouding, en alleen als de beheerder van deze installatie een administratie heeft gekoppeld. Moneybird ontvangt dan de factuur of creditnota zelf: het documentnummer, de datum, de omschrijving, de bedragen en de btw, de factuurgegevens die u hebt ingevoerd (bedrijfsnaam, factuuradres, btw-nummer) en uw e-mailadres, samen met de pdf van het document. Moneybird ontvangt niets over uw bestanden, uw overdrachten of uw handtekeningen.</li>
+<li data-partner-context="vies voorwaardelijk"><strong>VIES</strong> (de btw-nummercontrole van de Europese Commissie, ec.europa.eu, Europese Unie): alleen als een bedrijf uit een ander EU-land afrekent met een btw-nummer en de beheerder van deze installatie het btw-nummer van de verkoper heeft ingesteld. De relay vraagt dan of dat btw-nummer geldig is, zodat de btw verlegd kan worden. VIES ontvangt alleen dat btw-nummer en het btw-nummer van de verkoper, geen naam, e-mailadres, adres of bedrag. Wat VIES terugmeldt (de datum, het raadplegingsnummer en de naam en het adres die bij het nummer horen) bewaren we bij de factuur, als bewijs van de controle. Wordt er niet betaald, dan verdwijnt het na 30 dagen.</li>
+</ul>
 
-<h2>Changes to this policy</h2>
-<p>We may update this policy. Material changes will be noted via the "Last updated" date above. Continued use of the service after a change constitutes acceptance.</p>
+<p>Wat elke partij krijgt en wat nooit, en of ze vandaag actief is: <a href="/partners">actuele status op /partners</a>.</p>
+
+<h2>AVG / GDPR</h2>
+<p>Wij verwerken het minimum aan persoonsgegevens dat nodig is om uw account te laten werken, op een wettelijke grondslag (het uitvoeren van de dienst waar u om vraagt, en ons gerechtvaardigd belang bij het veilig houden ervan). U kunt per e-mail inzage in, of verwijdering van, uw accountgegevens vragen. De standaard <strong>verwerkersovereenkomst (DPA)</strong> staat op <a href="/dpa">/dpa</a> en geldt voor alle plannen; iedereen kan hem elektronisch ondertekenen, zonder account en zonder betaald plan.</p>
+<p>Tijdelijke relaygegevens worden nooit langer bewaard dan de geldende TTL (1 uur voor Community, 24 uur voor Firm, 7 dagen voor Enterprise). In de praktijk worden ze bij het downloaden veel eerder vernietigd.</p>
+
+<h2>Kinderen</h2>
+<p>PARAMANT is niet gericht op kinderen jonger dan 13 jaar. Wij verzamelen niet bewust gegevens van minderjarigen.</p>
+
+<h2>Wijzigingen in dit beleid</h2>
+<p>Wij kunnen dit beleid bijwerken. Wezenlijke wijzigingen worden aangegeven met de datum bij &ldquo;Laatst bijgewerkt&rdquo; hierboven. Als u de dienst na een wijziging blijft gebruiken, geldt dat als aanvaarding.</p>
 
 <h2>Contact</h2>
-<p>Questions about this Privacy Policy? Email <a href="mailto:info@paramant.app">info@paramant.app</a>.</p>
+<p>Vragen over dit privacybeleid? Mail naar <a href="mailto:info@paramant.app">info@paramant.app</a>.</p>
 
 </div>
 
+</main>
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

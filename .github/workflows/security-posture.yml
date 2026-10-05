@@ -1,0 +1,229 @@
+name: security-posture
+
+# What the outside world can see about Paramant, measured daily from the
+# outside, logged in nowhere.
+#
+# The gap this closes. Every gate in this repo reads the checkout: static-sanity
+# reads source, the cache-bust and CSP guards read frontend/, build-image builds
+# the Dockerfile, heartbeat drives the products through a browser. None of them
+# reads the certificate, the DNS zone, the response headers of the five sector
+# relays, or whether the ParaID issuing route is still shut. Those live on the
+# server and in the zone, not in git, and the repo has no drift guard for either
+# (scripts/check-prod-drift.sh covers the frontend docroot and nothing else).
+# The ParaID route was open on production for forty days in 2026 and was closed
+# by an nginx rule that exists on the server only. Nothing in CI would notice it
+# reopening. This does.
+#
+# The rule it is built on comes from the heartbeat rewrite of 2026-09-02: a
+# monitoring step never gets an escape of its own. A missing tool, a silent
+# host or an unparseable answer is red with the name of what is missing, never
+# green with a reason. scripts/security/posture.sh has no skip in it.
+#
+# And because the last monitor died from nobody watching the watcher, the
+# scanner has its own gate. The selftest job below drives all 108 measurements
+# green once and red once against stubbed curl, openssl, dig and npm, and fails
+# if any of them can only report one of the two. That job runs on every pull
+# request; the live job does not.
+
+on:
+  schedule:
+    # Daily at 04:43 UTC. Off the hour and off the half hour, because the whole
+    # of GitHub schedules on :00 and a job queued there starts late.
+    - cron: '43 4 * * *'
+  workflow_dispatch:
+  # Pull requests only, deliberately no push to main.
+  #
+  # deploy/deploy-3.1.sh phase 0a gates a deploy on every workflow that runs on
+  # a push to main without a paths: filter, and tests/deploy-3.1-dryrun.test.sh
+  # derives that list from these files so a new one cannot stay outside the
+  # gate. Adding a push trigger here would therefore make a deploy wait on THIS
+  # workflow's last completed run on main, and that run is usually the nightly
+  # scan, which is red on purpose. A red posture is a statement about the DNS
+  # zone and the server, not about whether main is deployable, and blocking
+  # deploys on it is exactly the mistake that runbook already records about
+  # heartbeat.yml.
+  #
+  # The selftest still gates every change, because every change reaches main
+  # through a pull request.
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  # Only the live job writes an issue. Read of the code is all the selftest needs.
+  issues: write
+
+concurrency:
+  # Two scans at once double the requests against production and race each
+  # other's issue comment.
+  group: security-posture
+  cancel-in-progress: false
+
+jobs:
+  selftest:
+    name: posture scanner, both directions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: The scanner parses
+        run: bash -n scripts/security/posture.sh tests/security-posture-dryrun.sh
+      # Not installed in this repo and not in any other job, so it is asked for
+      # rather than assumed. If the runner image stops shipping it the step says
+      # so instead of quietly passing. The stubs are in the list: a guard that
+      # skips the files most likely to be sloppy is not much of a guard, and the
+      # first run of this step found a literal-brace bug in exactly those.
+      - name: shellcheck, if the runner has it
+        run: |
+          set -uo pipefail
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck --severity=style \
+              scripts/security/posture.sh \
+              tests/security-posture-dryrun.sh \
+              tests/security-posture-stubs/*
+          else
+            echo "::warning title=shellcheck::not on this runner; only bash -n ran over the posture scripts"
+          fi
+      - name: Every measurement goes green once and red once
+        run: tests/security-posture-dryrun.sh
+
+  posture:
+    name: security posture, production
+    needs: selftest
+    # Held shut the same way heartbeat.yml is, and for the same reason. The
+    # first full scan came back with 18 red measurements. Ten of them are the
+    # missing X-Frame-Options and the empty Permissions-Policy on the five
+    # sector relays, fixed in this same change but only true on production once
+    # the relay image is deployed. The other eight no merge can touch: a
+    # duplicated HSTS on those five relays, no CAA record, an unsigned zone, and
+    # a live sitemap that still advertises two pages which answer 302. Merged
+    # without a gate this would go red every morning about a list everyone
+    # already knows, and an alarm that cries daily for a known reason is one
+    # people learn to ignore. Set SECURITY_POSTURE_ENABLED to true once the
+    # deploy has happened and the decisions in the pull request are carried out.
+    #
+    # workflow_dispatch always runs, so the scan can be started by hand at any
+    # point, including now, to see exactly what is still red.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'schedule' && vars.SECURITY_POSTURE_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    # Six hosts times four protocol handshakes, sixty sitemap urls and an
+    # advisory lookup per crate. About four minutes; this is the ceiling that
+    # turns a hung relay into a red run instead of a job that sits there.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Measure
+        id: scan
+        # continue-on-error, not a bare failure: the report has to be uploaded
+        # and the issue written before the job is allowed to end red.
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p security-posture-evidence
+          scripts/security/posture.sh \
+            --report security-posture-evidence/posture.md \
+            --json security-posture-evidence/posture.json
+
+      # Always, and a red run's report is the more useful of the two.
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: security-posture-${{ github.run_id }}
+          path: security-posture-evidence/
+          if-no-files-found: error
+          retention-days: 90
+
+      # A run that produced no report measured nothing, whatever its exit code
+      # said. That is the shape the old canaries failed in.
+      - name: A run without a report is a failed run
+        if: always()
+        run: |
+          set -uo pipefail
+          if [ ! -s security-posture-evidence/posture.json ]; then
+            echo "::error title=Security posture::the scan wrote no evidence, so it proved nothing"
+            exit 1
+          fi
+          node -e '
+            const j = JSON.parse(require("fs").readFileSync("security-posture-evidence/posture.json", "utf8"));
+            if (!Array.isArray(j.checks) || j.checks.length < 40) {
+              console.log("::error title=Security posture::only " + (j.checks || []).length + " measurements ran; the scan is incomplete");
+              process.exit(1);
+            }
+            console.log(j.verdict + ": " + j.green + " green, " + j.red + " red over " + j.checks.length + " measurements.");
+            if (j.verdict !== "GROEN") process.exit(1);
+          '
+
+      - name: Open or update the issue when the posture is red
+        if: failure()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            let scan = null;
+            try { scan = JSON.parse(fs.readFileSync('security-posture-evidence/posture.json', 'utf8')); } catch {}
+            const title = 'Security posture rood';
+            // COUNT AND LINK ONLY. This repository is public and so is every
+            // issue in it. An earlier draft pasted the full list of red
+            // measurements here, which would have published lines like "the
+            // unauthenticated issuing route is reachable again", naming an open
+            // door on production to anyone reading. The detail belongs in the
+            // artifact, which only someone who can already see the Actions tab
+            // can download. An alarm says that something is wrong and where to
+            // look; it does not narrate the weakness to the street.
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const head = scan
+              ? `**${scan.red} of ${scan.checks.length} posture measurements are red**, taken ${scan.stamp} from outside.`
+              : '**The scan produced no evidence**, so it failed before it could measure anything.';
+            const body = [
+              head,
+              '',
+              `Which ones, and what each of them found, is in the run: ${runUrl}`,
+              `Download the \`security-posture-${context.runId}\` artifact there for the full report.`,
+              '',
+              `_${new Date().toISOString()}_`,
+            ].join('\n');
+            // state: 'all' on purpose. Searching only open issues would find
+            // nothing after a green run closed the last one, and file a fresh
+            // issue for every episode instead of reopening the one that exists.
+            const all = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'all', labels: 'security-posture',
+              sort: 'created', direction: 'desc', per_page: 100,
+            });
+            // Pull requests come back from this endpoint too, and the title has
+            // to match so a hand-labelled issue is not adopted.
+            const mine = all.data.filter(i => !i.pull_request && i.title === title);
+            if (!mine.length) {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['security-posture'] });
+            } else {
+              const issue = mine.find(i => i.state === 'open') || mine[0];
+              if (issue.state !== 'open') {
+                await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'open' });
+              }
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body });
+            }
+
+      - name: Close the issue when the posture is green again
+        if: success()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'security-posture',
+            });
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number,
+                body: `Every posture measurement green again as of run ${context.runId}, with the report attached to that run. Closing.`,
+              });
+              await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'closed' });
+            }

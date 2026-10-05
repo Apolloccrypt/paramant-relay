@@ -1,15 +1,59 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sign in — Paramant</title>
+<title>Inloggen · Paramant</title>
+<link rel="canonical" href="https://paramant.app/auth/login">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/auth/login">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/login">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/login">
 <meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app. U typt geen wachtwoord.">
+<meta property="og:title" content="Inloggen bij Paramant">
+<meta property="og:description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app.">
+<meta property="og:url" content="https://paramant.app/auth/login">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Inloggen bij Paramant">
+<meta name="twitter:description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<style>
+/* Compact auth layout — existing design tokens only; design-system.css untouched. */
+.auth-wrap { max-width: 380px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); }
+.auth-head { text-align: center; margin-bottom: var(--space-4); }
+.auth-head .eyebrow { justify-content: center; }
+.auth-head h1 { font-size: clamp(24px, 5vw, 32px); line-height: 1.08; letter-spacing: -0.02em; color: var(--navy); margin: var(--space-2) 0 0; }
+.auth-card { margin: 0; }
+.auth-or { display: flex; align-items: center; gap: 10px; margin: var(--space-3) 0; color: var(--ink-dim); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--ink-hair); }
+.auth-foot { text-align: center; margin-top: var(--space-4); }
+[hidden] { display: none !important; }
+.auth-sub { text-align: center; color: var(--ink-dim); font-size: 14px; margin: var(--space-2) 0 0; }
+.auth-hint { text-align: center; color: var(--ink-dim); font-size: 12px; margin: 8px 0 0; line-height: 1.5; }
+.auth-altline { text-align: center; margin-top: var(--space-4); }
+.auth-link { background: none; border: none; color: var(--navy); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+.auth-link:hover { opacity: .75; }
+#code-fields { margin-top: 4px; }
+.auth-note { max-width: 380px; margin: var(--space-3) auto 0; padding: 14px 18px; border: 1px solid var(--ink-hair); border-radius: 8px; background: var(--card); color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+.auth-note p { margin: 0 0 10px; }
+.auth-note a { color: var(--navy); }
+</style>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=10">
+<script src="/js/theme.js?v=6"></script>
+<!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
+     Blocking and above every other script, so it exists before any renderer runs. -->
+<script src="/js/format-date.js?v=2"></script>
 </head>
 <body>
 
@@ -17,244 +61,99 @@
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/login" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/login" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/login" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/login" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
-<main class="container-sm">
+<main class="auth-wrap">
 
-<section class="section-lg">
-  <div class="eyebrow"><span class="bar"></span>sign in</div>
-  <h1>Welcome <em>back</em>.</h1>
-</section>
+<div class="auth-head">
+  <div class="eyebrow"><span class="bar"></span>inloggen</div>
+  <h1>Welkom <em>terug</em>.</h1>
+  <p class="auth-sub">Geen wachtwoord nodig: log in met uw passkey, of met een code van 6 cijfers uit uw authenticator-app.</p>
+</div>
 
-<section class="section">
-  <form id="login-form" class="form-card">
-    <label for="email">Email address</label>
-    <input type="email" id="email" name="email" required autocomplete="username"
-           autofocus>
+<div id="error" class="error auth-alert" role="alert" aria-live="assertive"></div>
 
-    <label for="totp" class="mt-3">6-digit code</label>
-    <input type="text" id="totp" name="totp" required inputmode="numeric"
+<form id="login-form" class="form-card auth-card" novalidate>
+  <label for="email">E-mailadres</label>
+  <input type="email" id="email" name="email" required autocomplete="username" autofocus>
+
+  <div class="auth-choice">
+    <button type="button" class="btn btn-primary" id="passkey-login-btn">Inloggen met een passkey</button>
+    <button type="button" class="btn btn-secondary" id="show-code-btn" aria-expanded="false" aria-controls="code-fields">Liever een code van 6 cijfers</button>
+  </div>
+  <p class="auth-hint">Uw apparaat vraagt om Face ID, Touch ID, Windows Hello of een beveiligingssleutel. De sleutel blijft op het apparaat.</p>
+  <div id="code-fields" hidden>
+    <label for="totp" class="mt-3">Code van 6 cijfers uit uw authenticator-app</label>
+    <input type="text" id="totp" name="totp" inputmode="numeric"
            pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
            placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
-
-    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">
-      Sign in
-    </button>
-
-    <div id="error" class="error"></div>
-  </form>
-
-  <div class="cta-row mt-3">
-    <button type="button" class="btn btn-secondary" id="passkey-login-btn">Sign in with a passkey</button>
+    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Inloggen</button>
   </div>
-  <p id="passkey-login-status" class="small" aria-live="polite"></p>
 
-  <p class="footer-text mt-4">
-    Lost your authenticator? <a href="/auth/backup">Use a backup code</a><br>
-    No backup codes? <a href="/auth/request-reset">Request a reset email</a><br>
-    Don&rsquo;t have an account? <a href="/signup">Create one</a>
-  </p>
-</section>
+  <p id="passkey-login-status" class="small" aria-live="polite" style="margin:8px 0 0"></p>
 
+  <div class="auth-altline">
+    <button type="button" class="auth-link" id="passkey-crossdevice-btn">Mijn passkey staat op een ander apparaat</button>
+  </div>
+</form>
+
+<div id="sha1-notice" class="auth-note" hidden role="note">
+  <p><strong>U bent ingelogd.</strong> Uw authenticator-app maakt nog SHA-1-codes. Die werken, maar een SHA-256-app zoals Raivo (iOS) of Aegis (Android) is sterker. <a href="/help/authenticator-apps">Bekijk welke apps dat doen</a>.</p>
+  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Verder naar uw account</a>
+</div>
+
+<p class="footer-text auth-foot">
+  Authenticator-app kwijt? <a href="/auth/backup">Inloggen met een back-upcode</a><br>
+  Back-upcodes ook kwijt? <a href="/auth/request-reset">Stuur mij een nieuwe instellink</a><br>
+  Nog geen account? <a href="/signup">Account maken</a>
+</p>
+
+<p class="small" style="color:var(--ink-dim);text-align:center;margin-top:24px">
+  Paramant is een product van <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+  Nederland. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+</p>
 </main>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script>
-(function() {
-  const form = document.getElementById('login-form');
-  const errorDiv = document.getElementById('error');
-  const submitBtn = document.getElementById('submit-btn');
+<script src="/js/pow-captcha.js?v=1"></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/auth-login.js?v=5"></script>
+<script type="module" src="/js/passkey.js?v=7"></script>
 
-  const params = new URLSearchParams(window.location.search);
-  const returnUrl = params.get('return') || '/account';
-
-  form.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    errorDiv.classList.remove('visible');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Signing in...';
-
-    const email = document.getElementById('email').value.trim();
-    const totp = document.getElementById('totp').value.trim();
-
-    try {
-      const res = await fetch('/api/user/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, totp }),
-        credentials: 'include',
-      });
-
-      if (res.ok) {
-        window.location = returnUrl;
-      } else if (res.status === 401) {
-        errorDiv.textContent = 'Invalid email or code.';
-        errorDiv.classList.add('visible');
-        document.getElementById('totp').value = '';
-        document.getElementById('totp').focus();
-      } else if (res.status === 403) {
-        errorDiv.innerHTML = 'No authenticator linked to this account. <a href="/auth/request-reset">Request a setup link</a> or <a href="/signup">create an account</a>.';
-        errorDiv.classList.add('visible');
-      } else if (res.status === 429) {
-        errorDiv.textContent = 'Too many attempts. Try again in 15 minutes.';
-        errorDiv.classList.add('visible');
-      } else {
-        errorDiv.textContent = 'Sign-in failed. Please try again.';
-        errorDiv.classList.add('visible');
-      }
-    } catch (err) {
-      errorDiv.textContent = 'Network error.';
-      errorDiv.classList.add('visible');
-    }
-
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Sign in';
-  });
-})();
-</script>
-<script type="module" src="/js/passkey.js"></script>
-
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/auth/login" hreflang="en" lang="en">This page in English</a></p>
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
+</footer>
 </body>
 </html>

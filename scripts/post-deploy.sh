@@ -2,8 +2,7 @@
 # post-deploy.sh — run after every deploy to catch auth stack regressions
 # Exits non-zero (and blocks the deploy pipeline) on any test failure.
 #
-# Usage: ./scripts/post-deploy.sh
-# Called automatically by deploy/deploy.sh after services restart.
+# Usage: ./scripts/post-deploy.sh   (run standalone after a deploy)
 
 set -euo pipefail
 

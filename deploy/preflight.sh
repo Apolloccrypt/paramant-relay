@@ -22,9 +22,9 @@ check_port() {
                 if [ -f .env ]; then sed -i '/^HTTP_PORT=/d' .env; sed -i '/^HTTPS_PORT=/d' .env; fi
                 echo "HTTP_PORT=${alt_http}" >> .env; echo "HTTPS_PORT=${alt_https}" >> .env
                 export HTTP_PORT=${alt_http}; export HTTPS_PORT=${alt_https}
-                echo -e "${GREEN}✓  Will use ports ${alt_http}/${alt_https} — saved to .env${NC}" ;;
+                echo -e "${GREEN}✓  Will use ports ${alt_http}/${alt_https} - saved to .env${NC}" ;;
             2) echo -e "${YELLOW}   Stop ${proc} and re-run this script${NC}"; exit 1 ;;
-            3) echo -e "${YELLOW}   Skipping — startup may fail${NC}"; ISSUES=$((ISSUES + 1)) ;;
+            3) echo -e "${YELLOW}   Skipping - startup may fail${NC}"; ISSUES=$((ISSUES + 1)) ;;
         esac
     else
         echo -e "${GREEN}✓  Port ${port} free${NC}"
@@ -37,8 +37,21 @@ if ! command -v docker &>/dev/null; then
     echo -e "${RED}✗  Docker not found${NC}"; echo ""
     read -p "   Install Docker now? [y/N]: " install_docker
     if [[ "$install_docker" =~ ^[Yy]$ ]]; then
-        echo "   Installing Docker..."; curl -fsSL https://get.docker.com | sh; sudo usermod -aG docker $USER
-        echo -e "${GREEN}✓  Docker installed — you may need to log out and back in${NC}"
+        # Download the vendor install script to a temp file first, then execute
+        # it (after the operator confirmation above) instead of piping the
+        # network stream straight into a shell. This makes the fetched script
+        # inspectable and avoids partial-download execution. (Ideally pin a
+        # SHA256 here too, but get.docker.com publishes no stable checksum.)
+        echo "   Installing Docker..."
+        DOCKER_INSTALL_SH=$(mktemp /tmp/get-docker.XXXXXX.sh)
+        if curl -fsSL https://get.docker.com -o "$DOCKER_INSTALL_SH"; then
+            sh "$DOCKER_INSTALL_SH"; rm -f "$DOCKER_INSTALL_SH"
+            sudo usermod -aG docker $USER
+            echo -e "${GREEN}✓  Docker installed - you may need to log out and back in${NC}"
+        else
+            rm -f "$DOCKER_INSTALL_SH"
+            echo -e "${RED}   Failed to download the Docker install script. Install from https://docs.docker.com/get-docker/${NC}"; exit 1
+        fi
     else
         echo -e "${RED}   Docker is required. Install from https://docs.docker.com/get-docker/${NC}"; exit 1
     fi
@@ -55,7 +68,7 @@ echo "Checking swap..."
 DISK_SWAP=$(swapon --show=TYPE,NAME --noheadings 2>/dev/null | grep -v zram | grep -v "^$" || true)
 ZRAM_SWAP=$(swapon --show=TYPE,NAME --noheadings 2>/dev/null | grep zram || true)
 if [ -n "$DISK_SWAP" ]; then
-    echo -e "${RED}✗  Disk swap is active — security risk for RAM-only storage${NC}"; echo "   $DISK_SWAP"; echo ""
+    echo -e "${RED}✗  Disk swap is active - security risk for RAM-only storage${NC}"; echo "   $DISK_SWAP"; echo ""
     read -p "   Disable disk swap now? [Y/n]: " disable_swap
     if [[ ! "$disable_swap" =~ ^[Nn]$ ]]; then
         if sudo swapoff -a 2>/dev/null && sudo sed -i '/swap/d' /etc/fstab 2>/dev/null; then
@@ -84,9 +97,12 @@ else
         TOKEN=$(openssl rand -hex 32)
         if [ ! -f .env ]; then cp .env.example .env; fi
         sed -i 's/^ADMIN_TOKEN=$//' .env; echo "ADMIN_TOKEN=${TOKEN}" >> .env
-        echo ""; echo -e "${GREEN}✓  ADMIN_TOKEN generated and saved to .env${NC}"
-        echo -e "${YELLOW}   Save this token securely — you need it to manage API keys:${NC}"; echo ""
-        echo "   ADMIN_TOKEN=${TOKEN}"; echo ""
+        chmod 600 .env 2>/dev/null || true
+        unset TOKEN
+        echo ""; echo -e "${GREEN}✓  ADMIN_TOKEN generated and saved to .env (chmod 600)${NC}"
+        # Do NOT echo the token to stdout - it would land in CI logs, shell
+        # scrollback and screen-shares. Tell the operator how to read it instead.
+        echo -e "${YELLOW}   Read it when you need it:${NC}  grep '^ADMIN_TOKEN=' .env"; echo ""
     fi
 fi
 echo ""

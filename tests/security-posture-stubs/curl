@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Stubbed curl for the posture dry run. Answers from POSTURE_STUB_MODE, never
+# from the network. See tests/security-posture-dryrun.sh.
+set -u
+mode=${POSTURE_STUB_MODE:-green}
+url=""; want_headers=0; want_code=0; post=0; body=""; take_body=0
+for a in "$@"; do
+  if [ "$take_body" -eq 1 ]; then body=$a; take_body=0; continue; fi
+  case "$a" in
+    -d) take_body=1 ;;
+    -D) want_headers=1 ;;
+    *'%{http_code}'*) want_code=1 ;;
+    POST) post=1 ;;
+    https://*) url=$a ;;
+  esac
+done
+[ "$want_headers" -eq 1 ] || case " $* " in *" -D "*) want_headers=1 ;; esac
+
+emit_headers() {
+  if [ "$mode" = missing ]; then return 0; fi
+  echo "HTTP/2 200 "
+  if [ "$mode" = green ]; then
+    echo "strict-transport-security: max-age=63072000; includeSubDomains; preload"
+    echo "content-security-policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; frame-ancestors 'none'"
+    echo "x-frame-options: DENY"
+    echo "referrer-policy: no-referrer"
+    echo "permissions-policy: geolocation=(), microphone=(), camera=(self)"
+    echo "x-content-type-options: nosniff"
+  else
+    # Every required header wrong in its own way, one way per header.
+    echo "strict-transport-security: max-age=63072000; includeSubDomains"
+    echo "strict-transport-security: max-age=63072000; includeSubDomains"
+    echo "content-security-policy: default-src 'self'; script-src 'self' 'unsafe-eval'; frame-ancestors 'none'"
+    echo "referrer-policy: unsafe-url"
+    echo "permissions-policy: interest-cohort=()"
+    echo "x-content-type-options: sniff"
+  fi
+}
+
+case "$url" in
+  *api.osv.dev/v1/querybatch)
+    # results must be one entry per crate asked about, or the scanner has to
+    # treat the answer as truncated rather than as "no vulnerabilities". The
+    # count is taken from the posted body, so this keeps working when the
+    # lockfile gains a crate.
+    case "$mode" in
+      green) printf '%s' "$body" | node -e 'let r="";process.stdin.on("data",d=>r+=d);process.stdin.on("end",()=>{const n=JSON.parse(r).queries.length;process.stdout.write(JSON.stringify({results:Array.from({length:n},()=>({}))}))})' ;;
+      red)   printf '%s' "$body" | node -e 'let r="";process.stdin.on("data",d=>r+=d);process.stdin.on("end",()=>{const n=JSON.parse(r).queries.length;const a=Array.from({length:n},()=>({}));a[0]={vulns:[{id:"RUSTSEC-STUB-0001"}]};process.stdout.write(JSON.stringify({results:a}))})' ;;
+      *)     echo 'not json' ;;
+    esac
+    exit 0 ;;
+  *api.osv.dev/v1/vulns/*)
+    # Shaped exactly like a real RustSec advisory: the severity lives in
+    # severity[] as a CVSS_V3 vector and database_specific carries only a
+    # licence. The gate used to read database_specific.severity, saw nothing
+    # here, and passed. CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H scores 9.1.
+    case "$mode" in
+      red) echo '{"id":"RUSTSEC-STUB-0001","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H"}],"database_specific":{"license":"CC0-1.0"}}' ;;
+      *)   echo 'not json' ;;
+    esac
+    exit 0 ;;
+  *robots.txt)
+    [ "$mode" = missing ] && exit 0
+    echo "User-agent: *"
+    echo "Allow: /"
+    echo "Disallow: /auth/"
+    if [ "$mode" = green ]; then
+      echo ""
+      echo "Sitemap: https://paramant.app/sitemap.xml"
+    fi
+    exit 0 ;;
+  *sitemap.xml)
+    [ "$mode" = missing ] && exit 0
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    if [ "$mode" = green ]; then
+      echo '  <url><loc>https://paramant.app/pricing</loc></url>'
+      echo '  <url><loc>https://relay.paramant.app/status</loc></url>'
+    else
+      # Redirects to a login, and that login is robots-disallowed.
+      echo '  <url><loc>https://paramant.app/auth/login</loc></url>'
+      # Off-origin. A scanner that follows this can be aimed at a third party
+      # by whoever can edit the sitemap, so it must be refused, not fetched.
+      echo '  <url><loc>https://someone-elses-host.example/x</loc></url>'
+    fi
+    echo '</urlset>'
+    exit 0 ;;
+esac
+
+if [ "$want_code" -eq 1 ]; then
+  if [ "$post" -eq 1 ]; then
+    # The ParaID issuing route. 404 is the only acceptable answer.
+    case "$mode" in
+      green) printf '404' ;;
+      red)   printf '200' ;;
+      *)     printf '' ;;
+    esac
+  else
+    # A sitemap url. Green answers 200; red answers a redirect to a login.
+    case "$mode" in
+      green) printf '200' ;;
+      red)   printf '302' ;;
+      *)     printf '' ;;
+    esac
+  fi
+  exit 0
+fi
+
+[ "$want_headers" -eq 1 ] && emit_headers
+exit 0

@@ -1,0 +1,48 @@
+/* relay-pulse.css  ·  site-wide "relay signal"
+ *
+ * One accent pulse glides once across the very top edge of a page when it
+ * loads: the signal passing through the relay. Once, not on a loop: motion
+ * that never stops is decoration a reader cannot switch off.
+ *
+ * Self-contained on purpose: nav.css and design-system.css are NOT touched. The
+ * effect lives entirely on body::after, is fixed + 2px tall + pointer-events:none
+ * (zero layout impact), and is transform-driven (no layout thrash). It honours
+ * prefers-reduced-motion by disappearing entirely. Tunable in one place: the
+ * --rp-* custom properties below.
+ */
+:root {
+  --rp-lime: var(--ochre, #D9A441);   /* the one accent */
+  --rp-width: 280px;    /* length of the travelling pulse */
+  --rp-period: 1.2s;    /* the one pass */
+  --rp-thickness: 2px;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--rp-width);
+  height: var(--rp-thickness);
+  z-index: 100;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(29, 78, 216, 0) 0%,
+    var(--rp-lime) 50%,
+    rgba(29, 78, 216, 0) 100%);
+  transform: translateX(-320px);
+  opacity: 0;
+  animation: relay-pulse var(--rp-period) ease-in-out 0.5s 1 both;
+}
+
+/* travel left -> right across the viewport once and fade out at the right
+   edge. translateX(100vw) clears the right edge on any width. */
+@keyframes relay-pulse {
+  0%   { transform: translateX(-320px); opacity: 1; }
+  95%  { transform: translateX(100vw);  opacity: 1; }
+  100% { transform: translateX(100vw);  opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; display: none; }
+}

@@ -9,7 +9,7 @@ R015 (release-channel model)
 
 ## Context
 
-Paramant is evolving from a single open-source relay project to a commercial
+Paramant is evolving from a single source-available relay project to a commercial
 product with managed-license tiers, fleet observability, and centrally-
 administered customer deployments (R013, R014, R015).
 
@@ -96,7 +96,7 @@ The contract surface is small and stable.
 
 All cross-repo communication is ML-DSA-65 signed by paramant-management's
 signing key (rotated yearly per R013). paramant-relay holds the verifier pubkey
-embedded in the open-source binary.
+embedded in the source-available binary.
 
 Customers can verify ANY response from paramant-management against the embedded
 pubkey -- if the signature is invalid, the response is ignored.

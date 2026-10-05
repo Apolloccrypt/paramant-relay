@@ -1,277 +1,187 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="UTF-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Email verified &mdash; check your inbox &mdash; Paramant</title>
-  <link rel="stylesheet" href="/design-system.css?v=19">
-  <link rel="stylesheet" href="/nav.css?v=13">
-  <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+  <title>E-mailadres bevestigd, nog één stap · Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://paramant.app/signup/verified">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/signup/verified">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/signup/verified">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/signup/verified">
+  <link rel="stylesheet" href="/design-system.css?v=32">
+  <link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+  <script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
   <style>
-    body { background: #F8FAFC; }
+    /* Every colour here is a token from app-2026.css, so this page follows the
+       theme instead of staying light inside a dark shell. Section 5 of
+       docs/brand/design-direction.md: no half rollout. */
+    body { background: var(--paper); }
     .vwrap { max-width: 620px; margin: 48px auto; padding: 0 20px; }
     .vcheck {
       display: inline-flex; align-items: center; gap: 8px;
-      background: #DCFCE7; color: #15803D;
+      background: var(--sig-done-bg); color: var(--sig-done);
+      border: 1px solid var(--line);
       padding: 6px 14px; border-radius: 100px;
       font-size: 13px; font-weight: 600;
       margin-bottom: 24px;
     }
     .vcheck svg { width: 14px; height: 14px; }
     .vtitle {
-      font-size: 30px; font-weight: 600; color: #0B3A6A;
+      font-size: 30px; font-weight: 600; color: var(--ink-1);
       margin: 0 0 16px; line-height: 1.2;
     }
     .vlead {
-      color: #475569; line-height: 1.6;
+      color: var(--ink-2); line-height: 1.6;
       margin: 0 0 32px; font-size: 16px;
     }
     .next-box {
-      background: #EFF6FF; border: 1px solid #BFDBFE;
+      background: var(--accent-soft); border: 1px solid var(--line);
       border-radius: 10px; padding: 28px; margin: 0 0 32px;
     }
-    .next-num {
-      display: inline-flex; width: 32px; height: 32px;
-      border-radius: 50%; background: #1D4ED8; color: #fff;
-      align-items: center; justify-content: center;
-      font-weight: 700; font-size: 15px; margin-bottom: 14px;
+    .next-step {
+      display: inline-block; background: var(--accent); color: var(--accent-ink);
+      border-radius: 999px; padding: 5px 14px;
+      font-weight: 700; font-size: 12px; letter-spacing: .04em;
+      text-transform: uppercase; margin-bottom: 14px;
     }
+    .vwho {
+      color: var(--ink-3); font-size: 13px; line-height: 1.7;
+      margin: 32px 0 0;
+    }
+    .vwho a { color: var(--accent); }
     .next-title {
-      font-size: 18px; font-weight: 600; color: #0B3A6A;
+      font-size: 18px; font-weight: 600; color: var(--ink-1);
       margin: 0 0 12px;
     }
     .next-msg {
-      color: #334155; line-height: 1.6;
+      color: var(--ink-2); line-height: 1.6;
       margin: 0 0 14px; font-size: 15px;
     }
     .next-subject {
-      display: inline-block; background: #fff;
-      border: 1px solid #CBD5E1; border-radius: 5px;
+      display: inline-block; background: var(--surface);
+      border: 1px solid var(--line-2); border-radius: 5px;
       padding: 8px 14px;
       font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-      font-size: 13px; color: #0B3A6A;
+      font-size: 13px; color: var(--ink-1);
       word-break: break-word;
     }
     .faq {
       margin-top: 36px; padding-top: 28px;
-      border-top: 1px solid rgba(11,58,106,0.1);
+      border-top: 1px solid var(--line);
     }
     .faq h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em;
-              color: #64748B; font-weight: 600; margin: 0 0 16px; }
+              color: var(--ink-3); font-weight: 600; margin: 0 0 16px; }
     .faq details { margin-bottom: 10px;
-                   border: 1px solid rgba(11,58,106,0.08);
-                   border-radius: 6px; padding: 14px 18px; background: #fff; }
-    .faq summary { cursor: pointer; font-weight: 600; color: #0B3A6A;
-                   font-size: 14px; }
+                   border: 1px solid var(--line);
+                   border-radius: 6px; padding: 14px 18px; background: var(--surface); }
+    /* One indicator, the page's own plus. Chromium still draws its list-item
+       triangle next to it unless the marker is removed on both sides, and the
+       row is a flex line so it reads the same at every width. */
+    .faq summary { cursor: pointer; font-weight: 600; color: var(--ink-1);
+                   font-size: 14px; list-style: none;
+                   display: flex; align-items: center; gap: 12px; }
     .faq summary::-webkit-details-marker { display: none; }
-    .faq summary::after { content: '+'; float: right; color: #94A3B8;
+    .faq summary::marker { content: ''; }
+    .faq summary::after { content: '+'; margin-left: auto; color: var(--ink-3);
                           font-weight: 400; font-size: 18px; line-height: 1; }
     .faq details[open] summary::after { content: '&minus;'; }
-    .faq p { color: #475569; line-height: 1.6;
+    .faq p { color: var(--ink-2); line-height: 1.6;
              margin: 10px 0 0; font-size: 14px; }
-    .faq code { background: #F1F5F9; padding: 2px 6px; border-radius: 3px;
-                font-size: 13px; color: #0B3A6A; }
-    .faq a { color: #1D4ED8; text-decoration: underline; }
+    .faq code { background: var(--surface-sunk); padding: 2px 6px; border-radius: 3px;
+                font-size: 13px; color: var(--ink-1); }
+    .faq a { color: var(--accent); text-decoration: underline; }
+    /* A finger opens the accordion, so the row it grabs is a real target. */
+    @media (pointer: coarse) {
+      .faq summary { min-height: var(--tap); }
+    }
   </style>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=10">
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
-        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/signup/verified" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/signup/verified" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/dashboard">Dashboard</a>
-    </div>
-  </div>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/signup/verified" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/signup/verified" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main class="vwrap">
-  <div class="vcheck" aria-label="Email verified">
+  <div class="vcheck" aria-label="E-mailadres bevestigd">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
          stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="20 6 9 17 4 12"/>
     </svg>
-    Email verified
+    E-mailadres bevestigd
   </div>
 
-  <h1 class="vtitle">One more step. Check your inbox for a second email.</h1>
+  <h1 class="vtitle">Nog één stap. Open de tweede mail.</h1>
 
-  <p class="vlead">Your email is confirmed and your Paramant account is created. To finish, you still need to connect an authenticator app &mdash; Paramant doesn't use passwords.</p>
+  <p class="vlead">Uw adres is bevestigd en uw account bestaat. Paramant werkt zonder wachtwoorden. De laatste stap is daarom een passkey of authenticator-app koppelen, via de tweede mail die wij u net stuurden.</p>
 
   <div class="next-box">
-    <div class="next-num">2</div>
-    <div class="next-title">Open the second email we just sent you</div>
-    <p class="next-msg">Look for an email with the subject:</p>
-    <p class="next-subject">Complete your Paramant account setup</p>
-    <p class="next-msg" style="margin-top:16px;">Open it and click the setup link. You'll see a QR code. Scan it with an app that supports SHA-256 TOTP: <strong>Raivo</strong> (iOS, open source), <strong>Aegis</strong> (Android, open source), <strong>1Password</strong>, <strong>Bitwarden</strong>, <strong>Authy</strong>, <strong>Ente Auth</strong>, or <strong>2FAS</strong>. Paramant uses SHA-256 &mdash; <strong>Google Authenticator, Microsoft Authenticator, and iCloud Keychain do NOT work</strong> because they only support SHA-1. The 6-digit login codes come from your chosen app, not from email.</p>
+    <div class="next-step">Doe dit nu</div>
+    <div class="next-title">Zoek naar dit onderwerp</div>
+    <p class="next-msg">De mail komt van noreply@paramant.app, met dit onderwerp:</p>
+    <p class="next-subject">Maak uw Paramant-account af</p>
+    <p class="next-msg" style="margin-top:16px;">Open hem en volg de instellink. Daar kiest u een passkey (Face ID, Touch ID, Windows Hello) of een authenticator-app, en bewaart u uw back-upcodes. Nog geen app? <strong>Google Authenticator</strong> en <strong>Microsoft Authenticator</strong> werken allebei. Gebruikt u al <strong>1Password</strong> of <strong>Bitwarden</strong>? Houd het daar. Elke andere gewone authenticator-app werkt ook, en <a href="/help/authenticator-apps">de hulppagina vergelijkt ze</a>. De codes van 6 cijfers komen uit die app, nooit per mail.</p>
   </div>
 
   <div class="faq">
-    <h2>Frequently asked</h2>
+    <h2>Veelgestelde vragen</h2>
     <details>
-      <summary>I don't see the second email</summary>
-      <p>Give it a minute &mdash; delivery can take up to 60 seconds. Check your spam / junk folder. The sender is <code>noreply@paramant.app</code>. Still nothing? <a href="/auth/request-reset">Request a new setup link</a> using the same email address.</p>
+      <summary>Ik zie de tweede mail niet</summary>
+      <p>De mail is onderweg, maar hoe snel uw provider hem aflevert, kunnen wij niet beloven. Kijk bij ongewenste mail. De afzender is <code>noreply@paramant.app</code>. Na een paar minuten nog niets? <a href="/auth/request-reset">Vraag een nieuwe instellink aan</a> met hetzelfde adres.</p>
     </details>
     <details>
-      <summary>Where's the 6-digit code in the email?</summary>
-      <p>It isn't in the email. Paramant uses <strong>SHA-256 TOTP</strong>. Codes are generated by a compatible authenticator app on your phone after you scan the QR code in the setup email. Recommended: <strong>Raivo</strong> (iOS) or <strong>Aegis</strong> (Android) &mdash; both open source. Also works: 1Password, Bitwarden, Authy, Ente Auth, 2FAS. <strong>Do not use</strong> Google Authenticator, Microsoft Authenticator, or iCloud Keychain &mdash; they only support SHA-1 and will generate codes the server rejects. <a href="/help/authenticator-apps">Full list &amp; why SHA-256.</a></p>
+      <summary>Waar staat de code van 6 cijfers in de mail?</summary>
+      <p>Die staat niet in de mail, en dat blijft zo. De authenticator-app op uw telefoon maakt de codes, zodra u de QR-code uit de instelmail hebt gescand. Elke gewone app werkt. <a href="/help/authenticator-apps">De hulppagina vergelijkt ze</a>.</p>
     </details>
     <details>
-      <summary>I already completed the setup</summary>
-      <p>Then you're done. <a href="/auth/login">Sign in</a> with your email and the 6-digit code from your authenticator app.</p>
+      <summary>Ik heb het instellen al afgerond</summary>
+      <p>Dan bent u klaar. <a href="/auth/login">Log in</a> met uw e-mailadres en uw passkey of de code van 6 cijfers uit uw authenticator-app.</p>
     </details>
   </div>
+
+  <p class="vwho">Paramant is een product van <strong>Paramantis Solutions B.V.</strong>, Harderwijk, Nederland. KvK 42115132. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
 </main>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/signup/verified" hreflang="en" lang="en">This page in English</a></p>
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
+</footer>
 </body>
 </html>

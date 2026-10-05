@@ -245,6 +245,56 @@ h3 {
   margin-top: 8px;
 }
 
+.progress-text.failed { color: #b91c1c; }
+
+/* 402 monthly-transfer-quota upgrade notice */
+.quota-notice {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(29, 78, 216, 0.06);
+  border-left: 3px solid var(--cobalt);
+}
+.quota-notice.hidden { display: none; }
+.quota-notice strong { display: block; color: var(--navy); font-size: 13px; }
+.quota-notice p { margin: 6px 0 10px; color: var(--ink-mid); font-size: 12px; }
+.quota-notice .quota-upgrade {
+  display: inline-block;
+  padding: 8px 14px;
+  background: var(--navy);
+  color: var(--bone);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+}
+.quota-notice .quota-upgrade:hover { background: var(--cobalt); }
+
+/* Login: rolling-out banner + mode header */
+.banner { padding: 12px 14px; margin-bottom: 20px; font-size: 13px; line-height: 1.5; color: var(--ink-mid); }
+.banner p { margin: 0; }
+.banner-lime { background: rgba(178, 255, 63, 0.12); border-left: 3px solid var(--lime); }
+.banner-label {
+  display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--navy); font-weight: 700; background: var(--lime);
+  padding: 2px 8px; margin-bottom: 6px;
+}
+.mode-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.mode-title {
+  font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--navy);
+}
+.mode-switch {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--cobalt); text-decoration: none;
+}
+.mode-switch:hover { text-decoration: underline; }
+.mode-switch.hidden { display: none; }
+
+input[type="password"] {
+  width: 100%; padding: 10px 12px; font-size: 13px; font-family: var(--mono);
+  border: 1.5px solid var(--ink-hair); background: var(--bone); color: var(--ink); margin-bottom: 16px;
+}
+input[type="password"]:focus { outline: none; border-color: var(--cobalt); }
+
 .helper-link {
   display: block;
   margin-top: 16px;

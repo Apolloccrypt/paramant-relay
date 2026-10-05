@@ -1,7 +1,18 @@
 'use strict';
 
+const crypto = require('crypto');
+const mailer = require('../../relay/lib/mail');
+
 const BASE_URL = process.env.SITE_URL || 'https://paramant.app';
 const FROM_ADDR = 'Paramant <hello@paramant.app>';
+
+// Derive a short, non-reversible reference id for the X-Entity-Ref-ID mail
+// header. Previously these were prefixes of the setup token / API key, which
+// leaked secret material into outbound mail headers (and any mail-log that
+// records them). Hash first, then truncate, so the ref stays stable per
+// secret but reveals nothing about it.
+const refIdHash = (secret) =>
+  crypto.createHash('sha256').update(String(secret ?? '')).digest('hex').slice(0, 12);
 
 const maskIP = (ip) => {
   if (!ip) return 'unknown';
@@ -9,6 +20,16 @@ const maskIP = (ip) => {
   if (m) return m[1] + '.xxx.xxx';
   return ip.slice(0, 8) + '...';
 };
+
+// HTML-escape any value that may carry user-controlled input before it lands
+// in an HTML email body. Covers &, <, >, " and '. Use for email, label,
+// reason, IP, etc. -- anything not built from constants in this module.
+const escHtml = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
 
 const formatTS = (ts) =>
   new Date(ts).toISOString().replace('T', ' ').replace(/\..*$/, '') + ' UTC';
@@ -26,9 +47,16 @@ function wrap(bodyText, bodyHtml, meta = {}) {
   };
 }
 
-function htmlShell(preheader, bodyHtml) {
+// `lang` is for the mails that are Dutch first (the signing invitation, the
+// account mails). Every other mail calls this with two arguments and gets
+// exactly what it had.
+function htmlShell(preheader, bodyHtml, lang = 'en') {
+  const nl = lang === 'nl';
+  const tagline = nl
+    ? 'Paramant, versleuteld versturen en ondertekenen.'
+    : 'Paramant &mdash; post-quantum encrypted file relay.';
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${nl ? 'nl' : 'en'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -46,8 +74,8 @@ function htmlShell(preheader, bodyHtml) {
         ${bodyHtml}
       </td></tr>
       <tr><td style="padding:24px 40px;border-top:1px solid rgba(11,58,106,0.08);font-size:12px;color:#64748b;line-height:1.6;">
-        <p style="margin:0 0 8px 0;">Paramant &mdash; post-quantum encrypted file relay.</p>
-        <p style="margin:0;"><a href="https://paramant.app" style="color:#1D4ED8;text-decoration:none;">paramant.app</a> &middot; <a href="https://paramant.app/security" style="color:#1D4ED8;text-decoration:none;">Security</a> &middot; <a href="https://paramant.app/help" style="color:#1D4ED8;text-decoration:none;">Help</a></p>
+        <p style="margin:0 0 8px 0;">${tagline}</p>
+        <p style="margin:0;"><a href="https://paramant.app" style="color:#1D4ED8;text-decoration:none;">paramant.app</a> &middot; <a href="https://paramant.app/security" style="color:#1D4ED8;text-decoration:none;">${nl ? 'Beveiliging' : 'Security'}</a> &middot; <a href="https://paramant.app/help" style="color:#1D4ED8;text-decoration:none;">${nl ? 'Hulp' : 'Help'}</a></p>
       </td></tr>
     </table>
   </td></tr>
@@ -60,18 +88,48 @@ function btn(url, label) {
   return `<div style="margin:24px 0;"><a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;text-decoration:none;padding:12px 24px;font-weight:500;font-family:system-ui,sans-serif;">${label}</a></div>`;
 }
 
+// ── DUTCH FIRST, ENGLISH BELOW ──────────────────────────────────────────────
+// The account mails are Dutch since 23 September 2026, with the English text
+// under it. The action that sends them (sign up, reset, deactivate) does not
+// carry the language of the page it started on, so one mail serves both
+// readers: Dutch on top because that is the site's main language, English
+// below a clear divider for whoever came in through /en/.
+function bilingualMail({ subject, preheader, nlText, enText, nlHtml, enHtml, refId }) {
+  const text = `${nlText}\n\n-------- English --------\n\n${enText}`;
+  const html = htmlShell(preheader, `
+    <div lang="nl">${nlHtml}</div>
+    <hr style="border:none;border-top:1px solid rgba(11,58,106,0.16);margin:32px 0 8px 0;">
+    <p style="margin:0 0 16px 0;font-family:monospace;font-size:11px;letter-spacing:0.15em;color:#64748b;">ENGLISH</p>
+    <div lang="en">${enHtml}</div>
+  `, 'nl');
+  return { ...wrap(text, html, { refId }), subject };
+}
+
+// The lifetime arrives as an English phrase from admin/server.js
+// (setupTokenValidFor): "1 hour", "36 hours", "2 days".
+function nlDuration(phrase) {
+  return String(phrase)
+    .replace(/\b1 hour\b/, '1 uur').replace(/\b(\d+) hours\b/, '$1 uur')
+    .replace(/\b1 day\b/, '1 dag').replace(/\b(\d+) days\b/, '$1 dagen');
+}
+
 // ── 1. SETUP EMAIL ────────────────────────────────────────────────────────────
-function setupEmail({ token, requestedAt, requestIP, isReset = false }) {
+// `validFor` is the human phrase for the link's lifetime. It is a parameter and
+// not a constant, because the number lives in admin/server.js
+// (SETUP_TOKEN_TTL_S) and a second copy here is how the mail came to promise
+// fourteen days after the link was shortened. setup-link-gate.test.js holds the
+// two together.
+function setupEmail({ token, requestedAt, requestIP, isReset = false, validFor = '2 days' }) {
   const url = `${BASE_URL}/auth/setup/${token}`;
   const preheader = isReset
-    ? 'Your TOTP authenticator has been cleared. Scan the QR code to re-enroll.'
-    : 'Scan the QR code with your authenticator app to finish signup.';
+    ? 'Uw authenticator-app is losgekoppeld. Scan de nieuwe QR-code.'
+    : 'Scan de QR-code met uw authenticator-app om uw account af te maken.';
 
   const resetWarn = isReset
     ? '\nIMPORTANT: delete your old Paramant entry from your authenticator app\nbefore scanning the new QR code — the old entry no longer works.\n'
     : '';
 
-  const text = `Hi,
+  const enText = `Hi,
 
 ${isReset ? 'Your TOTP authenticator has been reset.' : 'Welcome to Paramant.'} To ${isReset ? 'reset your' : 'finish setting up your'} account,
 connect an authenticator app. This is what Paramant uses instead of a password.
@@ -83,7 +141,7 @@ The link opens a page with a QR code. Scan it with your authenticator app
 (Google Authenticator, Authy, 1Password, or any TOTP app). You can also
 enter the secret manually if scanning does not work.
 
-This link is valid for 14 days.
+This link is valid for ${validFor}.
 
 Why an authenticator?
 
@@ -109,34 +167,74 @@ https://paramant.app`;
       </div>`
     : '';
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${isReset ? 'Set up your new Paramant authenticator' : 'Complete your Paramant account setup'}</h1>
     ${resetBanner}
     <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Your TOTP authenticator has been reset.' : 'Welcome to Paramant.'} To ${isReset ? 'reset your' : 'finish setting up your'} account, connect an authenticator app &mdash; this is what Paramant uses instead of a password.</p>
     ${btn(url, isReset ? 'Set up new authenticator' : 'Complete setup')}
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">The link opens a page with a QR code. Scan it with your authenticator app (Google Authenticator, Authy, 1Password, or any TOTP app). You can also enter the secret manually.</p>
-    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link is valid for <strong>14 days</strong>.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link is valid for <strong>${escHtml(validFor)}</strong>.</p>
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
     <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Why an authenticator?</h2>
     <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Passwords get reused, stolen, or phished. A TOTP code from your phone cannot be typed into a fake site or intercepted in a credential dump. It is the same mechanism your bank uses.</p>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">After setup you receive 10 backup codes. Save them somewhere safe (password manager, printed copy in a drawer) in case you lose your phone.</p>
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
     <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Did not request this reset?</strong> Contact support immediately at <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Did not sign up for Paramant?</strong> Ignore this email. No account is created until you complete setup.'}</p>
-    <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">Time: ${formatTS(requestedAt || Date.now())}<br>IP: ${maskIP(requestIP)}</p>
-  `);
+    <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">Time: ${formatTS(requestedAt || Date.now())}<br>IP: ${escHtml(maskIP(requestIP))}</p>
+  `;
 
-  return {
-    ...wrap(text, html, { refId: 'setup-' + token.slice(0, 8) }),
-    subject: isReset ? 'Set up your new Paramant authenticator' : 'Complete your Paramant account setup',
-  };
+  const nlValid = nlDuration(validFor);
+  const nlText = `Hallo,
+
+${isReset ? 'Uw authenticator-app is losgekoppeld.' : 'Welkom bij Paramant.'} Koppel een authenticator-app om ${isReset ? 'uw account weer te gebruiken' : 'uw account af te maken'}.
+Die gebruikt Paramant in plaats van een wachtwoord.
+
+${isReset ? 'Nieuwe authenticator-app instellen' : 'Account afmaken'}:
+${url}
+${isReset ? '\nBELANGRIJK: verwijder eerst de oude Paramant-regel uit uw authenticator-app.\nDie codes werken niet meer.\n' : ''}
+De link opent een pagina met een QR-code. Scan die met uw authenticator-app
+(Google Authenticator, Authy, 1Password of een andere TOTP-app). Lukt scannen
+niet, dan kunt u de sleutel ook met de hand invullen. U kunt daar ook een passkey kiezen.
+
+Deze link werkt ${nlValid}.
+
+Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek
+(wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.
+
+${isReset ? 'Hebt u deze reset niet aangevraagd? Mail dan meteen hello@paramant.app.' : 'Hebt u zich niet aangemeld bij Paramant? Dan kunt u deze mail negeren. Er komt pas een account als het instellen is afgerond.'}
+
+Tijd:  ${formatTS(requestedAt || Date.now())}
+IP:    ${maskIP(requestIP)}
+
+Paramant
+https://paramant.app`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${isReset ? 'Stel uw nieuwe authenticator-app in' : 'Maak uw Paramant-account af'}</h1>
+    ${isReset ? `<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:0 0 20px 0;">
+        <p style="margin:0;line-height:1.5;color:#92400E;font-size:14px;"><strong>Authenticator-app losgekoppeld.</strong> Verwijder eerst de oude Paramant-regel uit uw app. Die codes werken niet meer.</p>
+      </div>` : ''}
+    <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Uw authenticator-app is losgekoppeld.' : 'Welkom bij Paramant.'} Koppel een authenticator-app of een passkey om ${isReset ? 'uw account weer te gebruiken' : 'uw account af te maken'}. Die gebruikt Paramant in plaats van een wachtwoord.</p>
+    ${btn(url, isReset ? 'Nieuwe authenticator-app instellen' : 'Account afmaken')}
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">De link opent een pagina met een QR-code. Scan die met uw authenticator-app (Google Authenticator, Authy, 1Password of een andere TOTP-app). U kunt de sleutel ook met de hand invullen.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">Deze link werkt <strong>${escHtml(nlValid)}</strong>.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek (wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.</p>
+    <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Deze reset niet aangevraagd?</strong> Mail dan meteen <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Niet aangemeld bij Paramant?</strong> Dan kunt u deze mail negeren. Er komt pas een account als het instellen is afgerond.'}</p>
+  `;
+
+  return bilingualMail({
+    subject: isReset ? 'Stel uw nieuwe authenticator-app in voor Paramant' : 'Maak uw Paramant-account af',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'setup-' + refIdHash(token),
+  });
 }
 
 // ── 2. RESET CONFIRMATION EMAIL ───────────────────────────────────────────────
 function resetConfirmationEmail({ confirmToken, requestedAt, requestIP }) {
   const url = `${BASE_URL}/auth/reset-confirm/${confirmToken}`;
-  const preheader = 'Confirm that you requested a TOTP authenticator reset — link expires in 1 hour.';
+  const preheader = 'Bevestig dat u een nieuwe authenticator-app wilt koppelen. De link werkt 1 uur.';
 
-  const text = `Hi,
+  const enText = `Hi,
 
 Someone requested a reset of your Paramant authenticator (TOTP).
 
@@ -159,12 +257,12 @@ they would also need access to your inbox to click this link.
 
 Request details:
   Time: ${formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt))}
-  IP:   ${requestIP || 'unknown'}
+  IP:   ${maskIP(requestIP)}
 
 Paramant
 https://paramant.app`;
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Did you request a TOTP reset?</h1>
     <p style="margin:0 0 16px 0;line-height:1.6;">Someone requested a reset of your Paramant authenticator (TOTP).</p>
     <p style="margin:0 0 16px 0;line-height:1.6;">If this was you, click below to confirm. You will then receive a second email with your new authenticator setup link.</p>
@@ -178,14 +276,52 @@ https://paramant.app`;
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:13px;">This two-step flow protects you from accidental or malicious resets. An attacker who knows your email address alone cannot force a reset &mdash; they would also need access to your inbox to click this link.</p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">
       Time: ${formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt))}<br>
-      IP: ${requestIP || 'unknown'}
+      IP: ${escHtml(maskIP(requestIP))}
     </p>
-  `);
+  `;
 
-  return {
-    ...wrap(text, html, { refId: 'reset-confirm-' + confirmToken.slice(0, 8) }),
-    subject: 'Did you request a TOTP reset? — Paramant',
-  };
+  const when = formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt));
+  const nlText = `Hallo,
+
+Iemand vroeg om uw Paramant-account aan een nieuwe authenticator-app te koppelen.
+
+Was u dat, bevestig het dan met de link hieronder. Daarna krijgt u een tweede
+mail met de link om de nieuwe authenticator-app in te stellen.
+
+Reset bevestigen:
+${url}
+
+Deze link werkt 1 uur.
+
+Was u dit niet, negeer deze mail dan. Er verandert niets en uw huidige
+authenticator-app blijft gewoon werken.
+
+Waarom twee mails? Wie alleen uw e-mailadres kent, kan zo geen reset
+afdwingen. Daarvoor is ook toegang tot uw inbox nodig.
+
+Tijd: ${when}
+IP:   ${maskIP(requestIP)}
+
+Paramant
+https://paramant.app`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Vroeg u om een nieuwe authenticator-app?</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">Iemand vroeg om uw Paramant-account aan een nieuwe authenticator-app te koppelen.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;">Was u dat, bevestig het dan hieronder. Daarna krijgt u een tweede mail met de link om de nieuwe authenticator-app in te stellen.</p>
+    ${btn(url, 'Reset bevestigen')}
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">Deze link werkt <strong>1 uur</strong>.</p>
+    <div style="background:#F0F9FF;border-left:3px solid #1D4ED8;padding:12px 16px;margin:0 0 24px 0;">
+      <p style="margin:0;line-height:1.5;color:#0B3A6A;font-size:14px;"><strong>Niet aangevraagd?</strong> Negeer deze mail. Er verandert niets en uw huidige authenticator-app blijft gewoon werken.</p>
+    </div>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:13px;">Waarom twee mails? Wie alleen uw e-mailadres kent, kan zo geen reset afdwingen. Daarvoor is ook toegang tot uw inbox nodig.</p>
+  `;
+
+  return bilingualMail({
+    subject: 'Nieuwe authenticator-app bevestigen · Paramant',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'reset-confirm-' + refIdHash(confirmToken),
+  });
 }
 
 // ── 3. WELCOME / API KEY EMAIL ────────────────────────────────────────────────
@@ -225,9 +361,9 @@ https://paramant.app`;
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Your Paramant API key is ready</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">An administrator has issued a Paramant API key for your account.</p>
     <table style="border-collapse:collapse;margin:0 0 24px 0;width:100%;">
-      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Plan</td><td style="padding:8px 0;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${plan}</span></td></tr>
-      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Label</td><td style="padding:8px 0;">${label || '<em style="color:#94a3b8;">unlabeled</em>'}</td></tr>
-      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Sectors</td><td style="padding:8px 0;font-family:monospace;font-size:13px;">${(sectors || []).join(', ') || 'all'}</td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Plan</td><td style="padding:8px 0;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${escHtml(plan)}</span></td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Label</td><td style="padding:8px 0;">${label ? escHtml(label) : '<em style="color:#94a3b8;">unlabeled</em>'}</td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Sectors</td><td style="padding:8px 0;font-family:monospace;font-size:13px;">${escHtml((sectors || []).join(', ') || 'all')}</td></tr>
       <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Key (masked)</td><td style="padding:8px 0;font-family:monospace;font-size:13px;color:#0B3A6A;">${masked}</td></tr>
     </table>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">The full key was provided separately by the administrator who issued it.</p>
@@ -248,13 +384,29 @@ https://paramant.app`;
   `);
 
   return {
-    ...wrap(text, html, { refId: 'welcome-' + apiKey.slice(0, 8) }),
+    ...wrap(text, html, { refId: 'welcome-' + refIdHash(apiKey) }),
     subject: 'Your Paramant API key is ready',
   };
 }
 
 // ── 4. BILLING CONFIRMATION ───────────────────────────────────────────────────
-function billingConfirmationEmail({ planName, period, amountStr, stub = true }) {
+// Sent by the admin panel when a plan is set on an account from the inside.
+// Every caller of this template is that path, and the note it carries used to
+// say the opposite of the truth: that payments were in beta, that the customer
+// would be invoiced by hand, that real invoicing was still waiting on Mollie.
+// All three were false by September 2026. relay.js POST /v2/billing/checkout
+// calls mollie.createPayment against api.mollie.com unconditionally, the
+// webhook only grants on a re-fetched status paid (lib/billing.js), and it
+// issues a numbered document per payment on its own: lib/invoice.js, series
+// PS-YYYY-NNNN, an invoice when a seller VAT number is configured and a payment
+// receipt when it is not, plus lib/credit-note.js (CN-YYYY-NNNN) when money
+// goes back.
+//
+// What IS true of THIS mail is the other half: an admin-set plan is not a
+// purchase. No payment was taken, so no document is issued for it, and the
+// customer should not go looking for one. noPayment says exactly that and
+// nothing more.
+function billingConfirmationEmail({ planName, period, amountStr, noPayment = true }) {
   const preheader = `Your Paramant plan is now ${planName}.`;
   const periodLabel = period === 'yearly' ? 'Yearly' : period === 'monthly' ? 'Monthly' : 'Admin-provisioned';
 
@@ -265,7 +417,7 @@ Your Paramant plan has been upgraded.
 Plan:    ${planName}
 Billing: ${periodLabel}
 Amount:  ${amountStr || 'N/A'}
-${stub ? '\nNote: payment processing is in beta. This confirmation reflects the\nplan change on your account. Formal invoicing follows when Stripe\nintegration goes live.\n' : ''}
+${noPayment ? '\nNote: Paramant set this plan on your account. Nothing was charged for\nit, so this change has no invoice. A plan bought on paramant.app is paid\nthrough Mollie, and every payment gets a numbered invoice or payment\nreceipt that stays on your account page.\n' : ''}
 Questions about billing? Reply to this email.
 
 Paramant
@@ -279,13 +431,57 @@ https://paramant.app`;
       <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Billing</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;">${periodLabel}</td></tr>
       <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Amount</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;">${amountStr || 'N/A'}</td></tr>
     </table>
-    ${stub ? '<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:24px 0;"><p style="margin:0;line-height:1.5;color:#92400E;font-size:13px;"><strong>Beta note:</strong> payment processing is not yet live. This confirmation reflects the plan change on your account. Formal invoicing follows when Stripe integration goes live.</p></div>' : ''}
+    ${noPayment ? '<div style="background:rgba(11,58,106,0.04);border-left:3px solid #1D4ED8;padding:12px 16px;margin:24px 0;"><p style="margin:0;line-height:1.5;color:#475569;font-size:13px;"><strong>No payment for this change:</strong> Paramant set this plan on your account, so nothing was charged and this change has no invoice. A plan bought on paramant.app is paid through Mollie, and every payment gets a numbered invoice or payment receipt that stays on your account page.</p></div>' : ''}
     <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Questions about billing? Reply to this email.</p>
   `);
 
   return {
     ...wrap(text, html, { refId: 'billing-' + Date.now() }),
     subject: `Paramant plan upgraded to ${planName}`,
+  };
+}
+
+// ── 4b. PER-PRODUCT PLAN CHANGE ───────────────────────────────────────────────
+// Sent when an admin sets a SINGLE product's tier (ParaSign or ParaSend) without
+// touching the other product or the unified plan. Deliberately carries NO
+// billing note of any kind: this is a scoped entitlement change, and the mail
+// above is the one that answers for a plan and its money. productName is a
+// display name ("ParaSign"), tierName the tier ("Pro"); both are constants
+// from the caller.
+function productPlanChangeEmail({ productName, tierName }) {
+  const safeProduct = escHtml(productName || 'your product');
+  const safeTier = escHtml(tierName || '');
+  const preheader = `Your ${safeProduct} plan is now ${safeTier}.`;
+
+  const text = `Hi,
+
+Your ${productName} plan has been updated.
+
+Product: ${productName}
+Tier:    ${tierName}
+
+Only your ${productName} entitlement changed. Your other Paramant products
+and their tiers are unaffected.
+
+Questions? Reply to this email.
+
+Paramant
+https://paramant.app`;
+
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${safeProduct} plan updated to ${safeTier}</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your ${safeProduct} plan has been updated.</p>
+    <table style="border-collapse:collapse;margin:0 0 24px 0;width:100%;">
+      <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Product</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;">${safeProduct}</td></tr>
+      <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Tier</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${safeTier}</span></td></tr>
+    </table>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Only your ${safeProduct} entitlement changed. Your other Paramant products and their tiers are unaffected.</p>
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Questions? Reply to this email.</p>
+  `);
+
+  return {
+    ...wrap(text, html, { refId: 'product-plan-' + Date.now() }),
+    subject: `Paramant ${productName} plan updated to ${tierName}`,
   };
 }
 
@@ -334,47 +530,97 @@ https://paramant.app`;
 }
 
 // ── 6. ACCOUNT DELETION ───────────────────────────────────────────────────────
+// This mail used to say that account records were retained and that erasure was
+// a separate request to privacy@. That was true while deletion only revoked the
+// key and cleared Redis, leaving the email address in users.json on every sector
+// (audit finding 5 of 2026-07-21). Deletion now erases the personal data itself,
+// so the old wording understated what happened, and a mail that undersells an
+// erasure is as untrue as one that oversells it.
 function accountDeletionEmail({ email, deletedAt, reason }) {
-  const preheader = 'Your Paramant account has been deleted.';
+  const preheader = 'Uw Paramant-account is gedeactiveerd.';
   const dateStr = formatTS(typeof deletedAt === 'number' ? deletedAt : Date.parse(deletedAt));
 
-  const text = `Hi,
+  const enText = `Hi,
 
-Your Paramant account (${email}) was deleted on ${dateStr}.
+Your Paramant account (${email}) was deactivated on ${dateStr}.
+
+Its API key can no longer be used. Active sessions and the TOTP setup were removed, and your personal data was erased from our systems.
 
 What this means:
 - API key no longer works
 - Active sessions terminated
 - Personal data removed from our systems
-- Audit logs retained for 90 days per compliance policy
-- Files already relayed are not affected (end-to-end encrypted)
+- Billing records kept for as long as tax law requires
+
+If you have a question about what was kept and why, contact privacy@paramant.app.
 
 Reason: ${reason || 'not specified'}
 
-If this was a mistake or you want to return later, sign up again
-at https://paramant.app/signup with a new account.
+If this was a mistake or you want to restore access, contact
+support@paramant.app.
 
 Paramant
 https://paramant.app`;
 
-  const html = htmlShell(preheader, `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deleted</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${email}) was deleted on <strong>${dateStr}</strong>.</p>
+  const enHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deactivated</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${escHtml(email)}) was deactivated on <strong>${dateStr}</strong>.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Its API key can no longer be used. Active sessions and the TOTP setup were removed, and your personal data was erased from our systems.</p>
     <h2 style="margin:24px 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">What this means</h2>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>API key no longer works</li>
       <li>Active sessions terminated</li>
       <li>Personal data removed from our systems</li>
-      <li>Audit logs retained for 90 days per compliance policy</li>
-      <li>Files already relayed are not affected (end-to-end encrypted)</li>
+      <li>Billing records kept for as long as tax law requires</li>
     </ul>
+    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">If you have a question about what was kept and why, contact <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:12px 16px;margin:0 0 24px 0;">
-      <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason || 'not specified'}</p>
+      <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason ? escHtml(reason) : 'not specified'}</p>
     </div>
-    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to return later, <a href="https://paramant.app/signup" style="color:#1D4ED8;">sign up again</a> with a new account.</p>
-  `);
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to restore access, contact <a href="mailto:support@paramant.app" style="color:#1D4ED8;">support@paramant.app</a>.</p>
+  `;
 
-  return { ...wrap(text, html, { refId: 'deletion-' + Date.now() }), subject: 'Your Paramant account has been deleted' };
+  const nlText = `Hallo,
+
+Uw Paramant-account (${email}) is gedeactiveerd op ${dateStr}.
+
+De API-sleutel werkt niet meer. Actieve sessies en de koppeling met uw authenticator-app zijn verwijderd, en uw persoonsgegevens zijn uit onze systemen gewist.
+
+Wat dit betekent:
+- De API-sleutel werkt niet meer
+- Actieve sessies zijn beëindigd
+- Persoonsgegevens zijn uit onze systemen verwijderd
+- Betaalgegevens bewaren wij zo lang als de belastingwet vraagt
+
+Vragen over wat er bewaard is en waarom? Mail privacy@paramant.app.
+
+Reden: ${reason || 'niet opgegeven'}
+
+Was dit een vergissing, of wilt u weer toegang? Mail support@paramant.app.
+
+Paramant
+https://paramant.app`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account gedeactiveerd</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Uw Paramant-account (${escHtml(email)}) is gedeactiveerd op <strong>${dateStr}</strong>.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">De API-sleutel werkt niet meer. Actieve sessies en de koppeling met uw authenticator-app zijn verwijderd, en uw persoonsgegevens zijn uit onze systemen gewist.</p>
+    <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
+      <li>De API-sleutel werkt niet meer</li>
+      <li>Actieve sessies zijn beëindigd</li>
+      <li>Persoonsgegevens zijn uit onze systemen verwijderd</li>
+      <li>Betaalgegevens bewaren wij zo lang als de belastingwet vraagt</li>
+    </ul>
+    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">Vragen over wat er bewaard is en waarom? Mail <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
+    <p style="margin:0 0 20px 0;font-size:13px;color:#475569;"><strong>Reden:</strong> ${reason ? escHtml(reason) : 'niet opgegeven'}</p>
+    <p style="margin:0;line-height:1.6;color:#475569;font-size:14px;">Was dit een vergissing, of wilt u weer toegang? Mail <a href="mailto:support@paramant.app" style="color:#1D4ED8;">support@paramant.app</a>.</p>
+  `;
+
+  return bilingualMail({
+    subject: 'Uw Paramant-account is gedeactiveerd',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'deletion-' + Date.now(),
+  });
 }
 
 // ── SIGNUP VERIFICATION EMAIL ────────────────────────────────────────────────
@@ -383,8 +629,8 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
   const dateStr = formatTS(requestedAt);
   const maskedIp = maskIP(requestIP);
 
-  const preheader = 'Confirm your email to activate your Paramant account.';
-  const text = [
+  const preheader = 'Bevestig uw e-mailadres om uw Paramant-account te activeren.';
+  const enText = [
     'Verify your Paramant account',
     '',
     `You requested an account for ${email}.`,
@@ -399,10 +645,10 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
     '— Paramant',
   ].join('\n');
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Verify your email</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">
-      You requested a Paramant account for <strong>${email}</strong>. Click the button below to confirm your email address and activate your account.
+      You requested a Paramant account for <strong>${escHtml(email)}</strong>. Click the button below to confirm your email address and activate your account.
     </p>
     <div style="text-align:center;margin:0 0 28px 0;">
       <a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Verify email &amp; activate account</a>
@@ -414,12 +660,49 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
       <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
         This link expires in <strong>24 hours</strong>. If you did not request a Paramant account, ignore this email — no account will be created.
-        <br>Requested ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}.
+        <br>Requested ${dateStr}${requestIP ? ' · IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
-  `);
+  `;
 
-  return { ...wrap(text, html, { refId: 'verify-' + token.slice(0, 8) }), subject: 'Verify your Paramant account' };
+  const nlText = [
+    'Bevestig uw Paramant-account',
+    '',
+    `U vroeg een account aan voor ${email}.`,
+    'Open de link hieronder om uw e-mailadres te bevestigen en uw account te activeren:',
+    '',
+    url,
+    '',
+    'Deze link werkt 24 uur. Hebt u dit niet aangevraagd, dan kunt u deze mail negeren.',
+    '',
+    `Aangevraagd: ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}`,
+    '',
+    'Paramant',
+  ].join('\n');
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Bevestig uw e-mailadres</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">
+      U vroeg een Paramant-account aan voor <strong>${escHtml(email)}</strong>. Klik op de knop om uw e-mailadres te bevestigen en uw account te activeren.
+    </p>
+    <div style="text-align:center;margin:0 0 28px 0;">
+      <a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">E-mailadres bevestigen</a>
+    </div>
+    <p style="margin:0 0 8px 0;font-size:13px;color:#64748B;">
+      Of kopieer deze link naar uw browser:<br>
+      <a href="${url}" style="color:#1D4ED8;word-break:break-all;">${url}</a>
+    </p>
+    <p style="margin:16px 0 0 0;font-size:12px;color:#94A3B8;line-height:1.6;">
+      Deze link werkt <strong>24 uur</strong>. Hebt u geen Paramant-account aangevraagd, negeer deze mail dan. Er wordt dan geen account gemaakt.
+      <br>Aangevraagd ${dateStr}${requestIP ? ' · IP: ' + escHtml(maskedIp) : ''}.
+    </p>
+  `;
+
+  return bilingualMail({
+    subject: 'Bevestig uw Paramant-account',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'verify-' + refIdHash(token),
+  });
 }
 
 // ── DUPLICATE SIGNUP ATTEMPT NOTICE ─────────────────────────────────────────
@@ -432,8 +715,8 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
   const maskedIp = maskIP(requestIP);
   const loginUrl = `${BASE_URL}/auth/login`;
 
-  const preheader = 'Someone tried to create a Paramant account with your email.';
-  const text = [
+  const preheader = 'Iemand probeerde een Paramant-account te maken met uw e-mailadres.';
+  const enText = [
     'Signup attempt on your Paramant account',
     '',
     `Someone just attempted to create a Paramant account using ${email}.`,
@@ -449,10 +732,10 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
     'Paramant',
   ].join('\n');
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signup attempt on your account</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">
-      Someone just tried to create a Paramant account with <strong>${email}</strong>. Your existing account was not changed and no new account was created.
+      Someone just tried to create a Paramant account with <strong>${escHtml(email)}</strong>. Your existing account was not changed and no new account was created.
     </p>
     <p style="margin:0 0 20px 0;line-height:1.6;">
       If this was you trying to sign in, use the login page:
@@ -463,12 +746,47 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
       <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
         If this was not you, ignore this email. The attempt was rate-limited and no account was created.
-        <br>Attempt at ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}.
+        <br>Attempt at ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
-  `);
+  `;
 
-  return { ...wrap(text, html, { refId: 'dup-' + Date.now().toString(36) }), subject: 'Signup attempt on your Paramant account' };
+  const nlText = [
+    'Aanmeldpoging op uw Paramant-account',
+    '',
+    `Iemand probeerde net een Paramant-account te maken met ${email}.`,
+    'Uw bestaande account is niet veranderd en er is geen nieuw account gemaakt.',
+    '',
+    'Wilde u zelf inloggen? Gebruik dan de inlogpagina:',
+    loginUrl,
+    '',
+    'Was u dit niet, negeer deze mail dan. Er geldt een limiet op zulke pogingen.',
+    '',
+    `Poging op: ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}`,
+    '',
+    'Paramant',
+  ].join('\n');
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Aanmeldpoging op uw account</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">
+      Iemand probeerde net een Paramant-account te maken met <strong>${escHtml(email)}</strong>. Uw bestaande account is niet veranderd en er is geen nieuw account gemaakt.
+    </p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Wilde u zelf inloggen? Gebruik dan de inlogpagina:</p>
+    <div style="text-align:center;margin:0 0 28px 0;">
+      <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Inloggen bij Paramant</a>
+    </div>
+    <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
+      Was u dit niet, negeer deze mail dan. Er geldt een limiet op zulke pogingen en er is geen account gemaakt.
+      <br>Poging op ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
+    </p>
+  `;
+
+  return bilingualMail({
+    subject: 'Aanmeldpoging op uw Paramant-account',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'dup-' + Date.now().toString(36),
+  });
 }
 
 // ── BACKUP CODES RESET NOTIFICATION ─────────────────────────────────────────
@@ -531,22 +849,193 @@ function backupCodesResetEmail({ email, requestedAt }) {
 }
 
 // ── SEND HELPER ───────────────────────────────────────────────────────────────
+// ── PARASIGN ONBOARDING (NL) ──────────────────────────────────────────────────
+// Onboarding for the ParaSign /v1 signing API. Sent by an admin after the
+// `parasign` grant is toggled on. Mirrors welcomeEmail's security posture: only
+// a MASKED key appears in the body -- the full key was issued separately -- so
+// no secret lands in the mailbox or the Resend logs. Content is Dutch (NL).
+function parasignOnboardingEmail({ apiKey, plan, label, enabled = true }) {/*MARK:parasign_tpl*/
+  const preheader = 'Uw ParaSign-API staat aan. Zo ondertekent u uw eerste document.';
+  const masked = apiKey.slice(0, 12) + '...' + apiKey.slice(-4);
+  const docsUrl = `${BASE_URL}/docs`;
+
+  const text = `Hallo,
+
+De ParaSign-API voor ondertekenen (/v1) staat nu aan voor uw account.
+
+Plan:        ${plan}
+Label:       ${label || '(geen label)'}
+API-sleutel: ${masked}
+
+De beheerder heeft u de volledige sleutel apart gegeven.
+
+Aan de slag:
+
+1. Zet uw sleutel in de X-Api-Key-header bij elke aanroep van de ParaSign-API
+2. Documentatie: ${docsUrl}
+3. De ParaSign-endpoints staan onder /v1 op de Paramant-relay
+
+Uw sleutel veilig bewaren:
+
+- Bewaar hem in een wachtwoordbeheerder, nooit als gewone tekst
+- Zet hem niet in versiebeheer (.env-bestanden lekken)
+- Vervang hem meteen als u denkt dat iemand anders hem kent
+
+Vragen? Antwoord gewoon op deze mail.
+
+Paramant
+${BASE_URL}`;
+
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Uw ParaSign-API staat aan</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Een beheerder heeft de ParaSign-API voor ondertekenen (<code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">/v1</code>) voor uw account aangezet.</p>
+    <table style="border-collapse:collapse;margin:0 0 24px 0;width:100%;">
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Plan</td><td style="padding:8px 0;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${escHtml(plan)}</span></td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Label</td><td style="padding:8px 0;">${label ? escHtml(label) : '<em style="color:#94a3b8;">geen label</em>'}</td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">API-sleutel</td><td style="padding:8px 0;font-family:monospace;font-size:13px;color:#0B3A6A;">${masked}</td></tr>
+    </table>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">De beheerder die de sleutel uitgaf, heeft u de volledige sleutel apart gegeven.</p>
+    <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Aan de slag</h2>
+    <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
+      <li>Zet uw sleutel in de <code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">X-Api-Key</code>-header bij elke aanroep</li>
+      <li>De ParaSign-endpoints staan onder <code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">/v1</code> op de relay</li>
+    </ul>
+    ${btn(docsUrl, 'Bekijk de documentatie')}
+    <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
+    <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Uw sleutel veilig bewaren</h2>
+    <ul style="margin:0 0 16px 0;padding-left:20px;line-height:1.7;color:#475569;font-size:13px;">
+      <li>Bewaar hem in een wachtwoordbeheerder, nooit als gewone tekst</li>
+      <li>Zet hem niet in versiebeheer (.env-bestanden lekken)</li>
+      <li>Vervang hem meteen als u denkt dat iemand anders hem kent</li>
+    </ul>
+    <p style="margin:16px 0 0 0;color:#475569;font-size:14px;">Vragen? Antwoord gewoon op deze mail.</p>
+  `);
+
+  return {
+    ...wrap(text, html, { refId: 'parasign-' + refIdHash(apiKey) }),
+    subject: 'Uw ParaSign-API staat aan',
+  };
+}
+
+// The invitation to sign, and the same mail sent a second time on request.
+//
+// WHAT THIS MAIL MAY NOT CARRY, AND WHY THE RULE IS ABSOLUTE.
+// A signing link has two halves. Everything before the '#' names the request;
+// the fragment after it IS the AES key to the document. This message is posted
+// to a mail provider incorporated in the United States, so a fragment reaching
+// this function would put the decryption key, the address of the ciphertext and
+// the recipient in one American mailbox. Six sentences on paramant.app promise
+// that no US party ever holds a key. So the mail carries the notice and never
+// the key: the sender passes the opening link on over a channel they choose.
+//
+// The filename is out for the same reason. "opzegging-huurcontract.pdf" is the
+// content, not a label for it, and /dpa promises filenames are not stored or
+// handled in readable form. The recipient reads the name once the link has
+// opened the document in their own browser.
+//
+// This is why the function takes neither a documentName nor a flag for whether
+// the link carries a key: there is one kind of invitation mail now, and it is
+// the one that can be posted abroad without contradicting the site.
+function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex, lang }) {
+  // The last gate before the mail provider, and the one that holds even when
+  // the two in front of it are wrong. The browser cuts the fragment off before
+  // it posts the invitation, and the invitations endpoint refuses a link that
+  // still has one; this cuts it again. A key arriving here is a bug upstream,
+  // and an outgoing mail is the worst possible place to discover it.
+  const noticeUrl = String(inviteUrl || '').split('#')[0];
+  // Dutch first with the English underneath, because the sender does not know
+  // which language the recipient reads. A caller that does know passes
+  // lang 'nl' or 'en' and gets that one language only.
+  const langs = lang === 'nl' ? ['nl'] : lang === 'en' ? ['en'] : ['nl', 'en'];
+  const DEFAULT_SUBJECT = { nl: 'Verzoek om te ondertekenen', en: 'Signature requested' };
+  const safeSubject = String(subject || '').trim().slice(0, 140)
+    || langs.map((l) => DEFAULT_SUBJECT[l]).join(' / ');
+  const expiryTs = expiresAt ? formatTS(expiresAt) : '';
+  const note = String(message || '').trim().slice(0, 1000);
+  const W = {
+    nl: {
+      greeting: recipientLabel ? `Beste ${recipientLabel},` : 'Beste,',
+      sender: senderLabel || 'Een Paramant-gebruiker',
+      asks: 'heeft u gevraagd een document te bekijken en te ondertekenen.',
+      carries: 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Vraag de afzender om de volledige link, of open het bestand als u al een kopie hebt.',
+      open: 'Open het verzoek',
+      fromSender: 'Bericht van de afzender:',
+      signIn: 'Log in met het e-mailadres waarop u bent uitgenodigd. Stuur de link niet door.',
+      closes: `Ondertekenen kan tot ${expiryTs || '7 dagen na het aanmaken'}.`,
+      heading: 'Verzoek om te ondertekenen',
+      pre: 'Er wacht een document op uw handtekening in Paramant.',
+    },
+    en: {
+      greeting: recipientLabel ? `Hi ${recipientLabel},` : 'Hi,',
+      sender: senderLabel || 'A Paramant user',
+      asks: 'has asked you to review and sign a document.',
+      carries: 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.',
+      open: 'Open the request',
+      fromSender: 'Message from the sender:',
+      signIn: 'Sign in with this invited email address. Do not forward the link.',
+      closes: `Signing closes at ${expiryTs || '7 days after creation'}.`,
+      heading: 'Signature requested',
+      pre: 'A document is waiting for your signature in Paramant.',
+    },
+  };
+  const textBlock = (w) => `${w.greeting}
+
+${w.sender} ${w.asks}
+${w.carries}
+
+${w.open}:
+${noticeUrl}
+
+${note ? `${w.fromSender}\n${note}\n\n` : ''}${w.signIn}
+${w.closes}`;
+  const text = langs.map((l) => textBlock(W[l])).join('\n\n---\n\n') + `
+
+Paramant
+${BASE_URL}`;
+  const htmlBlock = (w, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(w.heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(w.greeting)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;"><strong>${escHtml(w.sender)}</strong> ${escHtml(w.asks)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(w.carries)}</p>
+    ${note && first ? `<div style="margin:20px 0;padding:14px 16px;background:#F8FAFC;border:1px solid #E2E8F0;line-height:1.6;color:#334155;">${escHtml(note).replace(/\n/g, '<br>')}</div>` : ''}
+    ${btn(noticeUrl, escHtml(w.open))}
+    <p style="margin:20px 0 8px 0;line-height:1.6;color:#92400E;font-size:13px;"><strong>${escHtml(w.signIn)}</strong></p>
+    <p style="margin:0;color:#64748b;font-size:12px;">${escHtml(w.closes)}</p>`;
+  const html = htmlShell(langs.map((l) => W[l].pre).join(' '),
+    langs.map((l, i) => htmlBlock(W[l], i === 0)).join('\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">'),
+    langs[0]);
+  return {
+    ...wrap(text, html, { refId: 'sign-' + refIdHash(`${envelopeId}:${partyIndex}`) }),
+    subject: safeSubject,
+  };
+}
+
+// Every message this file sends goes through the one door in lib/mail.js.
+//
+// This used to POST straight to api.resend.com with RESEND_API_KEY, which meant
+// it was NOT part of "mail goes through one provider": the relay could be moved
+// to a European carrier while every account mail, signing invitation and
+// invoice from the admin kept flowing to a US company. Nothing would have
+// noticed, because it worked.
+//
+// Through the door, MAIL_PROVIDER decides, one setting for the whole product.
 async function sendEmail(to, templateResult) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: templateResult.from || FROM_ADDR,
-      to: [to],
-      subject: templateResult.subject,
-      html: templateResult.html,
-      text: templateResult.text,
-      headers: templateResult.headers || {},
-    }),
+  const r = await mailer.stuur({
+    to,
+    from: templateResult.from || FROM_ADDR,
+    subject: templateResult.subject,
+    html: templateResult.html,
+    text: templateResult.text,
+    headers: templateResult.headers || undefined,
+    attachments: templateResult.attachments || undefined,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  // The reason, never the provider's response body: an error payload echoes
+  // the submitted message back, including the recipient address and sometimes
+  // the body, which would otherwise land verbatim in our logs.
+  if (!r || !r.ok) {
+    throw new Error('mail failed: ' + ((r && r.reason) || 'unknown')
+                    + ' via ' + ((r && r.provider) || '?'));
+  }
 }
 
 module.exports = {
@@ -556,7 +1045,10 @@ module.exports = {
   duplicateSignupAttemptEmail,
   resetConfirmationEmail,
   welcomeEmail,
+  parasignOnboardingEmail, /*MARK:parasign_export*/
+  signingInviteEmail,
   billingConfirmationEmail,
+  productPlanChangeEmail,
   billingCancellationEmail,
   accountDeletionEmail,
   sendEmail,

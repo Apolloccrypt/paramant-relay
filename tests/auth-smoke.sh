@@ -27,11 +27,22 @@ check() {
   fi
 }
 
+# "not this status code" needs one more case than it looks like. curl writes
+# %{http_code} as 000 when it never got a response at all: DNS failure, refused
+# connection, or the --max-time 8 running out. Compared against '500' that is
+# "not 500", so every one of the ten checks below reported PASS for an endpoint
+# that answered nothing, which is a worse outcome than the 500 they exist to
+# catch. This script is a post-deploy and post-rollback gate, and a hung route
+# next to a healthy homepage is exactly the partial outage it should catch.
 check_not() {
   local name="$1"
   local actual="$2"
   local bad="$3"
-  if [ "$actual" != "$bad" ]; then
+  if [ -z "$actual" ] || [ "$actual" = "000" ]; then
+    printf "  FAIL  %s  (no response at all: curl returned '%s')\n" "$name" "$actual"
+    FAIL=$((FAIL + 1))
+    FAILURES="$FAILURES\n  - $name (no response)"
+  elif [ "$actual" != "$bad" ]; then
     printf "  PASS  %s\n" "$name"
     PASS=$((PASS + 1))
   else

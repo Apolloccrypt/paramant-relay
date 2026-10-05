@@ -10,6 +10,781 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **A gate that counts the work that never landed.** `fix/sector-port-drift` was
+  ready on 10 June 2026 and fixes four fallback ports in `admin/server.js` that
+  point at listeners which do not exist. It was never merged, PR #199 was closed,
+  and on 5 September a second investigation found the same bug and fixed it
+  again. That is the cost this measures: not tidiness, paying twice to find one
+  bug because we did not pay once to merge it. `scripts/check-landen.mjs` decides
+  "landed" in four layers, because `git branch --merged` is useless against a
+  squash merge and counts the whole backlog twice: ancestry, a MERGED pull
+  request for the branch, patch-id equality via `git cherry`, and whether the
+  branch's net diff already reverse-applies to main's tree. On origin on 5
+  September it reads 71 branches, 64 it cannot find in main and 50 outside it for
+  longer than seven days, the oldest at 100 days. It turns red on any
+  branch unlanded for more than seven days without a dated entry in
+  `deploy/landen-uitstel.json`, so a freeze needs an end date and the backlog
+  comes back on its own schedule. `deploy/landen.md` carries the method and the
+  reasoning behind the term, `deploy/landen-inhaalslag.md` the triage of all 64
+  unlanded branches into three piles, and `tests/landen-poort.test.mjs` proves on
+  throwaway repositories that a squash reads as landed and that a branch left
+  lying turns the gate red.
+
+### Fixed
+- **A business in another EU country paid 21% Dutch VAT.** A service to a
+  business established in another member state is taxed where that business is,
+  and the VAT is reverse charged (Directive 2006/112/EC art. 44 and 196). The
+  checkout now asks VIES about the buyer's VAT number (`relay/lib/vat.js`).
+  Reverse charged only with `BILLING_SELLER_VAT` set, a number from a member
+  state other than the Netherlands, a company name and an address on the account
+  that hold a real word (not ".", "-" or "BV"), an address that names no other
+  country, a VIES answer "valid" with a consultation number, and no clearly
+  different company or country in that answer (Implementing Regulation 282/2011
+  art. 18). Then the buyer is charged the net, the invoice says 0%, "Btw verlegd
+  / VAT reverse charged" and both VAT numbers, and the terms ride on the Mollie
+  payment so the webhook's amount check, every renewal and a credit note agree
+  with what was charged. What VIES answered (date, consultation number, name,
+  address) is kept under the consultation number and copied onto the invoice,
+  for thirty days while the checkout is unpaid and for good once its invoice
+  exists; a checkout that cannot keep it charges 21%. Everything else stays at
+  21%, and a buyer who entered an EU number and still pays 21% leaves a
+  `billing_vat` warning with the country and the reason, never the number. The
+  bookkeeping export has three new columns for the ICP return: `vat_treatment`,
+  `customer_country`, `vat_consultation`. Invoices already issued and the
+  numbering are untouched. `docker-compose.yml` did not pass the four
+  `BILLING_SELLER_*` variables to the relays at all; it does now, and an
+  unquoted `\n` in the address is read as a line break. Moneybird, still off,
+  does not book a reverse-charged document at a guessed rate. VIES is in
+  `deploy/partners.json`, on /privacy and on /dpa. Known gaps, not rules: a
+  business outside the EU is still charged 21% (#519), and the recurring layer
+  neither replaces an older 21% subscription after a reverse-charged purchase
+  nor asks VIES again per term (#520).
+- **A ParaSign API key kept creating envelopes after a chargeback, a refund or
+  the end of the paid term.** The mint route already refused a new `psk_` key in
+  those cases, but the `/v1` router only asked whether the key carried the
+  `parasign` scope, and a key carries that for life. `POST /v1/envelopes` now
+  also asks the account, on every create, with the same rule the mint route
+  uses; an account that no longer holds ParaSign gets 403
+  `parasign_not_entitled`. Reading, fetching the receipt and document of, and
+  voiding the account's own earlier envelopes keep answering as they do for a
+  paying account, under the same owner and participant checks: the proof of
+  contracts that were already signed stays available.
+  `relay/test/route-v1-entitlement.test.js` drives a paying account, a
+  chargeback and a lapsed term on a booted relay.
+- **An envelope number was enough to get the mail addresses of everyone who had
+  signed it.** `GET /v2/envelopes/:id` is public on purpose, because a recipient
+  is an outside party with no key, but it answered with the same object the
+  owner sees. Two of its fields did the damage. `signer_pk_hash` was the key
+  into `GET /v2/lookup-signer/:pk_hash`, which sits before the auth gate and
+  returned the signer's real address, so two unauthenticated GETs turned an
+  envelope id into a list of mailboxes. `doc_hash` was a confirmation oracle:
+  anyone holding a candidate file could prove offline that this exact document
+  was the one inside, which undoes the zero-knowledge claim at the metadata
+  layer. Alongside them the anonymous answer carried the original filename, the
+  name the sender typed for every party, and who signed when and where on the
+  page. The public projection now says how far along an envelope is and nothing
+  about who: status, counts, per-slot progress, expiry. Everything identifying
+  needs the party's invite token or the owner's key, and the address on
+  lookup-signer needs a live key. What a verifier checking a receipt actually
+  needs is still public, because it is in the receipt already: that a key is
+  enrolled, under what label, since when, and whether it was revoked. The relay's
+  own developer API had decided this the same way for the same object a year
+  earlier; two routes over one envelope with opposite answers is not a policy.
+- **Every per-IP limit in the relay could be switched off with one header.**
+  `getClientIp` read `X-Real-IP` and believed it, on the stated assumption that
+  nginx sets it authoritatively. nginx did that on the apex and on the relay
+  host. It did not on the four sector hostnames or in the `/rp/<sector>/` blocks
+  on the main site, and nginx forwards unknown client headers by default, so on
+  those hosts the caller chose their own address: the view limiter, the sign
+  limiter, the signer lookup, the claim, status and MFA limiters, the anonymous
+  upload window and the transparency ingest window all became optional at once.
+  The reverse case needed no attacker: where nobody set the header, everyone on
+  that hostname shared one bucket and one noisy visitor could lock out the rest.
+  Both sides are fixed. Every edge block that reaches a relay now sets the
+  address from the connection and clears the two headers a caller could
+  otherwise use to assert trust, and the relay believes a forwarded address only
+  from a peer inside its own trusted range and only when it is really an
+  address. A block someone forgets in future is now a lost address, not a
+  bypass.
+- **Monthly caps were a suggestion that held until two requests arrived
+  together.** Both quota gates read the counter, decided, and then wrote it, with
+  an `await` in between; on the live signing route the read and the increment sat
+  38 lines and a full ML-DSA-65 verification apart. Ten simultaneous requests all
+  read the same number, all found room, and all counted: eleven signatures on a
+  plan that sells two, with nothing logging a complaint. The gates now decide and
+  count in one Redis round trip, taking the same shape the coupon code has used
+  since it was written, and the sign route reserves its slot before storing and
+  gives it back when the signature is rejected or turns out to be a retry.
+- **Guessing a ParaShare secret cost nothing.** `POST /v2/session/join` answers
+  whether a caller-supplied pre-shared secret is correct. It carries no API key
+  by design, but it also had no limit, no attempt counter and no lockout, so
+  whoever had the session id could try passphrases at wire speed against a phrase
+  a person chose. Joining now costs a per-address window and a per-session budget
+  of five, and the fifth wrong answer destroys the session, so rotating source
+  addresses buys nothing. The comparison is constant-time like every other secret
+  comparison in the codebase. On the same route the error message and the
+  comments said the commitment was SHA-256 while the code computed SHA3-256; both
+  produce 64 hex characters, so an integrator following the message built a
+  session that could never be joined and only found out at a 403 blaming their
+  secret.
+- **A stranger could delete a transfer they could never read.** An anonymous blob
+  is stored without an owner, and the owner check was skipped entirely when there
+  was none. For reading that is the design and it is written down: the hash is
+  the capability, the payload is encrypted with a key the relay never sees, and
+  it burns after one read. Destroying is not reading. Anyone who glimpsed the
+  hash in an access log or a mail gateway's link scanner could end the transfer
+  without ever opening it. A blob with no owner now has no owner who can abort it
+  either; it goes when it burns or when its time runs out.
+- **Anyone could push every real relay out of the public federation list.**
+  `POST /v2/relays/register` verifies an ML-DSA-65 signature against the public
+  key in the same request, so registering is simply owning a keypair. That is the
+  design, but it had no rate limit while the transparency-ingest route next to it
+  does, for the reason spelled out in that route's own comment. Worse, the
+  eviction at capacity threw out the FIRST INSERTED entry, and a Map does not
+  reorder on update, so the relay that had been in the federation longest and was
+  still checking in every hour was the first to go. Every registration also wrote
+  an attacker-chosen url and sector into the transparency log, on disk, even when
+  it repeated an existing one, and each append gossips a signed head to every
+  peer. Registration is now budgeted per address, eviction takes the least
+  recently seen, and a registration that says nothing new moves a timestamp
+  instead of writing a log entry.
+- **Reading a device's public keys did not need the key that owns them.** Three
+  routes sit before the auth gate so the keyless share-link flow can work, and
+  that keylessness spilled onto the named slots: for an unknown API key the
+  account resolver returns the header value verbatim, so presenting an account id
+  as the key addressed that account's namespace. Account ids and API keys are the
+  same string today, so little was reachable that way; the moment accounts move
+  to non-secret ids it becomes a cross-account read. Named slots now need a live
+  key. The share-link branch stays keyless, which is why the routes are there.
+- **`GET /v2/lookup-signer/:pk_hash` returned a mail address to anyone.** The
+  comment defending that said the caller must already possess the envelope to
+  ask. That stopped being true when the public envelope view started publishing
+  the hash. The address now needs a live API key; everything a verifier needs is
+  still open.
+
+- **The public transparency log gave away the exact second, so anyone holding a
+  copy of a document could prove it went through Paramant.** A leaf is
+  `SHA3-256(0x02 || sha256(file) || SHA3-256(sector) || ts)`, with no salt and no
+  secret: the file hash is known to whoever has the file, the sector is one of
+  five, and the only thing left is the time. Rounding the published time to the
+  hour leaves 3.6e6 x 5 candidates, measured at 57 seconds on one core, which is
+  bad. Two routes left none at all. `GET /ct/feed` published the stored
+  millisecond `t`, and joining it on the index to the full `leaf_hash` that
+  `/v2/ct/log` publishes confirmed a candidate document in ONE hash for the fifty
+  most recent entries. The signed tree head was worse: one is produced on every
+  append, so `tree_size` N is leaf N-1, and its `timestamp` was `Date.now()`
+  taken microseconds after that leaf's own, one thousand deep in
+  `/v2/sth/history`, mirrored to every peer, and inside a signature where a
+  projection could not fix it. Both are now rounded to the hour, the head before
+  it is signed rather than after. Heads signed earlier keep their precise
+  timestamp and still verify, because verification rebuilds the canonical
+  payload from the fields a head carries and pins no resolution. The
+  full-precision timestamp stays where it belongs: in the stored entry, and in
+  the receipt the customer keeps and can recompute his own leaf from.
+  `relay/test/route-ct-public-time.test.js` runs the attack itself, and its last
+  case walks every public CT route and fails on any value carrying sub-hour
+  precision, so a route added later is covered without being listed.
+- **A relay that lost its log signed a second, contradictory history under the
+  same key.** `CT_FILE` defaulted to none, so persistence was opt-in;
+  `docker-compose.yml` opted in and production was fine, while every self-host
+  and every `node relay.js` kept the whole log in RAM. Measured: four entries,
+  restart, and `/v2/ct/log` comes back at size 0 while the ML-DSA-65 identity and
+  the signed head history come back intact, so the relay signs `tree_size` 1 a
+  second time over a different root and `/v2/sth/history` ends up holding two
+  contradictory heads for one tree size. Every receipt issued before the restart
+  also stops resolving: `/v2/ct/proof` answers 404 for an index past the log's
+  own size. The log is now persisted by default, beside the signed heads it
+  attests to (the directory of `STH_FILE`, else `/data/ct-log.json`), and an
+  explicitly empty `CT_FILE` still selects RAM-only for the caller who means it.
+  Independently of the default, `produceSth` now refuses to sign a head that
+  contradicts one already signed, or that walks `tree_size` backwards: it logs
+  `sth_refused_would_fork` at error level, exposes `forked` on the public
+  `/v2/sth` so an outside monitor can tell a frozen log from a quiet week, and
+  adds the `ct_log_persisted` and `ct_log_forked` gauges.
+- **Trust-on-first-use and attested signing-key enrolment answered 500 and never
+  reached the log.** `ctAppendSigningPkEvent` accepted exactly
+  `signing_pk_enrolled` and `signing_pk_revoked` and threw on anything else,
+  while two of its four call sites passed `signing_pk_enrolled_tofu` and
+  `signing_pk_enrolled_attested`. Both threw into the route's outer catch, after
+  the key had already been stored. All four names are now declared.
+- **The ParaSign heartbeat searched the log for an entry type nothing
+  published.** `ctAppendEnvelope` prefixed `envelope_` onto names that already
+  carried it, so the log held `envelope_envelope_sign` while
+  `scripts/heartbeat/parasign.mjs` filtered for `envelope_sign`. That filter is
+  the strongest evidence the heartbeat collects and it could not fire. Nothing
+  already signed moves: the leaf preimage takes the raw event name, never this
+  string, so no inclusion proof and no receipt changes value.
+- **A second purchase could lower what a customer had, hand him a year he did
+  not buy, or take away months he did.** A Firm payment or a Pro gift code put
+  a customer who had paid for ParaSign Business back on Pro, on relay-main only:
+  the other relays refuse a lower grant from redis, so the API and the screens
+  then disagreed. A Business month bought over a Firm year ran thirteen months,
+  because it was added to the end of the year, and the first repair of that
+  dropped the Pro year instead. A product now holds a term per tier
+  (`terms_parasign`, `terms_parasend`, written only when it holds more than
+  one, so every existing record reads and writes as before), and a gate grants
+  the highest tier whose term still runs: a Business month over a Firm year is
+  a month of Business and then Pro until the end of the year, in either order
+  of payment, on every relay and after a restart. A payment extends the term of
+  its own tier from its own end and touches no other; the shared redis row
+  carries every term; the expiry mail is about the day the product falls to
+  Community. An admin grant lowers a running plan only with `downgrade: true`,
+  and then keeps its end date (409 `lower_than_running` otherwise; the admin
+  panel asks first); taking a plan away is still setting the floor. The
+  checkout sells only what the site sells (`billing-catalog.resolveSale`, 400
+  `not_on_sale` for the old Pro plans) and no second plan next to a running one
+  (409 `other_plan_running`; renewing works). And the bundle marker now
+  survives a restart, so a Firm term gets one expiry mail that says Firm
+  instead of two about plans the customer never bought.
+  `relay/test/rang-van-een-recht.test.js` pins the rules;
+  `tests/rang-en-kassa.test.mjs` drives them over two relays, through the
+  checkout with two tabs in both orders, and through the admin server.
+
+### Added
+- **A field gate on the transparency log.** `relay/lib/ct-fields.js` declares,
+  by name, every field that may appear on a log entry, every event type each
+  entry family may use, and every key each payload may carry. Every `ctAppend*`
+  passes its entry through it: an undeclared field is stripped before anything
+  is stored, written to `CT_FILE` or published, and logged at error level, and an
+  undeclared event type throws. `relay/test/ct-fields.test.js` is what makes it a
+  gate rather than a list: it holds the declaration against a hand-written second
+  copy, so adding a field turns the build red until someone writes down what it
+  is, and it scans `relay.js`, `envelope.js` and the heartbeat for the literals
+  they really pass, which is what makes throwing safe and what found the two
+  guards above. The log is the one place where a stray field is permanent and
+  public at the same time, and there is no taking one back out.
+- **A signed-in account can see what is waiting for its own signature.** Until
+  now a signing request was reachable only through the per-party invite token in
+  its invitation email: `relay/envelope.js` indexed an envelope under its
+  creator and nowhere else, so the signed-in homepage and `/dashboard` could
+  show an account its outbox and nothing more, and a recipient who lost the mail
+  had lost the document. `create()` now also writes a per-party index
+  (`parasign:party:<party-email-hash>:envelopes`, a sorted set keyed on the same
+  namespaced sha3-256 the envelope record already stores, never on the address),
+  and a slot leaves it the moment it is signed or the envelope is completed or
+  withdrawn. Envelopes made before the index existed are filled in by a one-shot
+  migration at boot, under a redis `SET NX PX` lock so one of the five relay
+  containers does the scan, with a redis marker so no later restart repeats it;
+  it adds only slots that are still waiting, so a second run cannot resurrect a
+  row that signing removed. `GET /v2/parasign/inbox` answers with a document
+  name, who sent it, when it went out and when signing closes, and deliberately
+  with no invite token, no document hash and no capsule: the worklist is
+  knowing-that, and opening a document still takes the link in the mail. The
+  address it answers for is derived by the relay from the authenticated key and
+  is never read off a request header. The route is the fourth entry in the app
+  session-token allowlist; `SECURITY.md` carries the table and the reason.
+  `POST /v2/parasign/inbox/<id>/resend` is in no token scope at all, because it
+  reads the stored invite token back so the admin can mail the invitation again:
+  it is internal auth plus an asserted verified email hash, it mints nothing (the
+  seven-day signing window still runs from `created_at`, so a resent link dies
+  with the first one), it can only mail the address of the session that asked,
+  and it is capped at one per document per hour. The resent mail is the same
+  invitation template and says the one thing that differs: the sender's
+  encrypted copy of the document is unlocked by a key that lives in the URL
+  fragment, which no server ever received, so a server-built resend carries the
+  signing link and not that key. The signed-in homepage leads on the new number
+  ("2 documents are waiting for your signature"), with a "Waiting for your
+  signature" card above "Waiting on a signature" and a "Send me the link again"
+  button on each row; `/dashboard` gets the same section above its own requests,
+  and the box that used to tell a reader to go and look in his email now points
+  at the list.
+
+### Fixed
+- **Signatures past a plan's monthly quota are no longer priced at a rate nobody
+  collects.** Six places told a paying customer that extra ParaSign signatures
+  above 100 cost EUR 0.40 each and would appear on the next invoice: the Firm
+  card on `/pricing` and its billing FAQ, the Firm card on `/parasign`, the tier
+  line on the homepage, the plan summary on `/dashboard`, and the inline notice
+  after a signature in `frontend/js/quota-upgrade.js`. None of it could happen.
+  `relay/lib/billing-catalog.js` holds fixed monthly and yearly amounts and no
+  per-unit line, there is no usage line in `billing.js`, `invoice.js` or
+  `billing-recurring.js`, and the billable counter in `relay/lib/quota.js` had no
+  reader outside its own test; a Firm subscription collects its own fixed amount
+  rather than issuing a larger one later. The meter is gone from
+  `relay/lib/entitlements.js`, from both sign paths and from the pages. Every
+  tier now stops at the quota it includes and answers one 402,
+  `monthly_sign_quota_reached`, which also ends a disagreement between the two
+  paths: the `/v1` create gate already blocked a Firm account at 100 while
+  `POST /v2/envelopes/:id/sign` let the same account run to 1000. The card a
+  customer sees at the limit names the ceiling that stopped him, the date it
+  resets, and Business as the plan that includes more. `tests/ui-truthfulness.test.mjs`
+  now sweeps every frontend page and script for a per-unit rate or a charge
+  deferred to a later invoice, and asks `billing-catalog.js` whether such a line
+  could be charged at all, so a promise about money has to exist in the price
+  list before it may exist on the site.
+- **The public CT log listing numbers its entries by position again.** On the
+  live log at `/v2/ct/log` five entries reported the indices 4 to 8 a second
+  time while 42 to 46 were missing: they sat at positions 42 to 46 and had kept
+  the stored index field from before an April rebuild moved them. Only the
+  listing was affected. The Merkle root, the inclusion proofs and the signed
+  tree head all verify, and `/v2/ct/proof?index=42` returned the entry at
+  position 42 the whole time, because those address the log by position. The
+  listing, the `/ct/feed` tail and the relay registry rebuild now derive the
+  index from the position too, so the stored field is no longer read on any
+  path that hands an index out. On startup the relay recounts a persisted log
+  once, logs a single line naming how many entries were wrong, and writes the
+  corrected field back through a temp file and a rename. The recount touches
+  nothing but that field: line order and leaf hashes are left alone, so the
+  Merkle root is byte-identical before and after, which
+  `relay/test/route-ct-log-index.test.js` recomputes from the file to prove.
+  A second boot finds nothing to do.
+- **No redis call in the relay or the admin panel can hang any more.** node-redis
+  holds commands on an offline queue while it reconnects, and it never times a
+  command out, so against a store that is gone a route neither succeeded nor
+  failed: it waited. #368 bounded one read on the TOTP path and wrote the rest
+  up in SECURITY.md as open. The bound now sits on the client itself
+  (`lib/redis-deadline.js`, `guardRedisClient` plus `disableOfflineQueue`), so
+  all of it is covered, including the `sMembers`/`sRem` pair behind
+  `/v2/user/consume-backup` that the earlier fix left next to the one it fixed.
+  Both mechanisms are needed and neither is enough alone: `disableOfflineQueue`
+  refuses a command issued while the socket is down, and only a deadline catches
+  a connection that stays open and goes silent, where the client still reports
+  itself ready. A third measurement made a rebuild necessary too: after a
+  command is lost that way, node-redis holds every later command behind it and
+  never recovers, so the guard reconnects after two unanswered commands in a
+  row. `PARAMANT_REDIS_DEADLINE_MS` keeps its name and is now the one knob for
+  both services. An outage answers 503 with `Retry-After`, never a 500 and never
+  a wrong-credentials 401.
+- **The relay's request handler now catches.** `http.createServer` was handed a
+  4000-line async callback with nothing behind it, so a throw was an unhandled
+  rejection: no response to the client, and on Node 22 a process exit. It was
+  survivable only because a dead redis hung rather than threw; with the bound
+  above, an outage is the normal throw path.
+- **`/v2/health/deep` mentions redis, and the admin has a `/health` at all.** The
+  deep check reported the same green whether the store that holds every TOTP
+  secret was reachable or not. The admin's container probe was
+  `GET /api/auth/check`, which answers 401 when nobody is signed in, so
+  "healthy" meant "the process still refuses me". The new admin `GET /health` is
+  always 200 and says `status: "degraded"` when redis is unreachable.
+- **`POST /api/user/login` no longer says which addresses are customers.** Two
+  leaks, and the loud one was the anti-guessing delay itself. `relay.js` charges
+  250 ms per failure past ten, capped at two seconds, before it checks a code,
+  and only a request naming an account that EXISTS ever reaches that sleep.
+  Twelve wrong codes from rotating source addresses put an address there, and
+  nothing refuses them. Measured over 100 requests per case on a booted admin:
+  at twelve prior failures 509.91 ms against 251.61 ms, at twenty 2010.23 ms
+  against 251.82 ms, ranges not overlapping either time; the work difference on
+  a clean address was a further 4 ms. The `503 totp_unavailable` answer was
+  unfloored too, and only an address with an account could produce it.
+
+  The delay is now charged by the admin, against the per-address failure counter
+  that counts a miss exactly like a hit, and the relay is told not to charge it
+  again (`throttled_upstream`). Every credential answer on both login routes,
+  including the 503, is held to `PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms)
+  plus what the address owes. Same measurement after: 251.86 against 251.87,
+  751.84 against 751.76, 2251.90 against 2252.11, all overlapping. The 429 and
+  the 428 are deliberately not padded: they are told apart by their status code
+  anyway.
+- **A rate-limit counter that lost its expiry refused for ever.** Every limiter
+  in both services was INCR plus a conditional `if (count === 1) expire(...)`.
+  The redis deadline above makes that gap reachable in one request: if the INCR
+  outlives the deadline while the server still executes it, the expiry is never
+  sent, the next INCR returns 2, and the key is immortal. Measured with redis
+  replies dropped during one login, the per-IP counter stood at 9 with TTL -1
+  and that source address kept getting 429 until the key was deleted by hand.
+  The same shape stranded the login failure counter (a proof-of-work bill that
+  never lifts, on an address anybody may name) and the monthly quota counters in
+  `relay/lib/quota.js` (an account permanently over its limit). All 18 INCR call
+  sites now go through `lib/redis-counter.js`, which sets the expiry after every
+  INCR with `NX`, so a lost window is repaired by the next request instead of
+  never.
+- **`POST /api/user/login-with-backup` answered the same question with argon2.**
+  `consumeBackupCode` verifies the code against every stored hash until one
+  matches, so a wrong code costs ten full argon2id verifications at 64 MiB:
+  measured here, p50 494.2 ms with a max of 870.9 ms. An address with no account
+  pays none of it, and the 250 ms floor the route inherited was far below it, so
+  it read as 472.7 ms against 251.6 ms with no overlap and the admin logged
+  "answer overran its floor" on every request. The route now has a floor of its
+  own (`PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS`, default 1500 ms) plus a throttle
+  mirrored onto the counter it already keeps for that address.
+- **A request body that was not what it said it was answered 500 in a
+  millisecond.** `{"email": {}}` is truthy, so `if (!email)` waved it through
+  into `String(email).trim().toLowerCase()`, which threw: an unhandled throw on
+  an unauthenticated route, and the fastest answer either login handler had.
+  Both now check the type and answer 400.
+- **`/health` and `/v2/health/deep` repeated the configured redis deadline** in
+  the error text they passed through, unauthenticated. They report a fixed word;
+  the message goes to the log.
+
+### Added
+- **A credit note for money that goes back.** A chargeback used to stamp
+  `reversed_at` on the invoice and stop there, which keeps our own records from
+  lying and is all it does: Dutch VAT law does not let an issued invoice be
+  withdrawn, so the document for a reversal is a SECOND document with its own
+  sequential number that refers to the first (Wet OB art. 35a in full, art. 29
+  for the VAT). `relay/lib/credit-note.js` issues it in its own series,
+  `CN-2026-0001` per calendar year, carrying the number and the date of the
+  invoice it credits, the same description, VAT rate, seller and buyer as that
+  invoice stated, and negative net, VAT and total. It is a PDF on the same
+  renderer, it is mailed, and it appears on /account beside the invoice. One per
+  reversal: the reversal is claimed before a number is drawn, exactly as a
+  payment is, so a Mollie retry finds the document instead of writing a second
+  one. A partial refund gets a credit note for the amount that went back, its
+  VAT pro rata in whole cents; because the split is computed against Mollie's
+  CUMULATIVE counter and issued as the difference, a series of partial credits
+  adds back up to the invoice to the cent, remainder and all, and can never give
+  back more than came in. The invoice is only stamped reversed when the whole of
+  it has been credited.
+- **The billing history on /account is a real history.** It said "No billing
+  events yet" to a customer who had paid, been invoiced and watched his term run
+  out, because the only feed behind it was the admin audit log, which records
+  what an ADMIN did to a plan and knows nothing about a self-serve Mollie
+  payment. `relay/lib/billing-history.js` derives one chronological list from
+  records that already exist: the invoice and credit-note records for the money,
+  and the paid periods on those same records, cross-read against the plan-expiry
+  index and its notice markers (#415), for the terms that ended. No new storage,
+  so nothing can drift from the documents it is derived from. A period end that
+  a renewal extended is not listed as an ending, because the customer never lost
+  a day; a lapse and a later restart are two real endings and both are listed.
+  The admin panel merges its audit events into the same list, so a plan change
+  still shows up in the one place the customer reads.
+- **`admin/test/ratelimit-ttl.test.js`**, which boots a real admin behind a proxy
+  that delivers commands and drops replies, and then reads the TTL on its own
+  connection. That is the only shape that reproduces a counter stranded without
+  a window: a full outage never executes the INCR either.
+- **An HTTP test harness for the admin panel** (`admin/test/_admin-server.js`),
+  the counterpart of `relay/test/_relay-server.js`. Every admin suite until now
+  was a lib test or a source-text assertion; none of them ever started the
+  server. `admin/test/login-http.test.js` runs the login limiter scenario
+  against the real process -- ten wrong codes from three addresses, then the
+  owner with a real proof-of-work -- and goes red against the pre-#368 admin,
+  which the test it supplements could not.
+
+- **Every ParaSend limit now reads the product tier, not the unified `plan`.**
+  Billing writes a purchase with `setProductPlan` ->
+  `entitlements.applyProductTier`, which sets `plan_parasend` (or
+  `plan_parasign`) and deliberately leaves the unified `plan` alone. Three
+  enforcement points still resolved their ceiling off `plan` and so could not
+  see a paid ParaSend upgrade at all: the link TTL and the read count on
+  `POST /v2/inbound`, and the device cap on `POST /v2/pubkey`. The moment
+  self-serve billing goes live that would hold a ParaSend Pro customer to a
+  1 hour link, 1 read and 5 devices while `/pricing` sells him 24 hours, 10
+  reads and 50 devices. It is not visible today only because billing still runs
+  through the admin route, which sets `plan` as well. All six ParaSend ceilings
+  (TTL, max views, devices, transfers per month, blob size, downloads per hour)
+  now come from `getEntitlements(record).parasend`, and the ParaSign quotas from
+  `.parasign`. `outbound_per_hour` was the one dimension the entitlement layer
+  did not carry and has been added, mirroring `lib/tiers.js` like the rest.
+- **A key with no plan no longer gets the Pro ceiling.** The device cap
+  defaulted to `pro` (50 devices) and the DID-registration pubkey TTL to `pro`
+  (30 days) for a record with no plan on file, the mirror image of the default
+  already fixed on the inbound ceilings. A missing plan is not evidence of a
+  paid one; both now fall to Community, 5 devices and 7 days.
+- **The device cap counted nothing.** Registered pubkeys are stored under
+  `<device_id>:<account_id>`, but the cap counted entries ending in
+  `:<api_key>`, which equals the account id only for a key that has none. For
+  every real account the tally stayed 0 and the cap never fired at any tier.
+  It now counts the suffix the route writes, so the ceiling is enforced.
+
+  Because the cap never fired, accounts can be over it today, and a tier change
+  can put an account over it at any time. The cap governs how many devices an
+  account may HAVE, so it applies only to a registration that would ADD one:
+  `POST /v2/pubkey` for a device the account already holds skips the cap
+  entirely and answers on the device itself (`409` while the entry is live,
+  `200` renewing an entry whose TTL has passed but which the hourly sweep has
+  not reached). Without that skip an account over its cap got `429` on every
+  re-registration, which is the normal path rather than an edge: a Community
+  device pubkey lives 7 days, so devices come back to this route routinely, and
+  such an account would have lost them one at a time. **The change an operator
+  will see: an account over its tier's device count keeps every device it has
+  and is refused its next NEW one.**
+- **The device-pubkey TTL table had the same hole as `outbound_per_hour`.** It
+  held three rows (`free`, `pro`, `enterprise`) behind a `?? free` fallback, so
+  `community` and `business` were not in it and reached the free row by
+  accident. Every tier name a caller can produce now has its own row.
+- **A 402 over quota now names the tier that decided.** The transfer and sign
+  quota declines reported the unified `plan`, telling a paying customer he was
+  on a tier he was not being held to. Same for `GET /v2/admin/usage`, which
+  reported limits derived from `plan` while the gates enforced the product
+  tier; it now reports the enforced numbers and carries `parasend_tier` and
+  `parasign_tier` alongside `plan`.
+
+- **`GET /v2/admin/usage` reported an uncapped file size for a tier that is
+  capped.** The Enterprise row says `file_mb` is unlimited, but `POST /v2/inbound`
+  takes the lower of that and the operator's `MAX_BLOB`, so the gate enforces
+  5 MB while both usage routes reported `-1`. They now report
+  `min(MAX_BLOB, tier file_mb)`, which is what an upload is actually held to.
+  Genuinely uncapped dimensions, such as Enterprise devices, still report `-1`.
+- **A legacy `business` plan no longer gets the Enterprise ParaSend ceilings.**
+  `derivePlanParasend` mapped `business` up to `enterprise` on a "never silently
+  downgrade" reading. But `business` is a ParaSign tier name: an account whose
+  unified plan says `business` never bought ParaSend, and mapping it up handed
+  it the whole enterprise row, uncapped devices and downloads per hour, 100 reads
+  per link, a 365 day device-pubkey TTL and the 10000-receipt retention. That is
+  a silent upgrade, and the enterprise row is also where the resource ceilings
+  come off. Mapping it down to `pro` would have been the opposite error (2000
+  transfers a month cut to 500, a 7 day link cut to 24 hours). It now resolves to
+  its own row with exactly the numbers it has always had: 2000 transfers, 100
+  devices, a 7 day link, 25 reads, 2000 downloads an hour, 4000 receipts. The row
+  is resolved but never sold: `POST /v2/admin/keys/set-product-plan` still
+  rejects `business` as a ParaSend tier, and `/pricing` sells Community, Pro and
+  Enterprise as before.
+
+### Changed
+- **/vault says what it does, and it no longer says "quantum-resistant".** The
+  page sold AES-256-GCM as quantum-resistant. AES-256 does survive Grover with
+  room to spare, but the claim describes the construction, and this
+  construction hangs on a human-chosen passphrase run through PBKDF2, which is
+  where it would actually break. The word is gone from the page and from the
+  header comment in `frontend/vault.js`. In its place: one sentence in plain
+  language (nothing leaves your browser, so we cannot reset your passphrase and
+  a lost one means a lost file) and one technical line that names every
+  parameter, "AES-256-GCM, key from your passphrase with PBKDF2-SHA-256,
+  600,000 rounds, random 16-byte salt, random 12-byte nonce".
+- **Vault PBKDF2 goes from 210,000 to 600,000 rounds**, the OWASP Password
+  Storage Cheat Sheet figure for PBKDF2-HMAC-SHA256. Files locked before this
+  still open: the count is a `u32` field in the `.prmnt` header and
+  `decryptFile` derives with the count the file carries, never with the current
+  constant. `tests/vault-kdf.test.mjs` forges a container at the old 210,000
+  rounds and makes the real page open it, and pins the number on the page to
+  the number in the code so the two cannot drift.
+- **Locking a file is a third verb in the signed-in navigation.** `/vault` sits
+  next to Send and Sign as "Lock a file". It had no route in from anywhere in
+  the product.
+- **The ParaSend delivery receipt moved out of the response header.**
+  `GET /v2/outbound/:hash` used to answer with `X-Paramant-Receipt`, the whole
+  signed receipt inline: 18551 bytes for that header and 19560 for the block.
+  Node's default `maxHeaderSize` is 16384, so a client using `fetch()` could not
+  download at all (`UND_ERR_HEADERS_OVERFLOW`), and nginx's default
+  `proxy_buffer_size` of 4k/8k answers 502. The download now carries
+  `X-Paramant-Receipt-Id`, `X-Paramant-Receipt-Hash` and
+  `X-Paramant-Receipt-Url`, and the receipt itself comes from the new
+  `GET /v2/transfers/:receipt_id/receipt`, which returns the exact same
+  base64url payload. Receipts are held for 15 minutes, per account, and bound to
+  the API key that made the download.
+
+### Deprecated
+- **`X-Paramant-Receipt`.** Off by default from this release, removed after
+  **2026-12-01**. `PARAMANT_INLINE_RECEIPT_HEADER=1` puts it back for the
+  transition; a proxy in front of the relay then needs `proxy_buffer_size`
+  raised to match. While it is off, every download carries
+  `X-Paramant-Receipt-Deprecated` naming the new URL, so a client cannot
+  silently turn a missing header into a missing receipt. The Python SDK does
+  exactly that today (`sdk-py/paramant_sdk.py:681`), which is why the notice
+  exists; `Apolloccrypt/paramant-sdk` PR #5 teaches it both shapes and that
+  release must ship before this one reaches production.
+
+---
+
+## [3.1.0] - unreleased
+
+277 commits since the `v3.0.0` tag (2026-06-24), of which 58 arrived through a
+numbered pull request and the rest were pushed to `main` directly. Compiled from
+`git log v3.0.0..origin/main` on 2026-09-02 and rebased onto `main` the same
+day, which brought six more PRs in; PR numbers are given where the commit
+carried one. Numbers written as "finding #n" are security findings or issues,
+not pull requests.
+
+Not yet tagged. Tagging and publishing are one step, described in
+`docs/RELEASE.md`; a tag that is not deployed is worse than no tag.
+
+### Security
+
+- Audit chain hardening: `chain_valid` is a real tamper check that binds every
+  field and recomputes rather than trusting a stored flag (finding #19), and the
+  SSRF guard now blocks NAT64 and 6to4 IPv4-in-IPv6 embeddings (finding #21).
+- AAD verification fails closed, PII is masked in logs, outbound mail is escaped
+  and per-user MFA attempts are throttled (#266).
+- Monthly tier caps are enforced on active use, not only at issue time, and
+  admin logs are masked (#267).
+- API keys are delivered through a one-time claim link instead of in plaintext
+  in an email (privacy finding H1, #268).
+- Audit PII retention is bounded and IP addresses are masked in persistent
+  records (privacy finding M2, #271).
+- Signing requires a fresh step-up token on `/attested`, and the signer public
+  key is pinned (#272).
+- `script-src 'unsafe-inline'` is gone from the admin panel (#273) and from the
+  public site (#274).
+- Batch of low-severity pentest findings #15, #17, #20, #22 and #23 (#206).
+- The public transparency log no longer leaks device identifiers (finding H-1,
+  #205).
+- Single-signer notary signatures are domain-separated (v2); v1 envelopes stay
+  verifiable (findings #3 and #4, #208).
+- The stub checkout that granted plans without a payment is disabled, and the
+  inbound content hash is verified against the payload on `/v2/inbound` and
+  `/v2/anon-inbound`.
+- DID auth runs against the owner's entitlements and quota, and a revoked
+  enrollment is refused.
+- The gitleaks allowlist was rebuilt from a verified full-history scan.
+- `/v2/health/deep` is reachable on production again, behind internal auth
+  rather than open (#322).
+
+### Added
+
+- ParaSign `/v1` signing API with authorization, quota and offline v3 verify
+  (#283), documented in the README (#285).
+- ParaSign PDF editor: HiDPI preview, placeable text and date fields,
+  annotations and page management (#286).
+- Recurring billing collects a second period, and `paid_until` survives a
+  restart (#315).
+- A canary for ParaSign, the product that had no alarm (#316), and a transfer
+  canary that runs a real file through the real relay hourly. The transfer
+  canary now also checks the clock (#320).
+- `/sign` is served to everyone, and says honestly what it needs (#317).
+- Visitors are counted by what a client did, not by what it called itself
+  (#318).
+- A signals script that says what is red without asking a model (#330).
+- Product heartbeat and docroot drift guard, running on every pull request, with
+  a red heartbeat made visible as a GitHub issue.
+- Document-focused user dashboard, a developer dashboard centred on the ParaSign
+  API, self-service ParaSign key minting, and encrypted document delivery with
+  signing invitations.
+- Per-product plan grants: one product's tier can be set without moving the
+  unified plan.
+- ParaSign sign tiers with Pro overage metering and a hard cap, plus per-tier
+  feature gates wired into the relay endpoints.
+- Per-account ParaSign envelope index, full per-envelope `.psign` audit export
+  and a CLI backfill for the index.
+- A one-time usage-purpose question on the dashboard, shown in the admin user
+  list.
+- `/about` and `/trust` pages, and a ParaSign product page at `/parasign`
+  (#325).
+- `docs/brand/messaging.md`: who we sell to, what we promise and how each
+  promise is proven (#331).
+
+### Changed
+
+- The recurring billing layer stays off until `BILLING_MODE` says otherwise
+  (#326).
+- Navigation says what we sell: seven items instead of forty (#324), and 17
+  standards and sector pages were pruned from paramant.app (#323).
+- The installers are served by us, and only the signatures we actually have are
+  claimed (#308); the native build's cost is stated alongside what it does well
+  (#309).
+- The relay is called source-available (BUSL-1.1) rather than open source.
+- The billing docs say Mollie, not Stripe, and document `/v2/billing/checkout`
+  and its webhook.
+- The homepage speaks to a buyer: Community as the gift, the business plans as
+  the product (#328).
+
+### Fixed
+
+- The hourly relay crash: a `setInterval` swept a `Map` that no longer existed.
+  This is the failure that the `no-undef` gate in `test.yml` now exists to
+  catch.
+- A comma-operator bug made the create-envelope gate swallow every POST.
+- Script readiness is sticky, so `/ontvang` stops hanging on keygen (#303), and
+  the heartbeat was extended to the pages that had no progress check (#304).
+- Dead destinations fixed, and every button's destination gated (#307).
+- The live device-hash feature survived the CSP refactor (#275); auth and
+  billing inline scripts were externalized and the real client IP restored
+  (#278).
+- The installer preserves the pinned release in the frontend scripts (#259), and
+  the admin compose volume paths resolve (#260).
+- A paid ParaSign upgrade is no longer invisible to the web sign gate; plan
+  changes fan out to every relay sector and are verified across all of them; a
+  new key plus a restart no longer drops a paid per-product grant.
+- Pricing buttons no longer fall back to an unattributable payment link.
+- TOTP dual-verifies SHA-256 and SHA-1, with a soft notice on SHA-1.
+- Stale entries are lazily pruned from the account envelope index.
+- Mobile navigation stays opaque and keeps its scroll position while open.
+
+### Removed
+
+- The Android APK and ParamantOS: nobody used either (#310).
+- ParaID (#319).
+
+### Build, CI and dependencies
+
+- The crypto binding builds on `rust:1.98-alpine` again, by adopting a
+  paramant-core that uses bindgen 0.72 (#329). This is the real fix for the
+  breakage that forced a re-pin to 1.95-alpine twice (#269, #284) and that
+  failed the drift gate on both #222 and #313.
+- `paramant-core-node` is built with `--locked`, so a transitive bump cannot
+  silently drift the crypto build (#270).
+- A drift gate that builds the real production Dockerfile on every pull request.
+  It is what caught #313 before merge.
+- `relay.js` finally has unit tests: the route suites boot a real `relay.js` and
+  exercise its critical paths (#341). Point 3 of the toekomstbestendigheid
+  report was that 6488 lines and 68 routes were loaded by no unit test at all;
+  this is the first bite out of it.
+- The heartbeat cannot be green without evidence (#338), and the site's ten
+  heaviest claims are pinned to the code that makes them true (#327). Both turn
+  a page that merely loads into a page that has to prove something.
+- Published relay images are signed with cosign and carry an SBOM and SLSA
+  provenance.
+- Suites that assert nothing are held to a named list instead of reporting green
+  over nothing (#321).
+- Browser suites are selected by what they import rather than by a hand-kept
+  list of names.
+- gitleaks runs on push and on pull request.
+- Action bumps: `sigstore/cosign-installer` 3.7.0 to 4.1.2 (#290),
+  `anchore/sbom-action` 0.17.9 to 0.24.2 (#291), `gitleaks/gitleaks-action`
+  2.3.9 to 3.0.0 (#292), `actions/checkout` 7.0.0 to 7.0.1 (#293),
+  `actions/upload-artifact` 4.6.0 to 7.0.1 (#294).
+- `redis` in the admin panel: 4.7.1 to 6.0.1 (#254), then 6.0.1 to 6.2.1 (#312).
+- #314 landed the 30 August fixes under the name "Release 3.1.0". No tag was cut
+  at the time; this section is that release.
+
+### Release hygiene
+
+Landed in this version rather than deferred, because none of it needs a product
+decision:
+
+- One version, one place. The root `package.json` is the version;
+  `relay/package.json`, `admin/package.json`, both lockfiles and both
+  `org.opencontainers.image.version` labels follow it, and `relay.js` reads its
+  own `package.json` at runtime instead of restating the number.
+  `tests/version-consistency.test.mjs` fails the build if any of them drift.
+  Before this, four places gave three answers: root 3.1.0, relay 3.0.0, admin
+  0.9.0-beta, image label 3.0.0, and `scripts/post-deploy-verify.sh` asserting
+  that `/health` returns 3.0.0 while the relay already answered 3.1.0. The admin
+  panel moves from `0.9.0-beta` to the project version.
+- One Node line. The image, CI and the devcontainer are on Node 24, the newest
+  LTS; `engines` is `>=22 <25`, which is exactly the two LTS lines still getting
+  security fixes. The images were on `node:25-alpine3.21` and CI on Node 20, and
+  both of those are end-of-life. The relay base moves to
+  `node:24-alpine3.24`, which also matches the Alpine of the
+  `rust:1.98-alpine` builder stage that compiles the musl binding.
+- Every environment variable is written down. `deploy/.env.example` documents all
+  77: the 72 the relay or the admin panel reads, plus 5 that docker-compose, the
+  deploy scripts or the self-host installers consume. Each with a purpose,
+  required-or-optional, its default and the file that reads it. It documented
+  three; the code read 57 names, 40 of them written down nowhere.
+  `tests/env-documented.test.mjs` fails the build on the next undocumented one,
+  on documentation for a variable nothing reads, and on a `read in:` pointer
+  naming a file that does not exist or never mentions the variable.
+- A release process that exists on paper and in the repo: `docs/RELEASE.md`.
+  `docs/PROJECT-STATUS.md`, which declared itself obsolete in its own second
+  line, points at the CHANGELOG and that document instead.
+
+### Also in 3.1.0: entries written before the `v3.0.0` tag
+
+The 3.0.0 section below is dated 2026-05-27. The `v3.0.0` tag was cut on
+2026-06-24, a month later. Everything written in between sat under
+`[Unreleased]` and never got a released section of its own, so as far as any tag
+is concerned it is part of 3.1.0. It is folded in here unchanged rather than
+rewritten, because rewriting it would be guessing at what it meant.
+
+
+### Removed
+- **Thunderbird FileLink add-on retired.** `thunderbird-filelink/` removed from the
+  repo and the add-on unpublished from addons.thunderbird.net (it was status
+  `public` at v1.0.0, ~1 daily user). It shipped a base64 bug from 1.0.0 onward:
+  `toBase64` encoded in 8192-byte windows, so the relay's base64 decode truncated
+  every upload to ~8 KB and recipients could never decrypt. The ParaShare receiver
+  mode in `frontend/parashare.html` is kept: it serves the same burn-on-read link
+  format the Gmail and Outlook integrations produce.
+- **ParaDrop feature removed (relay side).** The anonymous burn-on-read drop
+  webapp and its endpoints are gone: `frontend/drop.html`, the `/sw.js`
+  ParaDrop service worker, the `/drop` sitemap entry and crypto-agility table
+  row, and the relay routes `POST /v2/drop/create|pickup|status` with their
+  rate-limit/backoff helpers and allowlist entries. The general receive page
+  (`ontvang.html`) and ParaShare are unaffected. The `/drop` navigation links
+  and remaining ParaDrop mentions in content pages are scrubbed separately; the
+  Rust `para_drop.rs` in paramant-core is removed in its own PR.
+- **SDK extracted to its own repository.** `sdk-js/` and `sdk-py/` now live in
+  [Apolloccrypt/paramant-sdk](https://github.com/Apolloccrypt/paramant-sdk)
+  (Apache-2.0), together with the cross-implementation conformance suite. The
+  published packages keep the same names (`paramant-sdk` on PyPI and npm), so
+  installs are unaffected. The Python import path is now `from paramant import
+  GhostPipe`; the old `from paramant_sdk import ...` still works via a shim that
+  is deprecated and will be removed in 4.0. The relay keeps the canonical
+  wire-format v1 spec (`docs/wire-format-v1.md`), which the SDK conformance
+  suite cites. CI and dependabot entries for the SDK moved with it; the dangling
+  `scripts/paramant-receipt` symlink was removed.
+
+### Added
 - ParaSign Sg1 step 3 (issue #49): document signing where the relay is a
   NOTARY, not a key holder. `POST /v2/sign` (auth) verifies a client-made
   ML-DSA-65 signature, logs it to the CT tree, and counter-signs a `.psign`
@@ -74,6 +849,16 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   implementation deferred to later phases.
 
 ### Changed
+- **Recurring billing needs an explicit `BILLING_MODE`.** The customer, mandate
+  and subscription layer (`relay/lib/billing-recurring.js`) now runs only when
+  `BILLING_MODE` is set by hand to `live` or `test`. With it empty, as production
+  has run since billing exists, `billingMode()` still infers the mode from the
+  key, but the relay creates plain one-off payments exactly as the 2026-08-08
+  code did: no customer, no `sequenceType`, no subscription. The `billing_config`
+  line at boot now carries `mode_source`, `recurring` and a one-sentence
+  `stance`, at `warn` when the mode is inferred. Pinned by
+  `relay/test/billing-stance.test.js` and `billing-stance-boot.test.js`.
+  Deploy runbook: `deploy/DEPLOY-3.1.md`.
 - `mldsa65.js` migrated to the `@paramant/core` binding (matches the `mlkem768.js`
   M5b pattern). Byte-compatible via paramant-core ADR-0021 cross-impl KAT. Covers
   all ML-DSA-65 use in the relay (STH-signing + receipt/signature verify) through

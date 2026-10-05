@@ -14,7 +14,7 @@
 
 All data-plane endpoints require: `X-Api-Key: your_key`
 
-- `pgp_` prefix — end user key (10 uploads/day free, no account needed)
+- `pgp_` prefix, end user key. Community plan: 50 transfers a month, 500 MB per file.
 - `plk_` prefix — operator license key (unlimited, from `.env`)
 
 CT log and STH endpoints are **public** — no API key required.
@@ -61,6 +61,91 @@ Response:
 
 ---
 
+### The share link: `/v2/dl/<token>` end to end
+
+`POST /v2/inbound` hands back a `download_token`. That token is the whole of the
+asynchronous route: it lets somebody who was not present when you uploaded come
+and fetch the blob later, with no account, no API key and no second browser
+awake. This is what the "Send a link" stand on the ParaSend web app is built on,
+and what an integration builds on directly.
+
+**1. Upload the sealed bytes.** The file is encrypted on the sender's side. The
+relay is handed ciphertext and a SHA-256 of exactly those bytes, and it verifies
+the two match before it stores anything, so the hash written into the CT log
+leaf is a hash of bytes the relay really held.
+
+```bash
+curl -X POST https://relay.paramant.app/v2/inbound \
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"sha256hex","payload":"base64_ciphertext","ttl_ms":3600000}'
+```
+
+**2. Take the token out of the response.**
+
+```json
+{ "ok": true, "hash": "a3f2…", "ttl_ms": 3600000, "download_token": "6b3c…" }
+```
+
+`download_token` is 24 random bytes as 48 hex characters. `ttl_ms` is the value
+the relay actually applied, which is **not** always the one you asked for: the
+upload clamps your request to the account's ParaSend tier ceiling (`view_ttl_ms`
+in `relay/lib/tiers.js`: 1 hour on Community, 24 hours on Firm, 7 days on
+Enterprise, and the table under "ParaSend limits per tier" above is
+generated from the same rows). Compute the expiry the receiver is told from the
+`ttl_ms` that came back, never from the one you sent.
+
+**3. Build the link, and put the key after the `#`.** A URL fragment is never
+put on the wire by a browser, so a key that lives there is a key the relay
+cannot see even while it is holding the ciphertext. Everything before the `#`
+is fair game for the relay, a proxy, a mail server and a log; everything after
+it is not.
+
+```
+https://paramant.app/get?t=<download_token>&r=<sector>#<base64url(key||iv)>
+```
+
+| Part | What it is |
+|---|---|
+| `t` | the `download_token` from step 2 |
+| `r` | which relay sector holds the blob: `health`, `legal`, `finance` or `iot`. An account is valid on exactly one. Omitted, `/get` asks `health`. |
+| fragment | `base64url(key32 then iv12)`, unpadded: the AES-256-GCM key and nonce, 44 bytes before encoding |
+
+The plaintext `/get` expects inside the ciphertext is
+`[uint32-LE nameLen][name UTF-8][file bytes]`, so the file name travels sealed
+and the relay never learns it. The same wire is produced by the "Send a link"
+stand in the web app (`frontend/js/parashare.page.js`) and read by
+`frontend/js/get.page.js`.
+
+**4. The receiver opens it.** Three routes serve the link, and only one of them
+burns anything:
+
+| Route | What it does |
+|---|---|
+| `GET /v2/dl/:token` | An HTML confirmation page. Safe for link preloaders and mail scanners: known preload user-agents get a static placeholder, and nothing is spent. |
+| `GET /v2/dl/:token/get` | The download itself, and the only route that burns. Answers `410` to a known preload user-agent's twin, `409` while another download of the same token is in flight, and `410` once the token is spent or expired. |
+| `GET /v2/dl/:token/info` | `{ ok, enc_meta, file_size, ttl_left_s, used }` while the link is live, `404` once it is not. No credential. |
+
+**5. It works exactly once.** The blob is deleted and its buffer zeroed on the
+`finish` event of the download response, not when the response starts: a
+transfer that dies mid-flight leaves the token spendable, so a dropped
+connection is a retry and not a lost file. Once a download does finish, the
+token is marked used and the bytes are gone. The TTL is enforced separately by a
+timer, so a link nobody opens is destroyed when it expires whether or not
+anybody asks.
+
+**No delivery receipt on this route.** The relay signs a delivery receipt for
+`GET /v2/outbound/:hash`, the API's own download path, and you fetch it back
+from `GET /v2/transfers/:receipt_id/receipt`. The `/v2/dl` family signs nothing.
+If you need proof that a specific person took the file, use `/v2/outbound` and
+its receipt; `/v2/dl/:token/info` gives you a status and not a proof, and it
+cannot tell "downloaded" apart from "expired" on its own: both answer `404`.
+A caller that recorded the expiry at upload time can separate the two by its own
+clock, which is what the web app's "sent links" list does, and that inference is
+the caller's, not the relay's.
+
+---
+
 ### GET /v2/outbound/:hash — Download (burn-on-read)
 
 ```bash
@@ -75,9 +160,71 @@ Response headers:
 |--------|-------|
 | `X-Paramant-Burned` | `true` if blob was destroyed |
 | `X-Paramant-Hash` | SHA-256 hex of the blob |
-| `X-Paramant-Receipt` | Base64url-encoded signed delivery receipt |
+| `X-Paramant-Receipt-Id` | 32 hex characters. Fetch the receipt with it |
+| `X-Paramant-Receipt-Hash` | `sha3-256:<hex>` over the receipt bytes you will get back |
+| `X-Paramant-Receipt-Url` | `/v2/transfers/<receipt_id>/receipt` |
 
-The `X-Paramant-Receipt` value is a base64url-encoded JSON object:
+The receipt is handed over by reference, not by value. It carries a full
+ML-DSA-65 signature and an inclusion proof, so the payload is around 18 KB:
+too large for a response header. Node's default `maxHeaderSize` is 16 KB and
+nginx's default `proxy_buffer_size` is 4k/8k, so a receipt in the header meant
+`UND_ERR_HEADERS_OVERFLOW` on the client and 502 at the proxy.
+
+**Deprecated:** `X-Paramant-Receipt`, which carried that payload inline. It is
+off by default from 2026-09 and will be removed after **2026-12-01**. An
+operator can put it back for the transition with
+`PARAMANT_INLINE_RECEIPT_HEADER=1`, and must then also raise
+`proxy_buffer_size` on any proxy in front of the relay.
+
+While the old header is off, every download also carries
+`X-Paramant-Receipt-Deprecated: removed 2026-12-01; GET /v2/transfers/<id>/receipt`.
+It exists because a client that reads `X-Paramant-Receipt` and finds nothing
+cannot tell "this transfer had no receipt" from "the receipt moved", and a
+delivery proof must never go missing quietly. The header is not sent when the
+opt-in is on, because then there is nothing to announce.
+
+---
+
+### GET /v2/transfers/:receipt_id/receipt (fetch a delivery receipt)
+
+Requires the same API key that made the download. An unknown, expired, or
+foreign id all answer with the same 404, so the route cannot be used to probe
+whether a transfer existed.
+
+**How long you have, exactly.** Fetch the receipt right after the download.
+Three things can take it away, and all three answer with the same 404:
+
+| | |
+|---|---|
+| **Time** | 15 minutes from the download. |
+| **Your own volume** | The relay keeps your account's most recent receipts, up to twice your tier's hourly download ceiling: community 100, pro 1000, business 4000, enterprise 10000. Past that your oldest receipts drop. Another account's downloads can never take yours. |
+| **A relay without redis** | A relay configured with `REDIS_URL` keeps receipts in redis, so they survive a restart of the relay process. A relay without one keeps them in memory, and then a restart or a deploy loses every outstanding receipt. |
+
+If none of that is acceptable for your use, the receipt can still be delivered
+inline on the download itself: ask the operator to run the relay with
+`PARAMANT_INLINE_RECEIPT_HEADER=1`, which restores the `X-Paramant-Receipt`
+header alongside the reference. That header is around 18 KB, so it needs
+`proxy_buffer_size` raised on any proxy in front of the relay, and it is
+removed after 2026-12-01.
+
+```bash
+curl https://relay.paramant.app/v2/transfers/$RECEIPT_ID/receipt \
+  -H "X-Api-Key: pgp_your_key"
+```
+
+```json
+{
+  "ok": true,
+  "receipt": "<base64url>",
+  "receipt_hash": "sha3-256:9c1f…"
+}
+```
+
+`receipt_hash` is identical to the `X-Paramant-Receipt-Hash` the download
+carried, over the exact `receipt` string returned here, so the handover is
+verifiable end to end.
+
+`receipt` decodes to:
 
 ```json
 {
@@ -98,12 +245,18 @@ Pass this to `POST /v2/verify-receipt` to cryptographically confirm delivery.
 
 ### POST /v2/verify-receipt — Verify a delivery receipt
 
-Public. No API key required.
+Requires an API key (`X-Api-Key`); without one the relay answers 401.
+
+This endpoint asks the relay to check its own signature. To check a receipt
+without the relay, and without a network connection at all, open
+[https://paramant.app/verify#receipt](https://paramant.app/verify#receipt) and
+drop the receipt in. That page carries the relay identity key and repeats the
+same four checks in the browser.
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
   -H "Content-Type: application/json" \
-  -d '{"receipt":"<base64url from X-Paramant-Receipt>"}'
+  -d '{"receipt":"<base64url from GET /v2/transfers/:receipt_id/receipt>"}'
 ```
 
 Success:
@@ -178,6 +331,20 @@ curl https://relay.paramant.app/v2/sth
 
 The relay signs `{relay_id, sha3_root, timestamp, tree_size, version}` (keys sorted, JSON-serialised) using ML-DSA-65. Verify the signature against the key returned by `GET /v2/pubkey`.
 
+`timestamp` is rounded down to the top of the hour **before it is signed**, so a head says
+when it was signed no more precisely than the log says when anything happened. A head is
+produced on every append, so a millisecond timestamp here would have given away the exact
+time of the leaf at `tree_size - 1`, and the leaf commits to that time. `tree_size` still
+orders the heads one per append. Heads signed before this changed keep the precise
+timestamp they were signed with and still verify: verification rebuilds the canonical
+payload from the fields a head carries and pins no resolution.
+
+The response may also carry a `forked` object. It appears only when the relay has REFUSED
+to sign a head that would contradict one it already signed, which is what happens when a
+relay comes back from a restart with its signing key and its head history but without its
+tree. The relay then stops issuing heads rather than publishing a second history, and this
+field is how an outside monitor tells that apart from a quiet week.
+
 ---
 
 ### GET /v2/sth/history — STH history
@@ -226,6 +393,10 @@ Use this key to independently verify any STH signature or delivery receipt signa
 curl "https://relay.paramant.app/v2/ct/log?limit=20"
 # {"ok":true,"entries":[{…}],"tree_size":43,"root":"c7a9…"}
 ```
+
+`index` is the entry's position in the log, counted from the start. It is
+derived at request time, so it always matches the index `/v2/ct/proof` resolves
+and the leaf position the Merkle tree commits to.
 
 ---
 
@@ -315,7 +486,7 @@ curl "https://relay.paramant.app/v2/sth/peers/a1b2…?limit=50&offset=0"
 | Path | Description |
 |------|-------------|
 | `GET /ct/` | Public web UI — live tree view, verify button, no auth |
-| `GET /ct/feed` | JSON feed for the UI (auto-refresh every 10s) |
+| `GET /ct/feed` | JSON feed for the UI (auto-refresh every 10s). `t` is rounded to the hour, as in `/v2/ct/log` |
 | `GET /ct/feed.xml` | RSS feed — last 20 STHs. Subscribe to independently archive roots. |
 
 The RSS feed is designed for external archiving: any subscriber retains an independent copy of each signed tree head, making log tampering detectable even if the relay is compromised later.
@@ -370,17 +541,6 @@ curl -X POST https://relay.paramant.app/v2/setup/check \
   -d '{"domain":"relay.example.com"}'
 # {"ok":true,"setup_mode":true,"dns":"ok","tls":"pending","health":{…}}
 ```
-
-### POST /v2/request-trial — Request a free trial API key
-
-```bash
-curl -X POST https://relay.paramant.app/v2/request-trial \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Jane Smith","email":"jane@example.com","use_case":"DICOM transfer for radiology dept"}'
-# {"ok":true,"message":"Trial key sent to jane@example.com"}
-```
-
-Rate limits: 3 requests per IP per 24 hours, 1 request per email address per 7 days. Key is delivered via Resend. Also available via the web form at `https://paramant.app/request-key`.
 
 ### POST /v2/pubkey — Register device public keys
 
@@ -502,14 +662,37 @@ curl -X POST https://iot.paramant.app/v2/attest \
 
 ---
 
-## Rate limits
+## ParaSend limits per tier
 
-| Tier | Uploads/day | Retention |
-|------|-------------|-----------|
-| Free (pgp_) | 10 | 1 hour |
-| Community (plk_) | unlimited | 1 hour |
-| Professional | unlimited | 24 hours |
-| Enterprise | unlimited | configurable |
+Every ceiling below is enforced from one source, the account's **ParaSend**
+tier. That tier is its own axis: it is carried by `plan_parasend` on the account
+and is independent of the ParaSign tier, so buying one product does not move the
+other. A ParaSend purchase raises `plan_parasend` alone, and every gate reads
+that, so the limits a customer is held to are the limits the pricing page sold
+him. An account with no tier on file is held to Community.
+
+| | Community | Firm | Enterprise |
+|---|---|---|---|
+| Transfers per month | 50 | 500 | unlimited |
+| Link lifetime (max TTL) | 1 hour | 24 hours | 7 days |
+| Reads per link (max views) | 1 | 10 | 100 |
+| Registered devices | 5 | 50 | unlimited |
+| Max file size | 500 MB | 500 MB | 500 MB (tier `file_mb`) |
+| Max blob size | 5 MB | 5 MB | 5 MB (relay `MAX_BLOB`, one padded block) |
+| Downloads per hour | 50 | 500 | unlimited |
+
+Notes:
+
+- **Downloads per hour** is a sliding one-hour window per API key on
+  `GET /v2/outbound/:hash`; over it the relay answers `429`. It also sets how
+  many delivery receipts your account keeps (twice this number, see above).
+- **Max blob size** is the lower of the tier's ceiling and the operator's
+  `MAX_BLOB`, which is 5 MB on the hosted relay: that is the size every packet
+  is padded to, so a blob larger than one block is malformed rather than merely
+  big. It is not the file limit. A file is sent as a run of blocks, so the file
+  ceiling is the tier's `file_mb` (500 MB), enforced by counting the blocks that
+  share a `meta.file_id`. `GET /v2/admin/usage` reports `file_mb`, the number
+  you can actually send, and not the block size.
 
 ---
 

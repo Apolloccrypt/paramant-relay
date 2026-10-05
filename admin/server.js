@@ -1,11 +1,15 @@
 'use strict';
 const express = require('express');
 const emailTemplates = require('./lib/email-templates');
+const mailer = require('../relay/lib/mail');   // one way out, carrier is a setting
+const emailPolicy = require('./lib/email-policy');
 const pow = require('./lib/pow-captcha');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
-const { initRedis, redis } = require('./lib/redis');
+const { initRedis, redis, redisHealthy, scanKeys } = require('./lib/redis');
+const { isRedisOutage, redisRefusal } = require('./lib/redis-deadline');
+const { incrInWindow } = require('./lib/redis-counter');
 const { logAuditEvent, getAuditEvents } = require('./lib/audit');
 const { spawn } = require('child_process');
 const cliCommands = require('./lib/cli-commands');
@@ -13,6 +17,42 @@ const cliAudit = require('./lib/cli-audit');
 const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
+const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
+const { meetDeStand } = require('./lib/stand');
+const standIo = require('./lib/stand-io');
+// One user's sessions, without reading everybody else's. See admin/lib/user-sessions.js.
+const userSessions = require('./lib/user-sessions');
+// The scan is now a FALLBACK, handed to user-sessions only for a user who has no
+// index yet: every session minted before this deploy. Nothing calls it per
+// request any more.
+const scanSessions = (r, match) => scanKeys(r, { MATCH: match, COUNT: 100 });
+
+// How long a setup link lives. It was fourteen days, hand-typed as `14 * 86400`
+// at seven separate sites, and finding 15 of the 2026-09-05 review is what that
+// buys: for an account whose TOTP is not yet active, the link is the account.
+// Whoever can read the mailbox at any point in those two weeks turns it into a
+// secret, a code and a session in two unauthenticated requests, and an
+// unauthenticated login attempt against such an account MINTS A FRESH ONE and
+// mails it, every time, without cleaning up the last.
+//
+// Two days is long enough for a link that arrives by mail to survive a weekend,
+// and /admin/resend-setup already exists as the operator's answer to an expired
+// one. It is one constant now, so the next copy-paste cannot pick a different
+// number, and setup-link-gate.test.js refuses a literal next to a setup token.
+const SETUP_TOKEN_TTL_S = Math.max(3600, parseInt(process.env.SETUP_TOKEN_TTL_S || '', 10) || 2 * 86400);
+// The same number in words, for the mail that carries the link. One source, so
+// the mail cannot promise a fortnight for a link that lasts two days.
+function setupTokenValidFor() {
+  const h = Math.round(SETUP_TOKEN_TTL_S / 3600);
+  if (h < 48) return h === 1 ? '1 hour' : `${h} hours`;
+  const d = Math.round(h / 24);
+  return d === 1 ? '1 day' : `${d} days`;
+}
+const { buildRecipientParties, RECIPIENT_EMAIL_RE } = require('./lib/recipient-binding');
+const { acquireSignupLock } = require('./lib/signup-lock');
+const loginRate = require('./lib/login-ratelimit');
+const { billingStubGone } = require('./lib/billing-stub');
+const { logRedacted, maskIpForLog, maskEmailForLog: maskEmail } = require('./lib/log-redact');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
@@ -28,15 +68,97 @@ const BASE_PATH   = (process.env.BASE_PATH || '').replace(/\/$/, '');
 // every Object.keys(SECTORS) iteration in this file; add a sector here and
 // the rest follows. findUserByEmail() stays health-only on purpose: health
 // is the canonical admin-UI source and the lookup is hot-path.
+// The fallback is the CONTAINER-INTERNAL listener, and that is :3000 for every
+// sector (docker-compose.yml sets PORT: "3000" once, for all five). The numbers
+// 3001-3005 are host-side published ports; on the compose network nothing
+// listens there. health/legal/finance/iot carried those host numbers as their
+// fallback, so a missing or misspelt RELAY_* env pointed the admin at a dead
+// port and every fan-out for that sector failed with ECONNREFUSED instead of
+// falling back. Only main was right. Kept in sync by
+// tests/sector-fallback-ports.test.mjs, which reads the port out of
+// docker-compose.yml rather than trusting a number typed here.
 const SECTORS = {
   main:    process.env.RELAY_MAIN    || 'http://relay-main:3000',
-  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3005',
-  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3002',
-  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3003',
-  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3004',
+  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3000',
+  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3000',
+  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3000',
+  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3000',
 };
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
+
+// Absolute session lifetime, on top of the one-hour idle window that authUser
+// refreshes on every request. Without it the sliding expire() below is an
+// unbounded window: a session used once an hour never ends, and a stolen cookie
+// that is kept warm is permanent. docs/security/PARAMANT-SECURITY-STANDARD.md
+// SESS-01 asks for both a short idle timeout AND an absolute lifetime; this is
+// the second half. Twelve hours = one working day, then re-authenticate.
+// The key the passkey decoy credential is derived from. It must be secret: a
+// decoy that is a plain hash of a known input is recomputable by anyone, which
+// makes it perfectly recognisable and turns the anti-enumeration measure into
+// the oracle it was meant to remove. ADMIN_TOKEN is the secret this process
+// already has, and using it keeps the decoy stable across restarts so two
+// probes for the same unknown address agree.
+//
+// It defaults to empty, and an empty HMAC key is exactly the recomputable case,
+// so an unconfigured admin gets a per-process random one instead. That costs
+// stability across restarts, which only matters to an attacker patient enough
+// to probe across a deploy; being unpredictable matters more, and an admin
+// running without ADMIN_TOKEN is a development one. A dedicated secret would be
+// tidier than borrowing this one, and is noted for the owner rather than
+// invented here.
+const DECOY_SECRET = ADMIN_TOKEN || crypto.randomBytes(32);
+
+const USER_SESSION_MAX_AGE_MS = 12 * 3600 * 1000;
+// How stale last_seen may get before authUser rewrites the session record. A
+// write per request would double the redis traffic of every dashboard poll for
+// a field that is only ever rendered to the minute.
+const LAST_SEEN_REFRESH_MS = 60 * 1000;
+
+// ── Process-wide failure handling ───────────────────────────────────────────
+// Modelled on relay/relay.js: name the failure in the log, then leave. The
+// relay exits to zeroize its key material; the admin holds no such state, but
+// it must still not die anonymously. Node runs with
+// --unhandled-rejections=throw by default, and lib/redis.js throws
+// RedisUnavailableError whenever the client is not ready, so one unawaited
+// redis call anywhere in this file used to end the panel with a bare stack and
+// no cause. Registered before any work starts, so nothing can fail earlier than
+// these can report it. The supervisor (docker restart: unless-stopped) brings
+// the panel back; what this buys is a log line that says why.
+process.on('unhandledRejection', (reason) => {
+  const stack = (reason instanceof Error) ? reason.stack : String(reason);
+  console.error('[PARAMANT-ADMIN] unhandled_rejection:', String(reason).slice(0, 200), (stack || '').slice(0, 1000));
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[PARAMANT-ADMIN] uncaught_exception:', String(err && err.message || err).slice(0, 200), (err && err.code) || '');
+  process.exit(1);
+});
+
+// ── Constant-time secret compare ────────────────────────────────────────────
+// A copy of safeEqual from relay/lib/auth-gate.js, kept in step with it by
+// hand. Copied and not required: the admin image ships server.js, lib/ and
+// public/ and nothing else (admin/Dockerfile), so ../relay/ does not exist at
+// runtime and requiring it would crash the container on boot.
+// Why it compares BYTES: String#length counts UTF-16 code units while
+// Buffer.from() counts utf8 bytes. A token with the same character count but
+// one multibyte character passes a `a.length !== b.length` guard and then makes
+// crypto.timingSafeEqual throw a RangeError, which express 5 answers as a 500
+// where a 401 belongs. That difference is an oracle on the length of the
+// configured token. On a length mismatch this still runs a compare against
+// padding, so the refusal costs the same either way.
+function safeEqual(a, b) {
+  try {
+    const ba = Buffer.from(String(a || ''), 'utf8');
+    const bb = Buffer.from(String(b || ''), 'utf8');
+    if (ba.length !== bb.length) {
+      const pad = Buffer.alloc(Math.max(ba.length, bb.length));
+      crypto.timingSafeEqual(pad, pad);
+      return false;
+    }
+    return crypto.timingSafeEqual(ba, bb);
+  } catch { return false; }
+}
 
 async function createSession() {
   const sid = crypto.randomBytes(32).toString('hex');
@@ -75,19 +197,15 @@ setInterval(() => {
   for (const [k, v] of trialEmailTrack) if (now - v.lastAt > 8 * 86_400_000) trialEmailTrack.delete(k);
 }, 3_600_000);
 async function sendTrialEmail(to, firstName, key) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('[trial] RESEND_API_KEY not set'); return false; }
-  const resp = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  // This mail ends with "Hetzner DE, GDPR, no US CLOUD Act". It now leaves the
+  // building through the same door as that promise describes.
+  const resp = await mailer.stuur({
       from: 'PARAMANT <noreply@paramant.app>',
-      to: [to],
+      to,
       subject: 'Your PARAMANT trial API key',
       html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0c0c0c"><div style="max-width:580px;margin:40px auto;padding:40px;background:#0c0c0c;color:#ededed;font-family:monospace"><h2 style="color:#2d8a5c;margin:0 0 24px;font-size:18px;letter-spacing:.04em">PARAMANT TRIAL KEY</h2>${firstName ? `<p>Hi ${firstName},</p>` : ''}<p>Here's your 30-day trial API key:</p><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:13px;word-break:break-all;margin:16px 0">${key}</pre><h3 style="color:#2d8a5c;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Quick start</h3><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:12px;line-height:1.6"># Upload a file (burn-on-read)\ncurl -X POST https://health.paramant.app/v2/upload \\\n  -H "X-API-Key: ${key}" \\\n  -F "file=@document.pdf"\n\n# Returns a one-time URL\n# Recipient visits once — file is destroyed</pre><p style="color:#aaa;font-size:12px;margin-top:20px">Trial limits: 10 uploads/day &middot; 1h TTL &middot; 5 MB max &middot; ML-KEM-768</p><p style="font-size:12px;margin:8px 0"><a href="https://paramant.app/docs" style="color:#2d8a5c">paramant.app/docs</a></p><hr style="border:none;border-top:1px solid #242424;margin:24px 0"><p style="color:#6e6e6e;font-size:11px;margin:0">PARAMANT &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR &middot; no US CLOUD Act</p></div></body></html>`,
-    }),
   });
-  if (!resp.ok) { const t = await resp.text().catch(() => ''); console.error('[trial] Resend', resp.status, t); return false; }
+  if (!resp.ok) { console.error('[trial] mail failed:', resp.provider, resp.reason, resp.detail || ''); return false; }
   return true;
 }
 
@@ -117,7 +235,12 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
+// `withInternal` adds X-Internal-Auth, the SECOND relay gate. It is opt-in per
+// call rather than always on, because relayFetch also carries calls that must
+// stay first-gate only: the anonymous inbound proxy sends an empty token, and a
+// header the caller did not earn should not ride along behind it. Routes that
+// mutate an entitlement pass it; callRelay always sends it.
+function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, withInternal) {
   return new Promise((resolve, reject) => {
     const base = SECTORS[sector];
     if (!base) return reject(new Error(`Unknown sector: ${sector}`));
@@ -129,6 +252,7 @@ function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
       path: url.pathname + (url.search || ''), method: method || 'GET',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': tok, 'Authorization': `Bearer ${tok}` },
     };
+    if (withInternal) opts.headers['X-Internal-Auth'] = INTERNAL_TOKEN;
     if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
     const req = http.request(opts, r => {
       const chunks = [];
@@ -160,7 +284,7 @@ app.use((err, req, res, next) => {
   next(err);
 });
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'");
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
@@ -169,6 +293,28 @@ app.use((req, res, next) => {
   next();
 });
 app.use(BASE_PATH || '/', express.static(path.join(__dirname, 'public')));
+
+// GET /health -- liveness, and an honest word about the store.
+//
+// The admin had no health route at all: the container probe was GET
+// /api/auth/check, which answers 401 when nobody is signed in, so "healthy"
+// meant "the process still refuses me". That cannot distinguish an admin that
+// is fine from one whose redis has been gone for an hour, which is exactly the
+// blind spot the regression watchlist is about.
+//
+// Always 200, because the process IS up and still serves its static app and
+// still answers honestly on every other route. The status field is where the
+// truth about redis goes: "degraded" when the store cannot be reached. The
+// probe is bounded like every other redis call, so this route cannot be the one
+// that hangs.
+app.get(`${BASE_PATH}/health`, async (req, res) => {
+  const store = await redisHealthy();
+  res.status(200).json({
+    ok: true,
+    status: store.ok ? 'ok' : 'degraded',
+    redis: { ok: store.ok, detail: store.detail },
+  });
+});
 
 const api = express.Router();
 
@@ -180,15 +326,12 @@ api.post('/auth/login', async (req, res) => {
     return res.status(429).json({ error: 'Too many login attempts — try again in 15 minutes' });
   }
   const { token, totp } = req.body || {};
-  if (!token) return res.status(401).json({ error: 'Token required' });
-  if (!totp || !/^\d{6}$/.test(totp)) return res.status(400).json({ error: 'TOTP code required (6 digits)' });
-  // Fix 1 + Fix 3: timing-safe ADMIN_TOKEN comparison only — pgp_ enterprise path removed
-  // (pgp_ keys are regular API keys managed per-sector; they don't grant admin access)
-  const tokenBuf = Buffer.from(token, 'utf8');
-  const adminBuf = Buffer.from(ADMIN_TOKEN, 'utf8');
-  const isMaster = ADMIN_TOKEN.length > 0
-    && tokenBuf.length === adminBuf.length
-    && crypto.timingSafeEqual(tokenBuf, adminBuf);
+  // Both must be strings. Buffer.from() on a number or an object throws, and
+  // express answered that with a 500; /^\d{6}$/ also coerces 123456 to a match.
+  if (typeof token !== 'string' || !token) return res.status(401).json({ error: 'Token required' });
+  if (typeof totp !== 'string' || !/^\d{6}$/.test(totp)) return res.status(400).json({ error: 'TOTP code required (6 digits)' });
+  // Timing-safe ADMIN_TOKEN comparison only. An empty ADMIN_TOKEN never matches.
+  const isMaster = ADMIN_TOKEN.length > 0 && safeEqual(token, ADMIN_TOKEN);
   if (!isMaster) return res.status(401).json({ error: 'Invalid token' });
   try {
     const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, ADMIN_TOKEN);
@@ -265,8 +408,12 @@ function keyResults(results) {
   const created  = Object.entries(results).filter(([,v]) => v.status === 200 || v.status === 201).map(([s,v]) => ({ sector: s, key: v.data?.key }));
   const failed   = Object.entries(results).filter(([,v]) => v.status !== 200 && v.status !== 201).map(([s,v]) => ({
     sector: s,
-    status: v.status,
-    error: v.data?.error || `HTTP ${v.status}`,
+    status: v.status ?? null,
+    // A sector that threw in eachSector has { error } and no status/data, so
+    // reading v.data.error yielded "HTTP undefined". Prefer the thrown message,
+    // then the relay's error body, and only fall back to a status string when
+    // we actually have a status.
+    error: v.error || v.data?.error || (v.status ? `HTTP ${v.status}` : 'sector_unreachable'),
     ...(v.status === 402 && v.data?.upgrade_url ? { upgrade_url: v.data.upgrade_url } : {})
   }));
   const upgradeRequired = failed.some(f => f.status === 402);
@@ -274,6 +421,10 @@ function keyResults(results) {
 }
 
 api.post('/keys/all', authMiddleware, async (req, res) => {
+  if (req.body && req.body.email) {
+    const beleid = await emailPolicy.toets(req.body.email, 'aanmelden', { mx: false });
+    if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
+  }
   const body = { ...req.body, key: 'pgp_' + crypto.randomBytes(32).toString('hex') };
   const results = await eachSector(Object.keys(SECTORS), async s => {
     const r = await relayFetch(s, '/v2/admin/keys', 'POST', body, false, req.sessionToken);
@@ -290,6 +441,10 @@ api.post('/keys/sectors', authMiddleware, async (req, res) => {
   if (!Array.isArray(sectors) || !sectors.length) return res.status(400).json({ error: 'sectors array required' });
   const invalid = sectors.filter(s => !SECTORS[s]);
   if (invalid.length) return res.status(400).json({ error: `Unknown sectors: ${invalid.join(', ')}` });
+  if (body.email) {
+    const beleid = await emailPolicy.toets(body.email, 'aanmelden', { mx: false });
+    if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
+  }
   const sectorBody = { ...body, key: 'pgp_' + crypto.randomBytes(32).toString('hex') };
   const results = await eachSector(sectors, async s => {
     const r = await relayFetch(s, '/v2/admin/keys', 'POST', sectorBody, false, req.sessionToken);
@@ -312,21 +467,28 @@ api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
   if (anyRevoked) {
     try { await logAuditEvent(key, 'admin_key_revoked', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
   }
-  res.status(anyRevoked ? 200 : 502).json({ ok: anyRevoked, results });
+  // 502 is for transport failure only. A relay that answered with a 4xx (e.g.
+  // 404 = key not present in that sector) HANDLED the request -- it is not an
+  // upstream outage. Only return 502 when every sector failed to even answer
+  // (no status, or 5xx). Otherwise the outcome was handled across the fleet.
+  const allFailedTransport = Object.values(results).every(r =>
+    !r.status || r.status >= 500);
+  res.status(allFailedTransport ? 502 : 200).json({ ok: anyRevoked, results });
 });
 
 
 api.post('/admin/resend-setup', async (req, res) => {
   const tok = (req.headers['x-admin-token'] || req.headers['x-api-key'] || '').trim();
-  if (!ADMIN_TOKEN || tok.length !== ADMIN_TOKEN.length ||
-      !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(ADMIN_TOKEN)))
+  // safeEqual, not a hand-rolled length check plus timingSafeEqual: see its
+  // definition above for why the character count and the byte count are not the
+  // same number, and why the difference used to be a 500 and an oracle.
+  if (!ADMIN_TOKEN || !safeEqual(tok, ADMIN_TOKEN))
     return res.status(401).json({ error: 'unauthorized' });
   const { user_id, email } = req.body || {};
   if (!user_id || !email) return res.status(400).json({ error: 'missing_fields' });
   // Rate limit: max 10 admin resends per user per 24h
   const adminRlKey = `paramant:ratelimit:admin_resend:${user_id}`;
-  const adminRlCnt = await redis().incr(adminRlKey);
-  if (adminRlCnt === 1) await redis().expire(adminRlKey, 86400);
+  const adminRlCnt = await incrInWindow(redis(), adminRlKey, 86400);
   if (adminRlCnt > 10) return res.status(429).json({ error: 'rate_limited', admin_message: 'Max 10 resends per user per 24h' });
   try {
     await Promise.all([
@@ -335,21 +497,15 @@ api.post('/admin/resend-setup', async (req, res) => {
       redis().del(`paramant:user:backup_codes:${user_id}`),
       redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
     ]);
-    for await (const k of redis().scanIterator({ MATCH: 'paramant:user:setup_token:*', COUNT: 100 })) {
-      const raw = await redis().get(k);
-      if (raw) { try { const d = JSON.parse(raw); if (d.user_id === user_id) await redis().del(k); } catch {} }
-    }
-    const setupToken = crypto.randomBytes(32).toString('hex');
-    await redis().set(
-      `paramant:user:setup_token:${setupToken}`,
-      JSON.stringify({ user_id, email }),
-      { EX: 14 * 86400 }
-    );
+    // issueSetupToken also revokes this account's sessions. This route deletes
+    // the TOTP state and the backup codes and used to leave every live session
+    // standing, which is the wrong way round.
+    const setupToken = await issueSetupToken(user_id, email);
     await sendSetupEmail(email, setupToken);
-    const expiresAt = Date.now() + 14 * 86400 * 1000;
+    const expiresAt = Date.now() + SETUP_TOKEN_TTL_S * 1000;
     const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
     try { await logAuditEvent(user_id, 'admin_setup_resent', { email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    console.log(`[admin/resend-setup] sent to ${email}`);
+    console.log(`[admin/resend-setup] sent to ${maskEmail(email)}`);
     res.json({ success: true, email, expires_at: expiresAt, setup_url: setupUrl });
   } catch (err) {
     console.error('[admin/resend-setup]', err.message);
@@ -486,8 +642,9 @@ function parseCookies(req) {
 }
 
 // Call relay internal endpoint (with X-Internal-Auth)
-async function callRelay(endpoint, body, method = "POST") {
-  const relayUrl = SECTORS.health;
+async function callRelay(endpoint, body, method = "POST", sector = "health") {
+  const relayUrl = SECTORS[sector];
+  if (!relayUrl) throw new Error(`Unknown sector: ${sector}`);
   const opts = {
     method,
     headers: {
@@ -505,40 +662,115 @@ async function callRelay(endpoint, body, method = "POST") {
   return res;
 }
 
-// Find API key entry by email (queries health relay)
+// The effective entitlements of ONE account, straight from the relay.
+//
+// This is the only place a limit shown to a customer may come from. The relay
+// owns the tier table (relay/lib/tiers.js) and the product split
+// (relay/lib/entitlements.js), and it is the thing that actually says no at the
+// quota gate, so it is also the thing that gets to say what the ceiling is. The
+// admin image does not ship the relay package and must not carry a copy of the
+// numbers: a second table is a table that drifts, and it drifted. It had no
+// `business` row and it was keyed on the unified `plan`, which a purchase never
+// moves (entitlements.applyProductTier writes plan_parasign / plan_parasend and
+// nothing else), so a paying ParaSign Pro account was shown the community cap.
+//
+// Returns the { parasend, parasign } entitlement object, or null when the relay
+// could not answer. Callers must read null as "unknown" and refuse to render a
+// cap at all, never as a reason to fall back to a guess.
+async function readAccountEntitlements(accountId) {
+  if (!accountId) return null;
+  try {
+    const r = await callRelay(`/v2/admin/entitlements/${encodeURIComponent(accountId)}`, null, "GET");
+    if (!r.ok) return null;
+    const body = await r.json().catch(() => null);
+    if (!body || body.ok !== true || !body.entitlements) return null;
+    return body.entitlements;
+  } catch (err) {
+    console.error("[entitlements read]", err.message);
+    return null;
+  }
+}
+
+// Find API key entry by email (queries health relay).
+// reveal=1: the returned entry's full .key becomes the session user_id (Redis
+// id + relay operation token), so this server-to-server lookup needs the raw
+// value, not the masked default.
 async function findUserByEmail(email) {
   const lower = email.toLowerCase();
-  const r = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const r = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   if (r.status !== 200) return null;
   const keys = r.body?.keys || [];
   return keys.find(k => k.email && k.email.toLowerCase() === lower && k.active !== false) || null;
 }
 
-// Send setup email via Resend
+// Find API key entry by its key id (reverse of findUserByEmail). Used by the
+// usernameless/discoverable passkey login to resolve the email for the session
+// record after identity has been proven by the credential. Same source/cost as
+// findUserByEmail (one /v2/admin/keys read). Returns null if not found.
+// reveal=1: matches on the raw .key (userId is a full pgp_ value).
+async function findUserById(userId) {
+  if (!userId) return null;
+  const r = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+  if (r.status !== 200) return null;
+  const keys = r.body?.keys || [];
+  return keys.find(k => k.key === userId && k.active !== false) || null;
+}
+
+// Mint the one outstanding setup link for an account, and clear what it replaces.
+//
+// Finding 15 of the 2026-09-05 review, in one place. Three things had to be true
+// and were not:
+//   - at most ONE link is live at a time. The login path minted a fresh one on
+//     every unauthenticated attempt against a not-yet-activated account and
+//     mailed it, leaving the previous ones alive for their full term. Two weeks
+//     of attempts, two weeks of working links in one mailbox.
+//   - the link is short-lived (SETUP_TOKEN_TTL_S).
+//   - the sessions it can replace do not outlive it. This function hands out the
+//     means to take the account over; a session that predates it has no claim.
+// One outstanding token per account is an invariant, so the account only needs a
+// POINTER to it, not a scan of every token in the product to find its own. The
+// pointer may go stale (the token was consumed, or expired); a stale one costs a
+// DEL of a key that is already gone.
+const setupTokenPointer = (userId) => `paramant:user:setup_token_for:${userId}`;
+
+async function dropSetupTokenFor(userId) {
+  if (!userId) return;
+  const prev = await redis().get(setupTokenPointer(userId)).catch(() => null);
+  if (prev) await redis().del(`paramant:user:setup_token:${prev}`).catch(() => {});
+  await redis().del(setupTokenPointer(userId)).catch(() => {});
+}
+
+async function issueSetupToken(userId, email, extra = {}) {
+  await dropSetupTokenFor(userId);
+  await userSessions.revokeAll(redis(), userId, { scan: scanSessions });
+  const token = crypto.randomBytes(32).toString('hex');
+  await redis().set(`paramant:user:setup_token:${token}`, JSON.stringify({ user_id: userId, email, ...extra }), { EX: SETUP_TOKEN_TTL_S });
+  await redis().set(setupTokenPointer(userId), token, { EX: SETUP_TOKEN_TTL_S }).catch(() => {});
+  return token;
+}
+
+// Setup email, through the one door in relay/lib/mail.js so the carrier is a
+// setting rather than a hostname written here.
 async function sendSetupEmail(email, setupToken, isReset = false) {
-  const msg = emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: '', isReset: !!isReset });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  const msg = emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: '', isReset: !!isReset, validFor: setupTokenValidFor() });
+  // This one still throws on failure: somebody is waiting on a setup link and
+  // must not be told it was sent when it was not.
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 
 // Send signup email-verification link
 async function sendVerificationEmail(email, token, requestIP) {
   const msg = emailTemplates.signupVerificationEmail({ email, token, requestedAt: Date.now(), requestIP });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 // Send "someone tried to sign up with your email" notice to an existing
@@ -546,38 +778,86 @@ async function sendVerificationEmail(email, token, requestIP) {
 // both branches do the same kind of outbound work (no timing oracle).
 async function sendDuplicateSignupAttempt(email, requestIP) {
   const msg = emailTemplates.duplicateSignupAttemptEmail({ email, requestedAt: Date.now(), requestIP });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 // Send TOTP reset confirmation email (step 1 of two-stage flow)
 async function sendResetConfirmEmail(email, confirmToken, maskedIp, requestedAt) {
   const msg = emailTemplates.resetConfirmationEmail({ confirmToken, requestedAt, requestIP: maskedIp });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 // ── User session middleware ────────────────────────────────────────────────────
 async function authUser(req, res, next) {
   const token = parseCookies(req).paramant_user_session;
   if (!token) return res.status(401).json({ error: "unauthenticated" });
+  const key = `paramant:user:session:${token}`;
   try {
-    const raw = await redis().get(`paramant:user:session:${token}`);
+    const raw = await redis().get(key);
     if (!raw) return res.status(401).json({ error: "session_expired" });
-    await redis().expire(`paramant:user:session:${token}`, 3600);
-    req.userSession = JSON.parse(raw);
+    // Parse BEFORE the TTL is refreshed. The refresh used to be the first thing
+    // this middleware did, which meant a session was extended and only then
+    // inspected, so a record about to be thrown away had just been handed
+    // another hour of life.
+    let sess;
+    try { sess = JSON.parse(raw); }
+    catch { await redis().del(key).catch(() => {}); return res.status(401).json({ error: "session_expired" }); }
+
+    const now = Date.now();
+    // created_at is written by every issuing path (password+TOTP, backup code,
+    // passkey login, passkey register). A record from before this field existed
+    // has none: rather than refusing it (which logs everyone out on deploy) or
+    // exempting it forever, treat now as its start and stamp it, so it is
+    // capped from here on instead of never.
+    let created = Number(sess.created_at);
+    let rewrite = false;
+    if (!Number.isFinite(created) || created <= 0) { created = now; sess.created_at = now; rewrite = true; }
+    if (now - created > USER_SESSION_MAX_AGE_MS) {
+      await redis().del(key).catch(() => {});
+      return res.status(401).json({ error: "session_expired" });
+    }
+    // last_seen is what GET /api/user/account prints per session. It used to
+    // print created_at under that label, so the column said "last seen" and
+    // showed the login time. Written at most once a minute (see
+    // LAST_SEEN_REFRESH_MS) so an open dashboard does not add a write per poll.
+    if (!(now - Number(sess.last_seen) < LAST_SEEN_REFRESH_MS)) { sess.last_seen = now; rewrite = true; }
+    // BOUND TO THE CLIENT THAT LOGGED IN. Finding 22i: the session record holds
+    // the account's raw pgp_ API key -- twice, since user_id IS that key -- and
+    // `ip` and `ua` were stored at login and then read only to be PRINTED on the
+    // account screen. Nothing compared them. A cookie lifted off one machine
+    // therefore worked from any other, and one hour of it bought a credential
+    // with no expiry at all.
+    //
+    // The user agent and not the IP. A phone moving from wifi to mobile data
+    // changes its IP mid-session and changes its user agent never; binding to
+    // the address would log people out for walking out of the door, and an
+    // attacker on the same NAT would pass it anyway. A UA change on a live
+    // session token is close to always theft, and in the rare honest case (a
+    // browser that updated itself between two requests) the cost is one login.
+    //
+    // A record from before this field was written has no `ua` to compare: it is
+    // stamped rather than refused, so a deploy does not log everybody out.
+    const ua = req.get('user-agent') || '';
+    if (typeof sess.ua !== 'string') { sess.ua = ua; rewrite = true; }
+    else if (sess.ua !== ua) {
+      await redis().del(key).catch(() => {});
+      try { await logAuditEvent(sess.user_id, 'session_client_changed', { via: sess.via || 'totp' }); } catch (_) { /* audit is best effort */ }
+      return res.status(401).json({ error: "session_expired" });
+    }
+
+    // One command either way: SET with EX both stores and slides the window.
+    if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: 3600 });
+    else await redis().expire(key, 3600);
+
+    req.userSession = sess;
     req.userSessionToken = token;
     next();
   } catch (err) {
@@ -585,6 +865,28 @@ async function authUser(req, res, next) {
     res.status(503).json({ error: "session_store_unavailable" });
   }
 }
+
+// ── Developer dashboard allowlist ───────────────────────────────────────────
+// Extra gate ON TOP OF authUser for the hidden /developer dashboard. The email
+// allowlist comes from env only (DEVELOPER_ALLOWLIST, comma-separated) — never
+// hardcoded. The pure logic lives in ./lib/developer-gate (unit-tested in
+// admin/test/developer-gate.test.js).
+const { isDeveloper } = require("./lib/developer-gate");
+// Gate for /api/user/developer/* data endpoints. Runs after authUser (which
+// 401s on no session). A valid session that is not on the allowlist gets a
+// 404 — indistinguishable from "this route does not exist", so the developer
+// surface stays hidden from logged-in non-developers (never 403).
+function developerGate(req, res, next) {
+  if (!isDeveloper(req.userSession && req.userSession.email))
+    return res.status(404).json({ error: "not_found" });
+  next();
+}
+// Operations-dashboard data libs (CLI catalogue + snapshot builder). Source of
+// truth for the descriptions is paramant-solutions/tools/. Unit-tested in
+// admin/test/developer-snapshot.test.js.
+const { DEVELOPER_TOOLS } = require('./lib/developer-tools');
+const { buildSnapshot } = require('./lib/developer-snapshot');
+const developerConfig = require('./lib/developer-config');
 
 // Session cookie is SameSite=Lax (was Strict). Deliberate choice (ADR R018):
 // the invite/co-sign flow lands a recipient via a top-level navigation from an
@@ -612,6 +914,13 @@ function clearUserCookie(res) {
 
 // GET /api/captcha/challenge
 api.get('/captcha/challenge', async (req, res) => {
+  // Unauthenticated and each issued challenge writes a 300s Redis key, so an
+  // unthrottled caller can flood Redis. Cap per-IP (reuses the webauthn fixed-
+  // window limiter): 60 challenges / 5 min is far above any honest signup flow
+  // (one challenge per attempt) yet bounds the standing key count per source.
+  const ip = req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+  if (!(await webauthn.rateHit(redis(), `captcha:ip:${ip}`, 60, 300)))
+    return res.status(429).json({ error: 'rate_limited' });
   try {
     res.json(await pow.issueChallenge());
   } catch (e) {
@@ -619,36 +928,9 @@ api.get('/captcha/challenge', async (req, res) => {
   }
 });
 
-// Disposable / reserved domain denylist
-const BLOCKED_DOMAINS = new Set([
-  'localhost', 'example.com', 'example.org', 'example.net',
-  'test.com', 'test.local', 'test.invalid',
-  'mailinator.com', 'guerrillamail.com', 'guerrillamail.net',
-  'guerrillamail.org', 'guerrillamail.de', 'guerrillamail.info',
-  'sharklasers.com', 'guerrillamailblock.com', 'grr.la',
-  'spam4.me', 'yopmail.com', 'yopmail.fr', 'cool.fr.nf',
-  'jetable.fr.nf', 'nospam.ze.tc', 'nomail.xl.cx',
-  'mega.zik.dj', 'speed.1s.fr', 'courriel.fr.nf',
-  'moncourrier.fr.nf', 'monemail.fr.nf', 'monmail.fr.nf',
-  'trashmail.at', 'trashmail.com', 'trashmail.io',
-  'trashmail.me', 'trashmail.net', 'trashmail.org',
-  'dispostable.com', 'fakeinbox.com', 'maildrop.cc',
-  'discard.email', 'tempr.email', 'temp-mail.org',
-]);
-// Also block reserved TLDs
-const BLOCKED_TLDS = ['.local', '.test', '.invalid', '.example', '.localhost'];
-
-function isBlockedEmail(email) {
-  const lower = email.toLowerCase();
-  const atIdx = lower.lastIndexOf('@');
-  if (atIdx < 0) return true;
-  const domain = lower.slice(atIdx + 1);
-  if (BLOCKED_DOMAINS.has(domain)) return true;
-  for (const tld of BLOCKED_TLDS) {
-    if (domain.endsWith(tld)) return true;
-  }
-  return false;
-}
+// Welke adressen een account kunnen openen: admin/lib/email-policy.js, met de
+// lijst uit deploy/email-blocklist.json. Alleen voor aanmelden en verzenden;
+// een ontvanger wordt nooit getoetst (zie de uitleg bovenin die module).
 
 // POST /api/user/signup — stage 1: issue verification email, do NOT create account yet
 api.post("/user/signup", async (req, res) => {
@@ -662,21 +944,20 @@ api.post("/user/signup", async (req, res) => {
   // 2. Basic field validation
   if (!email || !dpa_accepted) return res.status(400).json({ error: "missing_fields" });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
-  if (isBlockedEmail(email)) return res.status(422).json({ error: "invalid_email", reason: "domain_not_allowed" });
+  const beleid = await emailPolicy.toets(email, 'aanmelden');
+  if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
 
   const norm = email.toLowerCase().trim();
 
   // 3. Per-IP rate limit (10 per hour)
   const ipKey = `paramant:signup:ratelimit:ip:${ip}`;
-  const ipCount = await redis().incr(ipKey);
-  if (ipCount === 1) await redis().expire(ipKey, 3600);
+  const ipCount = await incrInWindow(redis(), ipKey, 3600);
   if (ipCount > 10) return res.status(429).json({ error: "rate_limited" });
 
   // 4. Per-email rate limit (10 verification emails per 24h, hashed for privacy)
   const emailHash = crypto.createHash('sha256').update(norm).digest('hex');
   const emailKey = `paramant:signup:ratelimit:email:${emailHash}`;
-  const emailCount = await redis().incr(emailKey);
-  if (emailCount === 1) await redis().expire(emailKey, 86400);
+  const emailCount = await incrInWindow(redis(), emailKey, 86400);
   if (emailCount > 10) return res.status(429).json({ error: "rate_limited", reason: "too_many_attempts_for_email" });
 
   // 5. Both branches do the same kind of work (one Redis SET + one outbound
@@ -703,7 +984,7 @@ api.post("/user/signup", async (req, res) => {
       sendDuplicateSignupAttempt(norm, ip).catch(err =>
         console.error("[signup] duplicate notice failed:", err.message));
     });
-    console.log(`[signup] duplicate signup attempt: ${emailHash.slice(0, 8)} from ${ip}`);
+    logRedacted('log', `[signup] duplicate signup attempt: ${emailHash.slice(0, 8)} from ${maskIpForLog(ip)}`);
   } else {
     // Real pending signup token.
     await redis().set(
@@ -721,7 +1002,7 @@ api.post("/user/signup", async (req, res) => {
         redis().del(`paramant:signup:pending:${verifyToken}`).catch(() => {});
       });
     });
-    console.log(`[signup] pending signup for ${norm} from ${ip}`);
+    logRedacted('log', `[signup] pending signup for ${maskEmail(norm)} from ${maskIpForLog(ip)}`);
   }
 
   // Identical response shape and timing in both branches.
@@ -746,73 +1027,94 @@ api.get("/user/signup/verify/:token", async (req, res) => {
   let pending;
   try { pending = JSON.parse(raw); } catch { return res.redirect('/signup?error=invalid_token'); }
 
-  // Consume immediately (one-shot)
-  await redis().del(`paramant:signup:pending:${token}`);
-
   const { email, label } = pending;
 
-  // Check again — race guard
-  const existing = await findUserByEmail(email);
-  if (existing) return res.redirect('/signup?error=account_exists');
-
-  // Create the account across every sector listed in SECTORS so the key works
-  // on every relay -- including main (relay.paramant.app, internal sector
-  // "relay") which the SDK and direct API consumers target. Before SECTORS
-  // gained the 'main' entry (added together with this comment), the fan-out
-  // silently skipped main even while claiming to write to "every sector",
-  // and main's users.json drifted weeks behind the others.
-  const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
-  const createdAt = new Date().toISOString();
-  const createBody = {
-    key: keyVal,
-    email,
-    label: label || null,
-    plan: "community",
-    active: true,
-    created: createdAt,
-    created_at_ts: Date.now(),
-  };
-
-  // health is the source of truth for admin UI visibility. Must succeed.
-  const primaryRes = await relayFetch("health", "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN);
-  if (primaryRes.status !== 200 && primaryRes.status !== 201) {
-    console.error("[signup/verify] key creation failed on health:", primaryRes.status, primaryRes.body);
-    return res.redirect('/signup?error=server_error');
+  // Race guard (known-issues C1, TOCTOU). Two different pending tokens for
+  // the same address can reach this point concurrently -- both were issued
+  // while no account existed yet -- and both used to pass the existence
+  // re-check before either had created the account. Serialize on the e-mail
+  // hash: exactly one request runs check + create, the loser waits and then
+  // sees the winner's account. The same lock also covers a double click on
+  // one link, because the token is re-read and consumed under the lock.
+  const lock = await acquireSignupLock(redis(), email, token);
+  if (!lock.acquired) {
+    // Creation for this address is still in flight after ~3s of waiting.
+    // The pending token was NOT consumed, so a retry of the same link works.
+    return res.redirect('/signup?error=busy');
   }
-
-  // Fan-out to the other sectors. Best-effort — if one is briefly unavailable, reload-users
-  // can pick it up later; we don't want to leak a half-created account by failing the whole
-  // signup here after health succeeded.
-  const otherSectors = Object.keys(SECTORS).filter(s => s !== "health");
-  await Promise.all(otherSectors.map(s =>
-    relayFetch(s, "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN).catch(e => {
-      console.error(`[signup/verify] key propagation failed on ${s}:`, e && e.message || e);
-    })
-  ));
-
-  const setupToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:setup_token:${setupToken}`,
-    JSON.stringify({ user_id: keyVal, email, label: label || null }),
-    { EX: 14 * 86400 }
-  );
-  await redis().set(
-    `paramant:user:meta:${keyVal}`,
-    JSON.stringify({ email, created_at: createdAt })
-  ).catch(() => {});
-
   try {
-    await sendSetupEmail(email, setupToken);
-  } catch (err) {
-    console.error("[signup/verify] setup email failed:", err.message);
-    // Account exists, don't undo — they can contact support
+
+    // Re-read under the lock: a parallel click on the same link may have
+    // consumed the token while we waited for the lock.
+    if (!(await redis().get(`paramant:signup:pending:${token}`))) {
+      const consumed = await redis().get(`paramant:signup:consumed:${token}`);
+      return res.redirect(consumed ? '/signup/verified' : '/signup?error=expired_token');
+    }
+    const existing = await findUserByEmail(email);
+    if (existing) return res.redirect('/signup?error=account_exists');
+
+    // Create the account across every sector listed in SECTORS so the key works
+    // on every relay -- including main (relay.paramant.app, internal sector
+    // "relay") which the SDK and direct API consumers target. Before SECTORS
+    // gained the 'main' entry (added together with this comment), the fan-out
+    // silently skipped main even while claiming to write to "every sector",
+    // and main's users.json drifted weeks behind the others.
+    const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
+    const createdAt = new Date().toISOString();
+    const createBody = {
+      key: keyVal,
+      email,
+      label: label || null,
+      plan: "community",
+      active: true,
+      created: createdAt,
+      created_at_ts: Date.now(),
+    };
+
+    // health is the source of truth for admin UI visibility. Must succeed.
+    const primaryRes = await relayFetch("health", "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN);
+    if (primaryRes.status !== 200 && primaryRes.status !== 201) {
+      console.error("[signup/verify] key creation failed on health:", primaryRes.status, primaryRes.body);
+      // De pending-token is NIET verbruikt: een relay-hik mag de link uit de
+      // verificatiemail niet vernietigen. De gebruiker klikt hem gewoon opnieuw.
+      return res.redirect('/signup?error=server_error');
+    }
+
+    // Pas verbruiken nu het account echt bestaat (one-shot, onder de lock).
+    await redis().del(`paramant:signup:pending:${token}`);
+
+    // Fan-out to the other sectors. Best-effort — if one is briefly unavailable, reload-users
+    // can pick it up later; we don't want to leak a half-created account by failing the whole
+    // signup here after health succeeded.
+    const otherSectors = Object.keys(SECTORS).filter(s => s !== "health");
+    await Promise.all(otherSectors.map(s =>
+      relayFetch(s, "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN).catch(e => {
+        console.error(`[signup/verify] key propagation failed on ${s}:`, e && e.message || e);
+      })
+    ));
+
+    const setupToken = await issueSetupToken(keyVal, email, { label: label || null });
+    await redis().set(
+      `paramant:user:meta:${keyVal}`,
+      JSON.stringify({ email, created_at: createdAt })
+    ).catch(() => {});
+
+    try {
+      await sendSetupEmail(email, setupToken);
+    } catch (err) {
+      console.error("[signup/verify] setup email failed:", err.message);
+      // Account exists, don't undo — they can contact support
+    }
+
+    // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
+    await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 30 * 86400 }).catch(() => {});
+
+    console.log(`[signup/verify] account created for ${maskEmail(email)} (${keyVal.slice(0, 12)}...)`);
+    res.redirect('/signup/verified');
+
+  } finally {
+    await lock.release();
   }
-
-  // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
-  await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 30 * 86400 }).catch(() => {});
-
-  console.log(`[signup/verify] account created for ${email} (${keyVal.slice(0, 12)}...)`);
-  res.redirect('/signup/verified');
 });
 
 // POST /api/user/setup/:token — retrieve TOTP QR data (idempotent)
@@ -859,40 +1161,161 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
   const result = await verifyRes.json();
   if (!result.valid) return res.status(401).json({ error: "invalid_code" });
 
-  await callRelay("/v2/user/activate-totp", { user_id });
+  // Activation mints the backup codes and returns them exactly once. This is the
+  // only place the plaintext codes exist, so we read them straight from the
+  // activate response — no separate (and previously non-existent) lookup.
+  const activateRes = await callRelay("/v2/user/activate-totp", { user_id });
+  const { backup_codes } = activateRes.ok ? await activateRes.json() : { backup_codes: [] };
   await redis().del(`paramant:user:setup_token:${token}`);
+  await redis().del(setupTokenPointer(user_id)).catch(() => {});
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "" }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), user_id, sessionToken,
+    { user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", ...sessionKeyFields(user_id) }, 3600);
 
   setUserCookie(res, sessionToken);
-
-  const codesRes = await callRelay("/v2/user/get-backup-codes-plaintext", { user_id });
-  const { backup_codes } = codesRes.ok ? await codesRes.json() : { backup_codes: [] };
 
   res.json({ success: true, email, backup_codes });
 });
 
 // ── Login flow ────────────────────────────────────────────────────────────────
 
+// Every credential answer on /api/user/login leaves at the same point on the
+// clock, whatever the handler had to do to reach it.
+//
+// THE ORACLE THIS CLOSES. The status codes on this route were already
+// identical: an earlier fix folded three different 403s into one 401 precisely
+// so the code could not be read as "this address exists". The WORK was not.
+// An address that exists reaches a second relay call (/v2/user/verify-totp)
+// and one more redis read; one that does not returns two steps earlier. On a
+// booted admin, 200 requests per case, interleaved, one X-Real-IP each:
+//
+//   relay verify-totp cost   exists (p50)   absent (p50)   delta
+//   0 ms (instant stub)          3.02 ms        1.93 ms    1.10 ms
+//   3 ms (a realistic relay)     6.13 ms        1.93 ms    4.20 ms
+//
+// In the second row the two distributions do not overlap at all: the fastest
+// hit (4.58 ms) is slower than the slowest miss (4.02 ms), so ONE request
+// classifies an address, under the rate limit, without ever signing in. The
+// review measured 5.40 against 2.95 ms on the production pair; same channel,
+// different machine.
+//
+// WHAT REPLACES IT. A floor, not a sleep: the answer is held until t0 plus a
+// constant, so what an attacker times is a number this file sets. Padding by a
+// fixed amount would not have worked -- it moves both curves and keeps the
+// distance between them. The not-found branch also does the same shape of redis
+// work as the found one now, so the floor is a safety margin rather than the
+// only thing holding the two paths together.
+//
+// 429 and 428 are deliberately NOT padded. They are not credential answers,
+// their status codes tell them apart anyway, and slowing them down would only
+// cost the honest client who is being asked for a proof-of-work.
+const LOGIN_MIN_ANSWER_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_LOGIN_MIN_ANSWER_MS || '', 10);
+  // The floor has to sit above the p99 of the slowest branch or it stops being
+  // a floor and the difference leaks again. Zero or nonsense is not an opt-out.
+  return Number.isFinite(raw) && raw > 0 ? raw : 250;
+})();
+
+// /api/user/login-with-backup needs a floor of its own, six times higher, and
+// the reason is argon2.
+//
+// consumeBackupCode verifies the code against EVERY stored hash until one
+// matches, and a wrong code matches none, so a miss costs ten full argon2id
+// verifications at 64 MiB and timeCost 3. Measured on the machine this was
+// written on: one verification p50 49.7 ms, ten of them p50 494.2 ms with a max
+// of 870.9 ms. An address with no account never reaches any of it. That was the
+// whole answer: 472.7 ms for an address that exists against 251.6 ms for one
+// that does not, no overlap, and the admin logged "answer overran its floor"
+// on 40 out of 40 requests, which is the code saying out loud that the floor it
+// was given was not one.
+//
+// 1500 ms is 1.7x the slowest ten-hash miss measured here and 3x the median. A
+// slower box needs more, and it will say so: every overrun is logged. The route
+// is the emergency path a user takes once, when their authenticator is gone, so
+// a second and a half is a cost worth paying to stop the route answering the
+// question "is this address a customer".
+const LOGIN_BACKUP_MIN_ANSWER_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS || '', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 1500;
+})();
+
+// `extraMs` is the per-address throttle this attempt owes, from
+// loginRate.mirrorThrottleMs. It is added to the FLOOR rather than slept before
+// the work, so it cannot be told apart from the work itself, and it is the same
+// number for an address that exists and one that does not, because the counter
+// behind it counts both.
+function answerLoginAt(t0, res, status, body, extraMs = 0, baseMs = LOGIN_MIN_ANSWER_MS) {
+  const floor = baseMs + Math.max(0, extraMs);
+  const wait = floor - (Date.now() - t0);
+  if (wait <= 0) {
+    // Only reachable when the real work took longer than the floor, which means
+    // the floor has stopped being one. Loud, because what happens next is an
+    // existence oracle that nobody is measuring.
+    console.error(`[login] answer overran its floor by ${-wait}ms (floor ${floor}ms); PARAMANT_LOGIN_MIN_ANSWER_MS is too low`);
+    return res.status(status).json(body);
+  }
+  return new Promise((resolve) => setTimeout(resolve, wait)).then(() => res.status(status).json(body));
+}
+
 // POST /api/user/login
 api.post("/user/login", async (req, res) => {
+  // Read before anything else runs: every credential answer below is held until
+  // this moment plus LOGIN_MIN_ANSWER_MS plus whatever the address owes for its
+  // own failures. See answerLoginAt.
+  const t0 = Date.now();
   const { email, totp } = req.body || {};
-  if (!email || !totp) return res.status(400).json({ error: "missing_fields" });
+  // typeof, not truthiness. `{"email": {}}` is truthy and reached
+  // loginRate.emailFailures -> String(email).trim().toLowerCase(), which threw,
+  // so the route answered 500 in about a millisecond: an unhandled throw on an
+  // unauthenticated route, and the fastest answer the handler had.
+  if (typeof email !== "string" || typeof totp !== "string" || !email || !totp) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
 
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
-  const ipKey    = `paramant:user:ratelimit:ip:${ip}`;
-  const emailKey = `paramant:user:ratelimit:email:${email.toLowerCase()}`;
-  const ipCount    = await redis().incr(ipKey);    if (ipCount    === 1) await redis().expire(ipKey,    900);
-  const emailCount = await redis().incr(emailKey); if (emailCount === 1) await redis().expire(emailKey, 900);
-  if (ipCount > 5 || emailCount > 10) return res.status(429).json({ error: "rate_limited" });
+
+  // Per IP: a hard refusal, unchanged. The IP is the caller's own resource.
+  const ipHit = await loginRate.hitIp(redis(), ip);
+  if (!ipHit.allowed) return res.status(429).json({ error: "rate_limited" });
+
+  // Per e-mail: failures only, and never a refusal. The address is caller input,
+  // so a 429 keyed on it locks out its owner rather than the guesser -- which is
+  // exactly what the counter this replaces did, from eleven posts over three
+  // IPs. Past the threshold the next attempt costs a proof-of-work instead, the
+  // same 2^18 challenge signup and password reset already ask for. See
+  // lib/login-ratelimit.js.
+  const failures = await loginRate.emailFailures(redis(), email);
+  // What this ADDRESS owes for its own failures, hit or miss. The relay used to
+  // charge the same curve against the ACCOUNT, and only an address that exists
+  // could ever reach it, so the delay itself said whether the account was real:
+  // 306 ms against 252 ms at twelve failures, 2006 against 252 at the cap, with
+  // no overlap either time. Charged here, on a counter that does not know
+  // whether the account exists, it says nothing. See lib/login-ratelimit.js.
+  const throttleMs = loginRate.mirrorThrottleMs(failures);
+  if (loginRate.powRequired(failures)) {
+    const { challenge_id, nonce } = req.body || {};
+    const proof = await pow.verifyChallenge(challenge_id, nonce);
+    if (!proof.valid) {
+      // 428, not 429: the attempt is not refused, it is priced. The login page
+      // solves the challenge and posts again by itself. Hand the IP its attempt
+      // back first: nothing was evaluated here, and charging for the quote as
+      // well as the answer would leave an honest user two real tries out of five.
+      await loginRate.refundIp(redis(), ip);
+      return res.status(428).json({ error: "pow_required", reason: proof.reason });
+    }
+  }
 
   const user = await findUserByEmail(email);
-  if (!user) return res.status(401).json({ error: "invalid_credentials" });
+  if (!user) {
+    // The read the existing-account branch does next, against a key that cannot
+    // exist. A GET on a random key, no write, so it costs one round trip and
+    // leaves nothing behind: the point is that both branches make the same
+    // number of calls to the same store before they answer.
+    await redis().get(`paramant:user:totp_active:absent_${crypto.randomBytes(16).toString("hex")}`);
+    await loginRate.noteEmailFailure(redis(), email);
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
+  }
 
   const activeRaw = await redis().get(`paramant:user:totp_active:${user.key}`);
   if (activeRaw !== "true") {
@@ -900,69 +1323,135 @@ api.post("/user/login", async (req, res) => {
     let um = {}; try { if (metaRaw) um = JSON.parse(metaRaw); } catch {}
     if (um.totp_required) {
       if (um.email || user.email) {
-        const setupToken = (await import('crypto')).randomBytes ? require('crypto').randomBytes(32).toString('hex') : '';
-        if (setupToken) {
-          await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: user.key, email: um.email || user.email }), { EX: 14 * 86400 });
-          sendSetupEmail(um.email || user.email, setupToken).catch(e => console.error('[login/totp_required] email:', e.message));
-        }
+        const setupToken = await issueSetupToken(user.key, um.email || user.email);
+        if (setupToken) sendSetupEmail(um.email || user.email, setupToken).catch(e => console.error('[login/totp_required] email:', e.message));
       }
       // Setup mail is dispatched fire-and-forget above. Respond identically
       // to "no such account" so the status code cannot be used as an
       // enumeration oracle. Was: 403 totp_setup_required, which leaked the
       // fact that the email belongs to a real account with admin-required
       // TOTP not yet set up.
-      return res.status(401).json({ error: "invalid_credentials" });
+      await loginRate.noteEmailFailure(redis(), email);
+      return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
     }
     // Same 401 for TOTP-not-configured so this branch also does not leak
     // account existence. Was: 403 totp_not_configured.
-    return res.status(401).json({ error: "invalid_credentials" });
+    await loginRate.noteEmailFailure(redis(), email);
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
   }
 
-  const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp });
-  if (!verifyRes.ok) return res.status(401).json({ error: "invalid_credentials" });
+  // throttled_upstream: this attempt's delay is already in the floor above, so
+  // the relay must not charge it a second time. It still counts the failure and
+  // still reports what it would have charged, as throttle_ms.
+  const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp, throttled_upstream: true });
+  // The relay's single-use guard could not reach Redis and now fails closed.
+  // Pass the 503 through instead of dressing it up as a wrong code, and do not
+  // count it against the address: nobody failed, the service is down. During
+  // such an outage no sign-in can succeed anyway, because the session store is
+  // that same Redis.
+  // Floored like every other answer on this route. Unfloored it was a 9 ms
+  // reply where every other answer took 252 ms, and only an address with an
+  // account could ever produce it, so the outage answer was itself the oracle.
+  if (verifyRes.status === 503) return answerLoginAt(t0, res, 503, { error: "totp_unavailable" }, throttleMs);
+  if (!verifyRes.ok) {
+    await loginRate.noteEmailFailure(redis(), email);
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
+  }
   const result = await verifyRes.json();
-  if (!result.valid) return res.status(401).json({ error: "invalid_credentials" });
+  if (!result.valid) {
+    await loginRate.noteEmailFailure(redis(), email);
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
+  }
+
+  // A correct code proves who is at the keyboard, so the failures collected in
+  // this address's name stop counting right here. Without this the owner keeps
+  // paying for the guesser's score for the rest of the window.
+  await loginRate.clearEmailFailures(redis(), email);
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "" }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), user.key, sessionToken,
+    { user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
 
-  res.json({
+  // The success answer is floored too. A sign-in that came back faster than
+  // every refusal would be its own oracle: the 200 is visible, but so is the
+  // fact that this address got as far as having a code checked at all.
+  return answerLoginAt(t0, res, 200, {
     success: true,
     email: user.email,
     session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-  });
+    // Dual-verify: surface the algorithm so the login page can show a soft SHA-1
+    // note. Login already succeeded; this never blocks sign-in.
+    totp_algorithm: result.algorithm === "sha1" ? "sha1" : "sha256",
+  }, throttleMs);
 });
 
 // POST /api/user/login-with-backup
 api.post("/user/login-with-backup", async (req, res) => {
+  // Same clock discipline as /user/login: this route had the same shape of
+  // oracle, an address without an account returning several steps before one
+  // with an account had its code argon2-verified and its per-account throttle
+  // slept out.
+  const t0 = Date.now();
   const { email, backup_code } = req.body || {};
-  if (!email || !backup_code) return res.status(400).json({ error: "missing_fields" });
+  // typeof, not truthiness. `{"email": {}}` is truthy, reaches
+  // String(email).toLowerCase() two lines down, and used to answer 500 in about
+  // a millisecond, which is both an unhandled throw on an unauthenticated route
+  // and the fastest answer this handler has.
+  if (typeof email !== "string" || typeof backup_code !== "string" || !email || !backup_code) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
+
+  // This is an unauthenticated, session-granting factor. Without throttling,
+  // each wrong code triggers up to 10x 64MB argon2id verifications on the relay
+  // (CPU+memory amplification DoS), and nothing caps online guessing. Mirror
+  // the per-IP + per-email fixed-window limits the other auth paths use. The
+  // per-email key is hashed so it never stores PII.
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const emailHash = crypto.createHash('sha256').update(String(email).toLowerCase().trim()).digest('hex');
+  if (!(await webauthn.rateHit(redis(), `bk:ip:${ip}`, 10, 900)))
+    return res.status(429).json({ error: "rate_limited" });
+  // Counted, because this route charges an escalating cost as well as refusing
+  // at the ceiling. The hit happens before findUserByEmail, so the number is the
+  // same for an address with an account and one without, which is the only
+  // reason it can be used as the throttle for both.
+  const bkHit = await webauthn.rateHitCounted(redis(), `bk:email:${emailHash}`, loginRate.BACKUP_ATTEMPT_LIMIT, 900);
+  if (!bkHit.allowed) return res.status(429).json({ error: "rate_limited" });
+  // The relay's per-account delay is suppressed on this route
+  // (throttled_upstream below), so the cost of guessing is charged here instead,
+  // against a counter that does not know whether the account exists. See
+  // lib/login-ratelimit.js backupThrottleMs.
+  const bkThrottleMs = loginRate.backupThrottleMs(bkHit.count - 1);
+  const backupAnswer = (status, body) =>
+    answerLoginAt(t0, res, status, body, bkThrottleMs, LOGIN_BACKUP_MIN_ANSWER_MS);
 
   const user = await findUserByEmail(email);
-  if (!user) return res.status(401).json({ error: "invalid_credentials" });
+  if (!user) return backupAnswer(401, { error: "invalid_credentials" });
 
+  // throttled_upstream, for the reason given on /user/login: the relay's
+  // per-account delay is only ever charged to an address that exists. What
+  // bounds the argon2 work on this route is not that delay but the two hard
+  // caps above, five per address and ten per source address per fifteen
+  // minutes, which refuse rather than slow down.
   const consumeRes = await callRelay("/v2/user/consume-backup", {
     user_id: user.key,
     code: backup_code.trim().toUpperCase(),
+    throttled_upstream: true,
   });
-  const result = await consumeRes.json();
-  if (!result.valid) return res.status(401).json({ error: "invalid_credentials" });
+  // Guard the relay response parse: a relay error / non-JSON body must surface
+  // as 502 (relay failure), not a 500 from an unhandled JSON.parse throw.
+  if (!consumeRes.ok) return backupAnswer(502, { error: "relay_unreachable" });
+  let result;
+  try { result = await consumeRes.json(); } catch { return backupAnswer(502, { error: "relay_unreachable" }); }
+  if (!result || !result.valid) return backupAnswer(401, { error: "invalid_credentials" });
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code" }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), user.key, sessionToken,
+    { user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
-  res.json({ success: true, email: user.email });
+  return backupAnswer(200, { success: true, email: user.email });
 });
 
 
@@ -980,8 +1469,25 @@ api.post("/user/auth/webauthn/login/options", async (req, res) => {
   const L = webauthn.LIMITS.loginOptions;
   if (!(await webauthn.rateHit(redis(), `lo:ip:${ip}`, L.ip, L.windowSec)))
     return res.status(429).json({ error: "rate_limited" });
-  const email = (req.body?.email || "").toString().toLowerCase().trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
+  // The typed field is the ONLY thing that separates this route from the
+  // cross-device one below, which sends no address and therefore never failed.
+  // A phone adds invisible characters to it (no-break space, zero-width space,
+  // a pasted newline, the "Name <addr>" display form), and this route used to
+  // answer 400 to every one of them; see webauthn.normalizeLoginEmail.
+  const rawEmail = (req.body?.email || "").toString();
+  const email = webauthn.normalizeLoginEmail(rawEmail);
+  if (!webauthn.isLoginEmail(email)) {
+    // The diagnostic that was missing on 2026-09-04: which check refused, and
+    // the SHAPE of what arrived. No address, no hash of one, no domain, no IP.
+    logRedacted('warn', '[webauthn/login/options] refused invalid_email', JSON.stringify(webauthn.loginEmailShape(rawEmail)));
+    return res.status(400).json({ error: "invalid_email" });
+  }
+  // A request that only worked BECAUSE of the normalisation above is the
+  // evidence that names the cause the next time this is reported. One line, no
+  // address, and only on the path that would previously have been a 400.
+  if (!webauthn.isLoginEmail(rawEmail.toLowerCase().trim())) {
+    logRedacted('warn', '[webauthn/login/options] accepted after normalise', JSON.stringify(webauthn.loginEmailShape(rawEmail)));
+  }
   if (!(await webauthn.rateHit(redis(), `lo:acct:${webauthn.scopeHash(email)}`, L.account, L.windowSec)))
     return res.status(429).json({ error: "rate_limited" });
 
@@ -995,14 +1501,52 @@ api.post("/user/auth/webauthn/login/options", async (req, res) => {
       const r = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(userId)}`, null, "GET");
       if (r.status === 200) {
         const body = await r.json().catch(() => ({}));
-        allowCredentials = (body.credentials || []).map(c => ({ id: c.credId, transports: c.transports }));
+        // transports is forced to an array here as well as at the relay
+        // (relay/lib/user-webauthn.js), because a missing field would drop the
+        // key from the JSON and hand back the very difference the decoy below
+        // exists to erase.
+        allowCredentials = (body.credentials || []).map(c => ({
+          id: c.credId,
+          transports: Array.isArray(c.transports) ? c.transports : [],
+        }));
       }
+    } else {
+      // The call the known branch makes next, against a user_id that cannot
+      // exist. Same route, same store, one round trip, answer discarded: the
+      // point is that both branches make the same number of calls to the same
+      // store before they answer. The pattern is /user/login above, which does
+      // the same with a totp_active read against an absent key.
+      await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent("absent_" + crypto.randomBytes(16).toString("hex"))}`, null, "GET");
     }
   } catch (e) { /* fall through to decoy */ }
-  // Residual: a populated allowCredentials reveals "this account has >=1
-  // passkey" (not "exists" -- an account without passkeys also gets the decoy).
+  // The decoy: what an address with no passkeys, and an address that names no
+  // account at all, both get. It only works if it is shaped like a real entry.
+  // Until 2026-09-05 it was not: scopeHash truncates sha256 to 32 hex, so the
+  // decoy id was 16 bytes against a real credential's full length, and it
+  // carried no transports field at all while a real one always does. Two fields,
+  // both answering for free the question the comment at the top of this route
+  // promises they do not answer.
+  //
+  // Keyed on the admin token instead of a bare sha256 of the address: an
+  // unkeyed hash of a known input is computable by anyone who can read this
+  // source, so the decoy would be recognisable on sight. HMAC keeps it
+  // deterministic per address (two starts for the same unknown address agree)
+  // and stable across restarts, without being predictable from outside.
+  //
+  // KNOWN RESIDUALS, both deliberate:
+  //  - the NUMBER of entries still differs. An account with two passkeys
+  //    answers with two, the decoy always with one, so a populated list still
+  //    says "this account has passkeys" and a list of two says how many. Padding
+  //    to a fixed count changes what an honest user's browser offers, which is
+  //    the owner's call and not a fix to make here.
+  //  - a real credential id is variable length and this one is always 32 bytes.
+  //    32 is the common case; a decoy that does not know the account it stands
+  //    in for cannot match a shorter or longer one.
   if (allowCredentials.length === 0) {
-    allowCredentials = [{ id: Buffer.from(webauthn.scopeHash("decoy:" + email), "hex").toString("base64url") }];
+    allowCredentials = [{
+      id: crypto.createHmac("sha256", DECOY_SECRET).update("webauthn-decoy:" + email).digest("base64url"),
+      transports: ["internal", "hybrid"],
+    }];
   }
 
   let options;
@@ -1018,6 +1562,35 @@ api.post("/user/auth/webauthn/login/options", async (req, res) => {
   }
   const flowId = webauthn.newFlowId();
   await webauthn.putAuthFlow(redis(), flowId, { challenge: options.challenge, email, user_id: userId });
+  res.json({ flowId, options });
+});
+
+// POST /api/user/auth/webauthn/login/discoverable/options
+// Usernameless / cross-device login. Returns options with an EMPTY
+// allowCredentials list so the browser offers its account-chooser + the QR
+// "use a phone" path (WebAuthn hybrid transport). No email is bound to the
+// flow: identity is established at verify from the discoverable credential the
+// user proves possession of (credId -> account, cross-checked against the
+// assertion's userHandle). Rate-limited per IP only (no account scope to leak).
+api.post("/user/auth/webauthn/login/discoverable/options", async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginOptions;
+  if (!(await webauthn.rateHit(redis(), `lo:disc:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  let options;
+  try {
+    options = await generateAuthenticationOptions({
+      rpID: webauthn.RP_ID,
+      allowCredentials: [],          // discoverable: browser shows QR + account chooser
+      userVerification: "required",
+    });
+  } catch (e) {
+    console.error("[webauthn/login/discoverable/options]", e.message);
+    return res.status(500).json({ error: "internal" });
+  }
+  const flowId = webauthn.newFlowId();
+  await webauthn.putAuthFlow(redis(), flowId, { challenge: options.challenge, discoverable: true });
   res.json({ flowId, options });
 });
 
@@ -1038,15 +1611,39 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
     return res.status(429).json({ error: "rate_limited" });
 
   // Identity from the assertion only: resolve its credential id to an account
-  // via the relay, and require it to match the account the challenge was bound
-  // to. A decoy flow (unknown email) has user_id=null -> always rejected here.
+  // via the relay. For an email-first flow the account MUST match the one the
+  // challenge was bound to (a decoy flow has user_id=null -> always rejected).
+  // For a discoverable (usernameless) flow there is no bound account: identity
+  // IS whatever the proven credential resolves to, additionally cross-checked
+  // against the assertion's userHandle so the credential and its claimed handle
+  // must agree before a session is issued.
   let lookup;
   try {
     const r = await callRelay(`/v2/user/webauthn/lookup?cred_id=${encodeURIComponent(String(response.id || ""))}`, null, "GET");
     if (r.status !== 200) return res.status(401).json({ error: "invalid_credentials" });
     lookup = await r.json();
   } catch (e) { return res.status(401).json({ error: "invalid_credentials" }); }
-  if (!flow.user_id || lookup.user_id !== flow.user_id) return res.status(401).json({ error: "invalid_credentials" });
+  if (!lookup || !lookup.user_id) return res.status(401).json({ error: "invalid_credentials" });
+
+  let authedUserId, authedEmail;
+  if (flow.discoverable) {
+    // Usernameless: cross-check the assertion's userHandle resolves to the SAME
+    // account as the credential id (defence in depth against a mismatched pair).
+    const handleB64 = response.response && response.response.userHandle;
+    if (!handleB64) return res.status(401).json({ error: "invalid_credentials" });
+    try {
+      const hr = await callRelay(`/v2/user/webauthn/by-handle?handle=${encodeURIComponent(String(handleB64))}`, null, "GET");
+      if (hr.status !== 200) return res.status(401).json({ error: "invalid_credentials" });
+      const hb = await hr.json();
+      if (!hb.user_id || hb.user_id !== lookup.user_id) return res.status(401).json({ error: "invalid_credentials" });
+    } catch (e) { return res.status(401).json({ error: "invalid_credentials" }); }
+    authedUserId = lookup.user_id;
+    authedEmail = (await findUserById(authedUserId).catch(() => null))?.email || null;
+  } else {
+    if (!flow.user_id || lookup.user_id !== flow.user_id) return res.status(401).json({ error: "invalid_credentials" });
+    authedUserId = flow.user_id;
+    authedEmail = flow.email;
+  }
 
   // Verify the assertion. expectedOrigin/expectedRPID are config constants.
   let verification;
@@ -1071,23 +1668,24 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
   //   both non-zero -> new MUST be strictly higher, else refuse with NO session.
   const newCounter = verification.authenticationInfo.newCounter;
   if (!webauthn.counterIsAcceptable(lookup.counter, newCounter)) {
-    try { logAuditEvent("webauthn_counter_regression", { user_id: String(flow.user_id).slice(0, 12) + "…", stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
+    // The account id IS the audit key, so it goes in the first slot, whole: a
+    // truncated or constant key files the alarm where no reader looks.
+    try { await logAuditEvent(authedUserId, "webauthn_counter_regression", { stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
     return res.status(401).json({ error: "invalid_credentials" });
   }
   // Persist the advanced counter (auth already succeeded; best-effort).
-  try { await callRelay("/v2/user/webauthn/counter", { user_id: flow.user_id, cred_id: lookup.credId, counter: newCounter }); } catch {}
+  try { await callRelay("/v2/user/webauthn/counter", { user_id: authedUserId, cred_id: lookup.credId, counter: newCounter }); } catch {}
 
   // Issue the session. Passkey is a sufficient sole factor (ADR R018) -- NO TOTP
-  // step. Same shape/TTL/cookie as the email+TOTP path; marked via:'webauthn'.
+  // step. Same shape/TTL/cookie as the email+TOTP path. via marks how the
+  // passkey was presented: 'webauthn' (email-first) or 'webauthn_xdev'
+  // (usernameless / cross-device).
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn" }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), authedUserId, sessionToken,
+    { user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn", ...sessionKeyFields(authedUserId) }, 3600);
   setUserCookie(res, sessionToken);
-  try { logAuditEvent("webauthn_login", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
-  res.json({ success: true, email: flow.email });
+  try { await logAuditEvent(authedUserId, "webauthn_login", { via: flow.discoverable ? "webauthn_xdev" : "webauthn" }); } catch {}
+  res.json({ success: true, email: authedEmail });
 });
 
 
@@ -1240,6 +1838,7 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   // One-shot: consume the setup_token so it cannot be reused for another
   // registration or for TOTP setup.
   await redis().del(`paramant:user:setup_token:${flow.setup_token}`).catch(() => {});
+  await redis().del(setupTokenPointer(flow.user_id)).catch(() => {});
 
   // Issue the session — TOFU onboarding. Passkey is now this account's factor
   // (R018); NO TOTP step. Lax cookie. via:'webauthn-register'.
@@ -1247,13 +1846,10 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   // stays TOTP-gated until the passkey step-up (R018) is built, so signing is
   // blocked (not bypassed) for a passkey-only account.
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register" }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), flow.user_id, sessionToken,
+    { user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register", ...sessionKeyFields(flow.user_id) }, 3600);
   setUserCookie(res, sessionToken);
-  try { logAuditEvent("webauthn_register", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
+  try { await logAuditEvent(flow.user_id, "webauthn_register", {}); } catch {}
   res.json({ success: true, email: flow.email, recovery_codes: recoveryCodes });
 });
 
@@ -1339,7 +1935,7 @@ api.post("/user/account/webauthn/register/verify", authUser, async (req, res) =>
 
   // No new session (already logged in). No backup-code regeneration (would wipe
   // the account's existing recovery). Additive factor -> lockout-safe.
-  try { logAuditEvent("webauthn_account_passkey_added", { user_id: String(req.userSession.user_id).slice(0, 12) + "…" }); } catch {}
+  try { await logAuditEvent(req.userSession.user_id, "webauthn_account_passkey_added", {}); } catch {}
   res.json({ success: true });
 });
 
@@ -1352,6 +1948,370 @@ api.get("/user/account/webauthn/credentials", authUser, async (req, res) => {
       credId: c.credId, label: c.label, created_at: c.created_at, last_used_at: c.last_used_at, prfSupported: c.prfSupported,
     }));
     res.json({ passkeys, total: passkeys.length });
+  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+});
+
+
+// POST /api/user/envelopes (authUser) — create a signing envelope SAME-ORIGIN
+// (replaces the old direct browser -> health.paramant.app POST, audit #2).
+// recipe_version 5 (domain, signer key and visual placement bound). Party 0 is the signer themselves (their
+// session email), so a self-sign (no recipients) still gets an envelope and
+// goes through the per-document activation gate (R018: every signature is a
+// passkey-PRF activation; no separate weaker self-sign route). The relay is
+// reached with the session's own pgp_ key as X-Api-Key.
+api.post("/user/envelopes", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `env:ip:${ip}`, 30, 900))) return res.status(429).json({ error: "rate_limited" });
+  const docHash = (req.body?.doc_hash || "").toString().trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(docHash)) return res.status(400).json({ error: "invalid_doc_hash" });
+  const recipients = Array.isArray(req.body?.recipients) ? req.body.recipients : [];
+  const originalFilename = (req.body?.original_filename || "").toString().slice(0, 200);
+  const creatorPublicKey = (req.body?.creator_public_key || "").toString();
+  // Self-sign and co-sign include the requester as party 0. Request-signatures
+  // can explicitly omit them: the requester is then the owner/coordinator, not
+  // an unsigned party that would keep the envelope open forever.
+  const includeRequester = req.body?.include_requester !== false;
+  // ONE requested signing position for the whole envelope: where the requester
+  // asked every party to sign. It is a request, never a commitment -- a party's
+  // signature binds the appearance they actually used (POST /user/sign/submit),
+  // so this never touches the signing message. Bounded here with the SAME
+  // 4096-byte ceiling as that route, before the relay is called at all. Shape
+  // and coordinates are validated by the relay's normaliseAppearance.
+  const requestedAppearance = req.body?.requested_appearance;
+  if (requestedAppearance !== undefined) {
+    let requestedSize = 0;
+    try { requestedSize = Buffer.byteLength(JSON.stringify(requestedAppearance), "utf8"); }
+    catch { return res.status(400).json({ error: "invalid_requested_appearance" }); }
+    if (requestedSize > 4096 || !requestedAppearance || typeof requestedAppearance !== "object" || Array.isArray(requestedAppearance)) {
+      return res.status(400).json({ error: "invalid_requested_appearance" });
+    }
+  }
+  const parties = includeRequester
+    ? [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }]
+    : [];
+  // Audit 1.1: every envelope is binding_mode:"email", so a co-signer slot with
+  // an empty/invalid email hashes to a value the co-signer can never match ->
+  // a guaranteed 403 dead end. Require a valid email per recipient and refuse
+  // creation (400) instead of minting a doomed invite (was: silently dropped).
+  const built = buildRecipientParties(recipients);
+  if (built.error) return res.status(400).json({ error: built.error });
+  for (const p of built.parties) parties.push(p);
+  if (parties.length === 0) return res.status(400).json({ error: "recipient_required" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
+      body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 5, creator_public_key: creatorPublicKey, requested_appearance: requestedAppearance }),
+    });
+    const body = await rr.json().catch(() => ({}));
+    if (rr.status !== 200) return res.status(rr.status).json({ error: body.error || "envelope_create_failed" });
+    return res.json(body);   // { ok, envelope: { id, party_links:[{party_index, sign_path, invite_token}], ... } }
+  } catch (e) {
+    console.error("[user/envelopes POST]", e.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// POST /api/user/envelopes/:id/document (authUser) -- forward an opaque,
+// browser-encrypted document capsule to the envelope's relay. application/octet-
+// stream deliberately bypasses the global JSON parser and gets a narrow limit.
+api.post("/user/envelopes/:id/document", authUser,
+  express.raw({ type: "application/octet-stream", limit: "6mb" }), async (req, res) => {
+    const id = (req.params.id || "").toString();
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: "document_capsule_required" });
+    const capsuleSha256 = (req.headers["x-capsule-sha256"] || "").toString().trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(capsuleSha256)) return res.status(400).json({ error: "invalid_capsule_hash" });
+    try {
+      const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Capsule-Sha256": capsuleSha256,
+          "X-Api-Key": proxyApiKey(req.userSession),
+        },
+        body: req.body,
+        signal: AbortSignal.timeout(30000),
+      });
+      const body = await rr.json().catch(() => ({}));
+      if (!rr.ok) return res.status(rr.status).json({ error: body.error || "document_upload_failed", max_bytes: body.max_bytes });
+      return res.json(body);
+    } catch (e) {
+      console.error("[user/envelopes document POST]", e.message);
+      return res.status(502).json({ error: e.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
+    }
+  });
+
+// GET /api/user/envelopes/:id/document -- authenticated recipient delivery.
+// The relay requires the invite capability plus this proxy's verified session
+// email assertion. The browser never sends its fragment key to either server.
+api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  const partyIndex = Number(req.query.p);
+  const token = (req.query.t || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return res.status(400).json({ error: "invalid_invitation" });
+  }
+  const emailHash = partyEmailHashAdmin(req.userSession.email);
+  try {
+    const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+    if (!partyView.ok) return res.status(partyView.status === 410 ? 410 : 404).json({ error: "invitation_not_found" });
+    const env = (await partyView.json()).envelope;
+    if (!env?.party || !emailHash || env.party.email_hash !== emailHash) return res.status(403).json({ error: "recipient_mismatch" });
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
+      method: "GET",
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!rr.ok) {
+      const body = await rr.json().catch(() => ({}));
+      return res.status(rr.status).json({ error: body.error || "document_download_failed" });
+    }
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Cache-Control", "private, no-store");
+    const capsuleHash = rr.headers.get("x-capsule-sha256");
+    if (capsuleHash) res.setHeader("X-Capsule-Sha256", capsuleHash);
+    return res.send(Buffer.from(await rr.arrayBuffer()));
+  } catch (error) {
+    return res.status(502).json({ error: error.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
+  }
+});
+
+// GET /api/user/envelopes/:id/receipt -- final proof for an authenticated
+// recipient. The relay rechecks invite token, party index and verified email.
+api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  const partyIndex = Number(req.query.p);
+  const token = (req.query.t || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return res.status(400).json({ error: "invalid_invitation" });
+  }
+  const emailHash = partyEmailHashAdmin(req.userSession.email);
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = Buffer.from(await rr.arrayBuffer());
+    res.status(rr.status);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Type", rr.headers.get("content-type") || "application/json");
+    const disposition = rr.headers.get("content-disposition");
+    if (disposition) res.setHeader("Content-Disposition", disposition);
+    return res.send(body);
+  } catch (error) {
+    return res.status(502).json({ error: error.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
+  }
+});
+
+// POST /api/user/envelopes/:id/invitations -- optional convenience delivery.
+// The document stays encrypted, but email delivery necessarily processes the
+// complete personal URL, including its fragment key. The UI states this before
+// sending and keeps manual link sharing as the zero-knowledge alternative.
+api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
+  const invitations = Array.isArray(req.body?.invitations) ? req.body.invitations : [];
+  if (invitations.length < 1 || invitations.length > 20) return res.status(400).json({ error: "invalid_invitations" });
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `invite:ip:${ip}`, 40, 3600))) return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `invite:acct:${webauthn.scopeHash(req.userSession.user_id)}`, 60, 3600))) return res.status(429).json({ error: "rate_limited" });
+
+  try {
+    const owner = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/owner-check`, {
+      method: "GET",
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (owner.status === 404) return res.status(404).json({ error: "envelope_not_found" });
+    if (!owner.ok) return res.status(owner.status === 401 ? 401 : 502).json({ error: "owner_check_failed" });
+  } catch {
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+
+  const siteOrigin = new URL(SITE_URL).origin;
+  const checked = [];
+  for (const item of invitations) {
+    const email = (item?.email || "").toString().trim().toLowerCase().slice(0, 200);
+    const label = (item?.label || "").toString().trim().slice(0, 80);
+    const inviteUrlText = (item?.invite_url || "").toString().trim();
+    const partyIndex = Number(item?.party_index);
+    if (!RECIPIENT_EMAIL_RE.test(email) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || inviteUrlText.length > 2048) {
+      return res.status(400).json({ error: "invalid_invitation" });
+    }
+    let inviteUrl;
+    try { inviteUrl = new URL(inviteUrlText); }
+    catch { return res.status(400).json({ error: "invalid_invite_url" }); }
+    const token = inviteUrl.searchParams.get("t") || "";
+    // The fragment of a signing link is the document's AES key. This endpoint
+    // hands the link to a mail provider outside the EU, so a link that still
+    // carries a fragment is refused rather than trimmed: trimming would invite
+    // a modified client to post the key here and trust us to drop it, and the
+    // key would still have passed through this process and any log on the way.
+    // The mail carries the notice, the sender passes the opening link on over a
+    // channel they choose. Nothing past this check has ever held a key.
+    if (inviteUrl.hash !== "") {
+      return res.status(400).json({ error: "invite_url_carries_key" });
+    }
+    if (inviteUrl.origin !== siteOrigin || inviteUrl.pathname !== "/co-sign" || inviteUrl.searchParams.get("env") !== id || Number(inviteUrl.searchParams.get("p")) !== partyIndex || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+      return res.status(400).json({ error: "invalid_invite_url" });
+    }
+    let env;
+    try {
+      const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+      if (!partyView.ok) return res.status(400).json({ error: "invalid_invitation" });
+      env = (await partyView.json()).envelope;
+    } catch {
+      return res.status(502).json({ error: "relay_unreachable" });
+    }
+    if (!env?.party || env.party.email_hash !== partyEmailHashAdmin(email)) return res.status(400).json({ error: "recipient_mismatch" });
+    checked.push({ email, label, inviteUrl: inviteUrl.href, partyIndex, env });
+  }
+
+  const subject = (req.body?.subject || "").toString().trim().slice(0, 140);
+  const message = (req.body?.message || "").toString().trim().slice(0, 1000);
+  const senderLabel = req.userSession.email;
+  // Optional. Without it the invitation is Dutch with the English underneath.
+  const lang = ["nl", "en"].includes(req.body?.lang) ? req.body.lang : undefined;
+  const results = await Promise.all(checked.map(async (item) => {
+    try {
+      await emailTemplates.sendEmail(item.email, emailTemplates.signingInviteEmail({
+        inviteUrl: item.inviteUrl,
+        recipientLabel: item.label,
+        senderLabel,
+        // No document name. A filename is content, it is often the whole point
+        // ("opzegging-huurcontract.pdf"), and this message leaves the EU. The
+        // recipient sees the name after the link opens the document.
+        expiresAt: item.env.sign_expires_at,
+        subject,
+        message,
+        envelopeId: id,
+        partyIndex: item.partyIndex,
+        lang,
+      }));
+      return { party_index: item.partyIndex, ok: true };
+    } catch {
+      return { party_index: item.partyIndex, ok: false, error: "email_delivery_failed" };
+    }
+  }));
+  const failed = results.filter((item) => !item.ok).map((item) => item.party_index);
+  return res.status(failed.length ? 207 : 200).json({ ok: failed.length === 0, partial_failure: failed.length > 0, failed_party_indexes: failed, results });
+});
+
+// ── Per-document signing activation (R018: per-document PRF activation) ───────
+// A signature requires a fresh, server-issued, ONE-SHOT activation bound to
+// EXACTLY (account, envelope, party, doc-hash). Issuance authorizes BEFORE the
+// client unlocks its key (no token -> no unlock). Consumption at submit is
+// ATOMIC via GETDEL, so two concurrent submits with the same token cannot both
+// pass (no TOCTOU). The relay never holds this token; the admin proxy verifies
+// + consumes it and forwards to the relay sign with PR-0's verified_email_hash.
+const SIGN_ACTIVATION_TTL = 300;   // 5 min: room for the human PRF gesture (Face ID, hesitation)
+
+// Canonical party-email hash — byte-identical to relay/envelope.js partyEmailHash.
+function partyEmailHashAdmin(email) {
+  const norm = (email || "").toString().trim().toLowerCase();
+  if (!norm) return "";
+  return crypto.createHash("sha3-256").update("paramant/party-email/v1\x00", "utf8").update(norm, "utf8").digest("hex");
+}
+
+// POST /api/user/sign/activation (authUser) — AUTHORIZE + ISSUE (pre-unlock gate).
+api.post("/user/sign/activation", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;          // identity from the session, never the client
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `act:ip:${ip}`, 20, 900))) return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `act:acct:${webauthn.scopeHash(user_id)}`, 30, 900))) return res.status(429).json({ error: "rate_limited" });
+
+  const envelope_id = (req.body?.envelope_id || "").toString();
+  const party_index = parseInt(req.body?.party_index, 10);
+  const doc_hash = (req.body?.doc_hash || "").toString().trim().toLowerCase();
+  const invite_token = (req.body?.invite_token || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(envelope_id)) return res.status(400).json({ error: "invalid_envelope_id" });
+  if (!Number.isInteger(party_index) || party_index < 0) return res.status(400).json({ error: "invalid_party_index" });
+  if (!/^[0-9a-f]{64}$/.test(doc_hash)) return res.status(400).json({ error: "invalid_doc_hash" });
+
+  // ── AUTHORIZE before issuing (no token -> the client cannot proceed to unlock).
+  // The party view is token-gated (PR-0). Bind to: the invite capability (token),
+  // the signer's verified session email == the party's bound email, and the
+  // exact document hash == the envelope's doc_hash.
+  let env;
+  try {
+    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}&t=${encodeURIComponent(invite_token)}`, null, "GET");
+    if (r.status !== 200) return res.status(403).json({ error: "not_authorized" });
+    env = (await r.json()).envelope;
+  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+  const sessionEmailHash = partyEmailHashAdmin(email);
+  if (!env || env.doc_hash !== doc_hash) return res.status(403).json({ error: "doc_hash_mismatch" });
+  if (!env.party || !sessionEmailHash || env.party.email_hash !== sessionEmailHash) return res.status(403).json({ error: "not_authorized" });
+  // Signing-invite window (7d from creation, != 30d record retention): fail here,
+  // before the client runs the passkey-PRF, when the invite is no longer signable.
+  if (env.sign_expires_at && Date.parse(env.sign_expires_at) < Date.now()) return res.status(410).json({ error: "invite_expired" });
+
+  // ── ISSUE: one-shot record, server-side binding only, EX 300s.
+  const activation_id = crypto.randomBytes(32).toString("base64url");
+  await redis().set(`paramant:sign:activation:${activation_id}`,
+    JSON.stringify({ account_id: user_id, envelope_id, party_index, doc_hash, email_hash: sessionEmailHash, issued_at: Date.now() }),
+    { EX: SIGN_ACTIVATION_TTL });
+  res.json({ activation_id, email_hash: sessionEmailHash, recipe_version: env.recipe_version || 3, sign_domain: "paramant/parasign/doc/v1" });
+});
+
+// POST /api/user/sign/submit (authUser) — ATOMIC CONSUME + forward to relay sign.
+api.post("/user/sign/submit", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const { activation_id, signer_public_key, signature, appearance } = req.body || {};
+  if (!activation_id || typeof activation_id !== "string") return res.status(400).json({ error: "activation_id_required" });
+  if (!signer_public_key || !signature) return res.status(400).json({ error: "signature_required" });
+  let appearanceSize = 0;
+  try { appearanceSize = Buffer.byteLength(JSON.stringify(appearance ?? {}), "utf8"); }
+  catch { return res.status(400).json({ error: "invalid_appearance" }); }
+  if (appearanceSize > 4096 || (appearance !== undefined && (!appearance || typeof appearance !== "object" || Array.isArray(appearance)))) {
+    return res.status(400).json({ error: "invalid_appearance" });
+  }
+
+  // ── ATOMIC one-shot consume. GETDEL returns the record AND deletes it in one
+  // round-trip: of two concurrent submits with the same activation_id, exactly
+  // one receives the record; the other gets null and is rejected. No TOCTOU.
+  let raw;
+  try { raw = await redis().getDel(`paramant:sign:activation:${activation_id}`); }
+  catch (e) { return res.status(502).json({ error: "store_unavailable" }); }
+  if (!raw) return res.status(409).json({ error: "activation_invalid_or_used" });
+  let act; try { act = JSON.parse(raw); } catch { return res.status(409).json({ error: "activation_invalid_or_used" }); }
+
+  // The submit must come from the same account the activation was issued to.
+  if (act.account_id !== user_id) return res.status(403).json({ error: "account_mismatch" });
+
+  // Forward to the relay sign with PR-0's internal-auth email binding. The relay
+  // recomputes the v3 domain-prefixed message from its OWN stored envelope fields
+  // (doc_hash, party_index, email_hash) and verifies the ML-DSA-65 signature —
+  // doc/party/email are bound both by the consumed activation and by the message.
+  try {
+    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(act.envelope_id)}/sign`, {
+      party_index: act.party_index, signer_public_key, signature, verified_email_hash: act.email_hash,
+      appearance,
+      // Crypto M1: the account this activation was issued to, so the relay can
+      // pin the submitted key to that account's enrolled signing keys.
+      account_id: act.account_id,
+    }, "POST");
+    const body = await r.json().catch(() => ({}));
+    if (r.status !== 200) {
+      // 402 quota: pass the relay JSON through unchanged (dimension/plan/
+      // limit) so the frontend can render the upgrade notice.
+      if (r.status === 402) return res.status(402).json(body);
+      return res.status(r.status).json({ error: body.error || "sign_failed" });
+    }
+    // The signature receipt. Truncating the envelope id INSIDE the metadata is
+    // harmless (it is a label); truncating the key is not (it is the address).
+    try { await logAuditEvent(user_id, "parasign_doc_signed", { envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
+    return res.json({
+      ok: true,
+      signed_count: body.signed_count,
+      party_count: body.party_count,
+      status: body.status,
+      signed_at: body.signed_at,
+      appearance: body.appearance,
+      appearance_hash: body.appearance_hash,
+      quota: body.quota,
+    });
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
 });
 
@@ -1371,13 +2331,12 @@ api.post("/user/auth/request-totp-reset", async (req, res) => {
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
   const emailRlKey = `paramant:ratelimit:totp_reset:${emailHash}`;
   const ipRlKey    = `paramant:ratelimit:totp_reset_ip:${ip}`;
-  const [emailCnt, ipCnt] = await Promise.all([redis().incr(emailRlKey), redis().incr(ipRlKey)]);
-  await Promise.all([
-    emailCnt === 1 ? redis().expire(emailRlKey, 86400) : Promise.resolve(),
-    ipCnt    === 1 ? redis().expire(ipRlKey,    3600)  : Promise.resolve(),
+  const [emailCnt, ipCnt] = await Promise.all([
+    incrInWindow(redis(), emailRlKey, 86400),
+    incrInWindow(redis(), ipRlKey, 3600),
   ]);
   if (emailCnt > 5 || ipCnt > 10) {
-    console.warn(`[totp-reset-req] rate limited: emailHash=${emailHash} ip=${ip}`);
+    logRedacted('warn', `[totp-reset-req] rate limited: emailHash=${emailHash} ip=${maskIpForLog(ip)}`);
     return res.status(429).json({ error: "too_many_requests", retry_after: 86400 });
   }
 
@@ -1400,7 +2359,7 @@ api.post("/user/auth/request-totp-reset", async (req, res) => {
 
   try {
     await sendResetConfirmEmail(norm, confirmToken, maskedIp, new Date(requestedAt).toISOString());
-    console.log(`[totp-reset-req] confirmation email sent to ${norm}`);
+    console.log(`[totp-reset-req] confirmation email sent to ${maskEmail(norm)}`);
   } catch (err) {
     console.error("[totp-reset-req] email failed:", err.message);
   }
@@ -1429,17 +2388,10 @@ api.post("/user/auth/reset-confirm", async (req, res) => {
     redis().del(`paramant:user:backup_codes:${user_id}`),
     redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
   ]);
-  for await (const k of redis().scanIterator({ MATCH: "paramant:user:setup_token:*", COUNT: 100 })) {
-    const r = await redis().get(k);
-    if (r) { try { const d = JSON.parse(r); if (d.user_id === user_id) await redis().del(k); } catch {} }
-  }
-
-  const setupToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:setup_token:${setupToken}`,
-    JSON.stringify({ user_id, email }),
-    { EX: 14 * 86400 }
-  );
+  // The public variant of the reset revoked nothing at all until 2026-09-06,
+  // while the logged-in one did. That inconsistency ran in the attacker's
+  // favour: the reset he drives is precisely the one without a session.
+  const setupToken = await issueSetupToken(user_id, email);
 
   try { await logAuditEvent(user_id, "totp_reset_confirmed", { age_sec: Math.floor((Date.now() - requested_at) / 1000), ip: req.headers["x-real-ip"] || "unknown" }); } catch {}
 
@@ -1450,14 +2402,21 @@ api.post("/user/auth/reset-confirm", async (req, res) => {
     return res.status(500).json({ error: "email_failed" });
   }
 
-  console.log(`[reset-confirm] TOTP reset completed for ${email}`);
+  console.log(`[reset-confirm] TOTP reset completed for ${maskEmail(email)}`);
   res.json({ success: true, message: "Setup email sent. Check your inbox." });
 });
 
 // POST /api/user/logout
 api.post("/user/logout", async (req, res) => {
   const token = parseCookies(req).paramant_user_session;
-  if (token) await redis().del(`paramant:user:session:${token}`);
+  if (token) {
+    // Read the record first, so the index entry goes with the blob. Logging out
+    // used to delete only the blob, which left a dead token in nobody's way but
+    // also in the set for a week.
+    let uid = null;
+    try { uid = JSON.parse(await redis().get(`paramant:user:session:${token}`) || 'null')?.user_id || null; } catch { /* blob already gone */ }
+    await userSessions.forget(redis(), uid, token);
+  }
   clearUserCookie(res);
   res.json({ success: true });
 });
@@ -1479,6 +2438,58 @@ api.get("/user/session/verify", async (req, res) => {
 
 // ── Account management ────────────────────────────────────────────────────────
 
+// Per-product tiers, in ONE place, because three endpoints answer the same
+// question and the dashboard and the account page must not read two different
+// truths. The unified `plan` alone cannot say whether a customer is paying:
+// setProductPlan (relay.js, the Mollie webhook path) writes ONLY
+// plan_parasign / plan_parasend and by design never touches `plan`
+// (relay/lib/entitlements.js applyProductTier). So someone who buys ParaSign
+// Pro self-serve keeps plan "community", and a page reading only `plan` tells a
+// paying customer he is on the free plan. The paid_until pair travels with them
+// so a client can apply the same expiry rule as effectiveProductTier: a stored
+// tier above the floor is paid only while its period has not run out.
+// The day the term that was paid for runs out: the later of the two product
+// periods that is still in the future, or null when nothing is paid for. Both
+// the status endpoint and the cancel endpoint answer with this, so a customer
+// cannot be shown one date and promised another.
+function termEndOf(fields) {
+  const ends = [fields.paid_until_parasign, fields.paid_until_parasend]
+    .map((v) => (v ? Date.parse(v) : NaN))
+    .filter((t) => !Number.isNaN(t) && t > Date.now());
+  return ends.length ? new Date(Math.max(...ends)).toISOString() : null;
+}
+
+function productPlanFields(rec) {
+  return {
+    plan_parasign: rec?.plan_parasign ?? null,
+    plan_parasend: rec?.plan_parasend ?? null,
+    paid_until_parasign: rec?.paid_until_parasign ?? null,
+    paid_until_parasend: rec?.paid_until_parasend ?? null,
+  };
+}
+
+// The name of the plan this account is on, in the words the pricing page uses.
+// ONE function, because three places were naming the same plan differently: the
+// account page said FIRM PLAN, this API said "community", and the cancellation
+// mail said "your Paramant Pro plan" -- to one customer, about one purchase, on
+// the same afternoon. `pro` is Firm because Firm is what /pricing sells that
+// grants it (billing-catalog ON_SALE); a legacy ParaSign Pro buyer sees the
+// same word his own screens show him.
+const PLAN_NAMES = { pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
+function effectivePaidTier(fields) {
+  const live = (plan, until) => (plan && plan !== 'free' && plan !== 'community'
+    && (!until || Date.parse(until) > Date.now())) ? plan : null;
+  const order = ['enterprise', 'business', 'pro'];
+  const held = [live(fields.plan_parasign, fields.paid_until_parasign),
+    live(fields.plan_parasend, fields.paid_until_parasend)].filter(Boolean);
+  for (const tier of order) if (held.includes(tier)) return tier;
+  return null;
+}
+function planNameOf(fields) {
+  const tier = effectivePaidTier(fields);
+  return tier ? (PLAN_NAMES[tier] || tier) : 'Community';
+}
+
 // GET /api/user/me
 // JSON identity + account-summary endpoint backing the client-side /dashboard.
 // Same authUser cookie middleware as /api/user/account. Returns just what the
@@ -1496,14 +2507,42 @@ api.get("/user/me", authUser, async (req, res) => {
       email,
       label: user?.label || null,
       plan: (user && user.plan) || "standard",
+      ...productPlanFields(user),
       created_at: user?.created_at || null,
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
-      session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      // The earlier of the idle window and the absolute cap: with an absolute
+      // lifetime in force, "an hour from now" stops being true in a session's
+      // last hour.
+      session_expires_at: new Date(Math.min(
+        Date.now() + 3600 * 1000,
+        (Number(req.userSession.created_at) || Date.now()) + USER_SESSION_MAX_AGE_MS,
+      )).toISOString(),
+      // One-time dashboard survey: null while unanswered -> the dashboard
+      // shows the usage-purpose question; any stored value hides it forever.
+      usage_purpose: user?.usage_purpose ?? null,
     });
   } catch (err) {
     console.error("[user/me]", err.message);
     res.status(503).json({ error: "user_data_unavailable" });
+  }
+});
+
+// POST /api/user/usage-purpose: one-time dashboard survey ("What do you use
+// Paramant for?"). Same authUser cookie middleware as /api/user/me; forwarded
+// to the relay's internal /v2/user/usage-purpose which stores purpose +
+// timestamp on the account key record. A second call overwrites (last answer
+// wins; the dashboard only asks while the field is empty).
+api.post("/user/usage-purpose", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const purpose = req.body && typeof req.body.purpose === "string" ? req.body.purpose : "";
+  try {
+    const r = await callRelay("/v2/user/usage-purpose", { user_id, purpose });
+    const body = await r.json().catch(() => ({}));
+    return res.status(r.status).json(body);
+  } catch (e) {
+    console.error("[user/usage-purpose]", e.message);
+    return res.status(502).json({ error: "relay_unreachable" });
   }
 });
 
@@ -1523,40 +2562,258 @@ api.get("/user/check", authUser, (req, res) => {
   res.status(200).end();
 });
 
-// GET /api/user/account
-api.get("/user/account", authUser, async (req, res) => {
-  const { user_id, email } = req.userSession;
-  const user = await findUserByEmail(email);
-  const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
-
-  const sessions = [];
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (!raw) continue;
-    const s = JSON.parse(raw);
-    if (s.user_id !== user_id) continue;
-    const token = key.replace("paramant:user:session:", "");
-    sessions.push({
-      ip_masked: maskIp(s.ip || ""),
-      user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
-      last_seen: new Date(s.created_at).toISOString(),
-      current: token === req.userSessionToken,
-      via: s.via || "totp",
-    });
+// GET /api/user/developer/check
+// nginx auth_request probe for the /developer page (mirrors /user/check, with
+// the allowlist layer). authUser returns 401 on no session -> nginx redirects
+// to login. A valid session that is NOT on the developer allowlist gets 403,
+// which nginx remaps to 404 so the page's existence stays hidden. Allowlisted
+// session -> 200 and nginx serves /developer.html.
+// ── ParaSign /v1 API keys, for the customer who bought them ─────────────────
+// /pricing sells Firm with "a developer API with its own documentation and
+// webhooks, so signing can run inside your own software", and until now a buyer
+// had no way to get a key. The only route that mints one sat behind
+// developerGate, an operator EMAIL ALLOWLIST that answers 404, so the account
+// page's own "Developer settings" link was a dead end for every paying
+// customer. These three are the same relay route with the customer's session
+// instead of the allowlist; the entitlement check stays where it belongs, on
+// the relay (403 parasign_not_entitled for an account with no paid ParaSign
+// tier), so a free account still gets nothing.
+api.post("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay("/v2/user/parasign-keys", { user_id, label: req.body?.label, test: req.body?.test === true }, "POST");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
   }
-
-  res.json({
-    email,
-    label: user?.label || null,
-    plan: user?.plan || null,
-    created_at: user?.created_at || null,
-    api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
-    backup_codes_remaining: backupCount,
-    session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-    sessions,
-  });
+});
+api.get("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay(`/v2/user/parasign-keys?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.delete("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay("/v2/user/parasign-keys", { user_id, kid: req.body?.kid }, "DELETE");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys DELETE]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
 });
 
+api.get("/user/developer/check", authUser, (req, res) => {
+  if (!isDeveloper(req.userSession.email)) return res.status(403).end();
+  res.status(200).end();
+});
+
+// GET /api/user/developer/tools
+// Developer-only data endpoint behind authUser + developerGate (404 for
+// non-allowlisted). Provisional: the page renders the tool list statically;
+// this endpoint exists so the gated /api/user/developer/* surface is wired and
+// testable from day one.
+api.get("/user/developer/tools", authUser, developerGate, (req, res) => {
+  res.json({ status: "live", tools: DEVELOPER_TOOLS });
+});
+
+// ── Per-account saved tool config (cross-device). All three are gated by
+// authUser + developerGate and scoped to the session's user_id (no IDOR). Pure
+// validation lives in lib/developer-config (unit-tested). The config is data
+// only -- never executed; a literal key is refused (defence in depth).
+api.get("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    let configs = {};
+    if (raw) { try { configs = JSON.parse(raw) || {}; } catch {} }
+    res.json({ configs });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.post("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const { tool, command } = req.body || {};
+  const v = developerConfig.validateConfig(tool, command);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    const m = developerConfig.mergeConfig(raw, v.tool, v.command);
+    if (!m.ok) return res.status(400).json({ error: m.error });
+    await redis().set(developerConfig.KEY(req.userSession.user_id), m.json);
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.delete("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const tool = (req.body && req.body.tool) || req.query.tool;
+  if (typeof tool !== "string" || !developerConfig.TOOL_NAMES.has(tool)) return res.status(400).json({ error: "unknown_tool" });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    await redis().set(developerConfig.KEY(req.userSession.user_id), developerConfig.removeConfig(raw, tool));
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+
+// ── Self-service ParaSign /v1 API keys (developer dashboard "+ New key"). ─────
+// Proxies the logged-in session to the relay's /v2/user/parasign-keys, adding
+// X-Internal-Auth via callRelay and the session's own user_id (no IDOR). The
+// relay runs the SAME mintParasignKey generator as the admin route and enforces
+// the ParaSign entitlement (paid plan or explicit grant): a 403 here means the
+// account is not entitled, and the frontend shows a friendly upgrade note. POST
+// mints (full key returned ONCE), GET lists masked, DELETE revokes.
+api.post("/user/developer/parasign-keys", authUser, developerGate, async (req, res) => {
+  const { user_id } = req.userSession;
+  const body = { user_id, test: req.body && req.body.test === true };
+  const requestedLabel = req.body && req.body.label;
+  if (typeof requestedLabel === "string") body.label = requestedLabel.slice(0, 80);
+  try {
+    const relayRes = await callRelay("/v2/user/parasign-keys", body, "POST");
+    const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(out);
+  } catch (err) {
+    console.error("[user/developer/parasign-keys POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.get("/user/developer/parasign-keys", authUser, developerGate, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay(`/v2/user/parasign-keys?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(out);
+  } catch (err) {
+    console.error("[user/developer/parasign-keys GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.delete("/user/developer/parasign-keys", authUser, developerGate, async (req, res) => {
+  const { user_id } = req.userSession;
+  const kid = (req.body && (req.body.kid || req.body.key)) || "";
+  if (!kid) return res.status(400).json({ error: "missing_kid" });
+  try {
+    const relayRes = await callRelay("/v2/user/parasign-keys", { user_id, kid }, "DELETE");
+    const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(out);
+  } catch (err) {
+    console.error("[user/developer/parasign-keys DELETE]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// GET /api/user/developer/snapshot — one call for the initial dashboard render:
+// {email, plan, key_masked, quota:{transfers,signs,caps}, audit:[last 50],
+//  tools_status:{per tool}}. 3s in-memory cache per account so a refresh storm
+// cannot hammer Redis.
+const _snapCache = new Map(); // uid -> { at, data }
+api.get("/user/developer/snapshot", authUser, developerGate, async (req, res) => {
+  const uid = req.userSession.user_id;
+  const hit = _snapCache.get(uid);
+  if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
+  // The caps come from the relay, per account and per product. No local table,
+  // and no unified `plan` anywhere near a limit.
+  const ents = await readAccountEntitlements(uid);
+  if (!ents) return res.status(503).json({ error: "entitlements_unavailable" });
+  try {
+    const data = await buildSnapshot({ redis, getAuditEvents, entitlements: ents }, req.userSession);
+    _snapCache.set(uid, { at: Date.now(), data });
+    if (_snapCache.size > 500) _snapCache.clear();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "snapshot_failed" });
+  }
+});
+
+// GET /api/user/developer/stream — Server-Sent Events. Pushes new audit events
+// for this account as they land. SSE (not WebSocket): simpler, rides the
+// existing HTTP/auth/cookie stack, no upgrade handshake. Server-side 2s poll of
+// the account's audit zset; pushes deltas + a heartbeat. Closes on disconnect.
+api.get("/user/developer/stream", authUser, developerGate, async (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.write("retry: 4000\n");
+  res.write('event: hello\ndata: {"ok":true}\n\n');
+  const uid = req.userSession.user_id;
+  let lastTs = Date.now();
+  let alive = true;
+  const tick = async () => {
+    if (!alive) return;
+    try {
+      const events = await getAuditEvents(uid, { limit: 20 });
+      const fresh = events.filter((e) => (e.ts || 0) > lastTs).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      for (const ev of fresh) { lastTs = Math.max(lastTs, ev.ts || 0); res.write(`event: audit\ndata: ${JSON.stringify(ev)}\n\n`); }
+      res.write(`event: ping\ndata: ${Date.now()}\n\n`);
+    } catch {}
+  };
+  const iv = setInterval(tick, 2000);
+  req.on("close", () => { alive = false; clearInterval(iv); try { res.end(); } catch {} });
+});
+
+// GET /api/user/account
+api.get("/user/account", authUser, async (req, res) => {
+  try {
+    const { user_id, email } = req.userSession;
+    const user = await findUserByEmail(email);
+    const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
+
+    // The account screen's session list. It used to SCAN the whole keyspace and
+    // GET every session in the product to find this user's two, on every load,
+    // with no limiter. That was finding 14, and it was also a privacy shape
+    // nobody chose: to show you your own sessions the process read everybody
+    // else's IP and user agent and filtered afterwards. The index answers in one
+    // SMEMBERS plus one MGET, and it can only return this user's records.
+    const sessions = [];
+    for (const { token, session: s } of (await userSessions.list(redis(), user_id, scanSessions)).sessions) {
+      sessions.push({
+        ip_masked: maskIp(s.ip || ""),
+        user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
+        // last_seen, now that authUser maintains one. Falls back to the login
+        // time for a record not touched since the field was introduced, and to
+        // now for one written before created_at existed. Never to
+        // `new Date(undefined)`, which throws inside toISOString.
+        last_seen: new Date(s.last_seen || s.created_at || Date.now()).toISOString(),
+        current: token === req.userSessionToken,
+        via: s.via || "totp",
+      });
+    }
+
+    res.json({
+      email,
+      label: user?.label || null,
+      plan: user?.plan || null,
+      ...productPlanFields(user),
+      created_at: user?.created_at || null,
+      api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
+      backup_codes_remaining: backupCount,
+      // The earlier of the idle window and the absolute cap: with an absolute
+      // lifetime in force, "an hour from now" stops being true in a session's
+      // last hour.
+      session_expires_at: new Date(Math.min(
+        Date.now() + 3600 * 1000,
+        (Number(req.userSession.created_at) || Date.now()) + USER_SESSION_MAX_AGE_MS,
+      )).toISOString(),
+      sessions,
+    });
+  } catch (err) {
+    console.error("[user/account]", err.message);
+    res.status(503).json({ error: "account_unavailable" });
+  }
+});
+
+// Display form for the sessions API response, not for logs: it renders a
+// truncated address as a syntactically complete one (203.0.113.0), which a
+// reader of a log line cannot tell apart from a real address. Log lines use
+// maskIpForLog from lib/log-redact.js, which writes the host part as `x`.
 function maskIp(ip) {
   if (!ip) return "—";
   if (ip.includes(".")) {
@@ -1566,9 +2823,364 @@ function maskIp(ip) {
   return ip.split(":").slice(0, 2).join(":") + "::0";
 }
 
+// maskEmail for process logs lives in lib/log-redact.js and is imported at the
+// top of this file. Audit-chain records keep the full email on purpose (admin
+// traceability); the masked form is only for stdout/journald.
+
+// POST /api/user/parasend/token
+//
+// The route that lets ParaSend stop holding an api-key. /parashare asks for a
+// pst_ session token, the relay mints one for the account this session is
+// signed in as, and the browser is handed the token and nothing else.
+//
+// Three things this route does NOT do, each on purpose:
+//   * it takes no body. The account is the session's, read server-side through
+//     proxyApiKey(); a browser cannot name another one, so there is nothing to
+//     validate and nothing to get wrong;
+//   * it never returns the api-key, not even alongside the token. The whole
+//     point of the token is that the key stops travelling;
+//   * it does not fall back to the key when the relay cannot mint. A fallback
+//     would quietly put the credential back in the browser on exactly the days
+//     something is already wrong.
+//
+// GET /api/user/account/key below stays as it is. It is the reveal a
+// self-hoster and the account page still need, and it is no longer what
+// /parashare uses.
+//
+// The purpose is chosen HERE, by the route, never by the caller. A browser that
+// could name its own purpose could ask /parashare's endpoint for an `app` token
+// and start a checkout with it. Two routes, two fixed words, and the body the
+// browser sends is still ignored.
+async function mintSessionToken(req, res, purpose, label) {
+  const key = proxyApiKey(req.userSession);
+  if (!key) return res.status(403).json({ error: "no_account_key" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/session-token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Auth": INTERNAL_TOKEN,
+        "X-Api-Key": key,
+      },
+      body: JSON.stringify({ purpose }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    if (rr.status !== 200 || !body.token) {
+      // The relay's status is passed through so the page can tell an outage
+      // (503, worth a retry) from a refusal (401/403, worth the banner). The
+      // relay's body is not: it is written for an operator reading a log, and
+      // relaying it would put relay internals on a page anyone can open.
+      return res.status(rr.status === 200 ? 502 : rr.status).json({ error: "token_unavailable" });
+    }
+    return res.json({ token: body.token, expires_in_s: body.expires_in_s });
+  } catch (err) {
+    console.error(label, err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+}
+
+api.post("/user/parasend/token", authUser, (req, res) =>
+  mintSessionToken(req, res, "parasend", "[user/parasend/token]"));
+
+// POST /api/user/app/token
+//
+// The same trade for the signed-in app pages. /pricing needs to start a
+// checkout and /dashboard needs to read the account's own history and audit
+// export; all three used to fetch GET /api/user/account/key and authenticate to
+// the relay with the pgp_ key itself, which put a credential with no expiry and
+// no scope into any tab that visited them.
+//
+// A DIFFERENT token from the ParaSend one, not a wider one. The relay judges an
+// `app` token against APP_SCOPE (checkout, history, audit-export, inbox) and a
+// `parasend` token against SCOPE (the five transfer routes); neither list
+// contains the other, so this route gives /pricing and /dashboard what they
+// need without giving /parashare anything it did not already have.
+api.post("/user/app/token", authUser, (req, res) =>
+  mintSessionToken(req, res, "app", "[user/app/token]"));
+
 // GET /api/user/account/key
 api.get("/user/account/key", authUser, async (req, res) => {
-  res.json({ api_key: req.userSession.user_id });
+  // stap 3: reveal the account's PRIMARY api-key (== user_id today), and only
+  // when the account is legacy_revealable. The `revealable` field is additive;
+  // existing callers read `.api_key`, unchanged while every account is 1:1.
+  //
+  // The one route that turns a session cookie into a credential with no expiry,
+  // so it leaves a mark. It used to leave none at all: an attacker who lifted a
+  // cookie, read the key here and never came back was invisible in the audit
+  // trail, and the key he walked off with outlives every session.
+  // session-credential-gate.test.js holds this to being the only such route.
+  try { await logAuditEvent(req.userSession.user_id, 'account_key_revealed', { via: req.userSession.via || 'totp' }); } catch (_) { /* audit is best effort */ }
+  res.json(revealKey(req.userSession));
+});
+
+// GET /api/user/dashboard/overview — read-only Operations data for the normal
+// (non-developer) dashboard: plan, masked key, this-month quota, recent audit.
+// authUser only (NO developer gate). Reuses buildSnapshot minus the tools
+// catalogue. 3s per-account cache so the dashboard's 5s poll can't hammer Redis.
+const _ovCache = new Map(); // uid -> { at, data }
+api.get("/user/dashboard/overview", authUser, async (req, res) => {
+  const uid = req.userSession.user_id;
+  const hit = _ovCache.get(uid);
+  if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
+  // Same one source as the developer snapshot. When the relay cannot answer we
+  // say so with a 503 and the page keeps whatever it last drew; it does NOT
+  // fall back to a community cap, which is how a Pro customer came to read
+  // "2 signatures left" on a page his own supplier served him.
+  const ents = await readAccountEntitlements(uid);
+  if (!ents) return res.status(503).json({ error: "entitlements_unavailable" });
+  try {
+    const snap = await buildSnapshot({ redis, getAuditEvents, entitlements: ents }, req.userSession);
+    // key_masked is deliberately NOT passed on. /dashboard no longer prints a
+    // key in any form, and a payload that still carries one is a payload that
+    // will be printed again by the next person who reads it and assumes it is
+    // there to be used. The account key lives on /account, behind its fold.
+    const data = { tiers: snap.tiers, quota: snap.quota, audit: snap.audit };
+    _ovCache.set(uid, { at: Date.now(), data });
+    if (_ovCache.size > 500) _ovCache.clear();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "overview_failed" });
+  }
+});
+
+// GET /api/user/documents: the logged-in account's ParaSign worklist. The
+// browser cannot choose an account id. The relay returns metadata and signer
+// progress only, never document bytes, invite tokens or email hashes.
+api.get("/user/documents", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/envelopes", { user_id, limit: 100 }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/documents GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Heb ik dit document al aangeboden. Alleen over het eigen account, en alleen
+// op een hash die de vrager zelf al kent: de lijst hierboven laat de
+// documenthash bewust weg en dat blijft zo. Bedoeld voor een client die afbrak
+// tussen het aanmaken van de envelope en het opschrijven van het id, en die nu
+// niet kan vaststellen of hij er al een heeft.
+// ── the sending side of the dashboard ────────────────────────────────────────
+// What this account sent to a group, and who collected it. Same shape as the
+// signing worklist above: the session supplies the user, never the browser.
+api.get("/user/sends", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends", { user_id, limit: 50 }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// One send, with its recipients and who has been.
+api.get("/user/sends/:id", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends/detail",
+      { user_id, send_id: String(req.params.id || "") }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends detail]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Withdraw one recipient. The rest of the group keeps its links.
+api.post("/user/sends/:id/revoke", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends/revoke",
+      { user_id, send_id: String(req.params.id || ""),
+        email: String((req.body || {}).email || "") }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends revoke]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Send one person a fresh link. The old one stops working at that moment, and
+// the new one goes out by mail, never through this response.
+api.post("/user/sends/:id/reinvite", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends/reinvite",
+      { user_id, send_id: String(req.params.id || ""),
+        email: String((req.body || {}).email || "") }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends reinvite]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+api.get("/user/documents/lookup", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const docHash = String(req.query.doc_hash || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(docHash)) return res.status(400).json({ error: "invalid_doc_hash" });
+  try {
+    const relayRes = await callRelay("/v2/user/envelopes/lookup", { user_id, doc_hash: docHash }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/documents lookup]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Owner actions for the account-scoped document worklist. The browser supplies
+// only an envelope id; the relay receives the session account's own API key and
+// performs the durable account_id ownership check again.
+api.post("/user/documents/:id/cancel", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(404).json({ error: "not_found" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/documents cancel]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+api.get("/user/documents/:id/receipt", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(404).json({ error: "not_found" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/receipt`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = Buffer.from(await rr.arrayBuffer());
+    res.status(rr.status);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Type", rr.headers.get("content-type") || "application/json");
+    const disposition = rr.headers.get("content-disposition");
+    if (disposition) res.setHeader("Content-Disposition", disposition);
+    return res.send(body);
+  } catch (err) {
+    console.error("[user/documents receipt]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// ── The other side of the worklist: what is waiting for THIS account ─────────
+// /api/user/documents lists what the account SENT. These two list what was sent
+// TO it and let the reader get the invitation mail again, which until now was
+// the one thing a recipient who lost that mail could not do: the only handle on
+// an envelope was the per-party invite token inside it.
+//
+// GET /api/user/parasign/inbox: the account's own key goes to the relay, and the
+// relay derives the address from that key. The browser names nobody. The answer
+// carries a document name, who sent it, when it went out and when signing
+// closes, and never an invite token or a document hash.
+api.get("/user/parasign/inbox", authUser, async (req, res) => {
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/parasign/inbox?limit=50`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign/inbox]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// POST /api/user/parasign/inbox/:id/resend: send me that invitation again.
+//
+// The mail can only ever go to req.userSession.email. That is not a policy this
+// route enforces on top of something looser, it is the only address in play:
+// the relay is asked for the invite of the party whose email hash matches that
+// session address, so a caller who is not that party gets a 404 and there is no
+// second address for the mail to be sent to.
+//
+// NOTHING IS MINTED. The relay hands back the invite token it stored when the
+// envelope was created, and the seven-day signing window still runs from
+// created_at, so the resent link expires at the same moment as the first one and
+// the link already in the reader's mailbox keeps working.
+//
+// WHAT NO INVITATION MAIL CARRIES. The document is unlocked by a key that lives
+// in the URL fragment. Browsers never transmit a fragment, so no server has ever
+// held it; the first invitation was assembled in the sender's browser. Since the
+// key would otherwise reach a mail provider outside the EU, the first invitation
+// does not carry it either: both mails are the same notice, and the sender hands
+// the opening link over themselves.
+//
+// One per envelope per hour, per account. The bucket is keyed on the session
+// account and the envelope together, never on the envelope alone: an id the
+// caller gets to name must be able to cost that caller something, never to deny
+// somebody else their own resend.
+api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(404).json({ error: "not_found" });
+  const { user_id, email } = req.userSession;          // identity from the session, never the client
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `resend:ip:${ip}`, 20, 3600))) return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `resend:env:${webauthn.scopeHash(user_id + ":" + id)}`, 1, 3600))) return res.status(429).json({ error: "rate_limited" });
+
+  let invite;
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/parasign/inbox/${encodeURIComponent(id)}/resend`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Auth": INTERNAL_TOKEN,
+        "X-Verified-Email-Hash": partyEmailHashAdmin(email),
+      },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (rr.status === 404) return res.status(404).json({ error: "not_found" });
+    if (!rr.ok) return res.status(rr.status === 503 ? 503 : 502).json({ error: "resend_unavailable" });
+    invite = await rr.json();
+  } catch (err) {
+    console.error("[user/parasign/inbox resend]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+
+  // The signing link, rebuilt from the stored token. Same origin, same path and
+  // same parameters the sender's browser used, minus the fragment nobody has.
+  const inviteUrl = `${new URL(SITE_URL).origin}/co-sign?env=${encodeURIComponent(id)}&p=${encodeURIComponent(invite.party_index)}&t=${encodeURIComponent(invite.invite_token)}`;
+  try {
+    await emailTemplates.sendEmail(email, emailTemplates.signingInviteEmail({
+      inviteUrl,
+      recipientLabel: invite.party_label || "",
+      senderLabel: invite.sender || "",
+      expiresAt: invite.signing_closes_at,
+      envelopeId: id,
+      partyIndex: invite.party_index,
+    }));
+  } catch (err) {
+    console.error("[user/parasign/inbox resend mail]", err.message);
+    return res.status(502).json({ error: "email_delivery_failed" });
+  }
+  // The address is echoed so the page can say where it went, and it is the
+  // reader's own: it came out of their session, not out of the envelope.
+  return res.json({ ok: true, sent_to: email });
 });
 
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──
@@ -1588,6 +3200,142 @@ api.post("/user/account/signing-key", authUser, async (req, res) => {
     return res.status(relayRes.status).json(body);
   } catch (err) {
     console.error("[user/signing-key POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// POST /api/user/account/signing-key/tofu — TOFU enrol for a first-time invitee
+// (no TOTP), gated by an email-bound invite token instead. We forward the
+// SESSION's user_id (never a client-supplied id) + the invite context; the
+// relay self-verifies the token, that the party email == this account's email,
+// the one-shot, and the cross-account conflict. No invite context here means the
+// relay rejects — there is no TOTP-free enrol path without a valid invite.
+api.post("/user/account/signing-key/tofu", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const { pk_b64, label, envelope_id, party_index, invite_token } = req.body || {};
+  if (!pk_b64 || typeof pk_b64 !== "string") return res.status(400).json({ error: "missing_pk_b64" });
+  if (!envelope_id || !invite_token) return res.status(400).json({ error: "missing_invite_context" });
+  try {
+    const relayRes = await callRelay("/v2/user/signing-key/tofu", { user_id, pk_b64, label, envelope_id, party_index, invite_token }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/signing-key/tofu POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// ── Passkey step-up for binding a signing key (ADR R018) — the "your sign-in
+// passkey IS your signing key" gate. A logged-in user proves possession of one
+// of THEIR OWN passkeys with a fresh assertion; that step-up replaces TOTP for
+// the signing-key bind, so a passkey-only account (no authenticator app) can
+// enrol a signing key, and nobody needs a separate signing passphrase. rpId/
+// origin are config constants (never request-derived). The SAME WebAuthn get()
+// the client runs for this assertion also carries the PRF eval that wraps the
+// ML-DSA key locally — one Face ID / Touch ID tap both authorises and unlocks.
+
+// POST /api/user/account/signing-key/step-up/options (authUser) — issue a
+// one-shot assertion challenge over THIS account's own passkeys.
+api.post("/user/account/signing-key/step-up/options", authUser, async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginOptions;
+  if (!(await webauthn.rateHit(redis(), `su:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+  const { user_id } = req.userSession;
+  if (!(await webauthn.rateHit(redis(), `su:acct:${webauthn.scopeHash(user_id)}`, L.account, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  // Challenge is bound to THIS account's own passkeys only. No passkey -> tell
+  // the client to add one first (the attested relay bind would reject anyway).
+  let allowCredentials = [];
+  try {
+    const r = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    if (r.status === 200) allowCredentials = ((await r.json()).credentials || []).map(c => ({ id: c.credId, transports: c.transports }));
+  } catch (e) { console.error("[signing-key/step-up/options]", e.message); return res.status(502).json({ error: "relay_unreachable" }); }
+  if (allowCredentials.length === 0) return res.status(409).json({ error: "no_passkey" });
+
+  let options;
+  try {
+    options = await generateAuthenticationOptions({
+      rpID: webauthn.RP_ID,
+      allowCredentials,
+      userVerification: "required",
+    });
+  } catch (e) { console.error("[signing-key/step-up/options]", e.message); return res.status(500).json({ error: "internal" }); }
+  const flowId = webauthn.newFlowId();
+  await webauthn.putAuthFlow(redis(), flowId, { challenge: options.challenge, user_id, step_up: "signing-key" });
+  res.json({ flowId, options });
+});
+
+// POST /api/user/account/signing-key/step-up/bind (authUser) — verify the fresh
+// assertion (mirrors login/verify) and, on success, forward the pubkey bind to
+// the relay's TOTP-free attested route. The asserted credential MUST belong to
+// the logged-in account; the flow is one-shot (consumed before any crypto).
+api.post("/user/account/signing-key/step-up/bind", authUser, async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginVerify;
+  if (!(await webauthn.rateHit(redis(), `sub:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  const { user_id } = req.userSession;
+  const { flowId, response, pk_b64, label } = req.body || {};
+  if (!pk_b64 || typeof pk_b64 !== "string") return res.status(400).json({ error: "missing_pk_b64" });
+  const flow = await webauthn.takeAuthFlow(redis(), flowId);   // one-shot
+  if (!flow || !response || flow.step_up !== "signing-key") return res.status(401).json({ error: "step_up_required" });
+  // The step-up MUST belong to the same session that is binding the key.
+  if (flow.user_id !== user_id) return res.status(401).json({ error: "step_up_required" });
+
+  // Resolve the asserted credential and confirm it is THIS account's passkey.
+  let lookup;
+  try {
+    const r = await callRelay(`/v2/user/webauthn/lookup?cred_id=${encodeURIComponent(String(response.id || ""))}`, null, "GET");
+    if (r.status !== 200) return res.status(401).json({ error: "step_up_required" });
+    lookup = await r.json();
+  } catch (e) { return res.status(401).json({ error: "step_up_required" }); }
+  if (!lookup || !lookup.user_id || lookup.user_id !== user_id) return res.status(401).json({ error: "step_up_required" });
+
+  // Verify the assertion. expectedOrigin/expectedRPID are config constants.
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: flow.challenge,
+      expectedOrigin: webauthn.EXPECTED_ORIGIN,
+      expectedRPID: webauthn.RP_ID,
+      credential: {
+        id: lookup.credId,
+        publicKey: new Uint8Array(Buffer.from(lookup.publicKey, "base64url")),
+        counter: lookup.counter | 0,
+      },
+      requireUserVerification: true,
+    });
+  } catch (e) { return res.status(401).json({ error: "step_up_required" }); }
+  if (!verification.verified) return res.status(401).json({ error: "step_up_required" });
+
+  // Cloned-authenticator guard (the same rule as login/verify).
+  const newCounter = verification.authenticationInfo.newCounter;
+  if (!webauthn.counterIsAcceptable(lookup.counter, newCounter)) {
+    try { await logAuditEvent(user_id, "webauthn_counter_regression", { stored: lookup.counter | 0, presented: newCounter | 0, at: "signing-key-step-up" }); } catch {}
+    return res.status(401).json({ error: "step_up_required" });
+  }
+  try { await callRelay("/v2/user/webauthn/counter", { user_id, cred_id: lookup.credId, counter: newCounter }); } catch {}
+
+  // Step-up proven -> mint a one-shot proof token the relay consumes, then
+  // forward the bind. The token (256-bit, bound to this user, EX 120s in the
+  // SHARED Redis) lets the relay enforce the step-up itself (Auth M1) instead of
+  // trusting "a passkey exists"; a code path that skips this ceremony has no
+  // valid token and is rejected by the relay.
+  const stepUpToken = crypto.randomBytes(32).toString("hex");
+  try {
+    await redis().set(`paramant:signing:stepup:${stepUpToken}`,
+      JSON.stringify({ user_id, ts: Date.now() }), { EX: 120 });
+  } catch (e) { return res.status(502).json({ error: "step_up_store_unavailable" }); }
+  try {
+    const relayRes = await callRelay("/v2/user/signing-key/attested", { user_id, pk_b64, label, step_up_token: stepUpToken }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[signing-key/step-up/bind]", err.message);
     return res.status(502).json({ error: "relay_unreachable" });
   }
 });
@@ -1634,12 +3382,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
 
   await callRelay("/v2/user/delete-totp", { user_id });
 
-  const setupToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:setup_token:${setupToken}`,
-    JSON.stringify({ user_id, email }),
-    { EX: 14 * 86400 }
-  );
+  const setupToken = await issueSetupToken(user_id, email);
 
   try {
     await sendSetupEmail(email, setupToken);
@@ -1649,10 +3392,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
   }
 
   // Invalidate all sessions for this user
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
-  }
+  await userSessions.revokeAll(redis(), user_id, { scan: scanSessions });
 
   clearUserCookie(res);
   res.json({ success: true });
@@ -1661,17 +3401,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
 // POST /api/user/account/sessions/revoke-others
 api.post("/user/account/sessions/revoke-others", authUser, async (req, res) => {
   const { user_id } = req.userSession;
-  let revoked = 0;
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (!raw) continue;
-    const s = JSON.parse(raw);
-    const token = key.replace("paramant:user:session:", "");
-    if (s.user_id === user_id && token !== req.userSessionToken) {
-      await redis().del(key);
-      revoked++;
-    }
-  }
+  const revoked = await userSessions.revokeAll(redis(), user_id, { except: req.userSessionToken, scan: scanSessions });
   res.json({ success: true, revoked });
 });
 
@@ -1684,41 +3414,113 @@ api.delete("/user/account", authUser, async (req, res) => {
     await relayFetch(s, "/v2/admin/keys/revoke", "POST", { key: user_id }, false, ADMIN_TOKEN);
   });
 
+  // Revoking stops the key; it does not remove the person. This route sits
+  // behind the "Deactivate account" button, so a visitor who presses it is
+  // asking to be gone, and until now their email address stayed in users.json on
+  // every sector. Article 17 GDPR, and audit finding 5 of 2026-07-21.
+  await eachSector(Object.keys(SECTORS), async s => {
+    await relayFetch(s, "/v2/admin/keys/erase", "POST", { key: user_id }, false, ADMIN_TOKEN, true);
+  });
+
   await callRelay("/v2/user/delete-totp", { user_id });
 
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
-  }
+  await userSessions.revokeAll(redis(), user_id, { scan: scanSessions });
 
   clearUserCookie(res);
   res.json({ success: true });
 });
 
 // ── Session → API key proxy ───────────────────────────────────────────────────
+// This forwards a logged-in user's OWN X-Api-Key to a relay sector. It must NOT
+// be an open proxy: previously any method+path was allowed with no `..`
+// normalization, re-exposing the whole key-authenticated relay surface
+// cross-sector. We now enforce three gates before forwarding:
+//   1. method allowlist (GET/POST/DELETE only — the verbs the user surface uses)
+//   2. strict path normalization (reject traversal/scheme/host/control chars,
+//      single leading slash, no double slashes)
+//   3. an endpoint allowlist of the user-facing relay routes only — admin,
+//      setup, internal and reload routes are never reachable through here.
+// NOTE: the production frontend does not call this proxy today (no callers in
+// frontend/). The allowlist is therefore deliberately conservative; add a path
+// here only when a frontend feature genuinely needs it.
+const RELAY_PROXY_METHODS = new Set(["GET", "POST", "DELETE"]);
+// Each entry is an exact path OR a prefix marked with a trailing '/' (matches
+// the prefix and anything under it). Admin/setup/internal/reload are excluded.
+const RELAY_PROXY_ALLOW = [
+  "/v2/status", "/v2/capabilities", "/v2/check-key", "/v2/monitor",
+  "/v2/inbound", "/v2/outbound", "/v2/ack", "/v2/delivery",
+  "/v2/audit", "/v2/dl", "/v2/stream", "/v2/stream-next",
+  "/v2/envelopes/", "/v2/envelopes",
+  "/v2/session/create", "/v2/session/join", "/v2/session",
+  "/v2/pubkey/verify", "/v2/pubkey", "/v2/sender-pubkey",
+  "/v2/lookup-signer/", "/v2/lookup-signer",
+  "/v2/verify-receipt", "/v2/verify",
+  "/v2/team/devices", "/v2/team/add-device", "/v2/team",
+  "/v2/ws-ticket",
+];
+
+function normalizeRelayPath(raw) {
+  // raw is the wildcard remainder, never includes the query (Express strips it
+  // into req.query). Reject anything that smells like traversal or an absolute
+  // URL before we build the upstream target.
+  if (typeof raw !== "string") return null;
+  let p = "/" + raw;
+  // Decode once so percent-encoded traversal (%2e%2e, %2f) is caught too; a
+  // decode failure means malformed input -> reject.
+  try { p = decodeURIComponent(p); } catch { return null; }
+  if (p.includes("\\")) return null;                 // backslash
+  if (/[\x00-\x1f]/.test(p)) return null;            // control chars
+  if (p.includes("..")) return null;                 // traversal
+  if (/^\/+(https?:)?\/\//i.test(p)) return null;    // scheme/host smuggling
+  if (p.includes("//")) return null;                 // double slash / empty seg
+  if (!p.startsWith("/")) return null;
+  return p;
+}
+
+function relayPathAllowed(p) {
+  for (const entry of RELAY_PROXY_ALLOW) {
+    if (entry.endsWith("/")) { if (p.startsWith(entry)) return true; }
+    else if (p === entry) return true;
+  }
+  return false;
+}
+
 api.all("/relay/:sector/*path", authUser, async (req, res) => {
   const sector = req.params.sector;
   const relayBase = SECTORS[sector];
   if (!relayBase) return res.status(404).json({ error: "unknown_sector" });
 
-  const relayPath = "/" + (req.params.path || "");
+  if (!RELAY_PROXY_METHODS.has(req.method))
+    return res.status(405).json({ error: "method_not_allowed" });
+
+  const relayPath = normalizeRelayPath(req.params.path || "");
+  if (!relayPath) return res.status(400).json({ error: "invalid_path" });
+  if (!relayPathAllowed(relayPath)) return res.status(403).json({ error: "path_not_allowed" });
+
   const fetchOpts = {
     method: req.method,
     headers: {
-      "X-Api-Key": req.userSession.user_id,
+      "X-Api-Key": proxyApiKey(req.userSession),
       "Content-Type": "application/json",
     },
   };
 
-  if (["POST", "PUT", "PATCH"].includes(req.method)) {
+  // Forward the body faithfully for every method that can carry one (DELETE
+  // included — some relay routes take a JSON body on DELETE). express.json has
+  // already parsed it; re-serialize so the upstream sees the same payload.
+  if (req.method !== "GET" && req.body !== undefined && req.body !== null) {
     fetchOpts.body = JSON.stringify(req.body);
   }
 
   try {
     const proxyRes = await fetch(`${relayBase}${relayPath}`, fetchOpts);
     const ct = proxyRes.headers.get("content-type") || "";
-    res.status(proxyRes.status).set("content-type", ct);
-    res.send(ct.includes("application/json") ? await proxyRes.json() : await proxyRes.text());
+    // Stream the upstream body verbatim instead of re-parsing+re-serializing,
+    // so non-JSON and empty bodies (e.g. 204 on DELETE) survive untouched.
+    const buf = Buffer.from(await proxyRes.arrayBuffer());
+    res.status(proxyRes.status);
+    if (ct) res.set("content-type", ct);
+    res.send(buf);
   } catch (err) {
     console.error("[proxy]", err.message);
     res.status(502).json({ error: "relay_unreachable" });
@@ -1731,13 +3533,28 @@ api.post("/drop/upload", async (req, res) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: "invalid_email" });
   }
+  // Wie zonder account verzendt, wordt getoetst als afzender. De ontvanger van
+  // de link niet: die komt nergens in deze route voor.
+  const beleid = await emailPolicy.toets(email, 'verzenden');
+  if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
+  // Per-IP bucket: the per-email limit below is keyed only on attacker-supplied
+  // input, so rotating the email defeats it entirely. Cap per source IP too
+  // (20/day is generous for a human, bounds anonymous-relay abuse from one host).
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const ipKey = `paramant:drop:ratelimit:ip:${ip}`;
+  const ipCount = await incrInWindow(redis(), ipKey, 86400);
+  if (ipCount > 20) {
+    return res.status(429).json({
+      error: "rate_limited",
+      message: "Daily limit reached. Create a free account for 10 transfers a month.",
+    });
+  }
   const rlKey = `paramant:drop:ratelimit:${email.toLowerCase()}`;
-  const count = await redis().incr(rlKey);
-  if (count === 1) await redis().expire(rlKey, 86400);
+  const count = await incrInWindow(redis(), rlKey, 86400);
   if (count > 3) {
     return res.status(429).json({
       error: "rate_limited",
-      message: "Daily limit reached. Create a free account for unlimited drops.",
+      message: "Daily limit reached. Create a free account for 10 transfers a month.",
     });
   }
   const anonRes = await relayFetch("health", "/v2/anon-inbound", "POST", req.body, false, "");
@@ -1771,137 +3588,100 @@ const PLANS = [
   },
 ];
 
+// No caller since the stub checkout was hard-disabled below; the plan-change
+// route mails its own copy. Left in place, and the note is derived rather than
+// forced on: a plan the admin set was not paid for and says so, a plan that
+// arrived through a payment is already answered by the relay, which mails the
+// numbered invoice or receipt with the PDF attached (relay/lib/invoice.js).
 async function sendBillingConfirmation(email, plan, amount, period) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  // Ask about MAIL, not about one carrier. Gating on RESEND_API_KEY meant that
+  // after the move to a European provider this mail stayed silent on a
+  // perfectly configured account, and the warning in the log named a variable
+  // nobody was supposed to set any more.
+  if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
-  const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, stub: true });
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html }),
+  const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, noPayment: period === 'admin' });
+  const res = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo,
+    subject: msg.subject, text: msg.text, html: msg.html,
   });
-  if (!res.ok) console.error('[billing] Resend error:', res.status, await res.text().catch(() => ''));
+  if (!res.ok) console.error('[billing] mail failed:', res.provider, res.reason, res.detail || '');
 }
 
 async function sendCancellationScheduled(email, plan, cancelAt) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate });
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html }),
+  const res = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo,
+    subject: msg.subject, text: msg.text, html: msg.html,
   });
-  if (!res.ok) console.error('[billing] Resend cancel error:', res.status, await res.text().catch(() => ''));
+  if (!res.ok) console.error('[billing] cancellation mail failed:', res.provider, res.reason, res.detail || '');
 }
 
 api.get("/user/billing/plans", (req, res) => {
   res.json({ plans: PLANS });
 });
 
-api.post("/user/billing/checkout", authUser, async (req, res) => {
-  const { plan_id, period } = req.body || {};
-  if (!plan_id || !['monthly', 'yearly'].includes(period)) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-  const plan = PLANS.find(p => p.id === plan_id);
-  if (!plan || plan.id === 'community') return res.status(400).json({ error: 'invalid_plan' });
-  if (plan.price_monthly_eur === null) return res.status(400).json({ error: 'enterprise_contact_sales' });
-
-  const amount = period === 'yearly' ? plan.price_yearly_eur : plan.price_monthly_eur;
-  const token = crypto.randomBytes(20).toString('hex');
-  const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
-
-  await redis().set(
-    `paramant:user:checkout:${token}`,
-    JSON.stringify({
-      user_id: req.userSession.user_id,
-      email: req.userSession.email,
-      plan_id,
-      plan_name: plan.name,
-      period,
-      amount_eur: amount,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    }),
-    { EX: 3600 }
-  );
-
-  // PLACEHOLDER: replace this block with stripe.checkout.sessions.create() when integrating Stripe
-  res.json({ checkout_url: `/billing/checkout/${token}`, expires_at: expiresAt });
-});
-
-api.get("/user/billing/checkout/:token", authUser, async (req, res) => {
-  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
-  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
-  const s = JSON.parse(raw);
-  if (s.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
-  res.json({ plan_id: s.plan_id, plan_name: s.plan_name, period: s.period, amount_eur: s.amount_eur, email: s.email, status: s.status });
-});
-
-api.post("/user/billing/checkout/:token/confirm", authUser, async (req, res) => {
-  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
-  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
-  const session = JSON.parse(raw);
-  if (session.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
-  if (session.status !== 'pending') return res.status(409).json({ error: 'already_processed' });
-
-  // Get current plan for audit log
-  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
-  const currentKey = (keysRes.body?.keys || []).find(k => k.key === session.user_id);
-  const fromPlan = currentKey?.plan || 'community';
-
-  // PLACEHOLDER: replace with stripe.webhooks.constructEvent() verification when integrating Stripe
-  const updateRes = await callRelay("/v2/admin/keys/update-plan", { key: session.user_id, plan: session.plan_id });
-  if (!updateRes.ok) {
-    console.error('[billing] update-plan failed:', updateRes.status);
-    return res.status(502).json({ error: 'plan_update_failed' });
-  }
-
-  // (cross-sector /v2/reload-users trigger removed: update-plan already mutates
-  // the relay's in-memory apiKeys directly. The reload was the cause of the
-  // 2026-05-08 wipe race against the concurrent users.json write.)
-
-  const now = new Date().toISOString();
-  const nextBilling = session.period === 'yearly'
-    ? new Date(Date.now() + 365 * 86_400_000).toISOString()
-    : new Date(Date.now() + 30 * 86_400_000).toISOString();
-
-  await redis().set(
-    `paramant:user:billing:${session.user_id}`,
-    JSON.stringify({ plan: session.plan_id, period: session.period, amount_eur: session.amount_eur, activated_at: now, next_billing_date: nextBilling })
-  );
-
-  await logAuditEvent(session.user_id, 'plan_changed', {
-    from: fromPlan, to: session.plan_id, period: session.period, amount_eur: session.amount_eur, via: 'stub_checkout',
-  });
-
-  await redis().set(
-    `paramant:user:checkout:${req.params.token}`,
-    JSON.stringify({ ...session, status: 'completed', completed_at: now }),
-    { EX: 3600 }
-  );
-
-  try { await sendBillingConfirmation(session.email, session.plan_id, session.amount_eur, session.period); }
-  catch (err) { console.error('[billing] confirmation email failed:', err.message); }
-
-  res.json({ success: true, new_plan: session.plan_id, effective_from: now });
-});
+// -- Billing stub checkout -- HARD-DISABLED 2026-07-20 ------------------------
+// SECURITY: these three endpoints were a no-payment plan-grant bypass. The
+// confirm step called /v2/admin/keys/update-plan (admin-privileged) after only
+// checking the checkout was 'pending', so any logged-in free user could grant
+// themselves Pro for 0 euro. The ONLY path to a paid plan is now the Mollie flow
+// on the relay: POST /v2/billing/checkout creates a real payment and
+// /v2/billing/webhook grants the tier ONLY after Mollie confirms 'paid' with a
+// matching amount (relay lib/billing.processPayment). These endpoints grant
+// nothing and are kept as 410 Gone so any stale client gets a clean signal.
+api.post("/user/billing/checkout", authUser, billingStubGone);
+api.get("/user/billing/checkout/:token", authUser, billingStubGone);
+api.post("/user/billing/checkout/:token/confirm", authUser, billingStubGone);
 
 api.post("/user/billing/cancel", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
   const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
-  const cancelAt = billing?.next_billing_date || new Date(Date.now() + 30 * 86_400_000).toISOString();
+  // "You keep access until the end of your billing period" is a promise about a
+  // specific day, so it has to be the day the relay will actually stop granting.
+  // next_billing_date came from a Redis record nothing writes, so this fell
+  // through to now plus 30 days and told a customer who had paid for a YEAR
+  // that his plan ended next month. The term end is on the relay; read it.
+  const cancelUser = await findUserByEmail(email).catch(() => null);
+  const cancelAt = termEndOf(productPlanFields(cancelUser))
+    || billing?.next_billing_date
+    || new Date(Date.now() + 30 * 86_400_000).toISOString();
   await redis().set(`paramant:user:plan_cancel_at:${user_id}`, cancelAt);
-  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: billing?.plan || 'pro', via: 'user_request' });
-  try { await sendCancellationScheduled(email, billing?.plan || 'pro', cancelAt); }
+  // STOP THE COLLECTION. This used to write the marker above, send the mail
+  // below and stop, so "Cancellation scheduled" was a note to ourselves. With
+  // BILLING_MODE set, checkout opens a Mollie mandate and a subscription, and
+  // nothing here ever told Mollie to stop: the customer read that his plan was
+  // cancelled and was charged again the following month. The relay owns the
+  // Mollie side (POST /v2/billing/cancel, which cancels the NEXT collection and
+  // leaves the paid term running), and it answers 'noop' when there is no
+  // subscription, which is what a one-off deployment gets.
+  let stopped = null;
+  try {
+    // SECTORS.main, niet health. De Mollie-aanwijzers (mollie_customer_id en
+    // mollie_subscription_*) worden door de webhook geschreven, en nginx stuurt
+    // publiek /v2 naar relay-main, dus daar staan ze. Een cancel naar health
+    // vindt geen abonnement, antwoordt 'noop' en zegt dat er niets te stoppen
+    // was terwijl de incasso doorloopt: exact dezelfde fout, één relay verderop.
+    const rr = await callRelay('/v2/billing/cancel', { user_id }, 'POST', 'main');
+    const rb = await rr.json().catch(() => null);
+    stopped = rb && rb.results ? rb.results : (rb || null);
+    if (!rr.ok) console.error('[billing] relay cancel returned', rr.status, JSON.stringify(rb));
+  } catch (err) {
+    // The marker and the mail have already been written; the customer's
+    // cancellation is not lost because Mollie was slow. Loud, because a
+    // subscription that survives a cancellation is money we may not take.
+    console.error('[billing] relay cancel failed:', err.message);
+  }
+  const planName = planNameOf(productPlanFields(cancelUser));
+  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: planName, via: 'user_request' });
+  try { await sendCancellationScheduled(email, planName, cancelAt); }
   catch (err) { console.error('[billing] cancel email failed:', err.message); }
-  res.json({ scheduled_downgrade_at: cancelAt });
+  res.json({ scheduled_downgrade_at: cancelAt, plan_name: planName, subscription: stopped });
 });
 
 api.get("/user/billing/status", authUser, async (req, res) => {
@@ -1909,25 +3689,199 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
   const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
-  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
+  // Whether a collection stands behind this plan is the ONE thing on this page
+  // that health cannot answer: the Mollie pointers are written by the webhook,
+  // and public /v2 goes to relay-main. Read from health, auto_renews was false
+  // for every customer who did have a subscription. Best effort: a main that
+  // cannot answer leaves the row at whatever health knows rather than failing
+  // the whole page.
+  let renews = !!currentKey?.auto_renews;
+  try {
+    const mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+    const mainKey = (mainRes.body?.keys || []).find(k => k.key === user_id);
+    if (mainKey) renews = !!mainKey.auto_renews;
+  } catch (err) { console.error("[billing status] main read failed:", err.message); }
+  // What the account page shows about money has to be what actually happened.
+  // Two things were wrong here. The record this used to read,
+  // paramant:user:billing:<id>, is written by nothing in this codebase, so
+  // next_billing_date was always null and the renewal row the page promises
+  // never appeared. And stub_notice said no real charges apply, to customers
+  // Mollie had genuinely charged. The truth is on the relay: paid_until_* is
+  // the day the term that was paid for runs out, so that is the date to show.
+  const fields = productPlanFields(currentKey);
+  const accessUntil = termEndOf(fields);
   res.json({
-    current_plan: currentKey?.plan || 'community',
+    // The plan the account is actually on, not the legacy unified `plan` field.
+    // A purchase writes plan_parasign / plan_parasend and deliberately never
+    // touches `plan`, so this said "community" to every paying customer since
+    // billing existed.
+    current_plan: effectivePaidTier(fields) || 'community',
+    plan_name: planNameOf(fields),
+    ...fields,
     period: billing?.period || null,
-    amount_eur: billing?.amount_eur ?? 0,
+    amount_eur: billing?.amount_eur ?? null,
+    // The end of the term that was paid for. Every checkout is a one-off
+    // payment for that term (see /terms), so this is the day access stops
+    // unless another payment is made, not the day a collection is attempted.
+    access_until: accessUntil,
     next_billing_date: billing?.next_billing_date || null,
+    // From the relay record, not a constant. See the projection in relay.js.
+    auto_renews: renews,
     cancellation_scheduled_at: cancelAt || null,
-    stub_notice: 'Payment integration pending. No real charges apply.',
   });
 });
 
+// ─── Invoices ────────────────────────────────────────────────────────────────
+// The documents themselves live on the relay: the Mollie webhook is what issues
+// them, and the numbering counter and the records are in the redis the relays
+// share. The admin plane only lends the browser its session, exactly as it does
+// for envelopes: the account page never holds an api-key.
+//
+// SECTORS.main and not health, because nginx routes public /v2/ to relay-main
+// (deploy/nginx-paramant-public.conf), so that is the relay the Mollie webhook
+// reaches and the one whose logs a billing question is read out of.
+// Two series share the route: PS for an invoice, CN for the credit note that
+// reverses one. Both are served by the relay from the same document keyspace,
+// which checks the number belongs to this account.
+const INVOICE_NUMBER_RE = /^(?:PS|CN)-\d{4}-\d{4,}$/;
+
+api.get("/user/billing/invoices", authUser, async (req, res) => {
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/invoices`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return res.status(r.status === 401 ? 401 : 502).json({ error: "invoices_unavailable" });
+    return res.json(await r.json());
+  } catch (err) {
+    console.error("[user/billing/invoices]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// The PDF, streamed straight through. The relay checks the number belongs to
+// this account; the number pattern here only keeps a malformed path from
+// becoming an upstream request at all.
+// The path is :file and not :number.pdf on purpose: express 5's path-to-regexp
+// does not split a parameter from a literal suffix the way express 4 did, so
+// the extension is stripped here instead.
+api.get("/user/billing/invoices/:file", authUser, async (req, res) => {
+  const number = String(req.params.file || "").replace(/\.pdf$/i, "");
+  if (!INVOICE_NUMBER_RE.test(number)) return res.status(400).json({ error: "bad_invoice_number" });
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/invoices/${number}.pdf`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.status === 404) return res.status(404).json({ error: "not_found" });
+    if (!r.ok) return res.status(r.status === 401 ? 401 : 502).json({ error: "invoice_unavailable" });
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Length": String(buf.length),
+      "Content-Disposition": `attachment; filename="${number}.pdf"`,
+      "Cache-Control": "private, no-store",
+    });
+    return res.end(buf);
+  } catch (err) {
+    console.error("[user/billing/invoices/pdf]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Company name, address and VAT id for the invoice. All three optional: without
+// them a document is still issued, addressed to the account's email, and says on
+// its face how to get the company details onto the next one.
+async function billingProfileProxy(req, res, method) {
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/profile`, {
+      method,
+      headers: Object.assign(
+        { "X-Api-Key": proxyApiKey(req.userSession) },
+        method === "POST" ? { "Content-Type": "application/json" } : {}),
+      body: method === "POST" ? JSON.stringify({
+        company: req.body?.company ?? "",
+        address: req.body?.address ?? "",
+        vat: req.body?.vat ?? "",
+      }) : undefined,
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await r.json().catch(() => ({}));
+    return res.status(r.ok ? 200 : (r.status === 401 ? 401 : 502)).json(body);
+  } catch (err) {
+    console.error("[user/billing/profile]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+}
+api.get("/user/billing/profile", authUser, (req, res) => billingProfileProxy(req, res, "GET"));
+api.post("/user/billing/profile", authUser, (req, res) => billingProfileProxy(req, res, "POST"));
+
+// The customer's billing history, and it used to be only half of one: the audit
+// log records what an ADMIN did to a plan and knows nothing about a self-serve
+// Mollie payment, so a customer who had paid, been invoiced and seen his term
+// run out was shown "No billing events yet".
+//
+// The relay half is what the money did: invoices, credit notes, and the terms
+// that ended, all derived from records it already holds (relay/lib/
+// billing-history.js). The audit half stays, mapped into the same row shape, so
+// an admin plan change still appears in the one list the customer reads. A
+// relay that cannot be reached costs the money rows and keeps the rest, because
+// half a history beats an empty one.
+const AUDIT_LABEL = {
+  plan_changed: (m) => `Plan changed from ${m.from || 'unknown'} to ${m.to || 'unknown'}`,
+  plan_cancellation_scheduled: () => 'Cancellation scheduled',
+  plan_downgraded: (m) => `Plan downgraded to ${m.to || 'Community'}`,
+};
+
 api.get("/user/billing/history", authUser, async (req, res) => {
   const { user_id } = req.userSession;
-  const events = await getAuditEvents(user_id, {
-    limit: 10,
-    event_types: ['plan_changed', 'plan_cancellation_scheduled', 'plan_downgraded'],
+  let events = [];
+  try {
+    events = await getAuditEvents(user_id, {
+      limit: 10,
+      event_types: ['plan_changed', 'plan_cancellation_scheduled', 'plan_downgraded'],
+    });
+  } catch (err) {
+    console.error("[user/billing/history audit]", err.message);
+  }
+  const audit = (events || []).map((e) => {
+    const meta = e.metadata || {};
+    const label = AUDIT_LABEL[e.event_type];
+    return {
+      ts: e.ts,
+      type: e.event_type,
+      label: label ? label(meta) : e.event_type,
+      detail: null,
+      amount: null,
+      currency: null,
+      document: null,
+      // The raw event, so a page that has not been updated still renders.
+      event_type: e.event_type,
+      metadata: meta,
+    };
   });
-  res.json({ history: events });
+
+  let documents = [];
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/history`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const body = await r.json().catch(() => ({}));
+      if (Array.isArray(body.history)) documents = body.history;
+    }
+  } catch (err) {
+    console.error("[user/billing/history relay]", err.message);
+  }
+
+  const history = documents.concat(audit)
+    .filter((row) => row && row.ts)
+    .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
+    .slice(0, 50);
+  res.json({ history });
 });
 
 
@@ -2027,7 +3981,7 @@ api.get("/admin/audit", authMiddleware, async (req, res) => {
     const eventFilter = req.query.event || null;
     const sinceMs = req.query.since ? new Date(req.query.since).getTime() : 0;
     const events = [];
-    for await (const key of redis().scanIterator({ MATCH: "paramant:user:audit:*", COUNT: 100 })) {
+    for await (const key of scanKeys(redis(), { MATCH: "paramant:user:audit:*", COUNT: 100 })) {
       const userId = key.split(":").pop();
       if (userFilter && !userId.includes(userFilter)) continue;
       const entries = await redis().zRange(key, 0, -1).catch(() => []);
@@ -2051,14 +4005,72 @@ api.get("/admin/billing", authMiddleware, async (req, res) => {
       telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
       telemetry.getRecentAuditEvents(200),
     ]);
+    // stub_mode, mrr_eur and churn_this_month are gone. The first said billing
+    // was a stub, which stopped being true when Mollie went live; the other two
+    // were hardcoded zeros, a revenue and a churn figure this route never
+    // counted. Nothing read any of the three: the served admin screen
+    // (admin/public/app.js) renders plan_distribution and recent_checkouts and
+    // says in the tab itself that it shows neither payments nor revenue.
     res.json({
-      stub_mode: true, mrr_eur: 0,
       total_customers: Object.values(planDist).reduce((a, b) => a + b, 0),
-      churn_this_month: 0,
       plan_distribution: planDist,
       recent_checkouts: recentAudit.filter(e => e.event_type === "plan_changed").slice(0, 20),
     });
   } catch (err) { console.error("[admin/billing]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+// ── /admin/coupons ───────────────────────────────────────────────
+// The panel's window on relay/lib/coupon.js. Straight pass-through to
+// /v2/admin/coupons on ONE sector: coupons live in redis, which all five relays
+// share, so there is nothing to fan out and a fan-out would only invent five
+// answers to a question with one. The browser never holds ADMIN_TOKEN; it holds
+// an X-Session that authMiddleware swaps for it.
+//
+// A coupon raises a paid tier without a payment, so creating and withdrawing
+// one is written to the audit log like any other plan change.
+api.get('/admin/coupons', authMiddleware, async (req, res) => {
+  try {
+    const r = await relayFetch('health', '/v2/admin/coupons', 'GET', null, false, req.sessionToken);
+    res.status(r.status).json(r.body);
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+api.post('/admin/coupons', authMiddleware, async (req, res) => {
+  if (!await checkAdminRl('coupons', 'admin', 50)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const r = await relayFetch('health', '/v2/admin/coupons', 'POST', req.body || {}, false, req.sessionToken);
+    if (r.status === 201) {
+      try {
+        await logAuditEvent('admin', 'admin_coupon_created', {
+          code: (r.body && r.body.coupon && r.body.coupon.code) || '',
+          max: (r.body && r.body.coupon && r.body.coupon.max_redemptions) || 0,
+          admin_ip: req.headers['x-real-ip'] || 'unknown',
+        });
+      } catch {}
+    }
+    res.status(r.status).json(r.body);
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// The code travels in the path and the request carries no body. A DELETE whose
+// body the relay's admin gate refuses before reading leaves those bytes on the
+// wire, and the next request on that kept-alive connection is answered by a
+// socket that has lost its place.
+api.delete('/admin/coupons/:code', authMiddleware, async (req, res) => {
+  if (!await checkAdminRl('coupons', 'admin', 50)) return res.status(429).json({ error: 'rate_limited' });
+  const code = String(req.params.code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9-]{3,32}$/.test(code)) return res.status(400).json({ error: 'bad_code' });
+  try {
+    const r = await relayFetch('health', `/v2/admin/coupons/${encodeURIComponent(code)}`, 'DELETE', null, false, req.sessionToken);
+    if (r.status === 200) {
+      try {
+        await logAuditEvent('admin', 'admin_coupon_revoked', {
+          code, admin_ip: req.headers['x-real-ip'] || 'unknown',
+        });
+      } catch {}
+    }
+    res.status(r.status).json(r.body);
+  } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
 api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
@@ -2082,6 +4094,61 @@ api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
     }));
     res.json({ sectors: details });
   } catch (err) { console.error("[admin/relay-detail]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+// ── De standpagina ──────────────────────────────────────────────────────────
+//
+// Eén pagina die de werkelijke stand toont, achter dezelfde inlog als de rest
+// van deze adminkant: token plus TOTP, sessie in redis, X-Session op elke
+// vraag. Er komt dus geen nieuwe openbare route bij, en er staat niets op deze
+// route dat een beheerder hier niet allang mocht zien.
+//
+// De metingen zelf staan in lib/stand.js, met de buitenwereld in lib/stand-io.js.
+
+function bouwStandIo() {
+  return standIo.maakIo({
+    redis,
+    relayFetch,
+    sectors: Object.keys(SECTORS),
+    adminToken: ADMIN_TOKEN,
+  });
+}
+
+api.get('/admin/stand', authMiddleware, async (req, res) => {
+  try {
+    res.json(await meetDeStand(bouwStandIo()));
+  } catch (err) {
+    // Geen halve pagina met een verzonnen kop: als het meten zelf omvalt zegt
+    // de pagina dat, en dat is iets anders dan "alles groen".
+    console.error('[admin/stand]', err.message);
+    res.status(503).json({ error: 'meten_mislukt', message: err.message });
+  }
+});
+
+// De echte proef, alleen op verzoek. Hij stuurt werkelijk een bestand door de
+// relay en laat het weer vernietigen, en dat schrijft een regel in het
+// openbare transparantielogboek. Vandaar de knop en niet elk paginabezoek: een
+// statuspagina die zichzelf meetelt maakt het gebruikscijfer onbruikbaar,
+// precies zoals in augustus gebeurde.
+//
+// De anonieme uploadroute laat tien pogingen per uur per IP toe, dus hier
+// staat een eigen rem van één proef per vijf minuten. Loopt die af, dan is dat
+// een 429 met een reden en niet een stilzwijgend mislukte proef.
+api.post('/admin/stand/proef', authMiddleware, async (req, res) => {
+  const rem = 'paramant:stand:proef:rem';
+  try {
+    const bezet = await redis().set(rem, '1', { NX: true, EX: 300 });
+    if (bezet === null) {
+      return res.status(429).json({ error: 'te_snel', message: 'Er is net een proef gedaan. Over vijf minuten kan er weer een.' });
+    }
+  } catch (err) {
+    if (isRedisOutage(err)) throw err;
+  }
+
+  const io = bouwStandIo();
+  const uitslag = await io.doeProef();
+  try { await io.bewaarProef(uitslag); } catch (err) { console.error('[admin/stand] proef niet bewaard:', err.message); }
+  res.json(uitslag);
 });
 
 
@@ -2112,14 +4179,12 @@ api.post('/admin/force-totp', authMiddleware, async (req, res) => {
     if (required) {
       const totpActive = await redis().get(`paramant:user:totp_active:${key}`).catch(() => null);
       if (totpActive !== 'true') {
-        for await (const rkey of redis().scanIterator({ MATCH: `paramant:user:session:*`, COUNT: 100 })) {
-          const raw = await redis().get(rkey).catch(() => null);
-          if (raw) { try { const ss = JSON.parse(raw); if (ss.user_id === key) { await redis().del(rkey); sessions_revoked++; } } catch {} }
-        }
+        // Counted before issueSetupToken revokes them, so the number reported
+        // back is the number that were actually cut.
+        sessions_revoked += (await userSessions.list(redis(), key, scanSessions)).sessions.length;
         if (userMeta.email) {
           try {
-            const setupToken = require('crypto').randomBytes(32).toString('hex');
-            await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: key, email: userMeta.email }), { EX: 14 * 86400 });
+            const setupToken = await issueSetupToken(key, userMeta.email);
             await sendSetupEmail(userMeta.email, setupToken);
             setup_email_sent = true;
           } catch (e) { console.error('[admin/force-totp] setup email:', e.message); }
@@ -2134,7 +4199,7 @@ api.post('/admin/force-totp', authMiddleware, async (req, res) => {
 // ── Admin helpers ─────────────────────────────────────────────────────────────
 async function getAdminKeyMeta(key_id) {
   const [keysRes, metaRaw] = await Promise.all([
-    relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN),
+    relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN),
     redis().get(`paramant:user:meta:${key_id}`).catch(() => null),
   ]);
   const k = (keysRes.body?.keys || []).find(k => k.key === key_id) || {};
@@ -2146,15 +4211,56 @@ async function getAdminKeyMeta(key_id) {
     label: k.label || null,
     active: k.active !== false,
     sectors: k.sectors || [],
+    parasign: k.parasign === true, /*MARK:parasign_meta*/
+    account_id: k.account_id || key_id,
   };
+}
+
+async function mutatePlanFleet(endpoint, body) {
+  const run = sectors => eachSector(sectors, async s => {
+    const response = await callRelay(endpoint, body, 'POST', s);
+    let responseBody = null; try { responseBody = await response.json(); } catch {}
+    return { status: response.status, ok: response.ok, error: responseBody?.error || null, message: responseBody?.message || null };
+  });
+  const initial = await run(Object.keys(SECTORS));
+  const retrySectors = Object.entries(initial).filter(([, r]) => !r?.ok).map(([s]) => s);
+  const retried = retrySectors.length ? await run(retrySectors) : {};
+  const results = { ...initial, ...retried };
+  return { results, retried: retrySectors, failed: Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'sector_unreachable', message: r?.message || null })) };
+}
+
+async function readEntitlementsFleet(accountId) {
+  const results = await eachSector(Object.keys(SECTORS), async s => {
+    const response = await callRelay(`/v2/admin/entitlements/${encodeURIComponent(accountId)}`, null, 'GET', s);
+    let body = null; try { body = await response.json(); } catch {}
+    return { status: response.status, ok: response.ok && body?.ok === true, entitlements: body?.entitlements || null, error: body?.error || null };
+  });
+  const failed = Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'read_back_failed' }));
+  return { results, failed };
+}
+
+function verifyEntitlementsFleet(readBack, expected) {
+  const mismatched = [];
+  for (const [sector, result] of Object.entries(readBack.results)) {
+    if (!result?.ok) continue;
+    for (const [product, tier] of Object.entries(expected)) {
+      if (result.entitlements?.[product]?.tier !== tier) mismatched.push({ sector, product, expected: tier, actual: result.entitlements?.[product]?.tier || null });
+    }
+  }
+  return mismatched;
 }
 
 async function checkAdminRl(scope, id, limit) {
   const key = `paramant:ratelimit:admin_${scope}:${id}`;
-  const cnt = parseInt(await redis().get(key).catch(() => '0') || '0');
-  if (cnt >= limit) return false;
-  await redis().multi().incr(key).expire(key, 86400).exec().catch(() => {});
-  return true;
+  // Atomic INCR-then-compare: the previous get-then-set left a TOCTOU window
+  // where concurrent requests all read the same count and each passed. INCR
+  // returns the post-increment value, so the Nth concurrent caller sees N.
+  let cnt;
+  // incrInWindow sets the expiry unconditionally: a counter that lost its TTL
+  // used to refuse this admin for good. See lib/redis-counter.js.
+  try { cnt = await incrInWindow(redis(), key, 86400); }
+  catch { return false; } // fail closed if Redis is unavailable
+  return cnt <= limit;
 }
 
 // ── POST /admin/send-welcome ───────────────────────────────────────────────────
@@ -2186,9 +4292,9 @@ api.post('/admin/reset-totp', authMiddleware, async (req, res) => {
     if (!await checkAdminRl('reset_totp', key, 5)) return res.status(429).json({ error: 'rate_limited' });
     if (mode === 'direct') {
       await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
-      const setupToken = crypto.randomBytes(32).toString('hex');
-      await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: key, email: meta.email }), { EX: 14 * 86_400 });
-      await emailTemplates.sendEmail(meta.email, emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: req.headers['x-real-ip'], isReset: true }));
+      // issueSetupToken revokes the sessions the old factor let through.
+      const setupToken = await issueSetupToken(key, meta.email);
+      await emailTemplates.sendEmail(meta.email, emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: req.headers['x-real-ip'], isReset: true, validFor: setupTokenValidFor() }));
       try { await logAuditEvent(key, 'admin_totp_reset_initiated', { mode: 'direct', email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
       res.json({ ok: true, mode: 'direct', email: meta.email });
     } else {
@@ -2210,16 +4316,101 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
   if (!await checkAdminRl('change_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const meta = await getAdminKeyMeta(key);
-    const updateRes = await callRelay('/v2/admin/keys/update-plan', { key, plan: new_plan });
-    if (!updateRes.ok) return res.status(502).json({ error: 'relay_error' });
+    const mutation = await mutatePlanFleet('/v2/admin/keys/update-plan', { key, plan: new_plan });
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
-    if (notify && meta.email) {
+    const readBack = await readEntitlementsFleet(meta.account_id);
+    const derived = { community: { parasign: 'free', parasend: 'community' }, pro: { parasign: 'pro', parasend: 'pro' }, enterprise: { parasign: 'enterprise', parasend: 'enterprise' } };
+    const mismatched = verifyEntitlementsFleet(readBack, derived[new_plan] || {});
+    const allOk = mutation.failed.length === 0 && readBack.failed.length === 0 && mismatched.length === 0;
+    if (allOk && notify && meta.email) {
       const planName = new_plan.charAt(0).toUpperCase() + new_plan.slice(1);
-      emailTemplates.sendEmail(meta.email, emailTemplates.billingConfirmationEmail({ planName, period: 'admin', amountStr: 'admin-provisioned', stub: true })).catch(e => console.error('[admin/change-plan] email:', e.message));
+      emailTemplates.sendEmail(meta.email, emailTemplates.billingConfirmationEmail({ planName, period: 'admin', amountStr: 'admin-provisioned', noPayment: true })).catch(e => console.error('[admin/change-plan] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_plan_changed', { from: meta.plan, to: new_plan, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.json({ ok: true, from: meta.plan, to: new_plan, email_sent: !!(notify && meta.email) });
+    res.status(allOk ? 200 : 207).json({ ok: allOk, partial_failure: !allOk, error: allOk ? null : 'fleet_not_consistent', from: meta.plan, to: new_plan, failed_sectors: mutation.failed, read_back_failed: readBack.failed, verification_failed: mismatched, retried_sectors: mutation.retried, entitlements_by_sector: readBack.results, sector_count: Object.keys(SECTORS).length, email_sent: !!(allOk && notify && meta.email) });
   } catch (err) { console.error('[admin/change-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/set-product-plan — fine-grained per-product tier grant ────────
+// Sibling of /admin/change-plan that moves ONE product's tier (ParaSign OR
+// ParaSend) WITHOUT bumping the coarse unified plan or the other product.
+// Proxies to the relay's /v2/admin/keys/set-product-plan (same X-Internal-Auth
+// path as change-plan via callRelay), then reloads users fleet-wide so the
+// entitlement is observable at once. An unknown product or a tier not on that
+// product's ladder is rejected 400. Optional notify uses the per-product mail
+// (productPlanChangeEmail), which carries no billing note at all.
+api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
+  // downgrade: the relay moves a running higher term down to this tier only
+  // when asked, and then keeps its end date (relay.js set-product-plan). The
+  // panel asks the operator first; nothing else sends it.
+  const { key, product, tier, notify = false, downgrade = false } = req.body || {};
+  const LADDERS = { parasign: ['free', 'pro', 'business', 'enterprise'], parasend: ['community', 'pro', 'enterprise'] };
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (!LADDERS[product]) return res.status(400).json({ error: 'invalid_product', valid: Object.keys(LADDERS) });
+  if (!LADDERS[product].includes(tier)) return res.status(400).json({ error: 'invalid_tier', valid: LADDERS[product] });
+  if (!await checkAdminRl('set_product_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    const mutation = await mutatePlanFleet('/v2/admin/keys/set-product-plan', { key, product, tier, ...(downgrade === true ? { downgrade: true } : {}) });
+    // Every sector said no for the same reason: a grant never lowers a running
+    // higher plan (relay.js setProductPlan). Nothing moved anywhere, so the
+    // fleet is consistent and this is a refusal, not a partial failure. The
+    // floor tier is a revoke and is never refused this way.
+    const sectorCount = Object.keys(SECTORS).length;
+    if (mutation.failed.length === sectorCount && mutation.failed.every(f => f.status === 409 && f.error === 'lower_than_running')) {
+      return res.status(409).json({ ok: false, error: 'lower_than_running', message: mutation.failed[0].message, key, product, tier, failed_sectors: mutation.failed, sector_count: sectorCount });
+    }
+    await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
+    const readBack = await readEntitlementsFleet(meta.account_id);
+    const mismatched = verifyEntitlementsFleet(readBack, { [product]: tier });
+    const allOk = mutation.failed.length === 0 && readBack.failed.length === 0 && mismatched.length === 0;
+    const productName = product === 'parasign' ? 'ParaSign' : 'ParaSend';
+    const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+    if (allOk && notify && meta.email) {
+      emailTemplates.sendEmail(meta.email, emailTemplates.productPlanChangeEmail({ productName, tierName })).catch(e => console.error('[admin/set-product-plan] email:', e.message));
+    }
+    try { await logAuditEvent(key, 'admin_product_plan_changed', { product, tier, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.status(allOk ? 200 : 207).json({ ok: allOk, partial_failure: !allOk, error: allOk ? null : 'fleet_not_consistent', key, product, tier, failed_sectors: mutation.failed, read_back_failed: readBack.failed, verification_failed: mismatched, retried_sectors: mutation.retried, entitlements_by_sector: readBack.results, sector_count: Object.keys(SECTORS).length, email_sent: !!(allOk && notify && meta.email) });
+  } catch (err) { console.error('[admin/set-product-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/set-parasign - grant/revoke the ParaSign /v1 API entitlement ──
+// Admin override for the `parasign` scope, alongside the automatic grant on
+// payment. Fans the flag out to every sector (like disable-key) so the grant is
+// fleet-consistent, then reloads users so the change is observable at once.
+api.post('/admin/set-parasign', authMiddleware, async (req, res) => {/*MARK:parasign_routes*/
+  const { key, enabled } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled_required', message: 'Body must include enabled: true|false' });
+  if (!await checkAdminRl('set_parasign', 'admin', 30)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const results = await eachSector(Object.keys(SECTORS), async s =>
+      relayFetch(s, '/v2/admin/keys/set-parasign', 'POST', { key, enabled }, false, ADMIN_TOKEN, true));
+    const anyOk = Object.values(results).some(r => r && r.status === 200);
+    if (!anyOk) return res.status(502).json({ error: 'relay_error', results });
+    await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
+    try { await logAuditEvent(key, enabled ? 'admin_parasign_enabled' : 'admin_parasign_disabled', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, key, parasign: enabled });
+  } catch (err) { console.error('[admin/set-parasign]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/send-parasign-onboarding - email the ParaSign API how-to (NL) ──
+// Reuses the existing Resend send layer (emailTemplates.sendEmail). The mail
+// carries the MASKED key + a link to /docs; the full key is never put in mail
+// (same posture as welcomeEmail). ?preview=1 returns the rendered template.
+api.post('/admin/send-parasign-onboarding', authMiddleware, async (req, res) => {
+  const { key } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    if (!meta.email) return res.status(422).json({ error: 'no_email', message: 'No email on record for this key' });
+    const tpl = emailTemplates.parasignOnboardingEmail({ apiKey: key, plan: meta.plan, label: meta.label, enabled: meta.parasign });
+    if (req.query.preview === '1') return res.json({ ...tpl, recipient: meta.email });
+    if (!await checkAdminRl('parasign_onboard', key, 10)) return res.status(429).json({ error: 'rate_limited' });
+    await emailTemplates.sendEmail(meta.email, tpl);
+    try { await logAuditEvent(key, 'admin_parasign_onboarding_sent', { email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, email: meta.email });
+  } catch (err) { console.error('[admin/send-parasign-onboarding]', err.message); res.status(500).json({ error: 'send_failed', message: err.message }); }
 });
 
 // ── POST /admin/revoke-sessions ───────────────────────────────────────────────
@@ -2227,11 +4418,7 @@ api.post('/admin/revoke-sessions', authMiddleware, async (req, res) => {
   const { key } = req.body || {};
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   try {
-    let count = 0;
-    for await (const rkey of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 100 })) {
-      const raw = await redis().get(rkey).catch(() => null);
-      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) { await redis().del(rkey); count++; } } catch {} }
-    }
+    const count = await userSessions.revokeAll(redis(), key, { scan: scanSessions });
     try { await logAuditEvent(key, 'admin_sessions_revoked', { count, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.json({ ok: true, revoked: count });
   } catch (err) { console.error('[admin/revoke-sessions]', err.message); res.status(500).json({ error: 'internal' }); }
@@ -2263,11 +4450,14 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
   try {
     const meta = await getAdminKeyMeta(key);
     await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
+    // Erase the person, not just the key. Redis was already cleared below, but
+    // users.json on every sector kept the email address. Audit finding 5 of
+    // 2026-07-21. Errors are swallowed like the revoke above: a sector that is
+    // briefly unreachable must not leave the deletion half done and unretryable,
+    // and the call is idempotent so a retry is free.
+    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/erase', 'POST', { key }, false, ADMIN_TOKEN, true).catch(() => {}));
     await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
-    for await (const rkey of redis().scanIterator({ MATCH: `paramant:user:session:*`, COUNT: 100 })) {
-      const raw = await redis().get(rkey).catch(() => null);
-      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) await redis().del(rkey); } catch {} }
-    }
+    await userSessions.revokeAll(redis(), key, { scan: scanSessions });
     for (const pattern of [`paramant:user:meta:${key}`, `paramant:user:totp:${key}`, `paramant:user:totp_active:${key}`, `paramant:user:billing:${key}`]) {
       await redis().del(pattern).catch(() => {});
     }
@@ -2287,7 +4477,7 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   try {
     const [keysRes, metaRaw, billingRaw, auditEvents] = await Promise.all([
-      relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN),
+      relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN),
       redis().get(`paramant:user:meta:${key}`).catch(() => null),
       redis().get(`paramant:user:billing:${key}`).catch(() => null),
       getAuditEvents(key, { limit: 20 }),
@@ -2296,11 +4486,7 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
     if (!k) return res.status(404).json({ error: 'not_found' });
     let meta = {}; try { if (metaRaw) meta = JSON.parse(metaRaw); } catch {}
     let billing = null; try { if (billingRaw) billing = JSON.parse(billingRaw); } catch {}
-    let sessionCount = 0;
-    for await (const rkey of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 100 })) {
-      const raw = await redis().get(rkey).catch(() => null);
-      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) sessionCount++; } catch {} }
-    }
+    const sessionCount = (await userSessions.list(redis(), key, scanSessions)).sessions.length;
     const [totpActive, totpSecret] = await Promise.all([
       redis().get(`paramant:user:totp_active:${key}`).catch(() => null),
       redis().get(`paramant:user:totp:${key}`).catch(() => null),
@@ -2315,13 +4501,22 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
       email: meta.email || k.email || null,
       label: k.label || null,
       plan: k.plan || 'community',
+      // Per-product tiers (relay fills these, stored or derived) so the detail
+      // view shows the ParaSign/ParaSend truth, not just the unified plan.
+      plan_parasign: k.plan_parasign || null,
+      plan_parasend: k.plan_parasend || null,
+      parasign: k.parasign === true,
       sectors: k.sectors || [],
       active: k.active !== false,
       revoked_at: k.revoked_at || null,
       created: meta.created_at || k.created || null,
       totp_status,
       active_sessions: sessionCount,
-      billing: billing || { plan: k.plan || 'community', stub: true },
+      // No billing record in redis means this account never went through a
+      // payment, so the fallback says the plan and nothing else. The old
+      // `stub: true` on that fallback claimed the billing system was a stub,
+      // which it has not been since Mollie went live, and nothing read it.
+      billing: billing || { plan: k.plan || 'community' },
       audit_events: auditEvents,
     });
   } catch (err) { console.error('[admin/user-details]', err.message); res.status(500).json({ error: 'internal' }); }
@@ -2341,9 +4536,12 @@ api.post('/admin/preview-email', authMiddleware, async (req, res) => {
     let tpl;
     const fakeToken = 'preview' + crypto.randomBytes(8).toString('hex');
     if (type === 'welcome') tpl = emailTemplates.welcomeEmail({ apiKey: key || 'pgp_preview00000000', plan: meta.plan, label: meta.label, sectors: meta.sectors });
-    else if (type === 'setup') tpl = emailTemplates.setupEmail({ token: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0', isReset: options.isReset || false });
+    else if (type === 'setup') tpl = emailTemplates.setupEmail({ token: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0', isReset: options.isReset || false, validFor: setupTokenValidFor() });
     else if (type === 'reset-confirm') tpl = emailTemplates.resetConfirmationEmail({ confirmToken: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0' });
-    else if (type === 'billing') { const planName = (options.plan || meta.plan || 'pro'); tpl = emailTemplates.billingConfirmationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), period: 'monthly', amountStr: '€9/mo', stub: true }); }
+    // Previewed as the admin-set plan, because that is the only shape this mail
+    // is ever sent in: /admin/change-plan is its one live caller. A preview
+    // showing "Monthly, EUR 9/mo" showed a mail nobody receives.
+    else if (type === 'billing') { const planName = (options.plan || meta.plan || 'pro'); tpl = emailTemplates.billingConfirmationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), period: 'admin', amountStr: 'admin-provisioned', noPayment: true }); }
     else if (type === 'cancellation') { const planName = meta.plan || 'pro'; tpl = emailTemplates.billingCancellationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), cancelDate: new Date(Date.now()+30*86_400_000).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) }); }
     else if (type === 'deletion') tpl = emailTemplates.accountDeletionEmail({ email, deletedAt: Date.now(), reason: options.reason || 'preview' });
     res.json({ ...tpl, recipient: email });
@@ -2387,17 +4585,11 @@ async function verifyCliTotp(totp) {
 // Curated environment for handler scripts. We do NOT inherit the full process
 // env: only PATH/HOME plus paramant-relevant variables, and computed relay
 // locators. This bounds what `config show` can ever surface.
-function cliChildEnv() {
-  const env = { PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME || '/tmp' };
-  for (const [k, v] of Object.entries(process.env)) {
-    if (/^(PORT|BASE_PATH|NODE_ENV|RELAY_|SECTOR|ADMIN_|PARAMANT_|NATS_|REDIS_|RESEND_|COMPOSE_|BACKUP_)/.test(k)) {
-      env[k] = v;
-    }
-  }
-  env.RELAY_URL = SECTORS.health;
-  env.RELAY_SECTORS = Object.entries(SECTORS).map(([n, u]) => `${n}=${u}`).join(',');
-  env.ADMIN_TOKEN = ADMIN_TOKEN;
-  return env;
+function cliChildEnv(cmd) {
+  // Delegates to the pure, unit-tested builder (lib/cli-commands.buildChildEnv).
+  // Least-privilege: ADMIN_TOKEN is added only for cmd.needsAdminToken; the
+  // REDIS_/RESEND_/PARAMANT_ secrets are never broadcast to handler scripts.
+  return cliCommands.buildChildEnv(cmd, process.env, SECTORS, ADMIN_TOKEN);
 }
 
 // GET /api/admin/cli/commands -- whitelist metadata for completion/help.
@@ -2479,7 +4671,7 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   try {
     child = spawn(handlerPath, argv, {
       cwd: cliCommands.SCRIPTS_DIR,
-      env: cliChildEnv(),
+      env: cliChildEnv(cmd),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
@@ -2501,7 +4693,10 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   // 10-11. Client cancel (Ctrl+C closes the stream) -> kill the child.
   let finished = false;
   req.on('close', () => {
-    if (!finished) { try { child.kill('SIGKILL'); } catch {} }
+    if (finished) return;
+    finished = true;            // mark done so the close/error handlers no-op
+    clearTimeout(killer);       // the watchdog is moot once the client is gone
+    try { child.kill('SIGKILL'); } catch {}
   });
 
   child.on('error', err => {
@@ -2526,9 +4721,45 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   });
 });
 
+// ── CSRF: a cookie-authenticated write must come from our own page ──────────
+// Finding 19. SameSite=Lax is the whole defence today and it works on the
+// registrable domain, so every sector subdomain is same-site with paramant.app:
+// one HTML injection on one of them yields a page that may POST with the user's
+// session cookie, and twelve state-changing routes need no request body at all.
+// The decision table and the reasoning live in admin/lib/same-origin.js.
+//
+// Mounted here, in front of the whole /api router, so it cannot be forgotten on
+// the next route. Refusals are logged with the origin, because the first thing
+// anybody will ask when a client breaks is which origin it sent.
+const sameOrigin = require('./lib/same-origin');
+const CSRF_ALLOWED_ORIGINS = sameOrigin.buildAllowList(SITE_URL, process.env.CSRF_EXTRA_ORIGINS);
+const CSRF_ALLOW_LOCALHOST = process.env.NODE_ENV !== 'production';
+function requireSameOrigin(req, res, next) {
+  const v = sameOrigin.verdict({
+    method: req.method,
+    // req.path inside a mounted router is the path BELOW the mount, so this is
+    // '/user/logout' and not '/api/user/logout'. EXEMPT_PATHS is written that way.
+    path: req.path,
+    hasCookie: !!parseCookies(req).paramant_user_session,
+    origin: req.headers.origin,
+    secFetchSite: req.headers['sec-fetch-site'],
+    allow: CSRF_ALLOWED_ORIGINS,
+    allowLocalhost: CSRF_ALLOW_LOCALHOST,
+  });
+  if (v.ok) return next();
+  console.warn('[csrf] refused', req.method, req.originalUrl, v.reason);
+  return res.status(403).json({ error: 'csrf_origin', message: 'This request did not come from paramant.app.' });
+}
+app.use(`${BASE_PATH}/api`, requireSameOrigin);
+
 app.use(`${BASE_PATH}/api`, api);
 // /cli -- web debug terminal page (served before the SPA wildcard fallback).
 app.get(`${BASE_PATH}/cli`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'cli.html')));
+// /stand -- de standpagina, ook voor de SPA-wildcard langs. De pagina zelf is
+// een leeg geraamte: alles wat er te zien is komt van GET /api/admin/stand, en
+// dat zit achter authMiddleware. Er staat dus geen enkel gegeven in dit
+// bestand dat een buitenstaander niet mag zien.
+app.get(`${BASE_PATH}/stand`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'stand.html')));
 // Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
 app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
@@ -2537,6 +4768,21 @@ app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'p
   app.use((err, req, res, next) => {
     console.error('[unhandled error]', err.message);
     if (res.headersSent) return next(err);
+    if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'payload_too_large' });
+    // Redis unreachable is an availability answer, not a bug. Express 5 forwards
+    // a rejected async handler here by itself, so with every redis command now
+    // bounded (lib/redis-deadline) this one branch turns EVERY redis-backed
+    // route in this file into an honest 503 inside the deadline, instead of a
+    // request that waits for a store that is never going to answer.
+    // Name the refusal in the log. "redis_unavailable" alone leaves the operator
+    // guessing between a full disk (MISCONF), a hit ceiling (OOM) and a wrong
+    // ACL (NOPERM); the word Redis itself used points straight at the fix.
+    const refusal = redisRefusal(err);
+    if (refusal) console.error('[redis refused]', refusal, err.message);
+    if (isRedisOutage(err)) {
+      res.setHeader('Retry-After', '5');
+      return res.status(503).json({ error: 'redis_unavailable' });
+    }
     res.status(500).json({ error: 'internal_error' });
   });
 

@@ -17,7 +17,9 @@ YELLOW='\033[0;33m'; CYAN='\033[0;36m'; DIM='\033[2m'; RESET='\033[0m'
 
 SCAN_DATE=$(date '+%Y-%m-%d')
 REPORT_FILE="supply-chain-${SCAN_DATE}.json"
-VENDORS_FILE=$(mktemp /tmp/sc-vendors-XXXXXX.tsv)
+PTMP_DIR="${PARAMANT_TMPDIR:-/run/paramant-tmp}"
+{ mkdir -p "$PTMP_DIR" && chmod 700 "$PTMP_DIR"; } 2>/dev/null || PTMP_DIR="$(mktemp -d)"
+VENDORS_FILE=$(mktemp "$PTMP_DIR/sc-vendors-XXXXXX.tsv")
 trap 'rm -f "$VENDORS_FILE"' EXIT
 
 MODE=""

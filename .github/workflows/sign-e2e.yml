@@ -1,0 +1,67 @@
+name: sign-e2e
+
+# Functional test of the ParaSign signing subsystem in real Chromium with a
+# WebAuthn virtual authenticator (tests/sign-full.test.mjs). Self-contained: it
+# serves frontend/ and stubs /api, so no backend/Redis is needed.
+#
+# No longer path-gated: this is a required status check, and a skipped check
+# never reports, so the pull request would wait on it forever.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sign-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install deps (browsers installed separately)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run signing functional suite
+        run: node tests/sign-full.test.mjs
+
+      # Every other root suite that drives a browser. They import playwright, so
+      # the no-install unit job could never run them, and they were on no other
+      # workflow either: cosign appearance and delivery, the developer and user
+      # dashboards, the navigation shell, multi-verify and invite delivery had
+      # no CI at all. Selected by import, so a new browser suite is picked up
+      # here the day it is written. product-heartbeat has its own workflow.
+      #
+      # Selected by import means anything in tests/ that drives a browser lands
+      # here, gate or not. app-shots was a screenshot generator that asserted
+      # nothing, and on 2026-09-03 its `page.screenshot: Timeout 30000ms
+      # exceeded` took this workflow red on main and blocked the deploy, which
+      # needs sign-e2e green in phase 0a. It now lives in scripts/app-shots.mjs
+      # with the other generators, so this line did not have to grow an
+      # exception. The rule: tests/ is for files that assert something, and a
+      # file that only produces artefacts goes in scripts/, browser or not.
+      # Same move as the heartbeat canaries in test.yml. See tests/README.md.
+      #
+      # Selected by scripts/browser-suites.mjs, which walks the imports instead
+      # of grepping the first lines of the test file. A suite that reaches
+      # playwright through a helper is a browser suite too, and until 2026-09-04
+      # it was in neither half: tests/ui-elements-contrast.test.mjs got its
+      # browser from scripts/ui-contrast-sweep.mjs, so the grep left it out of
+      # this step and handed it to the job that installs no Chromium, where it
+      # hung the run rather than failing it.
+      #
+      # --browser-no-stack, not --browser. A suite that also BOOTS a relay needs
+      # this job's opposite: the relay's node_modules, the @paramant/core
+      # binding, the admin dependencies and a redis server, none of which this
+      # workflow installs and none of which it should. On 2026-09-05
+      # koper-hele-weg landed here on the strength of importing playwright and
+      # failed nine times over with "Cannot find module admin/node_modules/redis".
+      # It runs in relay-crypto-tests, the job that builds a backend. The two
+      # lists partition the browser suites, so nothing falls between them.
+      - name: Browser suites
+        run: node --test $(node scripts/browser-suites.mjs --browser-no-stack | grep -vE 'sign-full|product-heartbeat')

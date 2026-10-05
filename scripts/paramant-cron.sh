@@ -77,15 +77,22 @@ After=network.target
 Type=oneshot
 User=root
 ExecStart=/bin/bash -c '\
+  umask 077; \
   TS=$(date +%%Y%%m%%d-%%H%%M%%S); \
   DEST=/var/lib/paramant-backup/${TS}; \
-  mkdir -p "$DEST"; \
+  mkdir -p /var/lib/paramant-backup "$DEST"; \
+  chmod 700 /var/lib/paramant-backup "$DEST"; \
+  chown root:paramant /var/lib/paramant-backup "$DEST" 2>/dev/null || true; \
   for d in /var/lib/paramant-relay /var/lib/paramant-relay-*; do \
     [ -d "$d" ] || continue; \
     name=$(basename "$d"); \
     mkdir -p "$DEST/$name"; \
+    chmod 700 "$DEST/$name"; \
     cp "$d"/users.json "$DEST/$name/" 2>/dev/null || true; \
     cp "$d"/ct-log     "$DEST/$name/" 2>/dev/null || true; \
+    cp "$d"/keys.json  "$DEST/$name/" 2>/dev/null || true; \
+    chmod 600 "$DEST/$name"/* 2>/dev/null || true; \
+    chown root:paramant "$DEST/$name"/* 2>/dev/null || true; \
   done; \
   echo "Backup complete: $DEST"; \
   find /var/lib/paramant-backup -maxdepth 1 -type d -mtime +30 -exec rm -rf {} + 2>/dev/null || true'

@@ -1,20 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>License — PARAMANT</title>
-<meta name="description" content="PARAMANT Ghost Pipe Protocol — Business Source License 1.1. Free for personal use, MIT on 2030-01-01.">
-<meta property="og:title" content="License — PARAMANT">
-<meta property="og:description" content="PARAMANT Ghost Pipe Protocol — Business Source License 1.1. Free for personal use, MIT on 2030-01-01.">
+<title>Licentie: Business Source License 1.1 · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="De broncode van Paramant is openbaar onder de Business Source License 1.1. Op 2029-01-01 gaat de licentie over naar de Apache License 2.0.">
+<meta property="og:title" content="Licentie: Business Source License 1.1 · Paramant">
+<meta property="og:description" content="De broncode van Paramant is openbaar onder de Business Source License 1.1. Op 2029-01-01 gaat de licentie over naar de Apache License 2.0.">
 <meta property="og:url" content="https://paramant.app/license">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="License — PARAMANT">
-<meta name="twitter:description" content="PARAMANT Ghost Pipe Protocol — Business Source License 1.1. Free for personal use, MIT on 2030-01-01.">
+<meta name="twitter:title" content="Licentie: Business Source License 1.1 · Paramant">
+<meta name="twitter:description" content="De broncode van Paramant is openbaar onder de Business Source License 1.1. Op 2029-01-01 gaat de licentie over naar de Apache License 2.0.">
 <link rel="canonical" href="https://paramant.app/license">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/license">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/license">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/license">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -22,8 +29,9 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 main{max-width:760px;margin:64px auto;padding:0 24px 80px}
@@ -47,9 +55,9 @@ footer a{color:var(--cobalt)}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -60,26 +68,26 @@ footer a{color:var(--cobalt)}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -88,213 +96,161 @@ footer a{color:var(--cobalt)}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/license#webpage",
+      "url": "https://paramant.app/license",
+      "name": "Licentie: Business Source License 1.1 · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "De broncode van Paramant is openbaar onder de Business Source License 1.1. Op 2029-01-01 gaat de licentie over naar de Apache License 2.0."
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/license" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/license" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/license" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/license" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
 <main id="main-content">
-  <h1>License</h1>
-  <p class="sub">PARAMANT Ghost Pipe Protocol — Business Source License 1.1</p>
+  <h1>Licentie</h1>
+  <p class="lang-prevails">Bij verschil tussen de Nederlandse en de Engelse tekst geldt de Engelse versie, de originele tekst van de Business Source License 1.1. De Engelse tekst staat op <a href="/en/license" hreflang="en" lang="en">/en/license</a>.</p>
+  <p class="sub">PARAMANT Ghost Pipe Protocol: Business Source License 1.1</p>
 
   <div class="highlight">
-    <p>&#10003; Free to use for personal and non-commercial purposes.<br>
-    Commercial use requires a written license agreement.<br>
+    <p>&#10003; Gratis voor niet-productiegebruik, en gratis voor productiegebruik binnen de Additional Use Grant: tot 5 actieve API-sleutels per relay-instantie en één zelf gehoste installatie, commercieel gebruik inbegrepen.<br>
+    Voor gebruik buiten die grenzen is een schriftelijke commerciële licentieovereenkomst nodig.<br>
     Contact: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
   </div>
 
-  <h2>Summary</h2>
-  <p>The PARAMANT source code is publicly visible for transparency and trust. You may inspect, audit, and use the code for non-commercial purposes. Commercial use — including offering the software as a service, integrating it into a paid product, or using it in a business context — requires a written commercial license agreement with the licensor.</p>
-  <p>On 1 January 2030 the entire codebase will be released under the MIT License.</p>
+  <h2>Samenvatting</h2>
+  <p>De broncode van PARAMANT is openbaar in te zien, voor transparantie en vertrouwen. U mag de code gratis inzien, controleren, wijzigen, verder verspreiden en gebruiken voor niet-productiedoeleinden. Productiegebruik is ook gratis, binnen de hieronder geciteerde Additional Use Grant: maximaal 5 (vijf) actieve API-sleutels per relay-instantie en één zelf gehoste installatie, commercieel gebruik inbegrepen. Voor gebruik buiten die grenzen, zoals een onbeperkt aantal API-sleutels, meerdere sectoren, clustering voor hoge beschikbaarheid of commerciële herdistributie, is een schriftelijke commerciële licentieovereenkomst met de licentiegever nodig.</p>
+  <p>Op 1 januari 2029 wordt de volledige codebase vrijgegeven onder de Apache License 2.0.</p>
 
-  <h2>Full license text</h2>
+  <h2>Volledige licentietekst</h2>
+  <p>Hieronder staat de licentietekst, letterlijk en in het Engels.</p>
+  <!-- LICENCE-VERBATIM-START
+       Everything between these two markers is the LICENSE file, whole and word
+       for word, em-dashes and all. Block 23 of tests/site-claims.test.mjs
+       compares the entire box against the file with whitespace normalised, on
+       top of the field-by-field pins, so a reworded copy, a dropped paragraph
+       or a helpful extra line is a failing test and not a style choice.
+       scripts/check-commit-style.sh exempts this region from the em-dash rule
+       for the same reason. Do not edit the text here: edit LICENSE, then copy
+       the whole file in. -->
   <div class="license-box">Business Source License 1.1
 
-Licensor:             Mick Beer
-Licensed Work:        PARAMANT Ghost Pipe Protocol, Relay and Dashboard
-                      © 2026 Mick Beer. All Rights Reserved.
-Change Date:          2030-01-01
-Change License:       MIT License
+Licensor:       PARAMANT / Mick Beer
+Licensed Work:  PARAMANT Ghost Pipe
+Change Date:    2029-01-01
+Change License: Apache License 2.0
+
+Additional Use Grant
+
+You may make production use of the Licensed Work, provided such use does
+not exceed the following limits:
+
+  - Maximum 5 (five) active API keys per relay instance
+  - A single self-hosted deployment (one relay stack per organization)
+
+Use beyond these limits — including unlimited API keys, multiple sectors,
+high-availability clustering, or commercial redistribution — requires a
+commercial license. See https://paramant.app/pricing
 
 Terms
 
 The Licensor hereby grants you the right to copy, modify, create derivative
 works, redistribute, and make non-production use of the Licensed Work.
 
-The Licensor may make an Additional Use Grant, above, permitting limited
-production use.
+The production use rights granted in the Additional Use Grant above are
+limited to the conditions stated therein.
 
 Effective on the Change Date, or the fourth anniversary of the first publicly
 available distribution of a specific version of the Licensed Work under this
@@ -303,7 +259,7 @@ the terms of the Change License, and the rights granted in the paragraph
 above terminate.
 
 If your use of the Licensed Work does not comply with the requirements
-currently in effect as described in this file, you must purchase a
+currently in effect as described in this License, you must purchase a
 commercial license from the Licensor, its affiliated entities, or authorized
 resellers, or you must refrain from using the Licensed Work.
 
@@ -319,76 +275,66 @@ EXPRESS OR IMPLIED, INCLUDING (WITHOUT LIMITATION) WARRANTIES OF
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND
 TITLE.
 
-Additional Use Grant:
-  Non-commercial, personal and research use is permitted free of charge.
-  Commercial use — including offering the Licensed Work or any derivative
-  thereof as a service, integrating it into a paid product, or using it
-  in a business context — requires a written commercial license agreement
-  with the Licensor.
+MariaDB hereby grants you permission to use this License's text to license
+your works, and to refer to it using the trademark "Business Source License",
+as long as you comply with the Covenants of Licensor below.
 
-Contact: privacy@paramant.app
-Website: https://paramant.app</div>
+Covenants of Licensor
 
-  <h2>Questions</h2>
-  <p>For licensing questions or commercial agreements: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+In consideration of the right to use this License's text and the "Business
+Source License" name and trademark, Licensor covenants to MariaDB, and to
+all other recipients of the licensed work to be provided by Licensor:
+
+1. To specify as the Change License the GPL Version 2.0 or any later version,
+   or a license that is compatible with GPL Version 2.0 or a later version,
+   where "compatible" means that software provided under the Change License can
+   be included in a program with software provided under GPL Version 2.0 or a
+   later version.
+
+2. To either: (a) specify an additional grant of rights to use that does not
+   impose any additional restriction on the right granted in this License, as
+   the Additional Use Grant; or (b) insert the text "None".
+
+3. To specify a Change Date.
+
+4. Not to modify this License in any other way.</div>
+  <!-- LICENCE-VERBATIM-END -->
+
+  <h2>Vragen</h2>
+  <p>Voor vragen over de licentie of commerciële overeenkomsten: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
 </main>
 
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

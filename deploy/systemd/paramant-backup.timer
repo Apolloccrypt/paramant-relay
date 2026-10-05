@@ -1,0 +1,11 @@
+# Daily at 03:30 UTC. Persistent=true runs a missed backup at the next boot.
+[Unit]
+Description=Daily Paramant full-state backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+Unit=paramant-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,16 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Set up authenticator — Paramant</title>
+<title>Uw account instellen · Paramant</title>
+<link rel="canonical" href="https://paramant.app/auth/setup">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/auth/setup">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/setup">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/setup">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
-<script src="/js/qrcode.min.js"></script>
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<script src="/js/qrcode.min.js?v=1"></script>
+<style>
+/* Een auth-scherm is op een telefoon één taak. Kop, één zin en de knop moeten
+   samen in de eerste 844px bij 390px breed passen; met de standaard
+   sectiepadding stond de knop eronder. Alleen op deze pagina, alleen bestaande
+   tokens, design-system.css blijft ongemoeid. */
+@media (max-width: 600px) {
+  .section-lg { padding-top: var(--space-5); padding-bottom: var(--space-3); }
+  .section { padding: var(--space-5) 0; border-top: none; }
+}
+</style>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=10">
+<script src="/js/theme.js?v=6"></script>
+<!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
+     Blocking and above every other script, so it exists before any renderer runs. -->
+<script src="/js/format-date.js?v=2"></script>
 </head>
 <body>
 
@@ -18,316 +39,209 @@
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/setup" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/setup" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/setup" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/setup" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
 <main class="container-lg">
 
 <section class="section-lg">
-  <div class="eyebrow"><span class="bar"></span>account setup</div>
-  <h1>Scan the <em>QR code</em>.</h1>
-  <p class="lede">
-    One-time setup. Your authenticator app will generate 6-digit codes every 30 seconds.
+  <div class="eyebrow"><span class="bar"></span>stap 3 van 5</div>
+  <h1>Kies hoe u <em>inlogt</em>.</h1>
+  <p class="lede mt-3">
+    Kies er nu één en voeg de andere later toe. Daarna bewaart u uw back-upcodes en is het account klaar.
   </p>
 </section>
 
-<!-- Start state (scanner-safe: no POST until user clicks) -->
+<!-- Step 3: pick a sign-in method. Passkey is recommended; the authenticator
+     route stays scanner-safe (no POST until the user clicks "instead"). -->
 <section id="state-loading" class="section">
-  <div class="marker">
-    <div class="num">&#8594;</div>
-    <h2>Ready to set up.</h2>
-    <div class="tag">starts<br>here</div>
-  </div>
-  <p class="lede" style="margin-top:16px">
-    Click the button below to generate your QR code and begin setup.
-  </p>
-  <div class="cta-row" style="margin-top:24px">
-    <button type="button" class="btn btn-primary" id="start-btn">Start setup</button>
+  <div class="card" style="border-left:3px solid var(--ochre)">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Passkey &middot; Aanbevolen</div>
+    <p style="margin:0 0 16px">
+      Een passkey staat op dit apparaat en nergens anders. U opent hem met uw
+      vingerafdruk, uw gezicht of de pincode van uw apparaat. U hoeft niets te
+      onthouden of te typen. Het beste als u vooral op één telefoon of laptop werkt.
+    </p>
+    <button type="button" class="btn btn-primary" id="passkey-register-btn">Passkey instellen</button>
+    <p id="passkey-status" class="small" aria-live="polite"></p>
   </div>
 
-  <div style="margin-top:28px">
-    <p class="small">Prefer a passkey? Use Face ID, Touch ID, Windows Hello, or a
-       security key &mdash; no authenticator app, and nothing to type at login.</p>
-    <button type="button" class="btn btn-secondary" id="passkey-register-btn">Set up a passkey instead</button>
-    <p id="passkey-status" class="small" aria-live="polite"></p>
+  <div class="card mt-3">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Authenticator-app</div>
+    <p style="margin:0 0 16px">
+      Een app op uw telefoon toont elke 30 seconden een nieuwe code van 6 cijfers.
+      Die typt u om in te loggen. Beter als u op meerdere computers werkt, of als
+      collega's één werkplek delen.
+    </p>
+    <button type="button" class="btn btn-secondary" id="start-btn">Liever een app instellen</button>
   </div>
 </section>
 
 <!-- Connecting state -->
 <section id="state-connecting" class="section hidden">
-  <p class="lede">Generating your QR code&#8230;</p>
+  <p class="lede">Uw QR-code wordt gemaakt&#8230;</p>
 </section>
 
 <!-- Expired/invalid state -->
 <section id="state-invalid" class="section hidden">
   <div class="marker">
     <div class="num">&ndash;</div>
-    <h2>This link is no longer valid.</h2>
-    <div class="tag">token expired<br>or already used</div>
+    <h2>Deze link werkt niet meer.</h2>
+    <div class="tag">verlopen<br>of al gebruikt</div>
   </div>
 
   <p style="margin-top:16px">
-    The setup link has expired (14-day limit), been used already, or is invalid.
+    Een instellink werkt 14 dagen en één keer. Deze is verlopen, al gebruikt,
+    of niet helemaal gekopieerd. Begin opnieuw, dan sturen wij een nieuwe link
+    naar hetzelfde e-mailadres.
   </p>
 
   <div class="cta-row" style="margin-top:24px">
-    <a href="/signup" class="btn btn-primary">Start over</a>
+    <a href="/signup" class="btn btn-primary">Opnieuw beginnen</a>
   </div>
 </section>
 
 <!-- Active setup -->
 <section id="state-active" class="section hidden">
-<div class="app-warning" role="alert">
-  <div class="app-warning__title">Google Authenticator, Microsoft Authenticator, and iCloud Keychain will NOT work.</div>
-  <p class="app-warning__body">Paramant uses SHA-256 TOTP. These apps only support SHA-1. If you scan this QR with them, every code you enter will fail at login &mdash; even when the code looks correct.</p>
-  <div class="app-warning__grid">
-    <div class="app-warning__no">Google Authenticator</div>
-    <div class="app-warning__yes">Authy</div>
-    <div class="app-warning__no">Microsoft Authenticator</div>
-    <div class="app-warning__yes">1Password</div>
-    <div class="app-warning__no">iCloud Keychain</div>
-    <div class="app-warning__yes">Aegis (Android)</div>
-    <div></div>
-    <div class="app-warning__yes">Raivo (iOS)</div>
-    <div></div>
-    <div class="app-warning__yes">Bitwarden &middot; Ente Auth &middot; 2FAS</div>
-  </div>
-  <a class="app-warning__link" href="/help/authenticator-apps">Why we use SHA-256 &rarr;</a>
-</div>
-
+  <div class="eyebrow"><span class="bar"></span>stap 4 van 5</div>
   <div class="marker">
     <div class="num">01</div>
-    <h2>Scan with your authenticator.</h2>
-    <div class="tag">one-time<br>setup</div>
+    <h2>Voeg Paramant toe aan uw authenticator-app.</h2>
+    <div class="tag">scan of<br>typ de sleutel</div>
   </div>
 
   <div class="setup-grid">
     <div class="qr-card">
       <div id="qr-code"></div>
       <p class="qr-caption">
-        Point your authenticator app at this code.
+        Open uw authenticator-app, kies Account toevoegen en scan deze code.
       </p>
     </div>
 
     <div class="setup-info">
       <div class="info-row">
         <div class="info-label">Account</div>
-        <div class="info-value" id="setup-email">&mdash;</div>
+        <div class="info-value" id="setup-email">uw account</div>
       </div>
 
       <div class="info-row">
-        <div class="info-label">Algorithm</div>
-        <div class="info-value">SHA-256 &middot; 6 digits &middot; 30 seconds</div>
+        <div class="info-label">Algoritme</div>
+        <div class="info-value">SHA-256 &middot; 6 cijfers &middot; 30 seconden</div>
       </div>
 
       <div class="info-row">
-        <div class="info-label">Manual entry</div>
+        <div class="info-label">Scannen lukt niet?</div>
         <div class="info-value">
-          <code class="secret-display" id="secret-display">&mdash;</code>
-          <button type="button" class="btn btn-small btn-secondary" id="copy-secret">Copy</button>
+          <code class="secret-display" id="secret-display">uw sleutel</code>
+          <button type="button" class="btn btn-small btn-secondary" id="copy-secret">Kopiëren</button>
         </div>
         <p class="small mt-2">
-          Use this if scanning fails. Enter it manually in your authenticator app.
+          Typ deze sleutel dan met de hand in uw authenticator-app. Dat werkt precies zo.
         </p>
       </div>
     </div>
   </div>
+
+  <details class="mt-4" style="border:1px solid var(--ink-hair);border-radius:6px;padding:14px 18px">
+    <summary style="cursor:pointer;font-weight:600;color:var(--navy)">Welke apps werken?</summary>
+    <p class="small mt-2" style="margin-bottom:0">
+      Elke gewone authenticator-app werkt, ook Google Authenticator en Microsoft Authenticator.
+      Het sterkst is een SHA-256-app: Raivo of 2FAS (iPhone), Aegis (Android),
+      1Password, Bitwarden, Authy of Ente Auth. Elk van deze is een goede keuze.
+      <a href="/help/authenticator-apps">Meer over authenticator-apps</a>.
+    </p>
+  </details>
 </section>
 
 <!-- Verify -->
 <section id="state-verify" class="section hidden">
   <div class="marker">
     <div class="num">02</div>
-    <h2>Enter the current code.</h2>
-    <div class="tag">verify<br>setup works</div>
+    <h2>Vul de huidige code in.</h2>
+    <div class="tag">controleer<br>de koppeling</div>
   </div>
 
   <form id="verify-form" class="form-card">
-    <label for="verify-code">6-digit code from your authenticator</label>
+    <label for="verify-code">Code van 6 cijfers die uw app nu toont</label>
     <input type="text" id="verify-code" required inputmode="numeric"
            pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
            placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
 
     <button type="submit" class="btn btn-primary mt-3" id="verify-btn">
-      Confirm and activate account
+      Bevestigen en account activeren
     </button>
 
-    <div id="verify-error" class="error"></div>
+    <div id="verify-error" class="error" role="alert" aria-live="assertive"></div>
   </form>
 </section>
 
 <!-- Success + backup codes -->
 <section id="state-success" class="section hidden">
+  <div class="eyebrow"><span class="bar"></span>stap 5 van 5</div>
   <div class="marker">
-    <div class="num">03</div>
-    <h2>Save your backup codes.</h2>
-    <div class="tag">one-time<br>display</div>
+    <div class="num">02</div>
+    <h2>Bewaar uw back-upcodes.</h2>
+    <div class="tag">één keer<br>getoond</div>
   </div>
 
   <div class="warning-box">
-    <strong>Shown once. Save them now.</strong>
+    <strong>Eén keer getoond. Bewaar ze nu.</strong>
     <p>
-      Each code can be used exactly once to sign in without your authenticator. Save them in a password manager, print them, or store in a secure note.
+      Met elke code logt u één keer in als u uw telefoon of authenticator-app kwijt bent.
+      Wij maken ze aan en tonen ze alleen hier. Wij kunnen ze dus niet opnieuw tonen
+      of voor u terughalen. Bewaar ze ergens waar u ook zonder telefoon bij kunt.
     </p>
   </div>
 
   <div id="backup-codes" class="backup-grid"></div>
 
   <div class="cta-row mt-3">
-    <button type="button" class="btn btn-secondary" id="copy-codes">Copy all</button>
-    <button type="button" class="btn btn-secondary" id="download-codes">Download .txt</button>
-    <button type="button" class="btn btn-secondary" id="print-codes">Print</button>
+    <button type="button" class="btn btn-primary" id="download-codes">Mijn codes downloaden</button>
   </div>
+  <p class="small mt-2">
+    of <button type="button" id="copy-codes" style="background:none;border:none;color:var(--cobalt);font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">kopieer ze</button>
+    &middot; <button type="button" id="print-codes" style="background:none;border:none;color:var(--cobalt);font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">afdrukken</button>
+  </p>
 
   <div class="form-checkbox mt-4">
     <input type="checkbox" id="saved-confirm">
     <label for="saved-confirm">
-      I have saved my backup codes in a safe place.
+      Ik heb mijn codes bewaard op een plek waar ik ook zonder telefoon bij kan.
     </label>
   </div>
 
   <button type="button" class="btn btn-primary mt-3" id="finish-btn" disabled>
-    Continue to account
+    Instellen afronden
   </button>
 </section>
 
@@ -335,166 +249,60 @@
 <section id="state-passkey-success" class="section hidden">
   <div class="marker">
     <div class="num">&#10003;</div>
-    <h2>Passkey registered. Save your backup codes.</h2>
-    <div class="tag">one-time<br>display</div>
+    <h2>Passkey vastgelegd. Bewaar uw back-upcodes.</h2>
+    <div class="tag">één keer<br>getoond</div>
   </div>
 
   <div class="warning-box">
-    <strong>Shown once. Save them now.</strong>
-    <p>Each code signs you in once if you lose access to your passkey device.</p>
+    <strong>Eén keer getoond. Bewaar ze nu.</strong>
+    <p>Met elke code logt u één keer in als u het apparaat met uw passkey kwijt bent. Alleen nu worden ze getoond.</p>
   </div>
 
   <div id="passkey-backup-codes" class="backup-grid"></div>
 
   <div class="cta-row mt-3">
-    <button type="button" class="btn btn-secondary" id="passkey-copy-codes">Copy all</button>
-    <button type="button" class="btn btn-secondary" id="passkey-download-codes">Download .txt</button>
+    <button type="button" class="btn btn-secondary" id="passkey-copy-codes">Alles kopiëren</button>
+    <button type="button" class="btn btn-secondary" id="passkey-download-codes">Download als .txt</button>
   </div>
 
-  <button type="button" class="btn btn-primary mt-3" id="passkey-finish-btn">Continue to account</button>
+  <button type="button" class="btn btn-primary mt-3" id="passkey-finish-btn">Verder naar het dashboard</button>
 </section>
 
+<!-- Welcome: a finish line, not another task. Shown after the TOTP route's
+     "Finish setup". (The passkey route's Continue still lands on /dashboard via
+     passkey.js; aligning it to this screen is a small follow-up: a passkey.js
+     edit + a site-wide passkey.js ?v= bump.) -->
+<section id="state-welcome" class="section hidden">
+  <div class="eyebrow"><span class="bar"></span>klaar</div>
+  <h2>Alles staat klaar.</h2>
+  <p class="lede mt-3">Uw account is actief. Twee dingen die u nu kunt doen.</p>
+  <div class="grid2 mt-3">
+    <a href="/parashare" class="card" style="border-left:3px solid var(--ochre);text-decoration:none;display:block">
+      <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Een bestand versturen</div>
+      <p class="small" style="margin:0">Versleutel een bestand in uw browser en verstuur een link. Na de eerste keer openen wist de webapp het bestand. Dat geldt op elk plan.</p>
+    </a>
+    <a href="/sign" class="card" style="text-decoration:none;display:block">
+      <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Een document ondertekenen</div>
+      <p class="small" style="margin:0">Onderteken een pdf op dit apparaat. De privésleutel komt nooit op onze server.</p>
+    </a>
+  </div>
+  <p class="small mt-3">U komt hier altijd terug via uw <a href="/dashboard">dashboard</a>.</p>
+</section>
+
+<p class="small" style="color:var(--ink-dim);margin-top:24px">
+  Paramant is een product van <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+  Nederland. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+</p>
 </main>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script>
-(function() {
-  const token = window.location.pathname.split('/').pop();
-  let setupData = null;
-  let backupCodes = [];
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/auth-setup.js?v=5"></script>
+<script type="module" src="/js/passkey.js?v=7"></script>
 
-  function show(stateId) {
-    document.querySelectorAll('section[id^="state-"]').forEach(function(s) {
-      s.classList.add('hidden');
-    });
-    document.getElementById(stateId).classList.remove('hidden');
-  }
-
-  async function init() {
-    try {
-      const res = await fetch('/api/user/setup/' + encodeURIComponent(token), {
-        method: 'POST',
-      });
-
-      if (!res.ok) {
-        show('state-invalid');
-        return;
-      }
-
-      setupData = await res.json();
-      backupCodes = setupData.backup_codes;
-
-      new QRCode(document.getElementById('qr-code'), {
-        text: setupData.otpauth,
-        width: 240,
-        height: 240,
-        colorDark: '#0B3A6A',
-        colorLight: '#F8FAFC',
-        correctLevel: QRCode.CorrectLevel.M,
-      });
-
-      document.getElementById('setup-email').textContent = setupData.email;
-      document.getElementById('secret-display').textContent = setupData.secret;
-
-      show('state-active');
-
-      setTimeout(function() {
-        document.getElementById('state-verify').classList.remove('hidden');
-        document.getElementById('verify-code').focus();
-      }, 1500);
-    } catch (err) {
-      show('state-invalid');
-    }
-  }
-
-  document.getElementById('copy-secret').addEventListener('click', function() {
-    if (setupData) navigator.clipboard.writeText(setupData.secret);
-  });
-
-  document.getElementById('verify-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const code = document.getElementById('verify-code').value.trim();
-    const errorDiv = document.getElementById('verify-error');
-    errorDiv.classList.remove('visible');
-
-    const res = await fetch('/api/user/setup/' + encodeURIComponent(token) + '/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ totp: code }),
-      credentials: 'include',
-    });
-
-    if (!res.ok) {
-      errorDiv.textContent = 'Invalid code. Try the current number shown in your app.';
-      errorDiv.classList.add('visible');
-      return;
-    }
-
-    const data = await res.json();
-    // Keep init-phase codes if confirm response returned nothing — the backend currently calls
-    // a get-backup-codes-plaintext helper that doesn't retain plaintext, so confirm typically returns an empty array.
-    // The codes from the initial /api/user/setup/:token response are the real ones.
-    if (Array.isArray(data.backup_codes) && data.backup_codes.length > 0) {
-      backupCodes = data.backup_codes;
-    }
-
-    // Defensive last-resort: if we STILL have no codes (neither init nor confirm produced them),
-    // surface a real error instead of a silent empty success screen.
-    if (!Array.isArray(backupCodes) || backupCodes.length === 0) {
-      errorDiv.innerHTML = 'Your TOTP is set up, but your backup codes could not be generated. This is usually temporary. Please contact <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with subject <code>Setup incomplete</code> and we will regenerate them.';
-      errorDiv.classList.add('visible');
-      return;
-    }
-
-    const grid = document.getElementById('backup-codes');
-    grid.innerHTML = '';
-    backupCodes.forEach(function(c) {
-      const div = document.createElement('div');
-      div.className = 'backup-code';
-      div.textContent = c;
-      grid.appendChild(div);
-    });
-
-    show('state-success');
-  });
-
-  document.getElementById('saved-confirm').addEventListener('change', function(e) {
-    document.getElementById('finish-btn').disabled = !e.target.checked;
-  });
-
-  document.getElementById('copy-codes').addEventListener('click', function() {
-    navigator.clipboard.writeText(backupCodes.join('\n'));
-  });
-
-  document.getElementById('download-codes').addEventListener('click', function() {
-    const blob = new Blob([
-      'Paramant backup codes\n' +
-      'Save these in a safe place. Each can be used once.\n\n' +
-      backupCodes.join('\n') +
-      '\n\nGenerated: ' + new Date().toISOString()
-    ], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'paramant-backup-codes.txt';
-    a.click();
-  });
-
-  document.getElementById('print-codes').addEventListener('click', function() {
-    window.print();
-  });
-
-  document.getElementById('finish-btn').addEventListener('click', function() {
-    window.location = '/account';
-  });
-
-  document.getElementById('start-btn').addEventListener('click', function() {
-    show('state-connecting');
-    init();
-  });
-})();
-</script>
-<script type="module" src="/js/passkey.js"></script>
-
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/auth/setup" hreflang="en" lang="en">This page in English</a></p>
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
+</footer>
 </body>
 </html>

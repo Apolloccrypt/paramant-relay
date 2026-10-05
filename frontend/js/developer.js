@@ -1,0 +1,152 @@
+/* ParaSign API dashboard. No generic tool catalogue and no secret persistence. */
+(function () {
+  'use strict';
+
+  var API = '/api/user/developer/parasign-keys';
+  var snapshot = null;
+  var modal = document.getElementById('psk-modal');
+
+  function byId(id) { return document.getElementById(id); }
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char];
+    });
+  }
+  function json(url, options) {
+    return fetch(url, Object.assign({ credentials:'include', cache:'no-store', headers:{ Accept:'application/json' } }, options || {})).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (body) {
+        if (!response.ok) { var error = new Error(body.message || body.error || ('HTTP ' + response.status)); error.status = response.status; error.data = body; throw error; }
+        return body;
+      });
+    });
+  }
+  function copyText(text, button) {
+    if (!navigator.clipboard) return Promise.reject(new Error('clipboard_unavailable'));
+    return navigator.clipboard.writeText(text).then(function () {
+      var old = button.textContent; button.textContent = 'Gekopieerd';
+      setTimeout(function () { button.textContent = old; }, 1400);
+    });
+  }
+  function formatTime(ts) {
+    if (!ts) return '--:--';
+    var date = new Date(ts);
+    return date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  }
+  function isSignEvent(event) {
+    var type = String(event && event.event_type || '').toLowerCase();
+    return /sign|envelope|parasign/.test(type);
+  }
+
+  function renderSnapshot(data) {
+    snapshot = data;
+    var email = document.querySelector('[data-dv="email"]');
+    var plan = document.querySelector('[data-dv="plan"]');
+    if (email) email.textContent = data.email || '--';
+    // This is the ParaSign developer page, so the tier it names is the ParaSign
+    // tier. It used to print the unified `plan`, which a purchase never moves,
+    // so a Firm buyer read COMMUNITY next to his own email. The snapshot
+    // now carries a tier per product because an account can hold two different
+    // ones at once.
+    var tiers = data.tiers || {};
+    if (plan) plan.textContent = String(tiers.parasign || '--').toUpperCase();
+    byId('api-status-dot').className = 'status-dot ok';
+
+    var quota = data.quota || {};
+    var used = Number(quota.signs || 0);
+    var cap = quota.caps && quota.caps.signs;
+    byId('sign-used').textContent = String(used);
+    // A missing cap means the relay could not be asked, not that there is no
+    // ceiling: every tier has a finite monthly one (relay/lib/entitlements.js
+    // holds even enterprise to a real number). So the honest reading of an
+    // absent cap is "we do not know right now", and the page says that instead
+    // of promising a limit nobody grants.
+    byId('sign-cap').textContent = cap == null ? 'van --' : 'van ' + cap;
+    var percent = cap == null ? 0 : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
+    var bar = byId('sign-bar'); bar.style.width = percent + '%'; bar.className = percent >= 80 ? 'warn' : '';
+    byId('usage-note').textContent = cap == null ? 'Uw maandtegoed voor ondertekenen kon nu niet worden gelezen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
+    renderActivity((data.audit || []).filter(isSignEvent));
+  }
+
+  function renderActivity(events) {
+    var host = byId('activity');
+    if (!events.length) { host.innerHTML = '<div class="empty">Nog geen activiteit bij Ondertekenen. Maak via de API een ondertekenverzoek aan, dan ziet u het hier.</div>'; return; }
+    host.innerHTML = events.slice(0, 20).map(function (event) {
+      return '<div class="event"><time>' + esc(formatTime(event.ts)) + '</time><span>' + esc(event.event_type || 'parasign_event') + '</span></div>';
+    }).join('');
+  }
+
+  function renderKeys(keys) {
+    var host = byId('psk-keys');
+    if (!keys || !keys.length) { host.innerHTML = '<div class="empty">Nog geen API-sleutel voor Ondertekenen. Maak er een aan om uw eerste toepassing te koppelen.</div>'; return; }
+    host.innerHTML = keys.map(function (key) {
+      var active = key.active !== false;
+      var id = key.kid || '';
+      return '<div class="key-row"><div class="key-main"><div class="key-value">' + esc(key.key_masked || id || '--') + '</div><div class="key-meta"><span class="pill ' + (active ? '' : 'off') + '">' + (active ? 'actief' : 'ingetrokken') + '</span>' + (key.label ? '<span>' + esc(key.label) + '</span>' : '') + (key.mode ? '<span>' + esc(key.mode) + '</span>' : '') + '</div></div>' + (active ? '<button class="key-revoke" type="button" data-revoke="' + esc(id) + '">Intrekken</button>' : '') + '</div>';
+    }).join('');
+  }
+
+  function loadKeys() {
+    return json(API).then(function (data) { renderKeys(data.keys || []); }).catch(function (error) {
+      byId('psk-keys').innerHTML = '<div class="empty">De API-sleutels konden niet worden geladen. ' + esc(error.message) + '</div>';
+    });
+  }
+  function loadSnapshot() {
+    return json('/api/user/developer/snapshot').then(renderSnapshot).catch(function () {
+      byId('api-status-dot').className = 'status-dot err';
+    });
+  }
+
+  function showView(name) {
+    modal.querySelectorAll('[data-view]').forEach(function (node) { node.hidden = node.getAttribute('data-view') !== name; });
+  }
+  function openModal() {
+    byId('psk-label').value = '';
+    byId('psk-error').hidden = true;
+    showView('create'); modal.hidden = false;
+    setTimeout(function () { byId('psk-label').focus(); }, 0);
+  }
+  function closeModal() {
+    byId('psk-secret').textContent = '';
+    modal.hidden = true;
+    byId('psk-new').focus();
+  }
+  function createKey() {
+    var button = byId('psk-generate');
+    var label = byId('psk-label').value.trim();
+    var error = byId('psk-error');
+    button.disabled = true; button.textContent = 'Bezig met maken'; error.hidden = true;
+    json(API, { method:'POST', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ label:label }) }).then(function (data) {
+      byId('psk-secret').textContent = data.key || '';
+      // The key's own plan when the relay named one, otherwise the account's
+      // ParaSign tier from the snapshot. Not the unified plan: this is a
+      // ParaSign key, so the tier beside it is the ParaSign one.
+      var snapTier = snapshot && snapshot.tiers && snapshot.tiers.parasign;
+      byId('psk-meta').textContent = 'Sleutel ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · abonnement ' + (data.plan || snapTier || '--');
+      showView('secret'); loadKeys();
+    }).catch(function (failure) {
+      error.textContent = failure.status === 403 ? 'Uw account heeft geen toegang tot de API voor Ondertekenen. Controleer uw abonnement of vraag een beheerder om toegang.' : 'De sleutel kon niet worden gemaakt. ' + failure.message;
+      error.hidden = false;
+    }).finally(function () { button.disabled = false; button.textContent = 'Sleutel maken'; });
+  }
+  function revokeKey(kid, button) {
+    if (!kid || !window.confirm('Deze API-sleutel voor Ondertekenen intrekken? Toepassingen die hem gebruiken, werken dan direct niet meer.')) return;
+    button.disabled = true;
+    json(API, { method:'DELETE', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ kid:kid }) }).then(loadKeys).catch(function (error) {
+      button.disabled = false;
+      window.alert('De sleutel kon niet worden ingetrokken. ' + error.message);
+    });
+  }
+
+  byId('psk-new').addEventListener('click', openModal);
+  byId('psk-generate').addEventListener('click', createKey);
+  byId('psk-copy').addEventListener('click', function (event) { copyText(byId('psk-secret').textContent, event.currentTarget).catch(function () {}); });
+  byId('copy-example').addEventListener('click', function (event) { copyText(byId('quick-example').textContent, event.currentTarget).catch(function () {}); });
+  byId('psk-keys').addEventListener('click', function (event) {
+    var button = event.target.closest('[data-revoke]'); if (button) revokeKey(button.getAttribute('data-revoke'), button);
+  });
+  modal.addEventListener('click', function (event) { if (event.target === modal || event.target.closest('[data-close]')) closeModal(); });
+  document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && !modal.hidden) closeModal(); });
+
+  Promise.all([loadSnapshot(), loadKeys()]);
+  setInterval(loadSnapshot, 10000);
+}());

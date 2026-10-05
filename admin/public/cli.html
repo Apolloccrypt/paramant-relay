@@ -98,6 +98,17 @@
   .modal .ok { background: var(--accent); color: #fff; }
   .modal .cancel { background: transparent; color: var(--muted); border: 1px solid var(--border); }
   .modal .err { color: var(--bad); font-size: 11px; min-height: 14px; margin-top: 8px; }
+  /* ── Mobile-first overhaul (additief) ── */
+  @media(max-width:600px){
+    header { padding: 8px 12px; gap: 8px; flex-wrap: wrap; }
+    header h1 { font-size: 12px; }
+    .help-toggle { width: 36px; height: 36px; }
+    .cli-navlink { padding: 8px 12px; }
+    .terminal-container { padding: 6px 8px; }
+    .modal-overlay { align-items: flex-end; }
+    .modal { width: 100%; border-radius: 16px 16px 0 0; padding: 20px; }
+    .modal button { padding: 14px; }
+  }
 </style>
 </head>
 <body>

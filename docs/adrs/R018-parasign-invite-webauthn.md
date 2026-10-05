@@ -76,6 +76,15 @@ ActivatedSigner.dispose()                            // zeroize key material
   (32 random bytes). The emailed link is `/co-sign?env=<id>&p=<i>&t=<token>`.
   The token gates per-party detail and `markViewed`. Forwarding the email =
   forwarding the capability (documented residual risk, same as any e-sign link).
+- **Signing-invite TTL — 7 days, distinct from the 30-day record retention.** An
+  email-bound invite is *signable* only for `SIGN_INVITE_TTL_DAYS = 7` from the
+  envelope's `created_at` (≈ invite-send time). This is a separate, shorter window
+  than the 30-day envelope hash retention (`DEFAULT_TTL_DAYS`): the record stays
+  for 30d so a completed signature remains verifiable, but the *signable* window
+  closes at 7d. Enforced authoritatively in the relay `sign()` (`invite_expired`
+  → HTTP 410) and pre-checked in the admin activation gate via the
+  `sign_expires_at` field (fails before the passkey-PRF). Open/legacy envelopes
+  have no invite window — they are bounded only by the 30-day hash TTL.
 - **Authenticated-email binding (the ParaSign-grade layer):** the relay `/sign`
   endpoint is public and stateless, so it cannot know the caller's verified
   email. Binding-critical signs route through a new **admin proxy**
@@ -201,8 +210,155 @@ Two lockout dimensions:
 Status: account-login guard + tests landed (this gate). The vault invariant is
 asserted within PR-B.
 
+## Signing-identity model (definitive — one level, per-document PRF activation)
+
+This is the binding acceptance criterion for the signing layer. It is distinct
+from the *login* factor model above: login authenticates a session; signing is a
+separate, per-document act.
+
+### Invariant
+Producing a ParaSign signature ALWAYS requires, together, every time, all four:
+1. a **verified email address** (the account, mailbox-proven);
+2. a **device-bound passkey** (WebAuthn, `userVerification: required`);
+3. a **per-document PRF activation** (fresh, for exactly this document); and
+4. an **ML-DSA-65** post-quantum signing key.
+
+There is NO email-only and NO TOTP-only signing path. **One strength level — no
+tiers** in signature strength.
+
+### Login ≠ signing (sole control; eIDAS SAP/SAM seam)
+A logged-in passkey *session* does NOT unlock the signing key. The key is
+activated only at the moment of deliberate signing, for exactly one document,
+and is **zeroized immediately after**. Authentication and signature-activation
+are distinct ceremonies; a session conveys no signing capability. This preserves
+the activation⇄key-use seam so an HSM-backed SAM can later sit between activation
+and key-use without reworking the flow.
+
+### Mail is a channel, not proof
+Invitations and per-document sign-requests are delivered by email (binding the
+request to an address), but email never authorizes a signature. The
+cryptographic activation is always the passkey-PRF for that specific document.
+
+### TOFU enrolment
+An invitee with no passkey registers one as part of the first signing: prove
+mailbox control (invite token) → register a passkey → that passkey-PRF activates
+the signature. No passkey ⇒ no signature.
+
+### Recovery / lockout (the vault-wrap invariant stays)
+The vault key carries two wraps: `passphrase` (PBKDF2, ALWAYS present) and
+`webauthn-prf` (added at passkey enrolment).
+- The signing *flow* is ALWAYS passkey-PRF-activation; the PRF wrap is what the
+  activation uses. The passphrase wrap is **not a second signing path**.
+- The passphrase is **break-glass for key material, not a weaker signature**: the
+  owner can always decrypt/export their own key bytes (sole control), so a
+  passkey/PRF failure on a device that still holds the vault never permanently
+  destroys the key. A signature produced that way is still full-strength
+  ML-DSA-65 — the model never weakens a signature, it only guarantees the owner
+  cannot lose their key.
+- **Device loss** (the IndexedDB vault is device-local): recover by importing the
+  passphrase-encrypted backup key file (downloadable at `/sign`) into the new
+  device's vault and re-wrapping with a new passkey; or enrol a fresh signing key
+  (new keypair + new passkey), with old signatures staying verifiable (revoke
+  keeps history — the user-signing.js model).
+- **Account/login recovery is separate** (another passkey, TOTP, or backup codes)
+  and never by itself yields a signature.
+- Forward: when the HSM-backed SAM lands, the key moves server-side under SAM
+  sole control; the client passphrase-export no longer applies and recovery
+  becomes SAM/operator-managed. The seam already accommodates that swap.
+
+### Build acceptance criteria (applied during implementation, not yet built)
+- `/v2/user/signing-key` use moves behind a **per-document PRF activation** (a
+  server-issued, one-shot, short-TTL activation token bound to doc-hash +
+  envelope-id + party-index + account_id), replacing pure-TOTP gating for the
+  *signing* act. (TOTP step-up remains for adding a login passkey.)
+- Every signed message carries a unique **domain-separation prefix**
+  (e.g. `paramant/parasign/doc/v1`), byte-identical across relay + SDK + core, to
+  close cross-context signature reuse (pentest H3).
+- **Enforce a strong passphrase at key enrolment**: the passphrase wrap is the
+  recovery floor, so the break-glass is only as strong as that passphrase. A weak
+  passphrase must be rejected at enrol time.
+
+### v3 sign-message wire format (BYTE-EXACT — relay + SDK + core MUST match)
+Any implementation that signs a ParaSign document MUST hash exactly these bytes,
+in this order, with NO separators other than the single NUL after the label.
+A one-byte deviation = a silent signature mismatch (cf. the SDK conformity
+report). Recipe v3:
+
+    message = SHA3-256(
+        utf8("paramant/parasign/doc/v1")   // domain label, 24 bytes, NO trailing slash/version drift
+      ‖ 0x00                                // single NUL separator
+      ‖ utf8(envelope_id)                   // base64url id string, as-is (NOT decoded)
+      ‖ hex_decode(doc_hash)                // 32 bytes (SHA3-256 of the document)
+      ‖ utf8(decimal(party_index))          // e.g. "0", "10" — ASCII decimal, no padding
+      ‖ hex_decode(party_email_hash)        // 32 bytes, or 0 bytes when the party has no email
+    )
+
+Reference implementations (this PR): `relay/envelope.js signMessageBytes(...,3)`
+and `frontend/js/parasign-signer.js buildDocSignMessage(...)` — verified to
+produce identical digests. `party_email_hash` itself is
+`SHA3-256("paramant/party-email/v1" ‖ 0x00 ‖ lower(trim(email)))` (see
+`partyEmailHash`). When the SDK/core gain signing, they take these two formats
+1:1; do not "improve" the byte layout.
+
+### Non-ASCII canonicalization (cross-SDK signature safety)
+Surfaced by the SDK↔relay conformance suite: sdk-js serializes JSON strings as
+raw UTF-8 while sdk-py emits `\uXXXX` escapes, so any signed/canonicalized JSON
+payload containing non-ASCII (e.g. a signer label "José", "Müller") yields a
+**cross-SDK signature mismatch** — the same byte-identity class as the v3 domain
+prefix. Rule: anything that is signed or cross-SDK-canonicalized
+(sign-messages, receipts, envelope canonical forms) is **ASCII-only**, OR the
+single canonicalization divergence is resolved first. The v3 sign-message above
+is already safe by construction (it contains only the ASCII domain label, the
+base64url envelope id, ASCII decimal party index, and raw hash BYTES — never a
+raw name; emails are hashed, not embedded). Keep it that way: never fold a raw
+display string into a signed message; carry such fields outside the signature.
+
 ## Non-goals / boundary
 
 No HSM, no SAM, no SAP/SAD implementation, no eIDAS conformance work. This ADR
 only guarantees the activation⇄key-use seam stays intact so a SAM can be added
 later. No new product features beyond the invite flow above.
+
+## Addendum 2026-06-02 — the sign-in passkey IS the signing key
+
+Field reality: a passkey-first account has no TOTP, but every signing-key bind
+(`/v2/user/signing-key`) and every fresh-passkey mint was TOTP-gated, so a
+passkey-only user could not enrol a signing key at all; and the enrol that did
+work demanded a separate passphrase + 2× TOTP and, when a registration-time
+`prfSupported` flag read false-negative, minted a *second* passkey — the "two
+passkeys / set up a signing passkey" loop. Decision: collapse the two
+credentials. The passkey you sign in with becomes the passkey you sign with.
+
+What changed:
+- **Passkey step-up = TOTP-equivalent bind.** New admin
+  `POST /api/user/account/signing-key/step-up/{options,bind}`: a logged-in user
+  proves possession of one of *their own* passkeys with a fresh assertion (the
+  admin verifies it exactly like login/verify — challenge one-shot, credential
+  resolved to this account, counter rule), which authorises a TOTP-free bind via
+  new relay `POST /v2/user/signing-key/attested` (internal-auth, gated on
+  `countActiveCredentials >= 1`, server-side pk_hash, cross-account-conflict
+  check — "as strict as the TOTP it replaces", mirroring `/tofu`). The original
+  TOTP route is untouched (still used by the /account TOTP path + back-compat).
+- **One tap does both.** The SAME `navigator.credentials.get()` carries the
+  server challenge (→ step-up assertion, sent to the server) and a `prf.eval`
+  (→ PRF output, kept in the browser to wrap the ML-DSA key). `ensureSigningKey()`
+  in `parasign-signer.js` is the single resolve-or-enrol entry point /sign,
+  /co-sign and /account all call; it reuses the sign-in passkey via
+  `allowCredentials` and never trusts a stored `prfSupported` flag, so it cannot
+  spawn a duplicate passkey or loop.
+- **PRF may be the sole wrap.** `vaultCreatePrfOnly()` creates a vault entry with
+  only a `webauthn-prf` wrap — no passphrase. This deliberately relaxes the
+  earlier "PRF is never the sole wrap / passphrase is the recovery floor"
+  invariant. Rationale: a *signing* key is not a login factor — losing it just
+  means enrolling a fresh one (the relay keeps a multi-key list, old signatures
+  stay verifiable by their stored pubkey), and the synced passkey (iCloud
+  Keychain / Google Password Manager) is the real recovery. Account login keeps
+  its own recovery (backup codes), unaffected. A passphrase wrap can still be
+  *added* via `vaultStore` as an optional break-glass.
+
+Seam intact (the whole point of R018): PRF still only **unlocks** a stored,
+randomly-generated ML-DSA-65 key (activation); key-use stays behind
+`ActivatedSigner.sign()`. The key is NOT derived from the PRF output — that
+fusion would be the forbidden one (a SAM/HSM could never be slotted in later).
+`signMessageBytes(...,3)` / the v3 sign-message are untouched, so already-signed
+envelopes stay `valid:true`.

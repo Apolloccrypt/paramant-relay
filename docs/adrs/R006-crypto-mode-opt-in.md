@@ -59,6 +59,15 @@ trail consolidated with the M5b ML-KEM-768 migration).
 - The wire-format spec (docs/wire-format-v1.md) still documents all 18 algorithm
   IDs as recognized values. /v2/capabilities is the runtime source of truth for
   what is actually accepted.
+- Dependency surface: the two core impls (mlkem768.js, mldsa65.js) route to
+  @paramant/core; only the 16 extended impls require @noble/post-quantum. In the
+  core default @noble runs no crypto on the hot path (dormant), so the core
+  audit surface is @paramant/core, not @noble. @noble cannot move to a
+  devDependency, however: bootstrap.js requires all extended impls eagerly (so a
+  broken impl fails at startup, not first use), which loads @noble into the
+  process even in core mode. Pruning it from runtime deps would mean lazy
+  require()s in the extended impls (deferred to extended mode), a separate change
+  with its own startup-failure tradeoff.
 
 ## Alternatives considered
 

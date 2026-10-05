@@ -1,15 +1,20 @@
 {
   "name": "paramant",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
     "build": "bash build.sh"
   },
   "devDependencies": {
     "javascript-obfuscator": "^5.4.1",
+    "playwright": "^1.61.0",
     "terser": "^5.31.0"
   },
   "dependencies": {
+    "@noble/post-quantum": "^0.6.1",
     "redis": "^4.7.1"
   }
 }

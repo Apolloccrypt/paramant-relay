@@ -32,7 +32,7 @@ try:
 except ImportError:
     HAS_YAML = False
 
-VERSION = "2.4.5"
+VERSION = "3.0.0"
 MOUNT   = "/mnt"
 LOG     = "/tmp/paramant-install.log"   # overwritten after root check in main()
 

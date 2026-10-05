@@ -1,0 +1,14 @@
+# .style-denylist.example  ->  kopieer naar .style-denylist (die is gitignored)
+#
+# Een verboden term per regel. De stijl-scan (scripts/check-commit-style.sh)
+# blokkeert elke commit-message of toegevoegde diff-regel die zo'n term als heel
+# woord bevat (hoofdletterongevoelig). "acme" matcht dus "Acme" maar niet
+# "acmecorp". Regels die met # beginnen zijn commentaar; lege regels tellen niet.
+#
+# Zet in je eigen .style-denylist de echte persoons- en bedrijfsnamen die nooit
+# publiek mogen worden. Dit .example-bestand bevat alleen generieke voorbeelden
+# en wordt WEL gecommit; .style-denylist zelf staat in .gitignore en verlaat je
+# machine nooit.
+
+Acme
+Example Corp

@@ -1,281 +1,266 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Verify signature — PARAMANT</title>
-<meta name="description" content="Verify a .psign envelope against the original document. ML-DSA-65 (FIPS 204).">
+<title>Document of ontvangstbewijs controleren · Paramant</title>
+<meta property="og:site_name" content="Paramant">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="signing">
+<meta name="description" content="Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.">
+<meta property="og:title" content="Document of ontvangstbewijs controleren · Paramant">
+<meta property="og:description" content="Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.">
+<meta property="og:url" content="https://paramant.app/verify">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Document of ontvangstbewijs controleren · Paramant">
+<meta name="twitter:description" content="Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/verify">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/verify">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/verify">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/verify">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
-<link rel="stylesheet" href="/components-parasign.css?v=2">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/components-parasign.css?v=6">
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/verify#webpage",
+      "url": "https://paramant.app/verify",
+      "name": "Document of ontvangstbewijs controleren · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden."
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://paramant.app/verify#software",
+      "name": "Paramant",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web browser",
+      "url": "https://paramant.app/verify",
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/verify" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/verify" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/verify" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/verify" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
 <main id="main-content" role="main">
 <div class="ps-wrap">
   <header class="ps-head">
-    <p class="ps-kicker">Verify signature</p>
-    <h1 class="ps-title">Verify a .psign envelope</h1>
-    <p class="ps-lede">Check that a document has not been altered since signing. The document never leaves your browser &mdash; only its SHA3-256 hash and the envelope are sent.</p>
+    <p class="ps-kicker">Controleren</p>
+    <h1 class="ps-title">Controleer een bewijs van Paramant</h1>
+    <p class="ps-lede">Paramant levert twee soorten bewijs: een ondertekend document, en een ontvangstbewijs dat laat zien dat een bestand is afgeleverd en daarna vernietigd. U controleert ze allebei hier, op uw eigen apparaat. Wat u hier kiest of plakt, wordt niet geüpload. U heeft er geen account voor nodig.</p>
   </header>
 
+  <div class="rv-tabs" role="tablist" aria-label="Wat wilt u controleren">
+    <button class="rv-tab" type="button" id="tab-doc" role="tab" aria-selected="true" aria-controls="panel-doc">Ondertekend document</button>
+    <button class="rv-tab" type="button" id="tab-receipt" role="tab" aria-selected="false" aria-controls="panel-receipt">Ontvangstbewijs</button>
+  </div>
+
+  <div id="panel-doc" role="tabpanel" aria-labelledby="tab-doc">
+
   <section class="card ps-panel" aria-labelledby="v1">
-    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">Original document</h2></div>
-    <label class="ps-file"><input type="file" id="vf-document"><span class="ps-file-cta">Choose the original document</span><span class="ps-file-meta" id="vf-document-info">No file selected</span></label>
+    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">Origineel document</h2></div>
+    <label class="ps-file"><input type="file" id="vf-document"><span class="ps-file-cta">Kies het originele document</span><span class="ps-file-meta" id="vf-document-info">Geen bestand gekozen</span></label>
   </section>
 
   <section class="card ps-panel" aria-labelledby="v2">
-    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope &amp; key</h2></div>
-    <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Choose the .psign file</span><span class="ps-file-meta" id="vf-envelope-info">No file selected</span></label>
-    <div class="ps-field">
-      <label class="ps-label" for="vf-api-key">API key (X-Api-Key)</label>
+    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign-envelop</h2></div>
+    <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Kies het .psign-bestand</span><span class="ps-file-meta" id="vf-envelope-info">Geen bestand gekozen</span></label>
+    <div class="ps-field" id="vf-key-block" hidden>
+      <label class="ps-label" for="vf-api-key">API-sleutel (X-Api-Key)</label>
       <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">The verify endpoint currently requires an API key. (Fully account-free, client-side verification is a planned enhancement.)</p>
+      <p class="ps-warn">Dit is een oude envelop (v1 of v2). De notarishandtekening van de relay kan alleen de relay zelf controleren, en daarvoor heeft u een API-sleutel nodig. Nieuwe handtekeningen controleert u volledig offline, zonder sleutel.</p>
     </div>
   </section>
 
   <section class="card ps-panel" aria-labelledby="v3">
-    <div class="ps-panel-head"><span class="ps-step">3</span><h2 id="v3" class="ps-panel-title">Verify</h2></div>
-    <button class="btn btn-primary" id="vf-verify" type="button" disabled>Verify signature</button>
+    <div class="ps-panel-head"><span class="ps-step">3</span><h2 id="v3" class="ps-panel-title">Controleren</h2></div>
+    <button class="btn btn-primary" id="vf-verify" type="button" disabled>Handtekening controleren</button>
     <div class="ps-result" id="vf-result" hidden role="status" aria-live="polite"></div>
   </section>
 
   <aside class="ps-info">
-    <h2>What is checked</h2>
+    <h2>Wat er wordt gecontroleerd</h2>
     <ul>
-      <li>SHA3-256 of your document matches the hash inside the envelope</li>
-      <li>The signer's ML-DSA-65 signature over that hash is valid</li>
-      <li>The relay's notary signature over the envelope is valid</li>
-      <li>The envelope has not expired</li>
+      <li>De SHA3-256-hash van uw document is gelijk aan de hash in de envelop</li>
+      <li>De ML-DSA-65-handtekening van de ondertekenaar over die hash is geldig</li>
+      <li>De envelop is niet verlopen</li>
     </ul>
-    <p><a href="/dashboard">Open your dashboard &rarr;</a></p>
+    <p class="ps-help">De controle gebeurt volledig in uw browser. U heeft geen account of API-sleutel nodig, en het werkt ook offline.</p>
+    <p><a href="/dashboard">Naar uw dashboard &rarr;</a></p>
   </aside>
-</div>
+  </div>
+
+  <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
+    <section class="card ps-panel" aria-labelledby="r1">
+      <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="r1" class="ps-panel-title">Het ontvangstbewijs</h2></div>
+      <p class="ps-help">Een ontvangstbewijs is een kort blok tekst. U krijgt het zodra een bestand dat u verstuurde is opgehaald. Het laat zien welk bestand is overgedragen, wanneer, en of de kopie op de server is vernietigd.</p>
+      <label class="rv-drop" id="rv-drop">
+        <input type="file" id="rv-file" accept=".txt,.json,.receipt,application/json,text/plain">
+        <span class="rv-drop-cta">Sleep het ontvangstbewijs hierheen, of kies een bestand</span>
+        <span class="rv-drop-meta" id="rv-file-info">Nog niets geladen</span>
+      </label>
+      <div class="ps-field">
+        <label class="ps-label" for="rv-input">Of plak het ontvangstbewijs</label>
+        <textarea class="rv-paste" id="rv-input" spellcheck="false" placeholder="Plak hier de tekst van het ontvangstbewijs. De lange vorm op één regel en de leesbare vorm werken allebei."></textarea>
+      </div>
+    </section>
+
+    <section class="card ps-panel" aria-labelledby="r2">
+      <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="r2" class="ps-panel-title">Controleren</h2></div>
+      <button class="btn btn-primary" id="rv-check" type="button">Dit ontvangstbewijs controleren</button>
+      <div class="ps-result" id="rv-result" hidden role="status" aria-live="polite"></div>
+    </section>
+
+    <details class="card ps-panel" id="rv-keyblock">
+      <summary class="ps-panel-title">Een ontvangstbewijs van een andere server controleren</summary>
+      <p class="ps-help">Deze pagina kent de ondertekeningssleutel van elke Paramant-relay en kiest zelf de sleutel die in het ontvangstbewijs staat. Een gewoon ontvangstbewijs controleert u dus zonder dat er iets over het netwerk gaat. Draait u zelf een server? Plak dan hieronder de sleutel van die server.</p>
+      <div class="ps-field">
+        <label class="ps-label" for="rv-key">Ondertekeningssleutel van de server die het ontvangstbewijs uitgaf</label>
+        <textarea class="rv-paste" id="rv-key" spellcheck="false" placeholder="Laat dit leeg om de sleutel te gebruiken die bij deze pagina hoort."></textarea>
+        <p class="ps-help">Elke relay publiceert zijn eigen sleutel op <code class="mono">/v2/pubkey</code>, bijvoorbeeld <code class="mono" id="rv-key-hint"></code>.</p>
+      </div>
+    </details>
+
+    <aside class="ps-info">
+      <h2>Wat er wordt gecontroleerd</h2>
+      <ul>
+        <li>Het ontvangstbewijs gaat over het bestand dat het noemt, en geen ander</li>
+        <li>De regel waar het naar verwijst staat echt in het openbare transparantielogboek</li>
+        <li>De handtekening over het hele ontvangstbewijs klopt, dus er is niets veranderd</li>
+        <li>De momentopname van het logboek waar het ontvangstbewijs op steunt is ook ondertekend</li>
+      </ul>
+      <p class="ps-help">Alle vier de controles gebeuren op dit apparaat. Is de pagina eenmaal geladen, dan kunt u de internetverbinding verbreken. Het antwoord blijft hetzelfde.</p>
+    </aside>
+  </div>
 </main>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/verify" hreflang="en" lang="en">This page in English</a></p>
 
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script type="module" src="/parasign-verify.js?v=2"></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
+<script type="module" src="/parasign-verify.js?v=7"></script>
+<script type="module" src="/js/receipt-verify.js?v=3"></script>
 </body>
 </html>

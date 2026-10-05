@@ -1,21 +1,42 @@
-/* PARAMANT design-system.css v4.0
+/* PARAMANT design-system.css v4.2
    Source of truth: PARAMANT-DESIGN-SYSTEM-v4.md (Denim Edit)
-   Four colors: bone / navy / cobalt / lime. Zero radius. Sans + mono split. */
+   Four colors: bone / navy / cobalt / lime. Zero radius. Sans + mono split.
+
+   v4.1 verandert precies een ding: --ink-dim, --lime-dim en --black-dim
+   wijzen naar --ink-2 (#40505F) in plaats van naar rgba(11,58,106,.65).
+   Dat is de enige gemeten wijziging; alle andere waarden staan zoals ze
+   stonden. Zie het blok bij --ink-2 voor de getallen.
+
+   v4.2 is v4.1 terug als standaard, na drie weken nacht (v5, PR #417). De
+   namen die de nacht invoerde (--night, --cream, --ochre en de rest) blijven
+   bestaan en wijzen naar hun bone-tegenhanger, zodat elke paginaregel die
+   sindsdien tegen die namen is geschreven de bone volgt. */
 
 
 /* ═══════════════════════════════════════════════════
    TOKENS
    ═══════════════════════════════════════════════════ */
 :root {
-  /* surface */
-  --bone:   #F8FAFC;
-  --bone-2: #EEF2F6;
+  /* surface. --ground is the page ground by its own name, so /app-2026.css
+     can point its --paper at it without a loop through --bone. */
+  --ground: #FFFFFF;
+  --bone:   #FFFFFF;
+  --bone-2: #F5F6F7;
 
   /* ink */
   --navy:      #0B3A6A;
   --navy-2:    #0A2E55;
   --ink:       #0B3A6A;
-  --ink-dim:   rgba(11,58,106,.65);
+  /* --ink-2 is de leeskleur voor alles wat niet de primaire tekst is: de
+     kleine letter, de prijsregel, de limietregel, de meta onder een kaart.
+     De oude waarde was rgba(11,58,106,.65) en die landt op 4.09:1 tegen het
+     papier, 3.96:1 tegen de voet en 4.18:1 op een witte kaart. Drie keer net
+     onder de 4.5 die WCAG AA vraagt, en drie keer onder de tekst die de prijs
+     en de kleine letter draagt. #40505F haalt 7.95:1 op het papier en 7.35:1
+     op de voet. Gemeten met de WCAG 2.1 relatieve-luminantieformule; de meting
+     staat in tests/theme-contrast.test.mjs en die faalt op elke nieuwe. */
+  --ink-2:     #40505F;
+  --ink-dim:   var(--ink-2);
   --ink-hair:  rgba(11,58,106,.15);
   --ink-ghost: rgba(11,58,106,.08);
 
@@ -23,13 +44,15 @@
   --cobalt:   #1D4ED8;
   --cobalt-2: #1A43BE;
 
-  /* punctuation */
-  --lime: #B2FF3F;
+  /* punctuation. Was lime #B2FF3F, 1.16:1 on the bone: under the 3:1 that
+     tests/ui-elements-contrast.test.mjs asks of a mark. It follows the cobalt,
+     as it followed the ochre in v5. */
+  --lime: var(--cobalt);
 
   /* inverted text */
-  --bone-on-navy:      #F8FAFC;
-  --bone-on-navy-dim:  rgba(248,250,252,.72);
-  --bone-on-navy-hair: rgba(248,250,252,.18);
+  --bone-on-navy:      #FFFFFF;
+  --bone-on-navy-dim:  rgba(255, 255, 255,.72);
+  --bone-on-navy-hair: rgba(255, 255, 255,.18);
 
   /* typography */
   --sans: ui-sans-serif, system-ui, -apple-system, "Inter",
@@ -81,15 +104,232 @@
 
   /* ─── v3 legacy token aliases (remove after Phase D HTML migration) ─── */
   --black:       #0B3A6A;
-  --lime-dim:    rgba(11,58,106,.65);
+  --lime-dim:    var(--ink-2);
   --lime-hair:   rgba(11,58,106,.15);
   --lime-ghost:  rgba(11,58,106,.08);
-  --black-dim:   rgba(11,58,106,.65);
+  --black-dim:   var(--ink-2);
   --black-hair:  rgba(11,58,106,.15);
   --black-ghost: rgba(11,58,106,.08);
   --doc-bg:      var(--bone);
   --doc-ink:     var(--ink);
   --doc-ink-dim: var(--ink-dim);
+
+  /* ─── v4.2: the names the night edition (v5) introduced, on bone values ─── */
+  --tint:        11, 58, 106;
+  --night:       var(--bone);
+  --night-2:     var(--bone-2);
+  --cream:       var(--navy);
+  --ochre:       var(--cobalt);
+  --ochre-2:     var(--cobalt-2);
+  --ochre-ink:   var(--cobalt);
+  --on-ochre:    var(--bone-on-navy);
+  --petrol:      #155E75;
+  --petrol-ink:  #155E75;
+  --brick:       #8C3A34;
+  --brick-ink:   #8C3A34;
+  --ok-ink:      #1B6B45;
+  --warn-ink:    #79600F;
+  --paper:       #F1EAD6;
+  --paper-2:     #E7DDC4;
+  --paper-ink:   #1B1F22;
+  --paper-ink-2: #4A4A44;
+  --paper-line:  rgba(27, 31, 34, .18);
+  --r:           0;
+  --card:        #FFFFFF;
+  --card-2:      var(--bone-2);
+  --card-line:   var(--ink-hair);
+  --surface:     var(--card);
+  --line:        var(--ink-hair);
+  --line-2:      rgba(11, 58, 106, .30);
+  --accent:      var(--cobalt);
+  --accent-hov:  var(--cobalt-2);
+  --accent-ink:  var(--bone-on-navy);
+  --accent-soft: rgba(29, 78, 216, .08);
+  --accent-ring: rgba(29, 78, 216, .40);
+  --invert:      var(--navy);
+  --invert-ink:  var(--bone-on-navy);
+  --invert-dim:  var(--bone-on-navy-dim);
+  --invert-hair: var(--bone-on-navy-hair);
+  --bone-blur:   rgba(255, 255, 255, .92);
+}
+
+/* A link in running text is underlined, not only coloured: colour alone is
+   not enough to tell a link from its sentence (WCAG 1.4.1). A link with a
+   class is a component (a button, a card, a nav item) and keeps its own
+   styling. */
+main p a:not([class]),
+main li a:not([class]) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* On a navy slab the lime is the punctuation again: 9.7:1 on the navy, and the
+   ink that sits on it is the navy. */
+.section-dark, .section-navy, .section-cobalt, .page-hero--navy, .invert {
+  --lime: #B2FF3F;
+  --on-ochre: var(--navy);
+}
+:root[data-theme="dark"] :is(.section-dark, .section-navy, .section-cobalt, .page-hero--navy, .invert) {
+  --on-ochre: #0B1220;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   TOKENS, DARK  (v4.3)
+   The dark counterpart of the light theme above: the same shapes, type,
+   spacing and buttons, the same cobalt family, on a deep ink-navy ground
+   instead of white. It is the ONE dark set of the site: the marketing pages,
+   the /en copies and the app screens (/app-2026.css points its names here)
+   all follow it. /js/theme.js writes data-theme="dark" before the first paint
+   when the reader chose dark, or never chose and runs a dark system.
+
+   What stays paper in the dark. --paper and its family are the document
+   layer (the PDF preview on /sign, the paper mock on the homepage): a
+   document is white or cream in any room, so those names do not move.
+
+   Measured with the WCAG 2.1 relative-luminance formula. On the ground
+   #0E141B: ink 15.69, ink-2 9.48, ink-3 7.19, accent 6.87, accent-hov 8.80.
+   On a card #16202B: ink 13.95, ink-2 8.44, ink-3 6.39, accent 6.11. The
+   accent carries dark ink #0B1220 when it is a fill (6.95): a light cobalt
+   with white text on it would land at 2.69, so the fill turns the ink round,
+   the way the light theme's navy fill carries white.
+   tests/theme-contrast.test.mjs and tests/app-contrast.test.mjs walk every
+   text node in both editions.
+   ═══════════════════════════════════════════════════ */
+:root[data-theme="dark"] {
+  --tint: 230, 237, 245;
+
+  /* surface */
+  --ground:       #0E141B;
+  --bone:         #0E141B;
+  --bone-2:       #121A23;
+  --night:        #0E141B;
+  --night-2:      #121A23;
+  --card:         #16202B;
+  --card-2:       #1A2531;
+  --surface:      #16202B;
+  --surface-sunk: #0A0F15;
+  --surface-ink:  #070A0E;
+  --bone-blur:    rgba(14, 20, 27, .92);
+  --paper-blur:   rgba(14, 20, 27, .92);
+
+  /* ink */
+  --navy:    #E6EDF5;
+  --navy-2:  #E6EDF5;
+  --ink:     #E6EDF5;
+  --ink-1:   #E6EDF5;
+  --cream:   #E6EDF5;
+  --black:   #E6EDF5;
+  --ink-2:   #AEBBCA;
+  --ink-3:   #94A3B4;
+  --ink-dim:   var(--ink-2);
+  --lime-dim:  var(--ink-2);
+  --black-dim: var(--ink-2);
+
+  /* hairlines */
+  --ink-hair:    rgba(230, 237, 245, .14);
+  --ink-ghost:   rgba(230, 237, 245, .06);
+  --line:        rgba(230, 237, 245, .14);
+  --line-2:      rgba(230, 237, 245, .28);
+  --line-ghost:  rgba(230, 237, 245, .06);
+  --card-line:   rgba(230, 237, 245, .14);
+  --lime-hair:   rgba(230, 237, 245, .14);
+  --lime-ghost:  rgba(230, 237, 245, .06);
+  --black-hair:  rgba(230, 237, 245, .14);
+  --black-ghost: rgba(230, 237, 245, .06);
+
+  /* the one accent, the cobalt lifted for a dark ground */
+  --cobalt:      #6E9BFF;
+  --cobalt-2:    #8FB2FF;
+  --accent:      #6E9BFF;
+  --accent-hov:  #8FB2FF;
+  --accent-ink:  #0B1220;
+  --accent-soft: rgba(110, 155, 255, .12);
+  --accent-ring: rgba(110, 155, 255, .50);
+  --ochre:       #6E9BFF;
+  --ochre-2:     #8FB2FF;
+  --on-ochre:    #0B1220;
+  --ochre-ink:   #1D4ED8;   /* the accent as ink on paper (the cream diagrams): paper does not turn */
+  --lime:        #6E9BFF;
+  --mark:        #6E9BFF;
+  --mark-ink:    #6E9BFF;
+  --mark-on:     #0B1220;
+
+  /* the inverted slab: the light theme's navy block, lifted off the ground */
+  --invert:      #1A2431;
+  --invert-ink:  #F4F7FA;
+  --invert-dim:  rgba(244, 247, 250, .74);
+  --invert-hair: rgba(244, 247, 250, .18);
+  --bone-on-navy:      #F4F7FA;
+  --bone-on-navy-dim:  rgba(244, 247, 250, .74);
+  --bone-on-navy-hair: rgba(244, 247, 250, .18);
+  --on-ink:        #F4F7FA;
+  --on-ink-dim:    rgba(244, 247, 250, .74);
+  --on-ink-accent: #B2FF3F;
+
+  /* states, as ink on the dark ground */
+  --petrol-ink: #6CC4DC;
+  --brick:      #B04E40;   /* a fill: white on it 5.24; as a line 3.14 on a card */
+  --brick-ink:  #F0948A;
+  --ok-ink:     #7FCB9E;
+  --warn-ink:   #E3C169;
+  --sig-wait: #E3C169;
+  --sig-move: #6E9BFF;
+  --sig-done: #7FCB9E;
+  --sig-stop: #F0948A;
+  --sig-wait-bg: rgba(227, 193, 105, .12);
+  --sig-move-bg: rgba(110, 155, 255, .12);
+  --sig-done-bg: rgba(127, 203, 158, .12);
+  --sig-stop-bg: rgba(240, 148, 138, .12);
+  --sig-stop-line: rgba(240, 148, 138, .44);
+
+  /* shadow: depth still comes from hairlines; a shadow on dark is darker */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .40);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, .44), 0 8px 24px -12px rgba(0, 0, 0, .66);
+  --sh-3: 0 24px 64px -24px rgba(0, 0, 0, .80);
+
+  color-scheme: dark;
+}
+
+/* A fill in the accent carries the dark ink; its hover lifts instead of
+   sinking to navy, which on this ground would be the text colour. */
+/* :where keeps this at the weight of :root[data-theme], so a page state that
+   repaints a button (a standby form, a disabled step) still wins over it. */
+:root[data-theme="dark"] :where(.btn-primary, .cta-stack .primary, .drop-btn, .section-cobalt, .invert, .plan-tier-active) {
+  color: var(--accent-ink);
+}
+:root[data-theme="dark"] :where(.btn-primary, .cta-stack .primary, .drop-btn):hover {
+  background: var(--accent-hov);
+  border-color: var(--accent-hov);
+  color: var(--accent-ink);
+}
+
+/* The reusable hero band: the light one is a pale wash over white; in the
+   dark it is the same wash, one step up from the ground. */
+:root[data-theme="dark"] .page-hero {
+  background: linear-gradient(180deg, var(--bone-2) 0%, rgba(230, 237, 245, .02) 100%);
+  border-top-color: var(--ink-ghost);
+  border-bottom-color: var(--ink-ghost);
+}
+
+/* The switch between the two: a short colour fade that shows what changed.
+   Only while /js/theme.js holds html.theme-fade (240ms after a press), never
+   on load, and not at all under prefers-reduced-motion. */
+html.theme-fade,
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition: background-color 180ms var(--ease-sharp),
+              color 180ms var(--ease-sharp),
+              border-color 180ms var(--ease-sharp),
+              fill 180ms var(--ease-sharp),
+              stroke 180ms var(--ease-sharp) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-fade,
+  html.theme-fade *,
+  html.theme-fade *::before,
+  html.theme-fade *::after { transition: none !important; }
 }
 
 
@@ -213,7 +453,7 @@ h1 em::after {
   color: var(--bone-on-navy);
 }
 .section-navy {
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy);
 }
 .section-cobalt ::selection,
@@ -222,7 +462,7 @@ h1 em::after {
   color: var(--navy);
 }
 
-/* v3 .invert — maps to cobalt during migration */
+/* v3 .invert: maps to cobalt during migration */
 .invert {
   background: var(--cobalt);
   color: var(--bone-on-navy);
@@ -504,7 +744,7 @@ h1 em::after {
 .cta-stack .primary:hover { background: var(--navy); border-top-color: var(--navy); }
 .cta-stack a:not(.primary):hover,
 .cta-stack button:not(.primary):hover {
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy);
 }
 
@@ -523,16 +763,6 @@ h1 em::after {
   transition: background var(--duration-base) var(--ease-sharp),
               border-color var(--duration-base) var(--ease-sharp),
               box-shadow var(--duration-base) var(--ease-out);
-}
-/* Idle "breathe" — subtle lime ring that invites interaction without
-   shouting. Pauses on hover/focus/drag so feedback states are clean. */
-.drop:not(:hover):not(:focus-within):not(.drag-over),
-.dropzone:not(:hover):not(:focus-within):not(.drag-over) {
-  animation: drop-breathe 3.6s var(--ease-soft) infinite;
-}
-@keyframes drop-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(178,255,63,0); }
-  50%      { box-shadow: 0 0 0 4px rgba(178,255,63,.18); }
 }
 .drop:hover, .drop:focus-within,
 .dropzone:hover, .dropzone:focus-within {
@@ -1173,7 +1403,7 @@ h1 em::after {
   border-color: var(--navy);
 }
 .btn-secondary:hover {
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy);
 }
 
@@ -1295,7 +1525,7 @@ h1 em::after {
    v4: .foot-grid  |  v3 compat: .footer-grid
    ═══════════════════════════════════════════════════ */
 footer {
-  background: var(--bone-2);
+  background: var(--bone);
   padding: var(--space-9) 0;
   border-top: 1px solid var(--ink-hair);
 }
@@ -1306,6 +1536,15 @@ footer {
   grid-template-columns: 240px repeat(4, 1fr);
   gap: var(--space-8);
   align-items: start;
+}
+
+/* Slim footer: company identity + legal only. The five-column version carried
+   ~30 links (trust, self-host, connect, downloads) that duplicated the nav and
+   made the page end in noise. Business info and legal are what a footer is
+   actually for; everything else has a home in the navigation. */
+.footer-grid.footer-slim {
+  grid-template-columns: minmax(260px, 2fr) 1fr;
+  gap: var(--space-10, var(--space-8));
 }
 
 .footer-col-label,
@@ -1356,6 +1595,9 @@ footer {
 }
 @media (max-width: 600px) {
   .foot-grid, .footer-grid { grid-template-columns: 1fr; }
+  /* .footer-grid.footer-slim outranks the bare .footer-grid rule above, so the
+     slim variant needs its own stacking rule or it stays two-up on a phone. */
+  .footer-grid.footer-slim { grid-template-columns: 1fr; gap: var(--space-6); }
 }
 
 
@@ -1633,7 +1875,7 @@ pre code { background: none; padding: 0; }
   border-top: none;
 }
 .section-dark {
-  background: var(--navy);
+  background: var(--invert);
 }
 .section-dark h2 { color: var(--bone); }
 .section-dark p  { color: var(--bone-on-navy-dim); }
@@ -1788,8 +2030,17 @@ pre code { background: none; padding: 0; }
 /* Responsive */
 @media (max-width: 768px) {
   .two-col { grid-template-columns: 1fr; }
+  /* Wide comparison tables: scroll horizontally instead of being clipped by
+     html{overflow-x:clip}. display:block turns the table into its own scroll
+     box; nowrap keeps content wider than the viewport so it actually scrolls. */
   .compare-table,
-  .ownership-table { font-size: 12px; }
+  .ownership-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    font-size: 12px;
+  }
   .compare-table th,
   .ownership-table th,
   .compare-table td,
@@ -1861,7 +2112,7 @@ pre code { background: none; padding: 0; }
 .section-cobalt a,
 .section-dark a {
   color: var(--bone);
-  border-bottom: 1px solid rgba(248,250,252,0.3);
+  border-bottom: 1px solid rgba(255, 255, 255,0.3);
 }
 
 /* Marker z-index inside colored sections */
@@ -1874,7 +2125,7 @@ pre code { background: none; padding: 0; }
 /* Callout inside dark sections */
 .section-cobalt .callout,
 .section-dark .callout {
-  background: rgba(248, 250, 252, 0.08);
+  background: rgba(255, 255, 255, 0.08);
   border-left-color: var(--lime);
 }
 .section-cobalt .callout h4,
@@ -1946,7 +2197,7 @@ pre code { background: none; padding: 0; }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  background: rgba(248,250,252,0.15);
+  background: rgba(255, 255, 255,0.15);
   margin: 32px 0;
 }
 @media (max-width: 640px) {
@@ -2412,100 +2663,14 @@ pre code { background: none; padding: 0; }
 .stub-banner { background: #fef3c7; border: 1.5px solid #d97706; padding: var(--space-4) var(--space-5); }
 .stub-banner strong { color: #92400e; }
 
-/* === nav auth additions === */
-.nav-auth { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-
-.nav-signin {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-mid, #64748b);
-  text-decoration: none;
-  font-weight: 700;
-  padding: 8px 4px;
-}
-.nav-signin:hover { color: var(--navy); }
-
-.nav-cta {
-  display: inline-block;
-  padding: 9px 16px;
-  background: var(--lime);
-  color: var(--navy);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 700;
-  text-decoration: none;
-  border: 2px solid var(--lime);
-  transition: background 0.15s, border-color 0.15s;
-}
-.nav-cta:hover { background: var(--navy); border-color: var(--navy); color: var(--bone); }
-
-.nav-user { position: relative; }
-.nav-user-trigger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: transparent;
-  border: 1.5px solid var(--ink-hair);
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: var(--navy);
-  font-weight: 700;
-}
-.nav-user-trigger:hover { border-color: var(--cobalt); }
-.nav-user-email { text-transform: none; letter-spacing: 0; font-family: var(--sans, system-ui, sans-serif); font-size: 13px; font-weight: 500; }
-.nav-user-chevron { font-size: 10px; color: var(--ink-dim); }
-
-.nav-user-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  min-width: 200px;
-  background: var(--bone);
-  border: 1px solid var(--ink-hair);
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
-  padding: 6px 0;
-  z-index: 100;
-}
-.nav-user-menu[hidden] { display: none; }
-.nav-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 10px 16px;
-  font-family: var(--sans, system-ui, sans-serif);
-  font-size: 13px;
-  color: var(--ink);
-  text-decoration: none;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-.nav-menu-item:hover { background: rgba(29, 78, 216, 0.06); color: var(--cobalt); }
-.nav-menu-signout { color: #991b1b; }
-.nav-menu-signout:hover { background: rgba(220, 38, 38, 0.06); color: #991b1b; }
-.nav-menu-divider { height: 1px; background: var(--ink-hair); margin: 4px 0; }
-
-@media (max-width: 720px) {
-  .nav-auth { gap: 6px; }
-  .nav-signin { font-size: 10px; padding: 8px 2px; letter-spacing: 0.08em; }
-  .nav-cta { padding: 7px 10px; font-size: 9px; letter-spacing: 0.08em; border-width: 1.5px; }
-  .nav-help { display: none; }
-  .nav-user-email { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-}
-
-@media (max-width: 400px) {
-  .nav-auth { gap: 4px; }
-  .nav-signin { font-size: 9px; padding: 6px 2px; }
-  .nav-cta { padding: 6px 8px; font-size: 9px; }
-}
-/* === end nav auth === */
+/* De navigatiebalk staat in frontend/nav.css. Die had hier een tweede huis:
+   .nav-auth, .nav-signin, .nav-cta, .nav-user en .nav-help stonden in dit
+   bestand en de rest van de balk in nav.css, met twee losse media-queries
+   die de knop op een telefoon kleiner maakten in plaats van hem ruimte te
+   geven. Een balk die over twee stylesheets ligt is een balk waar niemand
+   het geheel van ziet. Alles staat nu in nav.css. Geen pagina laadt de een
+   zonder de ander: vault.html, billing/checkout.html en claim.html laden
+   design-system.css zonder nav.css en dragen geen van deze klassen. */
 
 
 /* ═══════════════════════════════════════════════════
@@ -2682,11 +2847,11 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
 /* ─── DARK BAND — reusable navy section ──────────────────── */
 .dark-band {
   background: #0B3A6A;
-  color: #F8FAFC;
+  color: #FFFFFF;
   padding: 48px 24px;
   margin: 48px 0;
 }
-.dark-band h2, .dark-band h3 { color: #F8FAFC; }
+.dark-band h2, .dark-band h3 { color: #FFFFFF; }
 .dark-band a { color: #B2FF3F; }
 .dark-band code, .dark-band .tag {
   background: #B2FF3F;
@@ -2697,7 +2862,7 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
 /* ── SECTION TINT — subtle off-white background for visual rhythm ── */
 /* visual-reset-v3 (sentinel) */
 .section-tint {
-  background: #F8FAFC;
+  background: #FFFFFF;
 }
 
 /* ── Skip to main content — WCAG 2.4.1 ─────────────────── */
@@ -2707,7 +2872,7 @@ a.skip-link,
   top: -200px !important;
   left: 0 !important;
   background: #0B3A6A;
-  color: #F8FAFC;
+  color: #FFFFFF;
   padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;
@@ -2723,6 +2888,11 @@ a.skip-link:focus-visible,
 .skip-link:focus-visible {
   top: 0 !important;
   outline: none;
+}
+a.skip-link:focus-visible,
+.skip-link:focus-visible {
+  outline: 3px solid var(--cobalt);
+  outline-offset: 2px;
 }
 
 
@@ -2826,7 +2996,7 @@ a.skip-link:focus-visible,
   margin: 80px auto 0 auto;
   padding: 24px;
   background: #0B3A6A;
-  color: #F8FAFC;
+  color: #FFFFFF;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 24px;
@@ -2842,7 +3012,7 @@ a.skip-link:focus-visible,
 .trust-value {
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
-  color: #F8FAFC;
+  color: #FFFFFF;
   line-height: 1.4;
 }
 @media (max-width: 900px) {
@@ -2855,33 +3025,6 @@ a.skip-link:focus-visible,
 @media (max-width: 500px) {
   .hero-trust-strip { grid-template-columns: 1fr; }
   .hero-split { padding: 32px 16px 64px 16px; }
-}
-
-/* ── Nav help link ──────────────────────────────────────── */
-.nav-help {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-mid, #64748b);
-  text-decoration: none;
-  font-weight: 700;
-  padding: 8px 12px;
-  border: 1px solid var(--ink-hair, #E2E8F0);
-  transition: all 140ms ease;
-  white-space: nowrap;
-}
-.nav-help:hover {
-  color: var(--navy, #0B3A6A);
-  border-color: var(--lime, #B2FF3F);
-  background: rgba(178, 255, 63, 0.08);
-}
-.nav-help:focus-visible {
-  outline: 2px solid var(--lime, #B2FF3F);
-  outline-offset: 2px;
-}
-@media (max-width: 900px) {
-  .nav-help { display: none; }
 }
 
 /* § 05 product grid — light-theme column differentiation ───────────────── */
@@ -2971,3 +3114,93 @@ a.skip-link:focus-visible,
   text-underline-offset: 2px;
 }
 .app-warning__link:hover { color: #7F1D1D; }
+
+/* ── Quota upgrade notice ─────────────────────────────────────────────────────
+   Rendered by js/quota-upgrade.js when the relay answers 402
+   monthly_*_quota_reached. A purchase moment, not an error dump. */
+.pa-quota-upsell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 480px;
+  padding: var(--space-4, 16px) var(--space-5, 20px);
+  border: 1px solid rgba(11, 58, 106, 0.14);
+  border-radius: 14px;
+  background: var(--bone, #FAF7F0);
+  box-shadow: 0 4px 14px rgba(11, 58, 106, 0.06);
+  text-align: left;
+}
+.pa-quota-upsell strong {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink, #0B1622);
+}
+.pa-quota-upsell span {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-dim, #5A6B7A);
+}
+.pa-quota-upsell .btn { margin-top: 4px; }
+
+
+/* Actions row inside the quota upgrade card (Upgrade to Pro / Maybe later),
+   rendered by js/quota-upgrade.js on the sign 402. */
+.pa-quota-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+/* ── Inline sign-quota notice ─────────────────────────────────────────────────
+   Rendered by js/quota-upgrade.js signNotice() after a successful sign:
+   free second signature, Firm last included signature. Informational, not an
+   error. */
+.pa-sign-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 10px 14px;
+  max-width: 560px;
+  border: 1px solid rgba(11, 58, 106, 0.14);
+  border-left: 3px solid var(--lime, #B2FF3F);
+  background: var(--bone, #FAF7F0);
+  text-align: left;
+}
+.pa-sign-note span {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink, #0B1622);
+}
+.pa-sign-note a { color: var(--cobalt, #1D4ED8); }
+
+/* Heading LEVEL vs heading SIZE. A page needs exactly one h1 for search engines
+   and screen readers, but the visual hierarchy does not always match the
+   document hierarchy. These two classes let the level be corrected without
+   changing how anything looks. */
+h2.paramant-h1 { font-size: var(--text-5xl); font-weight: 800; letter-spacing: -.035em; line-height: 0.94; }
+h1.paramant-h2 { font-size: var(--text-3xl); font-weight: inherit; letter-spacing: -.02em; line-height: inherit; }
+
+/* ── Legal strip ────────────────────────────────────────────
+   Auth, account and download pages carry no site footer. They still owe the
+   visitor the three legal documents, so apply-nav.py stamps this one line
+   there instead of a second navigation. */
+.legal-strip {
+  border-top: 1px solid var(--ink-hair, #E2E8F0);
+  margin-top: var(--space-6, 48px);
+  padding: 16px 24px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim, #64748b);
+}
+.legal-strip a {
+  color: var(--ink-dim, #64748b);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding: 2px 0;
+}
+.legal-strip a:hover { color: var(--navy, #0B3A6A); border-bottom-color: var(--lime, #B2FF3F); }
+.legal-strip a:focus-visible { outline: 2px solid var(--lime, #B2FF3F); outline-offset: 2px; }
+.legal-strip .legal-sep { padding: 0 8px; opacity: 0.5; }

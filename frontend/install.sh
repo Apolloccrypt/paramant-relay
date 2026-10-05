@@ -21,7 +21,7 @@ dim()  { echo -e "${D}$*${E}"; }
 
 INSTALL_DIR="${PARAMANT_DIR:-/opt/paramant}"
 REPO="https://github.com/Apolloccrypt/paramant-relay"
-VERSION="v3.0.0"
+RELAY_VERSION="${PARAMANT_VERSION:-v3.0.0}"
 MIN_RAM_MB=512
 MIN_DISK_GB=4
 
@@ -34,7 +34,7 @@ ${C}${BOLD}  ██╔═══╝ ██╔══██║██╔══██
 ${C}${BOLD}  ██║     ██║  ██║██║  ██║██║  ██║██║ ╚═╝ ██║██║  ██║██║ ╚███║   ██║   ${E}
 ${C}${BOLD}  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚══╝   ╚═╝   ${E}
 
-  ${D}Post-Quantum Relay Installer ${VERSION}${E}
+  ${D}Post-Quantum Relay Installer ${RELAY_VERSION}${E}
   ${D}ML-KEM-768 · Burn-on-read · Community Edition${E}
 
   ${Y}License: BUSL-1.1 — free for up to 5 API keys.${E}
@@ -221,10 +221,18 @@ if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" pull --ff-only -q
   ok "Updated to latest"
 else
-  info "Cloning ${REPO}..."
-  git clone --depth 1 --branch "${VERSION}" "$REPO" "$INSTALL_DIR" -q 2>/dev/null \
-    || git clone --depth 1 "$REPO" "$INSTALL_DIR" -q
-  ok "Cloned to ${INSTALL_DIR}"
+  info "Cloning ${REPO} at ${RELAY_VERSION}..."
+  # Pin to the release tag. Do NOT silently fall back to an unpinned default-
+  # branch clone if the tag is missing/unreachable: that would install whatever
+  # HEAD happens to be (supply-chain integrity gap). Fail loudly so the operator
+  # can pick a known-good PARAMANT_VERSION instead of getting a surprise revision.
+  if ! git clone --depth 1 --branch "${RELAY_VERSION}" "$REPO" "$INSTALL_DIR" -q; then
+    err "Could not clone ${REPO} at tag ${RELAY_VERSION}."
+    err "Refusing to fall back to an unpinned clone. Check your network, or set"
+    err "PARAMANT_VERSION to a tag that exists (see ${REPO}/tags) and re-run."
+    exit 1
+  fi
+  ok "Cloned ${RELAY_VERSION} to ${INSTALL_DIR}"
 fi
 
 cd "$INSTALL_DIR"
@@ -359,7 +367,7 @@ case "\${1:-help}" in
     docker compose -f "\${INSTALL_DIR}/docker-compose.yml" ps
     echo ""
     echo "=== Health ==="
-    for port in 3005 3002 3003 3004; do
+    for port in 3000 3001 3002 3003 3004; do
       resp=\$(curl -s http://127.0.0.1:\$port/health 2>/dev/null || echo '{}')
       ok=\$(echo "\$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ok','?'))" 2>/dev/null)
       ver=\$(echo "\$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null)
@@ -378,7 +386,7 @@ case "\${1:-help}" in
     ;;
   reload)
     echo "Reloading API keys (zero downtime)..."
-    for port in 3005 3002 3003 3004; do
+    for port in 3000 3001 3002 3003 3004; do
       resp=\$(curl -s -X POST http://127.0.0.1:\$port/v2/reload-users \
         -H "X-Api-Key: \${ADMIN_TOKEN}" \
         -H "Content-Type: application/json" -d '{}' 2>/dev/null || echo '{"error":"unreachable"}')
@@ -441,7 +449,7 @@ echo ""
 echo -e "  ${Y}${BOLD}MFA (TOTP) instellen — vereist voor admin panel:${E}"
 echo -e "  ${C}${TOTP_URI}${E}"
 echo -e "  Scan bovenstaande URI in je Authenticator app (Google Authenticator, Aegis, etc.)"
-echo -e "  ${D}Of voeg handmatig toe — Secret: ${TOTP_SECRET}  Algoritme: SHA256  Cijfers: 6  Periode: 30s${E}"
+echo -e "  ${D}Of voeg handmatig toe. Secret: ${TOTP_SECRET}  Algoritme: SHA256 (aanbevolen; elke standaard-app werkt, ook SHA-1)  Cijfers: 6  Periode: 30s${E}"
 echo ""
 echo -e "  ${D}Manage your relay:${E}"
 echo -e "  ${C}paramant status${E}       — check health"
@@ -450,8 +458,8 @@ echo -e "  ${C}paramant reload${E}       — reload API keys (zero downtime)"
 echo -e "  ${C}paramant upgrade${E}      — update to latest version"
 echo ""
 echo -e "  ${D}Add your first API key:${E}"
-echo -e "  ${C}python3 ${INSTALL_DIR}/scripts/paramant-admin.py add --label myuser --plan pro${E}"
-echo -e "  ${C}ADMIN_TOKEN=\$(paramant token) python3 ${INSTALL_DIR}/scripts/paramant-admin.py sync${E}"
+echo -e "  ${C}python3 ${INSTALL_DIR}/deploy/paramant-admin.py add --label myuser --plan pro${E}"
+echo -e "  ${C}ADMIN_TOKEN=\$(paramant token) python3 ${INSTALL_DIR}/deploy/paramant-admin.py sync${E}"
 echo ""
 echo -e "  ${D}Docs:${E} https://github.com/Apolloccrypt/paramant-relay#self-hosting"
 echo -e "  ${D}License: BUSL-1.1 — free for ≤5 API keys${E}"

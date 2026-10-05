@@ -21,7 +21,7 @@ dim()  { echo -e "${D}$*${E}"; }
 
 INSTALL_DIR="${PARAMANT_DIR:-/opt/paramant}"
 REPO="https://github.com/Apolloccrypt/paramant-relay"
-VERSION="v3.0.0"
+RELAY_VERSION="${PARAMANT_VERSION:-v3.0.0}"
 MIN_RAM_MB=512
 MIN_DISK_GB=4
 
@@ -34,7 +34,7 @@ ${C}${BOLD}  ██╔═══╝ ██╔══██║██╔══██
 ${C}${BOLD}  ██║     ██║  ██║██║  ██║██║  ██║██║ ╚═╝ ██║██║  ██║██║ ╚███║   ██║   ${E}
 ${C}${BOLD}  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚══╝   ╚═╝   ${E}
 
-  ${D}Post-Quantum Relay Installer ${VERSION} — Raspberry Pi Edition${E}
+  ${D}Post-Quantum Relay Installer ${RELAY_VERSION} — Raspberry Pi Edition${E}
   ${D}ML-KEM-768 · Burn-on-read · Community Edition${E}
 
   ${Y}License: BUSL-1.1 — free for up to 5 API keys.${E}
@@ -211,10 +211,18 @@ if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" pull --ff-only -q
   ok "Updated to latest"
 else
-  info "Cloning ${REPO}..."
-  git clone --depth 1 --branch "${VERSION}" "$REPO" "$INSTALL_DIR" -q 2>/dev/null \
-    || git clone --depth 1 "$REPO" "$INSTALL_DIR" -q
-  ok "Cloned to ${INSTALL_DIR}"
+  info "Cloning ${REPO} at ${RELAY_VERSION}..."
+  # Pin to the release tag. Do NOT silently fall back to an unpinned default-
+  # branch clone if the tag is missing/unreachable: that would install whatever
+  # HEAD happens to be (supply-chain integrity gap). Fail loudly so the operator
+  # can pick a known-good PARAMANT_VERSION instead of getting a surprise revision.
+  if ! git clone --depth 1 --branch "${RELAY_VERSION}" "$REPO" "$INSTALL_DIR" -q; then
+    err "Could not clone ${REPO} at tag ${RELAY_VERSION}."
+    err "Refusing to fall back to an unpinned clone. Check your network, or set"
+    err "PARAMANT_VERSION to a tag that exists (see ${REPO}/tags) and re-run."
+    exit 1
+  fi
+  ok "Cloned ${RELAY_VERSION} to ${INSTALL_DIR}"
 fi
 
 cd "$INSTALL_DIR"
@@ -288,7 +296,7 @@ step "Step 8/8 — Launching relay stack"
 cd "$INSTALL_DIR"
 
 info "Pulling arm64 image from Docker Hub..."
-docker pull mtty001/relay:latest --platform linux/arm64 2>&1 | tail -3 || true
+docker pull "mtty001/relay:${VERSION#v}" --platform linux/arm64 2>&1 | tail -3 || true
 
 info "Starting services..."
 docker compose up -d --remove-orphans 2>&1 | tail -5
@@ -369,7 +377,7 @@ echo ""
 echo -e "  ${Y}${BOLD}MFA (TOTP) instellen — vereist voor admin panel:${E}"
 echo -e "  ${C}${TOTP_URI}${E}"
 echo -e "  Scan bovenstaande URI in je Authenticator app (Google Authenticator, Aegis, etc.)"
-echo -e "  ${D}Secret: ${TOTP_SECRET}  Algoritme: SHA256  Cijfers: 6  Periode: 30s${E}"
+echo -e "  ${D}Secret: ${TOTP_SECRET}  Algoritme: SHA256 (aanbevolen; elke standaard-app werkt, ook SHA-1)  Cijfers: 6  Periode: 30s${E}"
 echo ""
 echo -e "  ${C}paramant status${E}    — check health"
 echo -e "  ${C}paramant logs${E}      — tail all logs"

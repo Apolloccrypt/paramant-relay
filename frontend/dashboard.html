@@ -1,411 +1,810 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Your Paramant — Dashboard</title>
-<meta name="description" content="Sign in to your Paramant dashboard.">
-<meta name="theme-color" content="#0B1622">
-<link rel="icon" type="image/svg+xml" href="/assets/paramant-icon.svg">
+<title>Uw overzicht · Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://paramant.app/dashboard">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/dashboard">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/dashboard">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/dashboard">
+<meta name="description" content="Log in op uw Paramant-overzicht.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
-<link rel="stylesheet" href="/design-system.css">
-<link rel="stylesheet" href="/nav.css">
-<link rel="stylesheet" href="/parapear.css">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/parapear.css?v=4">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
 <style>
 /* Dashboard. Client-side rendered from /api/user/me JSON. Auth-gate stays
    hard: on 401 the loader hard-redirects to /auth/login?next=/dashboard
-   before any tool-surface markup is revealed. The placeholder shown during
-   the fetch carries no user data and no enumerated tool routes.
-   Design: design-system tokens only. Apple-style: generous whitespace,
-   soft elevation (shadows, not borders), one lime accent on the flagship
-   cards, sober monochrome elsewhere. */
-.nav-cta, a.nav-cta, .nav .nav-cta { color: var(--navy) !important; }
+   before any account data is revealed. The placeholder shown during the fetch
+   carries no user data.
 
-main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); min-height: 70vh; }
+   The shape follows docs/brand/design-direction.md: hairlines instead of
+   boxes, exactly one filled accent (Request signatures), exactly one inverted
+   block (Community), and the register underneath in three columns that stack
+   in reading order below 760px. Tokens come from /app-2026.css, which is the
+   last stylesheet in the head so this block can be read against it. */
 
-/* Placeholder shown until fetch lands or redirects */
-.pa-loading { padding: var(--space-7) var(--space-4); text-align: center; color: var(--ink-dim); font-family: var(--sans); font-size: 14px; }
-.pa-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--ink-hair); border-top-color: var(--lime); border-radius: 50%; animation: pa-spin 0.8s linear infinite; vertical-align: middle; margin-right: 10px; }
-@keyframes pa-spin { to { transform: rotate(360deg); } }
-.pa-err-link { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); min-height: 70vh; }
 [hidden] { display: none !important; }
 
-/* Hero strip -- compact, identity + plan */
-.dh-hero { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) 0 var(--space-4); border-bottom: 1px solid var(--ink-hair); margin-bottom: var(--space-6); }
-.dh-hero h1 { font-family: var(--sans); font-size: clamp(26px, 3.4vw, 36px); line-height: 1.1; letter-spacing: -.018em; margin: 0; color: var(--ink); font-weight: 600; }
-.dh-hero h1 small { display: block; font-size: 14px; font-weight: 400; color: var(--ink-dim); margin-top: var(--space-1); letter-spacing: 0; }
-.dh-hero .dh-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding: 4px 10px; border: 1px solid var(--ink-hair); border-radius: 999px; background: var(--bone); }
-.dh-hero .dh-plan strong { color: var(--ink); font-weight: 600; }
+/* ── The placeholder that carries no user data ─────────────────────────────
+   It has the SHAPE of what is coming, so nothing jumps when the data lands. */
+.pa-loading { padding: var(--space-2) 0 var(--space-6); color: var(--ink-2); font: 14px/1.6 var(--sans); }
+.pa-loading .parapear-block { justify-content: flex-start; }
+.pa-spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; animation: pa-spin .8s linear infinite; vertical-align: -2px; margin-right: 10px; }
+@keyframes pa-spin { to { transform: rotate(360deg); } }
+.pa-err-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+#dh-error { border: 1px solid var(--line-2); border-left: 3px solid var(--sig-stop); border-radius: var(--r-1); background: var(--sig-stop-bg); padding: 16px 18px; color: var(--ink-1); }
 
-/* Onboarding hint (ParaPear, dismissible once) */
-.dh-onb { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); border-radius: 16px; background: var(--bone); border: 1px solid var(--ink-hair); margin-bottom: var(--space-5); box-shadow: 0 1px 2px rgba(11,58,106,0.04); }
-.dh-onb img { width: 92px; height: auto; flex-shrink: 0; }
-.dh-onb .dh-onb-text { flex: 1 1 auto; font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink); }
-.dh-onb .dh-onb-kicker { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
-.dh-onb .dh-onb-dismiss { background: transparent; border: none; padding: 8px 10px; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; border-radius: 8px; line-height: 1; }
-.dh-onb .dh-onb-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
-@media (max-width: 600px) { .dh-onb { flex-direction: column; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); } .dh-onb img { width: 96px; } }
+/* ── Hero: who you are and which plan pays for it ──────────────────────────── */
+.dh-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-2) 0 var(--space-5); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); }
+.dh-hero h1 { font-family: var(--sans); font-size: clamp(28px, 3.6vw, 44px); line-height: 1.08; letter-spacing: -.028em; margin: 0 0 10px; color: var(--ink-1); font-weight: 600; max-width: 20ch; }
+.dh-mission { max-width: 58ch; margin: 0; font: 16px/1.62 var(--sans); color: var(--ink-2); }
+/* The plan pill carries a beacon because the plan is measured, not claimed:
+   dashboard.js writes it from what /api/user/me actually returns. */
+.dh-hero .dh-plan { display: inline-flex; align-items: center; gap: 9px; margin-top: 6px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); padding: 7px 14px; border: 1px solid var(--line-2); border-radius: var(--r-pill); background: var(--surface); white-space: nowrap; }
+.dh-hero .dh-plan::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--sig-done); box-shadow: 0 0 0 3px var(--sig-done-bg); }
+.dh-hero .dh-plan strong { color: var(--ink-1); font-weight: 600; }
 
-/* Flagship pair -- the two big actions */
-.dh-flagship { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); margin-bottom: var(--space-7); }
-.dh-flag-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-6) var(--space-5) var(--space-5); border-radius: 18px; background: var(--bone); text-decoration: none; color: var(--ink); transition: transform .18s ease, box-shadow .18s ease; box-shadow: 0 1px 2px rgba(11,58,106,0.05), 0 4px 14px rgba(11,58,106,0.04); border: 1px solid rgba(11,58,106,0.06); position: relative; overflow: hidden; }
-.dh-flag-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(11,58,106,0.06), 0 14px 32px rgba(11,58,106,0.08); }
-.dh-flag-card:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; }
-.dh-flag-icon { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; border-radius: 16px; background: var(--lime); color: var(--navy); font-family: var(--mono); font-weight: 700; font-size: 24px; margin-bottom: var(--space-2); flex-shrink: 0; }
-.dh-flag-card h2 { font-family: var(--sans); font-size: 22px; line-height: 1.2; letter-spacing: -.01em; margin: 0; color: var(--ink); font-weight: 600; }
-.dh-flag-card p { font-family: var(--sans); font-size: 14.5px; line-height: 1.55; color: var(--ink-dim); margin: 0; flex: 1; }
-.dh-flag-meta { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding-top: var(--space-3); border-top: 1px solid var(--ink-hair); margin-top: var(--space-3); }
-.dh-flag-cta { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); margin-top: var(--space-2); display: inline-flex; align-items: center; gap: 6px; }
-.dh-flag-cta::after { content: "\2192"; transition: transform .18s ease; }
-.dh-flag-card:hover .dh-flag-cta::after { transform: translateX(3px); }
-@media (max-width: 720px) { .dh-flagship { grid-template-columns: 1fr; gap: var(--space-3); margin-bottom: var(--space-6); } .dh-flag-card { padding: var(--space-5) var(--space-4); border-radius: 16px; } .dh-flag-icon { width: 48px; height: 48px; font-size: 20px; border-radius: 14px; } .dh-flag-card h2 { font-size: 19px; } }
+/* ── Three ways in. One of them is the primary action of this screen. ─────── */
+.dh-start { display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, .825fr)); gap: var(--space-3); margin-bottom: var(--space-6); }
+.dh-start-card { min-height: 178px; display: flex; flex-direction: column; padding: 22px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); color: var(--ink-1); text-decoration: none; box-shadow: var(--sh-1); transition: transform var(--d-2) var(--e-standard), border-color var(--d-2) var(--e-standard), box-shadow var(--d-2) var(--e-standard); }
+.dh-start-card:hover { transform: translateY(-1px); border-color: var(--line-2); box-shadow: var(--sh-2); }
+.dh-start-card:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-start-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r-1); background: var(--accent-soft); color: var(--accent); font-size: 18px; margin-bottom: auto; }
+.dh-start-kicker { display: block; margin: 18px 0 7px; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.dh-start-card h2 { margin: 0 0 6px; font: 600 19px/1.18 var(--sans); letter-spacing: -.014em; color: inherit; }
+.dh-start-card p { margin: 0; font: 14px/1.55 var(--sans); color: var(--ink-2); }
+.dh-start-link { margin-top: 18px; display: inline-flex; align-items: center; gap: 7px; font: 600 13px/1 var(--sans); color: inherit; }
+/* The one filled accent on this screen. */
+.dh-start-card.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: var(--sh-2); }
+.dh-start-card.primary:hover { background: var(--accent-hov); border-color: var(--accent-hov); }
+.dh-start-card.primary .dh-start-icon { background: rgba(0, 0, 0, .14); color: var(--accent-ink); }
+.dh-start-card.primary .dh-start-kicker { color: var(--accent-ink); opacity: .8; }
+.dh-start-card.primary p { color: var(--accent-ink); opacity: .86; }
 
-/* Secondary tools row */
-.dh-tools-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 var(--space-3); }
-.dh-tools-head h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0; font-weight: 600; }
-.dh-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-7); }
-.dh-tool { display: flex; flex-direction: column; gap: 4px; padding: var(--space-4) var(--space-4); border-radius: 14px; background: var(--bone); text-decoration: none; color: var(--ink); transition: transform .15s ease, box-shadow .15s ease; box-shadow: 0 1px 2px rgba(11,58,106,0.03); border: 1px solid rgba(11,58,106,0.06); }
-.dh-tool:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(11,58,106,0.04), 0 6px 14px rgba(11,58,106,0.06); }
-.dh-tool:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
-.dh-tool h3 { font-family: var(--sans); font-size: 16px; font-weight: 600; margin: 0; color: var(--ink); letter-spacing: -.005em; }
-.dh-tool p { font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+/* ── The give-back band. The one inverted block on this screen. ───────────── */
+.dh-community { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); padding: var(--space-5); margin-bottom: var(--space-6); }
+.dh-community > div { flex: 1 1 340px; }
+.dh-community-kicker { margin: 0 0 var(--space-3); font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+.dh-community-lede { margin: 0 0 var(--space-3); font: 15px/1.62 var(--sans); max-width: 62ch; }
+.dh-community-adds { margin: 0; font: 13px/1.62 var(--sans); max-width: 62ch; }
+.dh-community-cta { flex: 0 0 auto; }
 
-/* Account block -- compact, expandable */
-.dh-acct { border-radius: 16px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.04); overflow: hidden; }
-.dh-acct-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); cursor: pointer; user-select: none; flex-wrap: wrap; list-style: none; color: var(--ink); }
+/* ── What a paying customer bought. No link to a higher tier. ─────────────── */
+.dh-paid { padding: var(--space-4) var(--space-5); margin-bottom: var(--space-6); }
+.dh-paid-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.dh-paid-lede { margin: 0 0 var(--space-2); font: 15px/1.62 var(--sans); color: var(--ink-1); }
+.dh-paid-foot { margin: 0; font: 13px/1.6 var(--sans); color: var(--ink-2); }
+
+/* ── One-time usage question ───────────────────────────────────────────────── */
+.dh-purpose { padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); }
+.dh-purpose-kicker { display: block; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+.dh-purpose h2 { font: 600 18px/1.2 var(--sans); letter-spacing: -.014em; color: var(--ink-1); margin: 0 0 3px; }
+.dh-purpose-sub { font: 13px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 var(--space-3); }
+.dh-purpose-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-2); }
+.dh-purpose-opt { text-align: left; cursor: pointer; font: inherit; min-height: var(--tap); padding: var(--space-3) var(--space-4); border-radius: var(--r-1); border: 1px solid var(--line-2); background: var(--surface); transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-purpose-opt:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.dh-purpose-opt:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-purpose-opt:disabled { opacity: .5; cursor: default; }
+.dh-purpose-opt strong { display: block; font: 600 14px/1.3 var(--sans); color: var(--ink-1); margin-bottom: 2px; }
+.dh-purpose-opt span { display: block; font: 12px/1.45 var(--sans); color: var(--ink-2); }
+.dh-purpose-foot { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+.dh-purpose-note { font: 13px/1.5 var(--sans); color: var(--sig-stop); }
+
+/* ── The register ──────────────────────────────────────────────────────────── */
+.dh-workspace { margin-bottom: var(--space-6); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); box-shadow: var(--sh-1); overflow: hidden; }
+.dh-workspace-head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 24px 26px 16px; }
+.dh-workspace-head h2 { margin: 0 0 4px; font: 600 clamp(19px, 2vw, 22px)/1.18 var(--sans); letter-spacing: -.022em; color: var(--ink-1); }
+.dh-workspace-head p { margin: 0; font: 14px/1.55 var(--sans); color: var(--ink-2); max-width: 58ch; }
+.dh-refresh { flex: 0 0 auto; min-height: 36px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: transparent; color: var(--ink-1); padding: 9px 14px; font: 500 13px/1 var(--sans); cursor: pointer; transition: border-color var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard); }
+.dh-refresh:hover { border-color: var(--accent); color: var(--accent); }
+.dh-refresh:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-refresh[disabled] { opacity: .55; cursor: default; }
+
+/* Segmented control. The count is inside the button, because the count is the
+   reason you click it. Active is the inverted field with a lime counter. */
+.dh-filters { display: flex; gap: 0; margin: 0 26px 0; padding: 0 0 16px; overflow-x: auto; scrollbar-width: none; }
+.dh-filters::-webkit-scrollbar { display: none; }
+.dh-filter { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; border: 1px solid var(--line-2); border-right-width: 0; border-radius: var(--r-0); padding: 8px 14px; background: transparent; color: var(--ink-2); font: 500 13px/1 var(--sans); white-space: nowrap; cursor: pointer; transition: background var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard); }
+.dh-filter:first-child { border-top-left-radius: var(--r-1); border-bottom-left-radius: var(--r-1); }
+.dh-filter:last-child { border-right-width: 1px; border-top-right-radius: var(--r-1); border-bottom-right-radius: var(--r-1); }
+.dh-filter:hover { background: var(--line-ghost); color: var(--ink-1); }
+.dh-filter [data-doc-count] { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--ink-3); }
+.dh-filter[aria-pressed="true"] { background: var(--surface-ink); border-color: var(--surface-ink); color: var(--on-ink); }
+.dh-filter[aria-pressed="true"] + .dh-filter { border-left-color: var(--surface-ink); }
+.dh-filter[aria-pressed="true"] [data-doc-count] { color: var(--on-ink-accent); }
+.dh-filter:focus-visible { outline: none; box-shadow: var(--ring); position: relative; z-index: 1; }
+
+.dh-documents { border-top: 1px solid var(--line); }
+.dh-send-rows { border-top: 1px solid var(--line); }
+/* A row is a container now: the top half opens the detail, the strip under it
+   says what happens next and carries the control that closes the request. */
+.dh-document { border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
+.dh-send-row { border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
+.dh-document:last-child { border-bottom: 0; }
+.dh-send-row:last-child { border-bottom: 0; }
+.dh-document:hover { background: var(--accent-soft); }
+.dh-send-row:hover { background: var(--accent-soft); }
+.dh-document-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dh-send-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dh-document-open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+.dh-send-open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+/* The affordance the old row never had: a hint that there is more behind it. */
+.dh-document-open::after { content: 'Details'; position: absolute; opacity: 0; }
+.dh-send-open::after { content: 'Details'; position: absolute; opacity: 0; }
+.dh-document-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 26px 15px; }
+.dh-send-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 26px 15px; }
+.dh-document-next { flex: 1 1 220px; min-width: 0; font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-send-next { flex: 1 1 220px; min-width: 0; font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-document-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dh-send-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dh-rowbtn { padding: 7px 14px; border: 1px solid var(--line); border-radius: var(--r-pill); background: transparent; color: var(--ink-1); font: 600 12px/1.2 var(--sans); cursor: pointer; text-decoration: none; transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-rowbtn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dh-rowbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-ring); }
+.dh-rowbtn.danger { color: var(--sig-stop, #d05b52); border-color: color-mix(in srgb, var(--sig-stop, #d05b52) 42%, transparent); }
+.dh-rowbtn.danger:hover { background: color-mix(in srgb, var(--sig-stop, #d05b52) 12%, transparent); border-color: var(--sig-stop, #d05b52); }
+.dh-rowask { flex: 1 1 100%; font: 400 13px/1.45 var(--sans); color: var(--ink-1); }
+.dh-rowask strong { font-weight: 600; }
+.dh-rowsay { font: 500 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-rowsay.done { color: var(--sig-ok, #4c9a72); }
+.dh-rowsay.fail { color: var(--sig-stop, #d05b52); }
+.dh-send-people { display: flex; flex-direction: column; gap: 2px; padding: 0 26px 14px; }
+.dh-send-person { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+.dh-send-person:first-child { border-top: 0; }
+.dh-send-who { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 13px/1.4 var(--sans); color: var(--ink-1); }
+.dh-send-when { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+.dh-dot { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1.3 var(--sans); white-space: nowrap; }
+.dh-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.dh-dot.collected { color: var(--sig-ok, #4c9a72); }
+.dh-dot.waiting { color: var(--sig-wait, #b58a2b); }
+.dh-dot.revoked { color: var(--ink-3); }
+@media (max-width: 640px) {
+  .dh-send-people { padding: 0 18px 12px; }
+  .dh-send-person { gap: 6px; }
+}
+@media (max-width: 640px) {
+  .dh-document-open { grid-template-columns: 1fr; gap: 10px; padding: 15px 18px 11px; }
+  .dh-send-open { grid-template-columns: 1fr; gap: 10px; padding: 15px 18px 11px; }
+  .dh-document-foot { padding: 0 18px 14px; }
+  .dh-send-foot { padding: 0 18px 14px; }
+  /* On a phone the control is the point of the strip, so it gets its own line
+     and a full-width target rather than a pill squeezed next to the sentence. */
+  .dh-document-acts { width: 100%; }
+  .dh-send-acts { width: 100%; }
+  .dh-document-acts .dh-rowbtn { flex: 1 1 auto; text-align: center; padding: 11px 14px; }
+  .dh-send-acts .dh-rowbtn { flex: 1 1 auto; text-align: center; padding: 11px 14px; }
+  /* Dezelfde maat voor de knoppen PER PERSOON. Die stonden op 30px hoog naast
+     een lang e-mailadres: te klein om op een telefoon te raken, en Withdraw is
+     een knop die je niet per ongeluk wilt indrukken en ook niet drie keer wilt
+     missen. Elk op een eigen regel, want naast elkaar past het adres niet. */
+  .dh-send-person { flex-wrap: wrap; gap: 8px; }
+  .dh-send-person .dh-rowbtn { flex: 1 1 100%; text-align: center; padding: 11px 14px; min-height: 40px; }
+  .dh-send-who { flex: 1 1 100%; word-break: break-word; }
+}
+.dh-document-name { min-width: 0; }
+.dh-send-name { min-width: 0; }
+.dh-document-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
+.dh-send-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
+.dh-document-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+.dh-send-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+/* The reference is a whole value or an honestly shortened one. Cut without a
+   sign that it was cut, "env_waiting_..." read as the complete id. */
+.dh-document-name .dh-doc-ref { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.dh-send-name .dh-doc-ref { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.dh-document-progress { min-width: 0; }
+.dh-send-progress { min-width: 0; }
+/* Never a bar without the number next to it. */
+.dh-document-progress span { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-2); }
+.dh-send-progress span { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-2); }
+/* The track has to be dark enough for the meter to read against it. On
+   --line-2 the ochre fill measures 2.92:1, which is the wrong side of the
+   3:1 WCAG 2.1 SC 1.4.11 asks of a control that shows a state. */
+.dh-progress { width: 100%; height: 3px; border-radius: var(--r-0); background: var(--ink-hair); overflow: hidden; }
+.dh-progress i { display: block; height: 100%; background: var(--accent); transform-origin: left center; animation: dh-meter var(--d-3) var(--e-standard) both; }
+@keyframes dh-meter { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* The four states are the four words dashboard.js renders, and nothing else. */
+.dh-status { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: var(--r-pill); font: 600 12px/1.35 var(--sans); white-space: nowrap; color: var(--sig-wait); background: var(--sig-wait-bg); }
+.dh-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.dh-status.waiting     { color: var(--sig-wait); background: var(--sig-wait-bg); }
+.dh-status.in_progress { color: var(--sig-move); background: var(--sig-move-bg); }
+.dh-status.completed   { color: var(--sig-done); background: var(--sig-done-bg); }
+.dh-status.cancelled   { color: var(--sig-stop); background: var(--sig-stop-bg); }
+
+.dh-empty { padding: 48px 26px; text-align: center; }
+.dh-empty strong { display: block; margin-bottom: 8px; font: 600 16px/1.3 var(--sans); color: var(--ink-1); }
+.dh-empty span { display: block; max-width: 52ch; margin: 0 auto; font: 14px/1.6 var(--sans); color: var(--ink-2); }
+.dh-empty .dh-refresh { margin-top: 12px; }
+.dh-empty .dh-empty-cta { margin-top: 16px; min-height: var(--tap); border-color: var(--accent); color: var(--accent); }
+.dh-empty .dh-empty-cta:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+/* Loading skeleton: the shape of a register row, so the page does not jump. */
+.dh-skel-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; padding: 17px 26px; border-bottom: 1px solid var(--line); }
+.dh-skel-row:last-child { border-bottom: 0; }
+.dh-skel { border-radius: var(--r-1); background: linear-gradient(90deg, var(--surface-sunk) 0%, var(--line-ghost) 42%, var(--surface-sunk) 84%); background-size: 300% 100%; animation: dh-skel-slide 1.25s var(--e-standard) infinite; }
+@keyframes dh-skel-slide { from { background-position: 120% 0; } to { background-position: -60% 0; } }
+.dh-skel-row .s-name { height: 13px; width: 58%; }
+.dh-skel-row .s-ref  { height: 10px; width: 34%; margin-top: 9px; }
+.dh-skel-row .s-num  { height: 10px; width: 76px; }
+.dh-skel-row .s-bar  { height: 3px; width: 100%; margin-top: 9px; border-radius: var(--r-0); }
+.dh-skel-row .s-chip { height: 24px; width: 130px; border-radius: var(--r-pill); }
+/* Full-page loading silhouette. Same measurements as the real thing, so the
+   swap costs no layout shift. */
+.dh-skel-page { padding-top: var(--space-2); }
+.dh-skel-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); }
+.dh-skel-hero .s-h1 { height: 40px; width: 420px; max-width: 78vw; margin-bottom: 8px; }
+.dh-skel-hero .s-h1.short { width: 300px; max-width: 56vw; margin-bottom: 16px; }
+.dh-skel-hero .s-lede { height: 15px; width: 520px; max-width: 92vw; }
+.dh-skel-hero .s-pill { height: 31px; width: 148px; border-radius: var(--r-pill); margin-top: 6px; }
+.dh-skel-start { display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, .825fr)); gap: var(--space-3); margin-bottom: var(--space-6); }
+.dh-skel-start .s-card { height: 178px; border-radius: var(--r-2); }
+.dh-skel-workspace { border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); }
+.dh-skel-wshead { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 24px 26px 16px; }
+.dh-skel-wshead .s-h2 { height: 26px; width: 220px; }
+.dh-skel-wshead .s-btn { height: 36px; width: 84px; border-radius: var(--r-1); }
+.dh-skel-filters { display: flex; gap: 0; padding: 0 26px 16px; }
+.dh-skel-filters .s-filter { height: 36px; width: 104px; border-radius: var(--r-0); }
+.dh-skel-rows { border-top: 1px solid var(--line); }
+@media (max-width: 760px) {
+  .dh-skel-start { grid-template-columns: 1fr; }
+  .dh-skel-start .s-card { height: 150px; }
+  .dh-skel-start .s-card:nth-child(n+3) { height: 104px; }
+  .dh-skel-wshead { padding: 20px 18px 14px; }
+  .dh-skel-filters { padding: 0 18px 14px; }
+}
+
+.dh-invites { display: flex; gap: 14px; align-items: flex-start; margin: 0 26px 22px; padding: 14px 16px; border-radius: var(--r-1); border-left: 2px solid var(--mark); background: var(--surface-sunk); }
+.dh-invites-icon { color: var(--accent); font-size: 17px; line-height: 1.4; }
+.dh-invites strong { display: block; margin-bottom: 3px; font: 600 13px/1.4 var(--sans); color: var(--ink-1); }
+.dh-invites span { display: block; font: 13px/1.55 var(--sans); color: var(--ink-2); }
+
+/* ── Waiting for your signature ─────────────────────────────────────────────
+   The register row of the outbox is a button that opens a detail dialog. These
+   rows are not: this page holds no way to open somebody else's document, so the
+   only control is the modest "mail me that link again". */
+.dh-inbox-list { display: grid; gap: 1px; padding: 0 26px 22px; }
+.dh-inbox-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.dh-inbox-row:last-child { border-bottom: 0; }
+.dh-inbox-name { min-width: 0; }
+.dh-inbox-name strong { display: block; font: 600 15px/1.35 var(--sans); color: var(--ink-1); overflow-wrap: anywhere; }
+.dh-inbox-name span { display: block; margin-top: 3px; font: 13px/1.5 var(--sans); color: var(--ink-2); }
+.dh-inbox-act { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface); font: 600 13px/1 var(--sans); color: var(--ink-2); cursor: pointer; }
+.dh-inbox-act:hover, .dh-inbox-act:focus-visible { color: var(--ink-1); border-color: var(--accent); }
+.dh-inbox-act[disabled] { cursor: default; color: var(--ink-3, var(--ink-2)); border-color: var(--line); }
+
+/* ── Document detail ───────────────────────────────────────────────────────── */
+.dh-doc-dialog { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 14px; background: rgba(0, 0, 0, .62); animation: dh-veil var(--d-2) var(--e-standard) both; }
+@keyframes dh-veil { from { opacity: 0; } to { opacity: 1; } }
+.dh-doc-dialog-panel { width: min(620px, 100%); max-height: calc(100dvh - 28px); overflow: auto; border-radius: var(--r-3); color: var(--ink-1); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-3); animation: dh-panel-in var(--d-3) var(--e-enter) both; }
+@keyframes dh-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.dh-doc-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 22px 24px 16px; border-bottom: 1px solid var(--line); }
+.dh-doc-dialog-head h2 { margin: 0; font: 600 20px/1.25 var(--sans); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.dh-doc-close { flex: 0 0 auto; width: var(--tap); height: var(--tap); margin: -10px -10px 0 0; border: 0; border-radius: var(--r-1); background: transparent; color: var(--ink-2); font-size: 24px; line-height: 1; cursor: pointer; }
+.dh-doc-close:hover { background: var(--line-ghost); color: var(--ink-1); }
+.dh-doc-close:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-doc-dialog-body { padding: 20px 24px 24px; }
+.dh-doc-kv { display: grid; grid-template-columns: 116px 1fr; gap: 10px 16px; margin: 0 0 18px; font: 13px/1.5 var(--sans); }
+.dh-doc-kv dt { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding-top: 2px; }
+.dh-doc-kv dd { margin: 0; color: var(--ink-1); overflow-wrap: anywhere; }
+.dh-doc-help { padding: 14px 16px; border-radius: var(--r-1); border-left: 2px solid var(--accent); background: var(--surface-sunk); color: var(--ink-2); font: 13px/1.6 var(--sans); }
+.dh-doc-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+/* Cancelling is the dangerous action, so it is a hairline that reddens and
+   never the only filled button in the dialog. */
+.dh-doc-actions .danger { color: var(--sig-stop); border-color: var(--sig-stop-line); }
+.dh-doc-actions .danger:hover { color: var(--sig-stop); border-color: var(--sig-stop); background: var(--sig-stop-bg); }
+.dh-doc-message { margin-top: 12px; font: 13px/1.55 var(--sans); color: var(--ink-2); }
+
+/* ── Quiet links and the account drawer ────────────────────────────────────── */
+.dh-quiet-links { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-bottom: var(--space-6); padding: 0 2px; }
+.dh-quiet-links a { display: inline-flex; align-items: center; min-height: 36px; color: var(--ink-2); font: 500 13px/1.4 var(--sans); text-decoration: none; border-bottom: 1px solid transparent; }
+.dh-quiet-links a:hover { color: var(--ink-1); border-bottom-color: var(--mark); }
+
+.dh-ask { padding: var(--space-5); margin-bottom: var(--space-6); }
+.dh-ask h2 { margin: 0 0 var(--space-4); font: 600 18px/1.22 var(--sans); letter-spacing: -.014em; color: var(--ink-1); }
+.dh-ask-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-4); margin: 0 0 var(--space-4); }
+.dh-ask-item { margin: 0; }
+.dh-ask-item dt { margin: 0 0 5px; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
+.dh-ask-item dd { margin: 0; font: 14px/1.6 var(--sans); color: var(--ink-2); }
+.dh-ask-foot { margin: 0; padding-top: var(--space-3); border-top: 1px solid var(--line); font: 14px/1.6 var(--sans); color: var(--ink-2); }
+
+.dh-acct { border-radius: var(--r-2); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-1); overflow: hidden; }
+.dh-acct-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--tap); padding: var(--space-4) var(--space-5); cursor: pointer; user-select: none; flex-wrap: wrap; list-style: none; color: var(--ink-1); }
 .dh-acct-head::-webkit-details-marker { display: none; }
-.dh-acct-head:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
-.dh-acct-head h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0; font-weight: 600; }
-.dh-acct-chev { font-family: var(--mono); font-size: 16px; color: var(--ink-dim); transition: transform .2s ease; line-height: 1; }
+.dh-acct-head:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+.dh-acct-head h2 { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0; }
+.dh-acct-chev { font-family: var(--mono); font-size: 16px; color: var(--ink-3); transition: transform var(--d-2) var(--e-standard); line-height: 1; }
 .dh-acct[open] .dh-acct-chev { transform: rotate(90deg); }
 .dh-acct-body { padding: 0 var(--space-5) var(--space-5); }
-.dh-acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--ink-hair); }
+.dh-acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--line); }
 .dh-acct-cell { padding: var(--space-3) 0; }
-.dh-acct-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
-.dh-acct-val { font-family: var(--sans); font-size: 18px; color: var(--ink); letter-spacing: -.005em; }
-.dh-acct-val.mono { font-family: var(--mono); font-size: 14px; }
-.dh-acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--ink-hair); margin-top: var(--space-3); }
-.dh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; border: 1px solid var(--ink-hair); background: transparent; color: var(--ink); transition: border-color .15s ease, background .15s ease; }
-.dh-btn:hover { border-color: var(--ink); background: var(--ink-ghost); }
-.dh-btn:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
-.dh-btn.warn:hover { border-color: var(--ink); background: var(--ink-ghost); color: var(--ink); }
-.dh-btn[disabled] { opacity: .55; cursor: default; }
-@media (max-width: 600px) { .dh-acct-head { padding: var(--space-3) var(--space-4); } .dh-acct-body { padding: 0 var(--space-4) var(--space-4); } }
+.dh-acct-lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 5px; }
+.dh-acct-val { font: 17px/1.35 var(--sans); color: var(--ink-1); letter-spacing: -.008em; }
+.dh-acct-val.mono { font-family: var(--mono); font-size: 13px; letter-spacing: 0; }
+.dh-acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--line); margin-top: var(--space-3); }
 
-/* Fade-in once the data lands */
-.dh-loaded > * { animation: dh-fade .3s ease-out both; }
-.dh-loaded > *:nth-child(2) { animation-delay: .04s; }
-.dh-loaded > *:nth-child(3) { animation-delay: .08s; }
-.dh-loaded > *:nth-child(4) { animation-delay: .12s; }
-.dh-loaded > *:nth-child(5) { animation-delay: .16s; }
-@keyframes dh-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .dh-loaded > * { animation: none; } .dh-flag-card, .dh-tool { transition: none; } }
+.dh-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 10px 15px; border-radius: var(--r-1); font: 500 13px/1.2 var(--sans); cursor: pointer; text-decoration: none; border: 1px solid var(--line-2); background: transparent; color: var(--ink-1); transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-btn:hover { border-color: var(--ink-3); background: var(--line-ghost); }
+.dh-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-btn.warn { color: var(--sig-stop); border-color: var(--sig-stop-line); }
+.dh-btn.warn:hover { color: var(--sig-stop); border-color: var(--sig-stop); background: var(--sig-stop-bg); }
+.dh-btn[disabled] { opacity: .5; cursor: default; }
+
+/* ── Setup nudge ───────────────────────────────────────────────────────────── */
+.dh-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(0, 0, 0, .62); animation: dh-veil var(--d-2) var(--e-standard) both; }
+.dh-modal-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); max-width: 460px; width: 100%; padding: var(--space-6) var(--space-5) var(--space-5); box-shadow: var(--sh-3); text-align: center; animation: dh-panel-in var(--d-3) var(--e-enter) both; }
+.dh-modal-img { display: block; margin: 0 auto var(--space-3); }
+.dh-modal-card h2 { font: 600 21px/1.2 var(--sans); letter-spacing: -.02em; color: var(--ink-1); margin: 0 0 var(--space-2); }
+.dh-modal-sub { font: 14px/1.6 var(--sans); color: var(--ink-2); margin: 0 0 var(--space-4); }
+.dh-pm-item { display: block; text-align: left; text-decoration: none; min-height: var(--tap); padding: var(--space-3) var(--space-4); border-radius: var(--r-1); border: 1px solid var(--line-2); background: var(--surface); margin-bottom: var(--space-3); transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-pm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dh-pm-item:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-pm-item strong { display: block; font: 600 15px/1.35 var(--sans); color: var(--ink-1); margin-bottom: 2px; }
+.dh-pm-item span { display: block; font: 13px/1.5 var(--sans); color: var(--ink-2); }
+.dh-modal-dismiss { margin-top: var(--space-2); min-height: var(--tap); background: transparent; border: 0; font: 13px/1 var(--sans); color: var(--ink-2); cursor: pointer; padding: 8px 12px; border-radius: var(--r-1); }
+.dh-modal-dismiss:hover { color: var(--ink-1); background: var(--line-ghost); }
+.dh-modal-dismiss:focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* ── Developer overview cards (only ever fetched on /developer) ────────────── */
+.dh-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
+.dh-ops-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: var(--r-2); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-1); }
+.dh-ops-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.dh-ops-dim { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.dh-ops-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.dh-ops-row:last-child { border-bottom: none; }
+.dh-ops-row .mono { font-family: var(--mono); font-size: 12px; color: var(--ink-1); word-break: break-all; }
+.dh-ops-row .dim { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: 0 0 auto; }
+.dh-usage-row { margin-bottom: var(--space-3); }
+.dh-usage-lab { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--ink-1); margin-bottom: 6px; }
+.dh-bar { height: 3px; border-radius: var(--r-0); background: var(--ink-hair); overflow: hidden; }
+.dh-bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width var(--d-3) var(--e-standard); }
+.dh-bar.warn > i { background: var(--sig-wait); }
+.dh-usage-upsell { display: inline-block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--accent); text-decoration: none; }
+.dh-usage-upsell:hover { text-decoration: underline; }
+.dh-ops-filter { width: 100%; min-height: var(--tap); box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line-2); border-radius: var(--r-1); font-family: var(--mono); font-size: 12px; background: var(--surface); color: var(--ink-1); }
+.dh-ops-filter:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+.dh-ops-tl { display: flex; flex-direction: column; max-height: 196px; overflow-y: auto; }
+.dh-tl-row { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.dh-tl-row:last-child { border-bottom: none; }
+.dh-tl-row .t { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: 0 0 auto; }
+.dh-tl-row .e { font-family: var(--mono); font-size: 11px; color: var(--ink-1); word-break: break-all; }
+
+/* ── Arrival: one 6px step, once, when the data lands ───────────────────────
+   The dialog is excluded on purpose. It is position:fixed, and an animating
+   ancestor becomes its containing block, which drags the whole overlay 6px
+   down the screen for the length of the animation. */
+.dh-loaded > *:not(.dh-doc-dialog) { animation: dh-fade var(--d-3) var(--e-enter) both; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(2) { animation-delay: .04s; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(3) { animation-delay: .08s; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(4) { animation-delay: .12s; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(5) { animation-delay: .16s; }
+@keyframes dh-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 980px) {
+  .dh-document, .dh-skel-row { grid-template-columns: minmax(0, 1fr) 116px 132px; gap: 16px; }
+  .dh-send-row, .dh-skel-row { grid-template-columns: minmax(0, 1fr) 116px 132px; gap: 16px; }
+}
+@media (max-width: 760px) {
+  main.pa-main { padding: var(--space-5) var(--space-3) var(--space-6); }
+  .dh-start { grid-template-columns: 1fr; }
+  .dh-start-card { min-height: 0; }
+  /* Two flagship products first, at full size. The third card is the same
+     action in a smaller shape, so a phone reads Sign and Send before it reads
+     anything else. */
+  .dh-start-card:nth-child(-n+2) h2 { font-size: 21px; }
+  .dh-start-card:nth-child(n+3) { padding: 16px 18px; }
+  .dh-start-card:nth-child(n+3) .dh-start-icon { width: 28px; height: 28px; font-size: 15px; }
+  .dh-start-card:nth-child(n+3) .dh-start-kicker { margin-top: 14px; }
+  .dh-start-card:nth-child(n+3) h2 { font-size: 16px; }
+  .dh-start-card:nth-child(n+3) p { font-size: 13px; }
+  .dh-start-card:nth-child(n+3) .dh-start-link { margin-top: 12px; }
+  .dh-community, .dh-ask, .dh-purpose { padding: var(--space-4); }
+  /* Under 760 the three columns stack in reading order: name, then progress,
+     then state. */
+  .dh-document, .dh-skel-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; padding: 16px 18px; }
+  .dh-send-row, .dh-skel-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; padding: 16px 18px; }
+  .dh-document-progress, .dh-skel-row .s-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+  .dh-send-progress, .dh-skel-row .s-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+  .dh-document-progress span { margin: 0; flex: 0 0 auto; }
+  .dh-send-progress span { margin: 0; flex: 0 0 auto; }
+  .dh-progress { flex: 1 1 auto; }
+  .dh-skel-row .s-num { flex: 0 0 auto; }
+  .dh-skel-row .s-bar { margin-top: 0; flex: 1 1 auto; }
+  .dh-workspace-head { padding: 20px 18px 14px; }
+  .dh-filters { margin: 0; padding: 0 18px 14px; }
+  .dh-filter { padding: 8px 11px; }
+  .dh-invites { margin: 0 18px 18px; }
+  .dh-empty { padding: 40px 18px; }
+  .dh-doc-dialog-head { padding: 18px 18px 14px; }
+  .dh-doc-dialog-body { padding: 18px; }
+  .dh-doc-kv { grid-template-columns: 1fr; gap: 3px; }
+  .dh-doc-kv dd { margin-bottom: 10px; }
+  .dh-acct-head { padding: var(--space-3) var(--space-4); }
+  .dh-acct-body { padding: 0 var(--space-4) var(--space-4); }
+  /* Tap targets on a phone: padding, never smaller or larger type. Measured at
+     390px the filter chips and Refresh were 36px, the four quiet links 36px,
+     and the two text links in a running line 19px. */
+  .dh-filter, .dh-refresh, .dh-btn, .dh-quiet-links a { min-height: var(--tap); }
+  /* The links inside the answers count too: measured at 390 they were 19px
+     ("See the plans", at the end of its line) and 41px. */
+  .dh-ask-list a, .dh-ask-foot a, footer .footer-links a { display: inline-flex; align-items: center; min-height: var(--tap); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dh-loaded > * { animation: none; }
+  .dh-skel { animation: none; background: var(--surface-sunk); }
+  .dh-progress i, .dh-doc-dialog, .dh-doc-dialog-panel, .dh-modal, .dh-modal-card { animation: none; }
+  .dh-start-card:hover { transform: none; }
+}
 </style>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=10">
+<script src="/js/theme.js?v=6"></script>
+<!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
+     Blocking and above every other script, so it exists before any renderer runs. -->
+<script src="/js/format-date.js?v=2"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <!-- Canonical site chrome (same nav + mobile drawer that every page uses).
-     The Products dropdown text necessarily lists tool names; this is global
-     navigation, not dashboard content. The dashboard tool-surface markup
-     (action cards, account block, paste-key) is NOT present in this static
-     file — it is server-rendered only by the auth-gated
-     /api/user/dashboard-fragment route. -->
+     Account content starts hidden below and is revealed only after the
+     session-authenticated /api/user/me request succeeds. -->
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/dashboard" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/dashboard" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/dashboard" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/dashboard" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
+
 <main id="main-content" class="pa-main">
-  <div id="dh-loading" class="pa-loading">
-    <div class="parapear-block">
-      <img class="parapear-img" src="/assets/parapear/parapear-wait.png" alt="" aria-hidden="true" decoding="async" width="120" height="120">
-      <div class="parapear-bubble">
-        <span class="parapear-kicker">One moment</span>
-        <span class="pa-spinner" aria-hidden="true"></span>Checking your session.
+  <!-- The placeholder shown while /api/user/me is in flight. It carries no
+       user data, and it has the SHAPE of the dashboard rather than a spinner
+       in the middle of an empty page: the hero, the three ways in and the
+       first register rows are all reserved, so the layout does not jump when
+       the real thing arrives. Lighthouse measured CLS 0.236 with the old
+       centred spinner. -->
+  <div id="dh-loading" class="pa-loading" aria-busy="true">
+    <p class="pa-sr-only">Uw sessie wordt gecontroleerd.</p>
+    <div class="dh-skel-page" aria-hidden="true">
+      <div class="dh-skel-hero">
+        <div>
+          <div class="dh-skel s-h1"></div>
+          <div class="dh-skel s-h1 short"></div>
+          <div class="dh-skel s-lede"></div>
+        </div>
+        <div class="dh-skel s-pill"></div>
+      </div>
+      <div class="dh-skel-start">
+        <div class="dh-skel s-card lead"></div>
+        <div class="dh-skel s-card"></div>
+        <div class="dh-skel s-card"></div>
+      </div>
+      <div class="dh-skel-workspace">
+        <div class="dh-skel-wshead"><div class="dh-skel s-h2"></div><div class="dh-skel s-btn"></div></div>
+        <div class="dh-skel-filters"><div class="dh-skel s-filter"></div><div class="dh-skel s-filter"></div><div class="dh-skel s-filter"></div><div class="dh-skel s-filter"></div></div>
+        <div class="dh-skel-rows">
+          <div class="dh-skel-row"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+          <div class="dh-skel-row"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+          <div class="dh-skel-row"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+        </div>
       </div>
     </div>
   </div>
 
   <div id="dh-root" hidden>
     <header class="dh-hero" aria-labelledby="dh-h1">
-      <h1 id="dh-h1">Your Paramant<small data-dh="email"></small></h1>
+      <div>
+        <h1 id="dh-h1">Uw documenten, overzichtelijk bij elkaar.</h1>
+        <p class="dh-mission">Met Ondertekenen laat u een document tekenen. Met Versturen stuurt u een bestand dat zichzelf wist na het lezen. Beide draaien op servers in Duitsland.</p>
+      </div>
       <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
     </header>
 
-    <aside class="dh-onb" data-pa-onboarding aria-label="Getting started" hidden>
-      <img src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="92" height="92">
-      <div class="dh-onb-text">
-        <span class="dh-onb-kicker">Welcome</span>
-        Everything lives here. Pick a flagship below to start, or open <strong>More tools</strong> for the full set. Recipients never need an account.
+    <section class="dh-start" aria-label="Begin met een document">
+      <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Handtekeningen vragen">
+        <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
+        <span class="dh-start-kicker">Ondertekenen</span>
+        <h2>Handtekeningen vragen</h2>
+        <p>Stuur een beveiligd document naar de mensen die moeten tekenen en zie wie al getekend heeft. Zij krijgen een uitnodiging per e-mail en tekenen via de link daarin, nadat ze zijn ingelogd op het account waaraan de uitnodiging gericht is.</p>
+        <span class="dh-start-link">Verzoek starten &rarr;</span>
+      </a>
+      <a class="dh-start-card" href="/parashare" aria-label="Een bestand veilig versturen">
+        <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
+        <span class="dh-start-kicker">Versturen</span>
+        <h2>Een bestand dat verdwijnt</h2>
+        <p>Het bestand wordt in uw browser versleuteld voordat het vertrekt. De ontvanger krijgt één link, en de webapp wist het bestand na de eerste keer openen. Er hoort geen ondertekening bij.</p>
+        <span class="dh-start-link">Bestand versturen &rarr;</span>
+      </a>
+      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Zelf een document ondertekenen">
+        <span class="dh-start-icon" aria-hidden="true">&#9998;</span>
+        <span class="dh-start-kicker">Ondertekenen</span>
+        <h2>Zelf ondertekenen</h2>
+        <p>Zet uw handtekening en download het resultaat meteen.</p>
+        <span class="dh-start-link">Ondertekenen openen &rarr;</span>
+      </a>
+    </section>
+
+    <!-- The one thing a free account should be told, in the words the homepage
+         uses: this is the Community plan, it is a gift and not a trial, and the
+         business plans are what pays for it. Shown by dashboard.js only while
+         the account is on a free plan, so a paying customer is never sold to. -->
+    <aside class="dh-community" id="dh-community" aria-label="Uw plan" hidden>
+      <div>
+        <p class="dh-community-kicker">Community &middot; &euro;0</p>
+        <p class="dh-community-lede">U zit op het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers, zodat dat zo blijft.</p>
+        <p class="dh-community-adds">Met een zakelijk plan krijgt u 100 of 1.000 handtekeningen per maand in plaats van 2. Links blijven langer open, u houdt een overzicht van wat u verstuurde, u krijgt ondersteuning van een vaste contactpersoon en een audittrail die u kunt exporteren en overdragen.</p>
       </div>
-      <button class="dh-onb-dismiss" type="button" data-pa-action="dismiss-onboarding" aria-label="Dismiss this tip">Got it</button>
+      <a class="dh-community-cta" href="/pricing">Zakelijke plannen bekijken &rarr;</a>
     </aside>
 
-    <section class="dh-flagship" aria-label="Primary actions">
-      <a class="dh-flag-card" href="/parashare" aria-label="Send a file via ParaShare">
-        <span class="dh-flag-icon" aria-hidden="true">&rarr;</span>
-        <h2>Send a file</h2>
-        <p>Encrypt in your browser, share a signed link, burn after one read. ML-KEM-768 hybrid key wrap, ML-DSA-65 signed receipt.</p>
-        <span class="dh-flag-cta">Open ParaShare</span>
-        <span class="dh-flag-meta">Client-side &middot; signed &middot; burn-on-read</span>
-      </a>
-      <a class="dh-flag-card" href="/sign" aria-label="Sign a document with ParaSign">
-        <span class="dh-flag-icon" aria-hidden="true">&#9998;</span>
-        <h2>Sign a document</h2>
-        <p>Post-quantum ML-DSA-65 signatures with self-contained .psign envelopes. CT-log notarised, verifiable without an account.</p>
-        <span class="dh-flag-cta">Open ParaSign</span>
-        <span class="dh-flag-meta">FIPS 204 &middot; .psign envelope &middot; CT-log notarised</span>
-      </a>
+    <!-- Where Mollie sends the buyer back to (/dashboard?billing=return). The
+         entitlement is granted by the webhook, never by this redirect, so the
+         two can arrive in either order: this band says which of the two the
+         page is looking at instead of leaving a paying customer on a dashboard
+         that still reads Community and says nothing about the money. Shown by
+         dashboard.js only when the query parameter is there. No link to
+         /pricing: the sale already happened. -->
+    <aside class="dh-paid" id="dh-billing-return" aria-label="Betaling" role="status" hidden>
+      <p class="dh-paid-kicker" data-dh="return-kicker">--</p>
+      <p class="dh-paid-lede" data-dh="return-lede">--</p>
+    </aside>
+
+    <!-- Shown by dashboard.js from seven days before the bought term runs out.
+         A one-off payment has nothing to cancel and nothing to collect, so the
+         band says the date, what happens after it, and offers the one action
+         that changes anything. -->
+    <div class="plan-term-warn" id="dh-term-warn" role="status" hidden>
+      <p class="plan-term-warn-text" data-dh="term-warn">--</p>
+      <a class="plan-term-warn-cta" href="/pricing">Verlengen</a>
+    </div>
+    <!-- The same fact in one line, shown whenever a term end is on record and
+         not only while it is close: before it, the day the plan stops; after
+         it, the day it stopped and where the account landed. Filled from
+         paid_until_*, which the relay has emitted since the betaalpad fixes. -->
+    <p class="plan-term-line" id="dh-term-line" hidden>--</p>
+
+    <!-- What a paying customer bought, in the words /pricing sells it in. Shown
+         by dashboard.js only on Firm, Business or Enterprise, and it carries no
+         link to a higher tier: someone who already pays is not a lead. -->
+    <aside class="dh-paid" id="dh-plan-paid" aria-label="Uw plan" hidden>
+      <p class="dh-paid-kicker"><span data-dh="paid-name">--</span>-plan &middot; actief</p>
+      <p class="dh-paid-lede" data-dh="paid-includes">--</p>
+      <p class="dh-paid-foot">Uw plan en de dag waarop uw termijn afloopt staan onder <a href="/account#billing-section">Plan en betaling</a>.</p>
+    </aside>
+
+    <!-- One-time question: shown by dashboard.js only while /api/user/me returns
+         usage_purpose: null. Answering or skipping posts to
+         /api/user/usage-purpose and hides it for good (server-side, per account). -->
+    <aside class="dh-purpose" id="dh-purpose" aria-label="Eén korte vraag" hidden>
+      <span class="dh-purpose-kicker">Eén korte vraag</span>
+      <h2>Waarvoor gebruikt u Paramant?</h2>
+      <p class="dh-purpose-sub">Eén tik, en we vragen het maar één keer. Zo weten we wat we het eerst moeten bouwen.</p>
+      <div class="dh-purpose-opts">
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="personal"><strong>Privégebruik</strong><span>Mijn eigen bestanden en documenten.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="organisation"><strong>Voor mijn organisatie</strong><span>Mijn bedrijf, praktijk of team.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="client_management"><strong>Ik beheer dit voor klanten</strong><span>IT-dienstverlener of MSP.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="research_journalism"><strong>Onderzoek of journalistiek</strong><span>Bronnen, bewijs, publicaties.</span></button>
+      </div>
+      <div class="dh-purpose-foot">
+        <button type="button" class="dh-modal-dismiss" data-pa-purpose="skipped">Overslaan</button>
+        <span class="dh-purpose-note" id="dh-purpose-note" hidden></span>
+      </div>
+    </aside>
+
+    <!-- Waiting for YOU. Above "Open documents" because that section is the
+         outbox: requests this account started and other people owe. This one is
+         the inbox, and it is the only list here the reader can act on now. -->
+    <section class="dh-workspace dh-inbox" id="dh-inbox" aria-labelledby="dh-inbox-title" hidden>
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-inbox-title">Wacht op uw handtekening</h2>
+          <p>Documenten die anderen u stuurden. Elk document opent via de persoonlijke link in de uitnodigingsmail.</p>
+        </div>
+        <button class="dh-refresh" type="button" id="dh-inbox-refresh">Vernieuwen</button>
+      </div>
+      <div class="dh-inbox-list" id="dh-inbox-list" aria-live="polite"></div>
     </section>
 
-    <div class="dh-tools-head"><h2>More tools</h2></div>
-    <section class="dh-tools" aria-label="More tools">
-      <a class="dh-tool" href="/get"><h3>Receive a file</h3><p>Open a secure link someone sent you. Decryption happens locally.</p></a>
-      <a class="dh-tool" href="/parashare"><h3>ParaShare</h3><p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p></a>
-      <a class="dh-tool" href="/drop"><h3>ParaDrop</h3><p>Device-to-device transfer. Six-digit pairing code. End-to-end encrypted.</p></a>
-      <a class="dh-tool" href="/verify"><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
+    <!-- The sending side. Deliberately ABOVE the signing worklist for an
+         account that sends to groups: the one question a sender has is who has
+         not collected yet, and that question should not need a scroll. Hidden
+         entirely when there is nothing, so a reader who only signs sees the
+         page they had yesterday. -->
+    <section class="dh-workspace" id="dh-sends-section" aria-labelledby="dh-sends-title" hidden>
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-sends-title">Bestanden die u verstuurde</h2>
+          <p>Wie heeft opgehaald, en wie nog niet.</p>
+        </div>
+        <button class="dh-refresh" type="button" id="dh-sends-refresh">Vernieuwen</button>
+      </div>
+      <div class="dh-documents" id="dh-sends" aria-live="polite"></div>
     </section>
 
-    <details class="dh-acct" aria-label="Account details">
+    <section class="dh-workspace" aria-labelledby="dh-documents-title">
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-documents-title">Lopende documenten</h2>
+          <p>Elk ondertekenverzoek dat u startte, en precies hoe ver elk verzoek is.</p>
+        </div>
+        <button class="dh-refresh" type="button" id="dh-documents-refresh">Vernieuwen</button>
+      </div>
+      <div class="dh-filters" role="group" aria-label="Documenten filteren">
+        <button class="dh-filter" type="button" data-doc-filter="open" aria-pressed="true">Lopend <span data-doc-count="open">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="completed" aria-pressed="false">Afgerond <span data-doc-count="completed">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="cancelled" aria-pressed="false">Geannuleerd <span data-doc-count="cancelled">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="all" aria-pressed="false">Alle <span data-doc-count="all">0</span></button>
+      </div>
+      <div class="dh-documents" id="dh-documents" aria-live="polite" aria-busy="true">
+        <!-- Loading state. Three rows in the shape of a register row, so the
+             list does not jump when the real data lands. The screen reader
+             hears the sentence, not the placeholder. -->
+        <p class="pa-sr-only">Uw documenten worden geladen. De status wordt uit uw account gelezen.</p>
+        <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+        <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+        <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+      </div>
+      <div class="dh-invites">
+        <span class="dh-invites-icon" aria-hidden="true">&#9993;</span>
+        <div><strong>Zoekt u een verzoek dat u kreeg?</strong><span>Verzoeken die op uw handtekening wachten staan hierboven. Elk verzoek opent via de persoonlijke link in de uitnodigingsmail, en uw account wordt gecontroleerd voordat het versleutelde document opent.</span></div>
+      </div>
+    </section>
+
+    <div class="dh-doc-dialog" id="dh-document-dialog" role="dialog" aria-modal="true" aria-labelledby="dh-document-dialog-title" hidden>
+      <div class="dh-doc-dialog-panel">
+        <div class="dh-doc-dialog-head"><h2 id="dh-document-dialog-title">Document</h2><button class="dh-doc-close" type="button" data-pa-action="document-close" aria-label="Sluiten">&times;</button></div>
+        <div class="dh-doc-dialog-body" id="dh-document-dialog-body"></div>
+      </div>
+    </div>
+
+    <!-- The three questions someone asks before he puts a real contract through
+         this. Each answer links to the page that carries the proof, so nothing
+         here is a claim this file has to be trusted on. -->
+    <section class="dh-ask" aria-labelledby="dh-ask-title">
+      <h2 id="dh-ask-title">Wat mensen vragen voordat ze erop vertrouwen</h2>
+      <dl class="dh-ask-list">
+        <div class="dh-ask-item">
+          <dt>Wat kost het?</dt>
+          <!-- Two products used to be two prices, and this answer named only
+               the cheaper one, so /help and this page quoted two numbers at one
+               customer. Firm ended that: one plan, one payment, both products.
+               The amount is on /pricing and pinned to
+               relay/lib/billing-catalog.js by relay/test/pricing-page.test.js,
+               so it cannot move here on its own. -->
+          <dd>Community is altijd gratis, zonder betaalkaart. Ondertekenen en Versturen samen beginnen bij &euro;29 per maand excl. btw, dat is Firm: één betaling voor beide. <a href="/pricing">Plannen bekijken</a></dd>
+        </div>
+        <div class="dh-ask-item">
+          <dt>Wie kan lezen wat ik verstuur?</dt>
+          <dd>Bestanden worden in uw browser versleuteld, en de relay draait bij Hetzner in Neurenberg, Duitsland. <a href="/security">Lees hoe</a></dd>
+        </div>
+        <div class="dh-ask-item">
+          <dt>Kan de andere partij een handtekening controleren?</dt>
+          <dd>Ondertekende documenten zijn te controleren zonder account. Oudere envelopformaten hebben de relay nodig. <a href="/verify">Probeer de controle</a></dd>
+        </div>
+      </dl>
+      <p class="dh-ask-foot">Andere vragen beantwoorden we in het <a href="/help">hulpcentrum</a>.</p>
+    </section>
+
+    <nav class="dh-quiet-links" aria-label="Andere acties met documenten">
+      <a href="/verify">Een ondertekend document controleren</a>
+      <a href="/get">Een beveiligde zending openen</a>
+      <a href="/vault">Een bestand beveiligen met een wachtzin</a>
+      <a href="/developer">Ontwikkelaarsinstellingen</a>
+    </nav>
+
+    <details class="dh-acct" aria-label="Accountgegevens">
       <summary class="dh-acct-head" id="dh-acct-toggle">
-        <h2>Manage account</h2>
+        <h2>Account beheren</h2>
         <span class="dh-acct-chev" aria-hidden="true">&rsaquo;</span>
       </summary>
       <div class="dh-acct-body">
         <div class="dh-acct-grid">
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Plan</div><div class="dh-acct-val" data-dh="plan">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Email</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">API key</div><div class="dh-acct-val mono" data-dh="api-key">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Member since</div><div class="dh-acct-val" data-dh="created">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Backup codes left</div><div class="dh-acct-val" data-dh="backup">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Session expires</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">E-mailadres</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Lid sinds</div><div class="dh-acct-val" data-dh="created">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Back-upcodes over</div><div class="dh-acct-val" data-dh="backup">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Sessie verloopt</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
         </div>
         <div class="dh-acct-actions">
-          <a class="dh-btn" href="/account">Account &amp; security</a>
-          <a class="dh-btn" href="/pricing">Plan &amp; billing</a>
-          <button type="button" class="dh-btn" data-pa-action="refresh">Refresh</button>
-          <button type="button" class="dh-btn warn" data-pa-action="signout">Sign out</button>
+          <a class="dh-btn" href="/account">Account en beveiliging</a>
+          <a class="dh-btn" href="/pricing">Plan en betaling</a>
+          <a class="dh-btn" href="/developer">Ontwikkelaarsinstellingen</a>
+          <button type="button" class="dh-btn" data-pa-action="refresh">Vernieuwen</button>
+          <button type="button" class="dh-btn warn" data-pa-action="signout">Uitloggen</button>
         </div>
       </div>
     </details>
   </div>
 
   <div id="dh-error" class="pa-loading" hidden>
-    Could not load your dashboard.
-    <a class="pa-err-link" href="/auth/login?next=%2Fdashboard">Sign in again</a>
+    Uw overzicht kon niet worden geladen.
+    <a class="pa-err-link" href="/auth/login?next=%2Fdashboard">Opnieuw inloggen</a>
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
   </div>
 </main>
 
+<!-- One-time setup nudge. Shown by dashboard.js only when a signing key and/or a
+     sign-in passkey is missing, and not previously dismissed. -->
+<div id="dh-passkey-modal" class="dh-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dh-pm-title">
+  <div class="dh-modal-card">
+    <img class="dh-modal-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="72" height="72">
+    <h2 id="dh-pm-title">Maak uw account af</h2>
+    <p class="dh-modal-sub">Met een paar eenmalige stappen logt u sneller in en kunt u documenten ondertekenen.</p>
+    <div id="dh-pm-items"></div>
+    <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Later</button>
+  </div>
+</div>
+
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/dashboard" hreflang="en" lang="en">This page in English</a></p>
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script src="/js/dashboard.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/dashboard.js?v=18" defer></script>
 </body>
 </html>

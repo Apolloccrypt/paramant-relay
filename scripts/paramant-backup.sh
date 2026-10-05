@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # paramant-backup — backup relay keys and CT log
 
+# Secrets hardening: backups contain keys.json (relay signing keys) and
+# users.json. Restrict everything this script creates to root only so a local
+# non-root account can never read the crown jewels (source files are 0600).
+umask 077
+
 BACKUP_BASE="/var/lib/paramant-backup"
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
@@ -10,7 +15,9 @@ echo "────────────────────────�
 
 TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
 DEST="${BACKUP_BASE}/${TIMESTAMP}"
-mkdir -p "$DEST"
+mkdir -p "$BACKUP_BASE" "$DEST"
+chmod 700 "$BACKUP_BASE" "$DEST"
+chown root:paramant "$BACKUP_BASE" "$DEST" 2>/dev/null || true
 
 EXPORTED=0
 
@@ -18,11 +25,14 @@ for dir in /var/lib/paramant-relay /var/lib/paramant-relay-*; do
   [[ -d "$dir" ]] || continue
   name=$(basename "$dir")
   mkdir -p "${DEST}/${name}"
+  chmod 700 "${DEST}/${name}"
 
   for f in users.json ct-log ct_log keys.json; do
     SRC="${dir}/${f}"
     if [[ -f "$SRC" ]]; then
       cp "$SRC" "${DEST}/${name}/"
+      chmod 600 "${DEST}/${name}/${f}"
+      chown root:paramant "${DEST}/${name}/${f}" 2>/dev/null || true
       SIZE=$(du -sh "$SRC" | cut -f1)
       echo -e "  ${GREEN}✓${RESET}  ${name}/${f}  (${SIZE})"
       EXPORTED=$((EXPORTED+1))

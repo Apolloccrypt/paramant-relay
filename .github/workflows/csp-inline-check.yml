@@ -1,0 +1,17 @@
+name: CSP inline-script check
+
+# Not path-gated: this is a required status check, and a skipped check never
+# reports, so the pull request would wait on it forever. The scan takes seconds.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  csp-inline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Geen inline JS onder script-src 'self'
+        run: ./scripts/check-csp-inline.sh

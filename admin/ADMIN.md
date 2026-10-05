@@ -26,6 +26,40 @@ Sessions are stored in Redis under `paramant:admin:session:{sid}` with a 12-hour
 | **Billing** | Active subscriptions and MRR breakdown |
 | **Relay** | Live health + uptime + metrics for all 5 sector relays, auto-refreshes every 10s |
 
+## De standpagina (`/admin/stand`)
+
+Een aparte pagina naast de tabs, in het Nederlands, voor de vraag "hoe staat het
+ervoor" zonder eerst ergens in te loggen op een server. Zelfde inlog als de rest
+van deze adminkant: `X-Session` uit `sessionStorage`, dus er komt geen nieuwe
+openbare route bij. Het bestand `public/stand.html` is een leeg geraamte; alles
+wat erop komt haalt `public/stand.js` op bij `GET /api/admin/stand`, en die zit
+achter `authMiddleware`.
+
+Vier blokken, in deze volgorde: werkt het, wordt het gebruikt, staat er iets
+rood, en wat wacht er op de eigenaar. Gaat een blok goed, dan staat het dicht.
+
+Twee regels worden in `lib/stand.js` afgedwongen en niet alleen beschreven:
+
+- `punt()` zet elk punt zonder `meting` op "niet gemeten". Een getal dat er niet
+  is kan dus niet als groen eindigen.
+- In `RANG` staat "niet gemeten" boven "let op", zodat een weggevallen meting de
+  kop wegtrekt van groen in plaats van mee te liften op wat wel lukte.
+
+De metingen staan in `lib/stand.js`, de buitenwereld in `lib/stand-io.js`.
+GitHub wordt zonder sleutel bevraagd (openbare repo, 60 vragen per uur, vijf
+minuten cache in redis); lukt dat niet, dan staat er "niet gemeten".
+
+De knop "doe de echte proef" stuurt via `POST /api/admin/stand/proef` werkelijk
+een bestand door de relay, haalt het terug, vergelijkt de bytes en controleert
+dat een tweede ophaalpoging 410 geeft. Dat is een echte handeling die in het
+openbare transparantielogboek komt, dus hij draait op verzoek en niet bij elk
+paginabezoek, en hij telt op de pagina zelf als zelftest en nooit als gebruik.
+Eigen rem: een proef per vijf minuten.
+
+Instellingen: `PARAMANT_SITE_URL`, `PARAMANT_REPO`, `STAND_ZELFTEST_ACCOUNTS`
+(zie `deploy/.env.example`). De sabotagetoets is
+`admin/test/stand-gate.test.js`.
+
 ---
 
 ## User action menu
@@ -82,7 +116,13 @@ All endpoints are mounted at `/admin/api/`. Authentication: `X-Session: <session
 | `POST` | `/admin/reset-totp` | `{ key }` | Send TOTP reset email |
 | `POST` | `/admin/force-totp` | `{ key, required: bool, reason? }` | Require or remove TOTP for user |
 | `POST` | `/admin/resend-setup` | `{ key }` | Resend TOTP setup link |
-| `POST` | `/admin/change-plan` | `{ key, new_plan, notify }` | Change plan (`community`/`pro`/`enterprise`/`trial`) |
+| `POST` | `/admin/change-plan` | `{ key, new_plan, notify }` | Change the legacy plan on every relay sector (`community`/`pro`/`enterprise`/`trial`) |
+| `POST` | `/admin/set-product-plan` | `{ key, product, tier, notify }` | Change one product tier on every relay sector without changing the legacy plan |
+
+Plan mutations retry failed sectors once. They return HTTP 207 with `ok:false`,
+`failed_sectors`, and `read_back_failed` unless every mutation and effective
+entitlement read-back succeeds. `entitlements_by_sector` contains the gate's
+effective ParaSign and ParaSend result for every relay.
 | `POST` | `/admin/revoke-sessions` | `{ key }` | Revoke all sessions |
 | `POST` | `/admin/disable-key` | `{ key, reason, notify }` | Disable API key |
 | `POST` | `/admin/delete-account` | `{ key, confirm: "DELETE", notify }` | Delete account |
@@ -124,6 +164,24 @@ command to run instead.
 
 ---
 
+## User document worklist
+
+`GET /api/user/documents` is the session-authenticated ParaSign worklist used by
+the normal dashboard. The browser cannot provide an account id. Admin derives it
+from the session and calls the internal relay endpoint `POST /v2/user/envelopes`.
+The account id stays in the JSON body because it is also a secret-shaped primary
+key in the current account model and must not enter access-log query strings.
+The response contains filenames, lifecycle status, timestamps and signer counts.
+It never contains document bytes, document hashes, email hashes, invite tokens or
+decryption keys.
+
+The lookup uses the per-account envelope index. It does not scan all Redis keys.
+New envelope records are checked against their stored `account_id` before they
+are returned. Legacy records without that field rely on their backfilled,
+account-scoped index membership.
+
+---
+
 ## Redis key layout (admin-relevant)
 
 | Key | Type | Content |
@@ -148,7 +206,7 @@ Located in `admin/lib/email-templates.js`. All emails go via Resend (`RESEND_API
 | `setupEmail` | "Complete your Paramant account setup" / "Set up your new Paramant authenticator" | New account created or TOTP reset confirmed |
 | `resetConfirmationEmail` | "Did you request a TOTP reset? — Paramant" | Two-stage TOTP reset step 1 |
 | `welcomeEmail` | "Your Paramant API key is ready" | Manual send from admin panel |
-| `billingConfirmationEmail` | "Paramant plan upgraded to {plan}" | Plan upgrade (admin or Stripe) |
+| `billingConfirmationEmail` | "Paramant plan upgraded to {plan}" | Plan upgrade (admin or Mollie) |
 | `billingCancellationEmail` | "Your Paramant plan cancellation is scheduled" | Subscription cancelled |
 
 > `dropNotificationEmail` and `accountDeletionEmail` are defined in the module but not yet wired to a UI action.

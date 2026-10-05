@@ -110,6 +110,9 @@ def _bip39_decode(phrase: str) -> bytes:
         raise RuntimeError('pip install mnemonic (vereist voor drop)')
 
 def _derive_drop_keys(entropy: bytes) -> tuple:
+    # The 'paramant-drop-v1' salt predates the ParaDrop feature removal
+    # (PRs #150-152) but is wire-format: sender and receiver must derive
+    # byte-identical keys for existing phrases, so it stays as-is.
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.backends import default_backend

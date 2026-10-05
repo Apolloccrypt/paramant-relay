@@ -5,6 +5,11 @@ relays). This is NOT self-host customer data — self-hosters back up their
 own relays. This document covers our backup of our hosted users, for which
 Mick is the data controller.
 
+> **This backup covers accounts only.** The full signing-critical
+> state (relay identity keys, CT/Merkle logs, redis) is
+> backed up separately: see `backup-restore-full.md`. That is the
+> disaster-recovery backup; this one is the narrow accounts view.
+
 ## Backup
 
 - **Schedule:** daily 03:15 (server local time) via `/etc/cron.d/paramant-backup`
@@ -36,7 +41,7 @@ Lose it and all backups are permanently unreadable.
 
 - Keep an OFFLINE copy of the private key (USB in a physical safe, or printed
   on paper). Retrieve it once with:
-  `ssh root@116.203.86.81 'cat /root/.config/paramant-backup/key.txt'`
+  `ssh root@<your-relay-host> 'cat /path/to/your/backup-key.txt'` (substitute host + path for your install)
 - NEVER commit the private key to any git repository, public or private.
 - The private key sitting next to the backups on the same box is fine for
   availability but means a full-host compromise exposes both — the offline

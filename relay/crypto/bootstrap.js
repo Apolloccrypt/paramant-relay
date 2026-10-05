@@ -10,6 +10,16 @@
 //                variants. Crypto-agility for experimental clients
 //                using the raw HTTP API.
 //
+// Backing libraries differ by tier. The two core impls (mlkem768.js, mldsa65.js)
+// route to @paramant/core (the Rust PQ-crypto core, NAPI binding). The 16
+// extended impls are the only code that requires @noble/post-quantum. So in the
+// production default (CRYPTO_MODE=core) @noble runs no crypto: it is dormant on
+// the hot path, and the core audit surface is @paramant/core, not @noble. The
+// extended impl files are still required eagerly (see below), so @noble is
+// loaded into the process even in core mode; it cannot move to a devDependency
+// without breaking that eager require. See ADR R006 for the dependency-surface
+// rationale.
+//
 // To enable extended mode: set CRYPTO_MODE=extended in .env. See ADR R006.
 
 const { registerKEM, registerSig } = require('./registry');

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARAMANT &middot; Stand</title>
+<style>
+:root{
+  --nacht:#08284A; --nacht-2:#0B3A6A; --nacht-3:#0E4680;
+  --bone:#F8FAFC; --bone-dim:rgba(248,250,252,.68); --bone-hair:rgba(248,250,252,.16);
+  --goed:#B2FF3F; --letop:#FFC24B; --onbekend:#9FB3C8; --kapot:#FF6B6B;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--nacht);color:var(--bone);font-family:var(--sans);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;padding:20px 16px 64px}
+.wrap{max-width:640px;margin:0 auto}
+
+.merk{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--bone-dim);margin-bottom:24px}
+.merk a{color:var(--bone-dim);text-decoration:none;border-bottom:1px solid var(--bone-hair)}
+
+/* De kop: het enige dat je in tien seconden hoeft te lezen. */
+.kop{border-left:5px solid var(--onbekend);padding:2px 0 2px 16px;margin-bottom:8px}
+.kop-woord{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--bone-dim);margin-bottom:8px}
+.kop-zin{font-size:23px;line-height:1.32;font-weight:600;letter-spacing:-.015em}
+.kop.s-goed{border-color:var(--goed)} .kop.s-letop{border-color:var(--letop)}
+.kop.s-onbekend{border-color:var(--onbekend)} .kop.s-kapot{border-color:var(--kapot)}
+.kop.s-goed .kop-woord{color:var(--goed)} .kop.s-letop .kop-woord{color:var(--letop)}
+.kop.s-onbekend .kop-woord{color:var(--onbekend)} .kop.s-kapot .kop-woord{color:var(--kapot)}
+
+.gemeten{font-family:var(--mono);font-size:12px;color:var(--bone-dim);margin:14px 0 26px}
+
+/* Blokken. Gaat het goed, dan staan ze dicht. */
+details.blok{border-top:1px solid var(--bone-hair);padding:2px 0}
+details.blok:last-of-type{border-bottom:1px solid var(--bone-hair)}
+summary{list-style:none;cursor:pointer;padding:15px 2px;display:flex;align-items:center;gap:12px;font-weight:600;font-size:17px}
+summary::-webkit-details-marker{display:none}
+.stip{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+.stip.s-goed{background:var(--goed)} .stip.s-letop{background:var(--letop)}
+.stip.s-kapot{background:var(--kapot)}
+/* Niet gemeten is geen bolletje: een holle ring, zodat hij nooit voor groen
+   kan doorgaan als je snel kijkt. */
+.stip.s-onbekend{background:none;border:2px solid var(--onbekend)}
+.blok-titel{flex:1}
+.blok-tel{font-family:var(--mono);font-size:11px;color:var(--bone-dim);letter-spacing:.06em}
+.pijl{color:var(--bone-dim);font-size:13px;transition:transform .15s}
+details[open] .pijl{transform:rotate(90deg)}
+
+.punt{padding:0 0 20px 23px;margin-left:0}
+.punt-kop{display:flex;align-items:baseline;gap:9px;margin-bottom:5px}
+.punt-naam{font-weight:600;font-size:15px}
+.punt-stand{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap}
+.punt-stand.s-goed{background:rgba(178,255,63,.16);color:var(--goed)}
+.punt-stand.s-letop{background:rgba(255,194,75,.16);color:var(--letop)}
+.punt-stand.s-onbekend{background:rgba(159,179,200,.16);color:var(--onbekend)}
+.punt-stand.s-kapot{background:rgba(255,107,107,.18);color:var(--kapot)}
+.punt-zin{font-size:16px;line-height:1.5;color:var(--bone)}
+.punt-bron{font-family:var(--mono);font-size:11.5px;color:var(--bone-dim);margin-top:7px;line-height:1.45}
+.hoe{margin-top:10px;background:rgba(0,0,0,.22);border-left:3px solid var(--letop);padding:10px 12px}
+.hoe-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--letop);margin-bottom:7px}
+.hoe code{display:block;font-family:var(--mono);font-size:12.5px;color:var(--bone);word-break:break-all;padding:2px 0}
+
+.regel{font-size:13.5px;color:var(--bone-dim);margin-bottom:20px;line-height:1.5}
+.knoppen{display:flex;gap:10px;flex-wrap:wrap;margin:26px 0 10px}
+button{font-family:var(--mono);font-size:12px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;padding:13px 18px;border:1.5px solid var(--bone-hair);background:transparent;color:var(--bone);cursor:pointer;border-radius:2px;min-height:46px}
+button:hover:not(:disabled){border-color:var(--bone)}
+button:disabled{opacity:.45;cursor:default}
+button.hoofd{background:var(--goed);color:var(--nacht);border-color:var(--goed)}
+.melding{font-size:14.5px;line-height:1.5;padding:12px 14px;border-left:3px solid var(--onbekend);background:rgba(0,0,0,.2);margin-top:14px;display:none}
+.laden{font-family:var(--mono);font-size:12px;color:var(--bone-dim);letter-spacing:.06em}
+@media (max-width:420px){ body{font-size:16px} .kop-zin{font-size:20px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="merk"><a href="/admin/">&larr; Paramant admin</a> &nbsp;&middot;&nbsp; Stand</div>
+
+  <div id="kop" class="kop s-onbekend">
+    <div class="kop-woord" id="kop-woord">bezig met meten</div>
+    <div class="kop-zin" id="kop-zin">Ik kijk hoe het ervoor staat.</div>
+  </div>
+  <div class="gemeten" id="gemeten"></div>
+
+  <div id="blokken"><div class="laden">meten...</div></div>
+
+  <div class="knoppen">
+    <button id="ververs" type="button">Opnieuw meten</button>
+    <button id="proef" type="button" class="hoofd">Doe de echte proef</button>
+  </div>
+  <div class="melding" id="melding"></div>
+  <p class="regel" style="margin-top:16px">
+    De echte proef stuurt nu een klein bestand door de relay, haalt het terug en
+    controleert of het daarna vernietigd is. Dat is een echte handeling, dus hij
+    komt in het openbare logboek te staan en telt hieronder mee als zelftest,
+    nooit als gebruik.
+  </p>
+</div>
+<script src="/admin/stand.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Documenten digitaal laten ondertekenen met ParaSign · Paramant</title>
+<meta property="og:site_name" content="Paramant">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="signing">
+<meta name="description" content="Laat een document ondertekenen en krijg een bewijs dat iedereen kan controleren. Gratis met het Community-plan, betaalde plannen voor kantoren die meer tekenen.">
+<meta property="og:title" content="Documenten digitaal laten ondertekenen met ParaSign &middot; Paramant">
+<meta property="og:description" content="Laat een document ondertekenen en krijg een bewijs dat iedereen kan controleren. Gratis met het Community-plan, betaalde plannen voor kantoren die meer tekenen.">
+<meta property="og:url" content="https://paramant.app/parasign">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Documenten digitaal laten ondertekenen met ParaSign &middot; Paramant">
+<meta name="twitter:description" content="Laat een document ondertekenen en krijg een bewijs dat iedereen kan controleren. Gratis met het Community-plan, betaalde plannen voor kantoren die meer tekenen.">
+<link rel="canonical" href="https://paramant.app/parasign">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/parasign">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/parasign">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/parasign">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<style>
+.ps-hero{padding:var(--space-10) 0 var(--space-6)}
+.ps-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
+.ps-band h2{font-size:var(--text-2xl);letter-spacing:-.02em;margin-bottom:var(--space-2)}
+.mono-eyebrow{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)}
+.ps-lede{font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
+.ps-who{font-size:var(--text-base);color:var(--navy);font-weight:700;line-height:1.7;max-width:680px;margin-top:var(--space-3)}
+.ps-band p{font-size:var(--text-base);color:var(--ink);line-height:1.8;max-width:680px;margin-top:var(--space-4)}
+.ps-band p a,.ps-band li a{color:var(--cobalt)}
+.ps-band p strong{color:var(--navy)}
+.ps-actions{display:flex;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-6)}
+.check-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-5)}
+.check-card{background:var(--bone);padding:var(--space-5) var(--space-5)}
+.check-card .k{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);font-weight:700}
+.check-card p{margin-top:var(--space-2);font-size:var(--text-sm);color:var(--ink);line-height:1.65;max-width:none}
+.check-card a{color:var(--cobalt)}
+.tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-5)}
+.tier-card{background:var(--bone);padding:var(--space-5);display:flex;flex-direction:column}
+.community{background:var(--night-2);border:1px solid var(--ink-hair);padding:var(--space-6);margin-top:var(--space-5);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:var(--space-6)}
+.community h3{font-size:var(--text-xl);letter-spacing:-.01em;color:var(--navy);margin:var(--space-2) 0 0}
+.community p{max-width:none;margin-top:var(--space-3);font-size:var(--text-sm);line-height:1.75}
+.community ul{list-style:none;margin:var(--space-4) 0 0;padding:0}
+.community li{font-family:var(--mono);font-size:var(--text-xs);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid rgba(var(--tint), .18);line-height:1.5}
+.community li:last-child{border-bottom:none}
+.community li::before{content:'+ ';font-weight:700}
+.tier-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt)}
+.tier-price{font-family:var(--mono);font-size:var(--text-2xl);font-weight:700;color:var(--navy);margin-top:var(--space-2)}
+.tier-price span{font-size:var(--text-sm);color:var(--ink-dim);font-weight:400}
+.tier-note{font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-1);line-height:1.5}
+.tier-note .incl{color:var(--navy);font-weight:700}
+.tier-card ul{list-style:none;margin:var(--space-4) 0 0;padding:0}
+.tier-card li{font-family:var(--mono);font-size:var(--text-xs);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid var(--ink-hair);line-height:1.5}
+.tier-card li:last-child{border-bottom:none}
+.tier-card li::before{content:'+ ';font-weight:700;color:var(--cobalt)}
+.ps-fine{font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);max-width:none}
+.ps-steps{list-style:none;counter-reset:step;margin-top:var(--space-5);padding:0;max-width:680px}
+.ps-steps li{counter-increment:step;position:relative;padding:var(--space-4) 0 var(--space-4) var(--space-8);border-top:1px solid var(--ink-hair);font-size:var(--text-base);color:var(--ink);line-height:1.7}
+.ps-steps li:last-child{border-bottom:1px solid var(--ink-hair)}
+.ps-steps li::before{content:counter(step,decimal-leading-zero);position:absolute;left:0;top:var(--space-4);font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;font-weight:700;color:var(--cobalt)}
+.ps-steps strong{color:var(--navy)}
+.scope-note{background:var(--bone);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);padding:var(--space-4) var(--space-5);margin-top:var(--space-5);max-width:680px}
+.scope-note p{margin-top:0}
+@media(max-width:1023px){.community{grid-template-columns:1fr;gap:var(--space-4)}}
+@media(max-width:640px){.check-grid,.tier-grid{grid-template-columns:1fr}}
+/* Mobile is the design target and the house .sec-head is not, at this width:
+   it keeps the section number in its own grid column, which leaves the H1 about
+   160px to wrap in. On /parasign that cost six lines of headline and pushed the
+   buttons and the eIDAS note clean off the first screen. On a narrow screen the
+   number stacks above the headline instead of standing beside it. Page-local on
+   purpose: design-system.css is shared with pages this PR does not touch. */
+@media(max-width:640px){
+  .ps-hero{padding-top:var(--space-6)}
+  /* The hero runs headline, lede, who, buttons, price line, SES note. The house
+     .sec-head parks 64px of margin under its rule and .ps-actions takes another
+     32px on top, which on a 390x844 phone pushed the sentence that says a
+     ParaSign signature is a Simple Electronic Signature to y=863, 19px past the
+     fold (tests/first-screen.test.mjs). Both gaps shrink here, on this page and
+     this width only. Not a word of the note changes: it is the sentence pinned
+     as SES in tests/ui-truthfulness.test.mjs and repeated at about.html:254. */
+  #main-content .sec-head{grid-template-columns:1fr;row-gap:var(--space-2);margin-bottom:var(--space-5)}
+  #main-content .sec-head .num{font-size:var(--text-xl);line-height:1}
+  #main-content .ps-actions{margin-top:var(--space-5)}
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/parasign#webpage",
+      "url": "https://paramant.app/parasign",
+      "name": "Documenten digitaal laten ondertekenen met ParaSign · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Laat een document ondertekenen en krijg een bewijs dat iedereen kan controleren. Gratis met het Community-plan, betaalde plannen voor kantoren die meer tekenen."
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://paramant.app/parasign#software",
+      "name": "Paramant",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web browser",
+      "url": "https://paramant.app/parasign",
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasign" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasign" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasign" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasign" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
+</div>
+<main>
+
+<!-- HERO. Four things and no more, in the order docs/brand/messaging.md sets:
+     what you can do here, who it is for, the split with its real number, and
+     the one limit a lawyer asks about before anything else. The algorithm names
+     are the reason section 04 is true; section 6 of the guide keeps them out of
+     the H1 and out of the opening paragraph, so they live down there. -->
+<section class="ps-hero" id="main-content" tabindex="-1">
+  <div class="container-md">
+    <div class="sec-head">
+      <span class="num">00</span>
+      <h1 class="paramant-h2">Onderteken in uw browser, bewijs het jaren later.</h1>
+      <span class="mono-eyebrow">ParaSign &middot; ondertekenen met Paramant</span>
+    </div>
+    <p class="ps-lede">Stuur een contract ter ondertekening en krijg het getekend terug, zonder omweg via de cloud van een ander. Iedereen kan het later controleren, zonder ons.</p>
+    <p class="ps-who">Voor juridische, financiële en zorgpraktijken in de EU die contracten en documenten van cliënten ondertekenen.</p>
+    <div class="ps-actions">
+      <a href="/sign" class="btn btn-primary">Document ondertekenen &rarr;</a>
+      <a href="/pricing" class="btn btn-secondary">Bekijk de prijzen &rarr;</a>
+    </div>
+    <p class="ps-fine">Gratis met het <a href="#plans">Community-plan</a>: 2 handtekeningen per maand, zonder betaalkaart, voor altijd. Betaalde plannen vanaf &euro;29 per maand excl. btw. Wie u uitnodigt, logt in met het adres waar de uitnodiging heen ging.</p>
+    <div class="scope-note">
+      <p><strong>Eerst wat dit is.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Wat het bewijs wel en niet laat zien, staat in <a href="#proof">deel 04</a>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT IT DOES -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">01 / Wat het doet</span>
+    <h2 style="margin-top:var(--space-2)">Zelf tekenen of laten tekenen, met bewijs</h2>
+    <p>ParaSign is de ondertekenkant van Paramant. Het document dat u ondertekent blijft privé: de leesbare inhoud en uw ondertekensleutel verlaten uw browser nooit. Er ligt bij ons dus geen kopie van het contract die iemand kan opvragen.</p>
+    <div class="check-grid">
+      <div class="check-card">
+        <div class="k">Pdf-editor en zichtbare stempel</div>
+        <p>Plaats tekst, datums en opmerkingen, beheer de pagina's en zet de stempel op elke pagina die u wilt. De stempel is wat lezers zien; het .psign-bestand is het bewijs.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Samen tekenen, met een paraaf op elke pagina</div>
+        <p>Voeg iedereen toe die moet tekenen. Elke uitnodiging is gekoppeld aan precies het e-mailadres dat u invult, en het versleutelde document reist met het verzoek mee. Iedere ondertekenaar kan de eigen handtekening als paraaf op elke pagina zetten. Er is geen vaste volgorde: ieder tekent wanneer het uitkomt.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Elk soort bestand, via een vingerafdruk</div>
+        <p>Is het bestand geen pdf, dan ondertekent u alleen de hash: een vingerafdruk van de bytes. De ontvanger controleert dat door van hetzelfde bestand opnieuw de hash te berekenen.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">API voor ontwikkelaars vanaf Firm</div>
+        <p>Bouw ondertekenen in uw eigen apps en offertes in met de API en webhooks. Zie de <a href="/docs#parasign-api">documentatie</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT IT COSTS -->
+<section class="ps-band" id="plans">
+  <div class="container-md">
+    <span class="mono-eyebrow">02 / Wat het kost</span>
+    <h2 style="margin-top:var(--space-2)">Community is gratis. Bedrijven betalen.</h2>
+    <p>Die verdeling is bewust. Particulieren tekenen gratis met het Community-plan. Organisaties die veel ondertekenen kopen een betaald plan, en die plannen betalen voor het gratis plan.</p>
+    <p><strong>Het Community-plan is gratis, voor altijd.</strong> Het is geen proefperiode en geen lokkertje. Bedrijven betalen voor hogere grenzen (langer geldige links, vaker ophalen, meer apparaten, een eigen relay), niet om functies vrij te spelen, en dat houdt het Community-plan gratis.</p>
+    <p><strong>Elk plan krijgt dezelfde versleuteling, dezelfde post-quantum handtekeningen en hetzelfde openbare bewijslogboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.</strong></p>
+
+    <div class="community">
+      <div>
+        <span class="mono-eyebrow">Community</span>
+        <h3>&euro;0, voor altijd</h3>
+        <p>Geen betaalkaart, geen klok, geen proefperiode die stilletjes afloopt. Op de <a href="/pricing">prijspagina</a> heet het ook <strong>Community</strong>.</p>
+        <ul>
+          <li>2 handtekeningen per maand</li>
+          <li>Geen grens op ontvangen</li>
+          <li>Volledige post-quantum cryptografie</li>
+          <li>Openbaar controlelogboek</li>
+          <li>Geen betaalkaart nodig</li>
+        </ul>
+        <div class="ps-actions">
+          <a href="/signup" class="btn btn-primary">Gratis beginnen &rarr;</a>
+        </div>
+        <p class="ps-fine">Ontvangen wordt niet geteld. De tabel met plannen in relay/lib/tiers.js kent geen grens voor ontvangen, dus uitgenodigd worden, een uitnodiging openen en het document ophalen tellen op geen enkel plan mee. Uw eigen handtekening zetten telt wel: die gaat van de 2 per maand hierboven af, wie het document ook stuurde.</p>
+      </div>
+      <div>
+        <div class="k" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--navy)">Waarom het gratis is</div>
+        <p>Paramant wordt gebouwd door <strong>Paramantis Solutions B.V.</strong> in Harderwijk (zie de pagina <a href="/about">over Paramant</a>). Het Community-plan is wat het bedrijf teruggeeft: wie een document wil ondertekenen zonder het aan een Amerikaanse cloud te geven, kan dat hier kosteloos, met dezelfde cryptografie als een betalende klant.</p>
+        <p>Het is geen uitgeklede versie van het product. Community krijgt dezelfde handtekeningen, dezelfde versleuteling en hetzelfde openbare bewijslogboek als Business. Een betaald plan koopt volume, een API, ondersteuning en verantwoording. Nooit veiligheid.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:var(--text-md);margin-top:var(--space-8);color:var(--navy)">Betaalde plannen</h3>
+    <p>Voor kantoren die veel ondertekenen, de API nodig hebben of verantwoording afleggen aan een auditor. Namen en prijzen zijn die van de <a href="/pricing">prijspagina</a>; daar rekent u ook af.</p>
+    <div class="tier-grid">
+      <div class="tier-card">
+        <div class="tier-name">Firm</div>
+        <div class="tier-price">&euro;29<span>/maand</span></div>
+        <div class="tier-note">excl. btw &middot; <span class="incl">u betaalt &euro;35,09/mnd incl. 21% btw</span><br>Per jaar &euro;290 excl.</div>
+        <ul>
+          <li>100 handtekeningen per maand; daarna wacht ondertekenen tot de nieuwe maand</li>
+          <li>Dezelfde betaling dekt ParaSend: 500 verzendingen per maand, links 24 uur geldig</li>
+          <li>Tot 500 keer per uur een ParaSend-bestand ophalen via de API</li>
+          <li>Toegang tot de API</li>
+        </ul>
+      </div>
+      <div class="tier-card">
+        <div class="tier-name">Business</div>
+        <div class="tier-price">&euro;299<span>/maand</span></div>
+        <div class="tier-note">excl. btw &middot; <span class="incl">u betaalt &euro;361,79/mnd incl. 21% btw</span><br>Per jaar &euro;2.990 excl.</div>
+        <ul>
+          <li>1.000 handtekeningen per maand</li>
+          <li>Vaste contactpersoon, antwoord binnen één werkdag</li>
+          <li>Exporteerbaar auditlogboek met CT-tree-head</li>
+        </ul>
+      </div>
+      <div class="tier-card">
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-price">In overleg</div>
+        <div class="tier-note">Per organisatie</div>
+        <ul>
+          <li>Een eigen relay</li>
+          <li>Relay per sector (zorg, juridisch, financieel)</li>
+          <li>SLA met compensatie bij uitval</li>
+          <li>Licentie om zelf te hosten</li>
+        </ul>
+      </div>
+    </div>
+    <p class="ps-fine">Prijzen excl. btw. Bij het afrekenen betaalt u incl. 21% btw: Firm &euro;35,09/mnd of &euro;350,90/jaar, Business &euro;361,79/mnd of &euro;3.617,90/jaar. De prijs is per organisatie, niet per gebruiker. Afrekenen en de volledige vergelijking staan op de <a href="/pricing">prijspagina</a>.</p>
+  </div>
+</section>
+
+<!-- HOW TO BEGIN -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">03 / Zo begint u</span>
+    <h2 style="margin-top:var(--space-2)">In drie stappen een ondertekend document</h2>
+    <p>Om een document te ondertekenen heeft u een Paramant-account nodig, want de ondertekensleutel hoort bij dat account. Een verzoek openen dat iemand u stuurde kan zonder: wie is uitgenodigd, volgt de persoonlijke link in de e-mail.</p>
+    <ol class="ps-steps">
+      <li><strong><a href="/signup">Maak een gratis account</a>.</strong> Geen betaalkaart, geen tijdslimiet. Het Community-plan geeft 2 handtekeningen per maand.</li>
+      <li><strong><a href="/sign">Open ParaSign</a> en kies uw document.</strong> Een pdf krijgt een zichtbare stempel die u op elke pagina kunt zetten; andere bestanden worden via hun vingerafdruk ondertekend. Voeg zo nodig medeondertekenaars toe en teken. Uw sleutel wordt ontgrendeld met Face ID, Touch ID of een beveiligingssleutel op het moment dat u tekent, en verlaat uw apparaat nooit.</li>
+      <li><strong>Downloaden en delen.</strong> U krijgt de pdf met stempel en het .psign-bestand. Iedereen kan ze controleren op de <a href="/verify">controlepagina</a>, offline en zonder account.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- THE PROOF, LAST -->
+<section class="ps-band" id="proof">
+  <div class="container-md">
+    <span class="mono-eyebrow">04 / Hoe het werkt, en hoe u het controleert</span>
+    <h2 style="margin-top:var(--space-2)">De techniek is het bewijs, geen verkooppraatje</h2>
+    <p>Niets hierboven is iets waard als u ons op ons woord moet geloven. Dit is wat eronder zit, en bij elke bewering staat waar u het zelf kunt controleren.</p>
+    <div class="check-grid">
+      <div class="check-card">
+        <div class="k">ML-DSA-65 (FIPS 204)</div>
+        <p>ML-DSA-65 (FIPS 204), in uw browser gemaakt. De private sleutel komt nooit bij de relay. Het overzicht van algoritmen op de pagina over <a href="/crypto-agility">crypto-wendbaarheid</a> noemt het als de standaard die geladen is.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Uw sleutels zijn van u</div>
+        <p>De private sleutel wordt op uw apparaat gemaakt en nooit verstuurd. Wij zien alleen de publieke helft. Hoe dat werkt, staat op de <a href="/security">beveiligingspagina</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">SHA3-256 voor bestanden die geen pdf zijn</div>
+        <p>Bij zo'n bestand ondertekent u de SHA3-256-hash van de bytes. Bereken de hash van hetzelfde bestand opnieuw, en de handtekening klopt of klopt niet.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Openbaar logboek</div>
+        <p>Elke handtekening komt in een openbaar logboek waar alleen iets bij kan, niets uit. Bekijk het in het <a href="/ct-log">CT-logboek</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Controleren zonder ons</div>
+        <p>Een getekend document is te controleren zonder contact met ons. Controleer een .psign-bestand op de <a href="/verify">controlepagina</a>: geen account, geen API-sleutel, geen verbinding met ons.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Code die u kunt inzien</div>
+        <p>De code van de relay is in te zien op <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>. Wie erachter zit, staat op de pagina <a href="/about">over Paramant</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">EU-grond, EU-recht</div>
+        <p>Hetzner in Duitsland, Bunny DNS (Sloveni&euml;). Uw bestanden gaan niet langs een Amerikaanse partij. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten, zoals <a href="/privacy">/privacy</a> uitlegt. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Geen Amerikaanse partij raakt een bestand of een sleutel aan. Op die pagina staan ook de subverwerkers. Regel 5 op <a href="/rules">onze regelspagina</a> zegt hetzelfde, volledig.</p>
+      </div>
+    </div>
+    <div class="scope-note">
+      <p><strong>Wat het bewijs dekt.</strong> Een afgeronde handtekening laat zien dat de sleutel in het .psign-bestand precies dit document heeft ondertekend, en dat de regel in het openbare logboek staat. Het laat niet zien wie die sleutel heeft. Wilt u een handtekening aan een bepaald e-mailadres koppelen, stuur het document dan als ondertekenverzoek in plaats van open te ondertekenen.</p>
+      <p><strong>En wat het niet is.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES), zoals <a href="#main-content">bovenaan deze pagina</a> staat uitgelegd. We zeggen precies wat het wel en niet is, op de plek waar een koper beslist.</p>
+      <p><strong>Wat een gewone handtekening in Nederland waard is.</strong> Naar Nederlands recht heeft een gewone elektronische handtekening dezelfde rechtsgevolgen als een handgeschreven handtekening, als de methode voldoende betrouwbaar is gezien het doel waarvoor ze werd gebruikt en alle andere omstandigheden (Burgerlijk Wetboek, art. 3:15a, <a href="https://wetten.overheid.nl/BWBR0005291/2025-07-01" target="_blank" rel="noopener">wetten.overheid.nl BWBR0005291</a>). Een gekwalificeerde handtekening (QES) verschuift de bewijslast: bij een QES hoeft die betrouwbaarheid niet te worden aangetoond. Bij een gewone handtekening is het een open norm, en ParaSign is gebouwd om de betrouwbaarheid aan te tonen: elke handtekening levert een bewijs op en een regel in een openbaar logboek dat iedereen kan controleren. Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.</p>
+    </div>
+    <div class="ps-actions">
+      <a href="/sign" class="btn btn-primary">Document ondertekenen &rarr;</a>
+    </div>
+  </div>
+</section>
+
+</main>
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/parasign" hreflang="en" lang="en">This page in English</a></p>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Bedrijf</div>
+        <div class="footer-links">
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Juridisch</div>
+        <div class="footer-links">
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
+          <a href="/sla">SLA</a>
+          <a href="/license">Licentie</a>
+          <a href="/partners">Partners</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
+</body>
+</html>

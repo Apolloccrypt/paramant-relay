@@ -158,11 +158,21 @@ python3 scripts/paramant-admin.py sync
 These are **end-user plans** — they control what a `pgp_` API key holder can do.
 Set when you create a key with `--plan`.
 
-| Plan | Uploads/day | Max file size | TTL | Views/blob | Priority |
-|------|-------------|---------------|-----|------------|----------|
-| `free` | 10 | 5 MB | 1 hour | 1 | Low |
-| `pro` | Unlimited | 500 MB | 24 hours | 10 | High |
-| `enterprise` | Unlimited | Unlimited | 7 days | 100 | Highest |
+| Plan | Transfers/month | Max file size | TTL | Views/blob | Downloads/hour |
+|------|-----------------|---------------|-----|------------|----------------|
+| `free` | 10 | 5 MB | 1 hour | 1 | 50 |
+| `pro` | 500 | 5 MB | 24 hours | 10 | 500 |
+| `enterprise` | 1,000,000 | 5 MB | 7 days | 100 | unlimited |
+
+Every figure comes from `relay/lib/tiers.js`, the single source the relay reads.
+The table used to say `pro` and `enterprise` had unlimited uploads and a 500 MB
+file: transfers are metered per calendar month (`transfers_month`, HTTP 402
+`monthly_transfer_quota_reached`), never per day, and `file_mb` is bounded by
+the operator's `MAX_BLOB` (5 MB on the hosted relay), which is always the last
+word. No metered tier is unbounded: `relay/lib/entitlements.js` holds even
+`enterprise` to a finite monthly ceiling. `Priority` named no field at all and
+is replaced by `outbound_per_hour`, the per-key hourly download window the relay
+does enforce with a 429.
 
 > **Get a free `pgp_` key:** [paramant.app/request-key](https://paramant.app/request-key) — form takes 30 seconds, key arrives by email. No account or credit card needed.
 
@@ -512,7 +522,7 @@ Expected output (one entry per registered relay):
 > location /admin/ {
 >     allow YOUR_ADMIN_IP;
 >     deny all;
->     proxy_pass http://admin:4200/admin/;
+>     proxy_pass http://127.0.0.1:4200/admin/;
 >     ...
 > }
 > ```
@@ -540,10 +550,11 @@ TOTP_SECRET=YOUR_BASE32_SECRET
 # Scan the QR code or enter the secret in Aegis / Google Authenticator / Authy
 ```
 
-> **Note:** PARAMANT uses **TOTP-SHA256** (RFC 6238 with HMAC-SHA256). When
-> manually entering the secret in an authenticator app, select **SHA-256** as the
-> algorithm if the app exposes that option. Aegis supports this. Google
-> Authenticator defaults to SHA-1 and will generate incorrect codes.
+> **Note:** PARAMANT verifies both **HMAC-SHA256** and **HMAC-SHA1** TOTP codes
+> (RFC 6238), so every standard authenticator app works, including Google
+> Authenticator. For the strongest setup, pick a SHA-256 app (Aegis, Raivo, 2FAS,
+> Authy, 1Password, Bitwarden, Ente Auth) and select **SHA-256** as the algorithm
+> if the app exposes that option.
 
 ---
 

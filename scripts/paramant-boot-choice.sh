@@ -29,7 +29,7 @@ _banner() {
   echo "         *                           *"
   echo -e "            *   *   *   *   *   *   *${RESET}"
   echo ""
-  echo -e "${BOLD}     ParamantOS v2.4.5 — Post-Quantum Ghost Pipe Relay${RESET}"
+  echo -e "${BOLD}     ParamantOS v3.0.0 — Post-Quantum Ghost Pipe Relay${RESET}"
   echo -e "     EU/DE · ML-KEM-768 · RAM-only · BUSL-1.1"
   echo ""
 }
@@ -39,7 +39,7 @@ while true; do
   _banner
 
   CHOICE=$(whiptail \
-    --title "ParamantOS v2.4.5 — Boot Menu" \
+    --title "ParamantOS v3.0.0 — Boot Menu" \
     --menu "\nWelcome! What would you like to do?\n" 16 64 3 \
     "1" "Install ParamantOS to disk  [TUI wizard]" \
     "2" "Run as live system          [no installation]" \

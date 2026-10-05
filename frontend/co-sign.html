@@ -1,17 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
+     before every module and deferred script that signals or awaits. -->
+<script src="/js/ready.js?v=1"></script>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Co-sign envelope - PARAMANT</title>
-<meta name="description" content="Sign a multi-party envelope. Post-quantum (ML-DSA-65), zero-knowledge: the relay never sees the document or your private key.">
+<title>Document medeondertekenen · Paramant</title>
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="signing">
+<meta name="description" content="Bekijk en onderteken een document dat iemand u stuurde. Het bestand en uw ondertekensleutel blijven in uw browser.">
+<meta property="og:title" content="Document medeondertekenen · Paramant">
+<meta property="og:description" content="Bekijk en onderteken een document dat iemand u stuurde. Het bestand en uw ondertekensleutel blijven in uw browser.">
+<meta property="og:url" content="https://paramant.app/co-sign">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-cosign.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Document medeondertekenen: een ondertekend document met een gecontroleerde post-quantum stempel.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Document medeondertekenen · Paramant">
+<meta name="twitter:description" content="Bekijk en onderteken een document dat iemand u stuurde. Het bestand en uw ondertekensleutel blijven in uw browser.">
+<meta name="twitter:image" content="https://paramant.app/og-cosign.png">
 <meta name="robots" content="noindex,nofollow">
 <link rel="canonical" href="https://paramant.app/co-sign">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/co-sign">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/co-sign">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/co-sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
@@ -23,364 +47,264 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .card-head-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
 .card-body{padding:18px}
 .dot{width:6px;height:6px;background:var(--lime);border:1px solid var(--navy)}
-.dot.amber{background:#f59e0b}
-.dot.red{background:rgba(255,80,80,1)}
+.dot.amber{background:var(--ochre)}
+.dot.red{background:rgba(196, 96, 79, 1)}
 .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:12px;line-height:1.6}
 .kv dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding-top:1px}
 .kv dd{font-family:var(--mono);font-size:11px;color:var(--ink);word-break:break-all}
 .party-row{display:grid;grid-template-columns:32px 1fr auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--ink-hair);font-size:12px;align-items:center}
 .party-row:last-child{border-bottom:0}
-.party-row.me{background:rgba(178,255,63,0.08);margin:0 -8px;padding-left:8px;padding-right:8px}
+.party-row.me{background:rgba(29, 78, 216, 0.08);margin:0 -8px;padding-left:8px;padding-right:8px}
 .party-idx{font-family:var(--mono);font-size:10px;color:var(--ink-dim);text-align:center}
 .party-label{font-weight:600}
 .party-status{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
 .party-status.signed{color:var(--cobalt)}
 .party-status.pending{color:#888}
-.party-status.viewed{color:#d4a017}
+.party-status.viewed{color:var(--warn-ink)}
 .field{margin-bottom:14px}
 .label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
 .input,.select,.file-cta{width:100%;padding:10px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:12px}
 .file-cta{display:inline-block;text-align:center;cursor:pointer;border-style:dashed}
 .file-cta:hover{border-color:var(--cobalt);color:var(--cobalt)}
-.btn{display:inline-block;width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-decoration:none;text-align:center}
+.btn{display:inline-block;width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-decoration:none;text-align:center}
 .btn:hover{opacity:.85}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
 .btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
 .banner{padding:10px 14px;font-size:12px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:14px;line-height:1.5}
-.banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,0.04)}
-.banner.err{border-color:rgba(200,30,30,0.6);color:rgba(180,20,20,1);background:rgba(255,80,80,0.06)}
-.banner.warn{border-color:#d4a017;background:#fff4d6;color:#5a3f00}
-.disclaimer{background:#fff4d6;border:1px solid #d4a017;padding:10px 14px;font-size:12px;color:#5a3f00;margin-bottom:14px;line-height:1.5}
-.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:#7a5300}
+.banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(var(--tint), 0.04)}
+.banner.err{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1);background:rgba(196, 96, 79, 0.06)}
+.banner.warn{border-color:#d4a017;background:var(--card);color:var(--warn-ink)}
+/* The warning band. Its border was #d4a017 and its heading #7a5300, both from
+   the days of a bone page: on the night the heading is a dark ochre on a dark
+   card and there is nothing left to read. The band keeps its meaning and takes
+   the system's warning ink. */
+.disclaimer{background:var(--card);border:1px solid var(--ochre);padding:10px 14px;font-size:12px;color:var(--warn-ink);margin-bottom:14px;line-height:1.5}
+.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:var(--warn-ink)}
 .tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px}
 .tag.green{border-color:var(--cobalt);color:var(--cobalt)}
-.tag.red{border-color:rgba(200,30,30,0.6);color:rgba(180,20,20,1)}
+.tag.red{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1)}
 .step{display:none;animation:fadeIn .2s ease}
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* The preview IS the document, so it gets the width. Nested padding (card 32,
+   card-body 18, its own 10) ate 120px of a 390px phone and left the page 229px
+   wide with a margin on either side, while the sender who placed the box was
+   looking at a 343px render of the same page. The negative margin cancels the
+   two paddings it is nested in, so the preview runs edge to edge inside the
+   card and both sides see the document at the same scale. */
+.doc-preview{margin:12px -50px 0;border:1px solid var(--ink-hair);border-left:0;border-right:0;background:var(--card);max-height:72vh;overflow:auto;padding:10px 8px}
+.doc-page{position:relative;width:100%;margin:0 auto 12px;max-width:100%}
+.doc-page:last-child{margin-bottom:0}
+.doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#FFFFFF}
+.doc-page.appearance-page{position:relative;cursor:crosshair}
+.appearance-layer{position:absolute;inset:0;pointer-events:auto;cursor:crosshair}
+/* ── The document layer ──
+   Everything with .appearance-* on it is drawn ON the page being signed, and a
+   page is white paper in every theme. The blue is the ink that ends up in the
+   PDF, the same #1D4ED8 the seal is drawn with in frontend/js/sign-flow.js and
+   pinned in sign.html: a box the signer sees in cream on a warm dark ground
+   would be a preview of a document nobody will ever receive. So these values
+   are fixed on purpose, they are the one place on this page where a token is
+   deliberately not used, and scripts/ui-contrast-sweep.mjs has them on its
+   known list for that reason and no other. */
+.appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid #1D4ED8;background:rgba(255,255,255,.94);color:#0C1B2A;padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(0, 0, 0, .16);pointer-events:auto}
+.appearance-field.date{border-color:#5C6A78;font-family:var(--mono);font-weight:500}
+/* The box the SENDER asked for, before the signer has touched it. It must not
+   look like a signature that already exists: no name, no date, no delete
+   control, a dashed outline and its own words. It becomes a real placed field
+   the moment the signer chooses Place my signature. */
+.appearance-field.requested{border:2px dashed #1D4ED8;background:rgba(29,78,216,.06);box-shadow:none;color:#1D4ED8;font-weight:600;justify-content:center;text-align:center;pointer-events:none}
+.appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
+.appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:#1D4ED8;color:#FFFFFF;font:700 13px/1 var(--sans);cursor:pointer}
+.appearance-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.appearance-tools .btn{width:auto;min-width:120px}
+/* 44px: a finger, not a mouse. These were 34-36px, under every touch-target
+   guideline, on the one screen where a mis-tap costs a signature. */
+.btn,.file-cta{min-height:44px}
+.appearance-tools .btn{min-height:44px}
+/* The pointer to the requested spot. It sits ABOVE the preview because that is
+   where the reader is when the document opens; the spot itself can be three
+   pages down. */
+.requested-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;border:1px solid var(--cobalt);background:rgba(var(--tint), .04);font-size:12px;line-height:1.5;color:var(--cobalt)}
+.requested-note .btn{width:auto;min-width:0;padding:11px 14px;flex:0 0 auto}
+.appearance-help{font-size:12px;line-height:1.55;color:var(--ink-dim)}
+.allpages{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:13px;cursor:pointer;min-height:44px}
+.allpages input{width:18px;height:18px;flex:0 0 auto}
+.appearance-help.active{color:var(--cobalt);font-weight:600}
+.doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
+.review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
+.blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
+.blind-link:hover{color:var(--brick-ink)}
 @media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
+/* One step at a time. Until GATE 1 passes (co-sign.js puts .needs-login on
+   <body>), an invitee can do exactly one thing: sign in. Everything that only
+   works once there is a session stays out of the way, so the page never shows
+   a disabled "sign" button under a "sign in" button, or three amber banners
+   that repeat one instruction. */
+body.needs-login #review-card,
+body.needs-login #sign-confirm,
+body.needs-login #cs-pass-panel,
+body.needs-login #review-gate,
+body.needs-login #sign-intro{display:none}
+/* Collapsed technical detail: the summary line is all an invitee sees until
+   they ask for the rest. */
+.how{border:1px solid var(--ink-hair);margin-bottom:14px;background:var(--card)}
+.how>summary{cursor:pointer;padding:10px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-dim)}
+.how>summary:hover{color:var(--ink)}
+.how-body{padding:0 14px 12px;font-size:12px;line-height:1.6;color:var(--ink-dim)}
+.how-body p{margin-bottom:8px}
+.how-body p:last-child{margin-bottom:0}
 </style>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
-  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+  <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
 </nav>
 
 <main id="main-content">
 
 <div class="step" id="step-loading">
-  <h1>Opening envelope</h1>
-  <p class="sub">Fetching envelope metadata from the relay. The relay does not have the document itself - only the SHA3-256 hash and your signature slot.</p>
-  <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Loading...</div></div></div>
+  <h1>Verzoek openen</h1>
+  <p class="sub">De gegevens van het verzoek worden opgehaald bij de relay. Die heeft het document zelf niet, alleen de SHA3-256-hash ervan en de plek waar u tekent.</p>
+  <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Laden...</div></div></div>
 </div>
 
 <div class="step" id="step-error">
-  <h1>Could not open envelope</h1>
-  <p class="sub">The link is invalid, expired, or the relay refused to serve it.</p>
-  <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Unknown error.</div></div></div>
-  <a href="/" class="btn btn-outline">Back to home</a>
+  <h1>Het verzoek kan niet worden geopend</h1>
+  <p class="sub">De link is ongeldig of verlopen, of de relay gaf het verzoek niet vrij.</p>
+  <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Onbekende fout.</div></div></div>
+  <a href="/" class="btn btn-outline">Terug naar de startpagina</a>
 </div>
 
 <div class="step" id="step-cosign">
-  <h1>Co-sign envelope</h1>
-  <p class="sub">Sign your acknowledgement for this multi-party document. The signature is produced locally in your browser (ML-DSA-65). The relay only learns your public key and the resulting signature - never your private key, never the document bytes.</p>
+  <h1>Document medeondertekenen</h1>
+  <p class="sub">Bekijk het document dat u is gestuurd en zet uw handtekening.</p>
 
-  <div class="disclaimer">
-    <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
-    This is a cryptographic acknowledgement, not a notarised legal signature.
-    Verify the document hash below against the file you received separately.
-  </div>
+  <details class="how">
+    <summary>HOE DIT WERKT</summary>
+    <div class="how-body">
+      <p>Het ontsleutelen en ondertekenen met ML-DSA-65 gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
+      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de hash hieronder met die van het bestand dat u los ontving.</p>
+    </div>
+  </details>
 
   <div class="card">
     <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">Status: ...</div></div>
     <div class="card-body">
       <dl class="kv">
-        <dt>Envelope id</dt><dd id="env-id">-</dd>
+        <dt>Verzoek-id</dt><dd id="env-id">-</dd>
         <dt>Document SHA3-256</dt><dd id="env-hash">-</dd>
-        <dt>Filename hint</dt><dd id="env-filename">-</dd>
-        <dt>Created</dt><dd id="env-created">-</dd>
-        <dt>Expires</dt><dd id="env-expires">-</dd>
-        <dt>Progress</dt><dd id="env-progress">-</dd>
+        <dt>Bestandsnaam</dt><dd id="env-filename">-</dd>
+        <dt>Gemaakt</dt><dd id="env-created">-</dd>
+        <dt>Verloopt</dt><dd id="env-expires">-</dd>
+        <dt>Voortgang</dt><dd id="env-progress">-</dd>
       </dl>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Parties</div></div>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Ondertekenaars</div></div>
     <div class="card-body" id="parties-list"></div>
   </div>
 
-  <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Verify the document (optional but recommended)</div></div>
+  <div class="card" id="review-card">
+    <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title">Bekijk wat u ondertekent</div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">Pick the file you received out-of-band. We hash it locally (SHA3-256) and compare it against the envelope hash above. The file is never uploaded.</p>
-      <label class="file-cta" for="verify-file">Choose a file (or drop here) - never uploaded</label>
+      <details class="how">
+        <summary>WAAR HET DOCUMENT VANDAAN KOMT</summary>
+        <div class="how-body">
+          <p>Het versleutelde document wordt in deze browser ontsleuteld. U kunt pas ondertekenen als de SHA3-256-hash overeenkomt met het verzoek. De sleutel van het document en de leesbare inhoud krijgt de relay niet.</p>
+        </div>
+      </details>
+      <div class="banner" id="document-delivery-status">Het versleutelde document wordt geladen...</div>
+      <label class="file-cta" for="verify-file" id="verify-file-cta" hidden>Kies het document zelf als het niet vanzelf laadt</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
+      <div class="requested-note" id="requested-note" hidden>
+        <span id="requested-note-text">De afzender heeft aangegeven waar u tekent</span>
+        <button class="btn" id="requested-note-go" type="button">Naar die plek</button>
+      </div>
+      <div class="doc-preview" id="doc-preview" hidden></div>
+      <div id="appearance-editor" hidden>
+        <div class="appearance-tools" role="toolbar" aria-label="Zichtbare velden van uw handtekening">
+          <button class="btn btn-outline" id="appearance-seal" type="button">Plaats mijn handtekening</button>
+          <button class="btn btn-outline" id="appearance-date" type="button">Plaats datum</button>
+          <button class="btn btn-outline" id="appearance-clear" type="button">Wis mijn velden</button>
+        </div>
+        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Ook op elke andere pagina</label>
+        <p class="appearance-help">Zet dezelfde handtekening op elke pagina van het document, op dezelfde plek. Dat is de paraaf per blad.</p>
+        <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Deze plekken vallen onder uw cryptografische handtekening.</p>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Sign as <span id="me-label">party</span></div></div>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Ondertekenen als <span id="me-label">ondertekenaar</span></div></div>
     <div class="card-body">
-      <div class="field">
-        <label class="label" for="signer-name">Your name (optional, baked into the signed acknowledgement)</label>
-        <input type="text" class="input" id="signer-name" maxlength="80" placeholder="e.g. Mick Beer" autocomplete="name">
-      </div>
-      <div class="field">
-        <label class="label" for="signer-key-src">Signing key</label>
-        <select class="select" id="signer-key-src">
-          <option value="ephemeral">Generate one-time key for this signature</option>
-        </select>
-      </div>
-      <button class="btn" id="sign-confirm" type="button" disabled>Sign acknowledgement</button>
+      <details class="how" id="sign-intro">
+        <summary>WAARMEE U TEKENT</summary>
+        <div class="how-body">
+          <p>U tekent met uw ondertekensleutel (ML-DSA-65). Op het moment dat u tekent, ontgrendelt u die met Face ID, Touch ID of een beveiligingssleutel. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
+        </div>
+      </details>
       <div class="banner" id="sign-status" hidden></div>
+      <div id="sign-cta" style="margin-bottom:12px" hidden></div>
+      <button class="btn" id="sign-confirm" type="button" disabled>Dit document ondertekenen</button>
+      <!-- Authenticator-code (TOTP) fallback: shown only when one-tap passkey
+           signing isn't available (provider can't do WebAuthn-PRF, e.g. Proton Pass,
+           or there's no passkey). The 6-digit code authorises a fresh signing key
+           for this session — signing "like logging in again". -->
+      <div class="banner" id="cs-pass-panel" hidden style="margin-top:12px">
+        <p id="cs-pass-prompt" style="margin-bottom:10px"></p>
+        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Code van 6 cijfers" aria-label="Code uit uw authenticator-app" style="width:100%;padding:10px;border:1px solid var(--ink-hair);border-radius:6px;margin-bottom:8px;font-size:14px">
+        <p id="cs-pass-err" hidden style="color:var(--danger);font-size:13px;margin-bottom:8px"></p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" id="cs-pass-cancel" type="button">Annuleren</button>
+          <button class="btn" id="cs-pass-confirm" type="button">Doorgaan</button>
+        </div>
+      </div>
+      <div class="review-gate" id="review-gate" hidden></div>
     </div>
   </div>
 </div>
 
 <div class="step" id="step-done">
-  <h1>Acknowledgement signed</h1>
-  <p class="sub">Your ML-DSA-65 signature has been submitted. The relay logged it to the public CT log and updated the envelope status.</p>
+  <h1>Uw handtekening is gezet</h1>
+  <p class="sub">Uw ML-DSA-65-handtekening is verstuurd. De relay heeft hem in het openbare CT-logboek gezet en de status van het verzoek bijgewerkt.</p>
   <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Result</div></div>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Resultaat</div></div>
     <div class="card-body">
       <dl class="kv">
-        <dt>Envelope</dt><dd id="done-env-id">-</dd>
+        <dt>Verzoek</dt><dd id="done-env-id">-</dd>
         <dt>Status</dt><dd id="done-status">-</dd>
-        <dt>Progress</dt><dd id="done-progress">-</dd>
-        <dt>Your public key</dt><dd id="done-pk">-</dd>
+        <dt>Voortgang</dt><dd id="done-progress">-</dd>
+        <dt>Vingerafdruk van uw sleutel</dt><dd id="done-pk">-</dd>
       </dl>
       <div style="margin-top:14px">
-        <span class="tag green">Signed locally</span>
+        <span class="tag green">Op uw apparaat ondertekend</span>
         <span class="tag green">ML-DSA-65</span>
         <span class="tag green">Zero-knowledge</span>
       </div>
+      <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Pdf-kopie met zichtbare stempel downloaden</button>
+      <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Definitief .psign-bewijs downloaden</a>
+      <p class="review-gate" id="done-download-note" hidden>Dit is een leesbare werkkopie. Het definitieve .psign-bestand bewijst het oorspronkelijke pdf-document en elke ondertekende plek. Bewaar het origineel, deze kopie en het .psign-bestand samen.</p>
+      <p class="review-gate" id="done-proof-wait" hidden>Het definitieve .psign-bewijs is beschikbaar zodra iedere uitgenodigde ondertekenaar heeft getekend.</p>
     </div>
   </div>
-  <a href="/" class="btn btn-outline">Back to home</a>
+  <a href="/" class="btn btn-outline">Terug naar de startpagina</a>
 </div>
+
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/en/co-sign" hreflang="en" lang="en">This page in English</a></p>
 
 </main>
 
-<script type="module" src="/vendor/parasign-bridge.js"></script>
-<script>
-const RELAY = 'https://health.paramant.app';
-
-// ---------- helpers ----------
-function $(id) { return document.getElementById(id); }
-function showStep(id) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); $(id).classList.add('active'); }
-function showError(m) { $('error-msg').textContent = m; showStep('step-error'); }
-function toHex(u8) { let s=''; for (let i=0;i<u8.length;i++) s+=u8[i].toString(16).padStart(2,'0'); return s; }
-function toB64(u8) { let s=''; for (let i=0;i<u8.length;i++) s+=String.fromCharCode(u8[i]); return btoa(s); }
-function fromHex(s) { const out = new Uint8Array(s.length/2); for (let i=0;i<out.length;i++) out[i] = parseInt(s.slice(i*2,i*2+2),16); return out; }
-function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-
-async function waitForParasign() {
-  if (window.__parasign) return window.__parasign;
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('Signing library failed to load')), 10000);
-    window.addEventListener('parasign:ready', () => { clearTimeout(t); resolve(window.__parasign); }, { once: true });
-  });
-}
-
-// ---------- state ----------
-let __envelope = null;
-let __partyIndex = -1;
-let __signerKey = null;
-let __hashMatches = null;
-
-// Reproduce the relay's sign-message: sha3_256(envelope.id || doc_hash || party_index_as_decimal)
-async function buildSignMessage(envId, docHash, partyIndex) {
-  const p = await waitForParasign();
-  const idBytes = new TextEncoder().encode(envId);
-  const hashBytes = fromHex(docHash);
-  const piBytes = new TextEncoder().encode(String(partyIndex));
-  const combined = new Uint8Array(idBytes.length + hashBytes.length + piBytes.length);
-  combined.set(idBytes, 0);
-  combined.set(hashBytes, idBytes.length);
-  combined.set(piBytes, idBytes.length + hashBytes.length);
-  return p.sha3_256(combined);
-}
-
-// ---------- boot ----------
-async function init() {
-  const params = new URLSearchParams(location.search);
-  const envId = (params.get('env') || '').trim();
-  const partyIndex = parseInt(params.get('p') || '', 10);
-  if (!envId || !Number.isInteger(partyIndex) || partyIndex < 0) {
-    return showError('Missing or invalid env / p query parameter.');
-  }
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(envId)) {
-    return showError('Envelope id is malformed.');
-  }
-  __partyIndex = partyIndex;
-
-  showStep('step-loading');
-  $('loading-msg').textContent = 'Fetching envelope...';
-
-  try {
-    const r = await fetch(RELAY + '/v2/envelopes/' + encodeURIComponent(envId));
-    if (r.status === 404) return showError('Envelope not found, expired, or already burned.');
-    if (r.status === 429) return showError('Rate-limited - too many requests from this address. Try again in a minute.');
-    if (!r.ok) return showError('Relay error: HTTP ' + r.status);
-    const data = await r.json();
-    __envelope = data.envelope;
-    if (__partyIndex >= __envelope.party_count) return showError('Party index out of range for this envelope.');
-
-    // Best-effort viewed-receipt; ignore failures so the rest of the page still loads.
-    try { await fetch(RELAY + '/v2/envelopes/' + encodeURIComponent(envId) + '/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ party_index: partyIndex }) }); } catch {}
-
-    renderEnvelope();
-    showStep('step-cosign');
-  } catch (e) {
-    showError(e.message || 'Network error');
-  }
-}
-
-function renderEnvelope() {
-  const e = __envelope;
-  $('env-id').textContent = e.id;
-  $('env-hash').textContent = e.doc_hash;
-  $('env-filename').textContent = e.original_filename || '(not provided)';
-  $('env-created').textContent = e.created_at || '-';
-  $('env-expires').textContent = e.expires_at || '-';
-  $('env-progress').textContent = e.signed_count + ' / ' + e.party_count + ' signed';
-  $('env-status').textContent = 'Status: ' + (e.status || '-');
-  const dot = $('env-status-dot');
-  dot.className = 'dot ' + (e.status === 'complete' ? '' : e.status === 'sent' ? 'amber' : '');
-
-  const list = $('parties-list');
-  list.innerHTML = '';
-  for (const p of e.parties) {
-    const row = document.createElement('div');
-    row.className = 'party-row' + (p.index === __partyIndex ? ' me' : '');
-    const label = escapeHtml(p.label || ('Party ' + (p.index + 1)));
-    const status = p.status === 'signed' ? 'SIGNED' : p.status === 'viewed' ? 'VIEWED' : 'PENDING';
-    row.innerHTML =
-      '<div class="party-idx">#' + p.index + '</div>' +
-      '<div class="party-label">' + label + (p.index === __partyIndex ? ' (you)' : '') + '</div>' +
-      '<div class="party-status ' + (p.status || 'pending') + '">' + status + '</div>';
-    list.appendChild(row);
-  }
-
-  const me = e.parties[__partyIndex] || {};
-  $('me-label').textContent = (me.label || 'party ' + (__partyIndex + 1));
-  if (me.status === 'signed') {
-    $('sign-status').hidden = false;
-    $('sign-status').className = 'banner ok';
-    $('sign-status').textContent = 'This slot has already been signed. Nothing to do.';
-    $('sign-confirm').disabled = true;
-    return;
-  }
-  $('sign-confirm').disabled = false;
-  $('sign-confirm').onclick = doSign;
-  $('verify-file').onchange = onVerifyFile;
-
-  // Populate vault keys if any.
-  populateVaultKeys().catch(() => {});
-}
-
-async function populateVaultKeys() {
-  const p = await waitForParasign();
-  if (!(await p.vaultAvailable())) return;
-  const items = await p.vaultList();
-  const sel = $('signer-key-src');
-  for (const it of items) {
-    const opt = document.createElement('option');
-    opt.value = 'vault:' + it.id;
-    opt.textContent = 'Vault: ' + (it.label || (it.pk_hash || '').slice(0, 12));
-    sel.appendChild(opt);
-  }
-}
-
-async function onVerifyFile(ev) {
-  const f = ev.target.files && ev.target.files[0];
-  if (!f) return;
-  const p = await waitForParasign();
-  const buf = new Uint8Array(await f.arrayBuffer());
-  const h = toHex(p.sha3_256(buf));
-  __hashMatches = (h === __envelope.doc_hash);
-  const b = $('verify-result');
-  b.hidden = false;
-  if (__hashMatches) {
-    b.className = 'banner ok';
-    b.textContent = 'Hash matches. This file is the same one the creator hashed.';
-  } else {
-    b.className = 'banner err';
-    b.textContent = 'Hash mismatch. The file you chose is different from the one in this envelope. Computed: ' + h.slice(0, 16) + '... Expected: ' + __envelope.doc_hash.slice(0, 16) + '...';
-  }
-}
-
-async function ensureSignerKey() {
-  const p = await waitForParasign();
-  const sel = $('signer-key-src').value;
-  if (sel === 'ephemeral') {
-    const seed = crypto.getRandomValues(new Uint8Array(32));
-    const kp = p.ml_dsa65.keygen(seed);
-    __signerKey = { secretKey: kp.secretKey, publicKey: kp.publicKey };
-    return __signerKey;
-  }
-  if (sel.startsWith('vault:')) {
-    const id = parseInt(sel.slice('vault:'.length), 10);
-    const pass = prompt('Passphrase to unlock the vault key:');
-    if (!pass) throw new Error('Vault unlock cancelled');
-    const unlocked = await p.vaultUnlock(id, pass);
-    __signerKey = { secretKey: unlocked.secretKey, publicKey: unlocked.publicKey };
-    return __signerKey;
-  }
-  throw new Error('Unsupported key source');
-}
-
-async function doSign() {
-  if (__hashMatches === false) {
-    if (!confirm('The file you uploaded does not match the envelope hash. Sign anyway? You will be signing a hash that does not match your local document.')) return;
-  }
-  $('sign-confirm').disabled = true;
-  $('sign-status').hidden = false;
-  $('sign-status').className = 'banner';
-  $('sign-status').textContent = 'Signing in browser...';
-
-  try {
-    const p = await waitForParasign();
-    const key = await ensureSignerKey();
-    const msg = await buildSignMessage(__envelope.id, __envelope.doc_hash, __partyIndex);
-    const signature = p.ml_dsa65.sign(key.secretKey, msg);
-
-    $('sign-status').textContent = 'Submitting signature to relay...';
-    const r = await fetch(RELAY + '/v2/envelopes/' + encodeURIComponent(__envelope.id) + '/sign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        party_index: __partyIndex,
-        signer_public_key: toB64(key.publicKey),
-        signature: toB64(signature),
-      }),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (r.status === 429) { throw new Error('Rate-limited. Wait a minute before retrying.'); }
-    if (r.status === 410) { throw new Error('Envelope is already complete; no more signatures accepted.'); }
-    if (r.status === 409) { throw new Error('This slot already holds a different signature.'); }
-    if (r.status === 400) { throw new Error(data.error || 'Bad request'); }
-    if (r.status === 404) { throw new Error('Envelope or party slot not found.'); }
-    if (!r.ok) { throw new Error('Relay error: HTTP ' + r.status); }
-
-    $('done-env-id').textContent = __envelope.id;
-    $('done-status').textContent = data.status + (data.idempotent ? ' (idempotent re-submit)' : '');
-    $('done-progress').textContent = data.signed_count + ' / ' + data.party_count + ' signed';
-    $('done-pk').textContent = toHex(p.sha3_256(key.publicKey)).slice(0, 32) + '...';
-    showStep('step-done');
-  } catch (e) {
-    $('sign-status').className = 'banner err';
-    $('sign-status').textContent = e.message || 'Signing failed';
-    $('sign-confirm').disabled = false;
-  }
-}
-
-init();
-</script>
+<script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
+<script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
+<script src="/js/quota-upgrade.js?v=7" defer></script>
+<script type="module" src="/co-sign.js?v=26"></script>
 </body>
 </html>

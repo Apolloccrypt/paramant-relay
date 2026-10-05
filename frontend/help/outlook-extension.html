@@ -1,10 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Outlook add-in — PARAMANT Help</title>
-<meta name="description" content="Set up the Paramant Outlook add-in for Microsoft 365 and Exchange. Send encrypted attachments from within Outlook.">
+<title>Versleutelde bijlagen versturen vanuit Outlook · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:description" content="Installeer de Paramant-invoegtoepassing voor Outlook in Microsoft 365, Outlook op het web of Exchange 2019 en verstuur versleutelde bijlagen vanuit uw inbox.">
+<meta name="twitter:title" content="Versleutelde bijlagen versturen vanuit Outlook · Paramant">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:title" content="Versleutelde bijlagen versturen vanuit Outlook · Paramant">
+<meta property="og:description" content="Installeer de Paramant-invoegtoepassing voor Outlook in Microsoft 365, Outlook op het web of Exchange 2019 en verstuur versleutelde bijlagen vanuit uw inbox.">
+<meta property="og:url" content="https://paramant.app/help/outlook-extension">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Paramant">
+<link rel="canonical" href="https://paramant.app/help/outlook-extension">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/outlook-extension">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/outlook-extension">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/outlook-extension">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="extensions">
+<meta name="description" content="Installeer de Paramant-invoegtoepassing voor Outlook in Microsoft 365, Outlook op het web of Exchange 2019 en verstuur versleutelde bijlagen vanuit uw inbox.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -30,7 +51,7 @@ a:hover{opacity:.7}
 em{color:var(--cobalt)}
 .step{display:flex;gap:20px;margin-bottom:32px;padding-bottom:32px;border-bottom:1px solid var(--ink-ghost)}
 .step:last-of-type{border-bottom:none}
-.step-num{width:32px;height:32px;background:var(--cobalt);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-num{width:32px;height:32px;background:var(--cobalt);color: var(--on-ochre);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
 .step-body{flex:1}
 .step-body h2{margin-top:0}
 .tip{border-left:3px solid var(--cobalt);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
@@ -63,8 +84,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
   display: inline-flex;
@@ -74,9 +96,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -87,26 +109,26 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -115,366 +137,290 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/help/outlook-extension#webpage",
+      "url": "https://paramant.app/help/outlook-extension",
+      "name": "Versleutelde bijlagen versturen vanuit Outlook · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Installeer de Paramant-invoegtoepassing voor Outlook in Microsoft 365, Outlook op het web of Exchange 2019 en verstuur versleutelde bijlagen vanuit uw inbox."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/help/outlook-extension#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Help",
+          "item": "https://paramant.app/help"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Invoegtoepassing voor Outlook"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 
-<div class="meta-bar">
-  <span>build 3.0.0</span>
-  <span class="sep">·</span>
-  <span>aes-256-gcm / ml-kem-768</span>
-  <span class="sep">·</span>
-  <span>eu/de · ram only</span>
-</div>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
-        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/outlook-extension" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/outlook-extension" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/dashboard">Dashboard</a>
-    </div>
-  </div>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
-</div><main>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/outlook-extension" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/outlook-extension" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
+</div>
+<main id="main-content" tabindex="-1">
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/help">Hulp</a>
     <span>/</span>
-    Outlook add-in
+    Invoegtoepassing voor Outlook
   </div>
 
-  <h1>Paramant for <em>Outlook</em> — encrypted attachments from within your inbox.</h1>
+  <h1>Paramant voor <em>Outlook</em>: versleutelde bijlagen vanuit uw inbox.</h1>
 
-  <p class="lead">The Paramant Outlook add-in lets you upload a file and insert a burn-on-read link directly from a compose or reply window in Outlook for Microsoft 365, Outlook on the web, and Exchange 2019.</p>
+  <p class="lead">Met de Paramant-invoegtoepassing voor Outlook uploadt u een bestand en zet u een link die na het lezen vervalt rechtstreeks in een nieuw bericht of antwoord. Dat werkt in Outlook voor Microsoft 365, Outlook op het web en Exchange 2019. De webapp en de extensies wissen het bestand na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op Firm en 100 keer op Enterprise.</p>
 
-  <h2>Compatibility</h2>
+  <h2>Wat werkt</h2>
 
   <ul class="compat-list">
-    <li><span class="dot dot-yes"></span><strong>Outlook for Microsoft 365</strong> — desktop app on Windows and Mac</li>
-    <li><span class="dot dot-yes"></span><strong>Outlook on the web</strong> — outlook.office.com and outlook.office365.com</li>
-    <li><span class="dot dot-yes"></span><strong>Exchange Server 2019</strong> — on-premises, with Outlook 2019 desktop client</li>
-    <li><span class="dot dot-no"></span><strong>Outlook 2016 / 2013</strong> — Office.js add-ins require Outlook 2019 or 365</li>
-    <li><span class="dot dot-no"></span><strong>Outlook mobile (iOS / Android)</strong> — add-ins are not supported in mobile Outlook</li>
+    <li><span class="dot dot-yes"></span><strong>Outlook voor Microsoft 365</strong>: de desktopapp op Windows en Mac</li>
+    <li><span class="dot dot-yes"></span><strong>Outlook op het web</strong>: outlook.office.com en outlook.office365.com</li>
+    <li><span class="dot dot-yes"></span><strong>Exchange Server 2019</strong>: on-premises, met de desktopclient Outlook 2019</li>
+    <li><span class="dot dot-no"></span><strong>Outlook 2016 en 2013</strong>: invoegtoepassingen met Office.js vragen Outlook 2019 of 365</li>
+    <li><span class="dot dot-no"></span><strong>Outlook op de telefoon (iOS en Android)</strong>: invoegtoepassingen werken niet in mobiele Outlook</li>
   </ul>
 
-  <h2>Installation</h2>
+  <h2>Installeren</h2>
 
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <h2>Add from Microsoft AppSource</h2>
-      <p>In Outlook, open any compose or reply window. Click the <strong>Apps</strong> button in the ribbon (or the three-dot menu on web). Select <strong>Get Add-ins</strong>. Search for <strong>Paramant</strong> and click <strong>Add</strong>.</p>
-      <p>Alternatively, your Microsoft 365 administrator can deploy the add-in to your entire organisation from the Microsoft 365 admin center under <strong>Settings &rarr; Integrated apps</strong>.</p>
+      <h2>Toevoegen via Microsoft AppSource</h2>
+      <p>Open in Outlook een nieuw bericht of een antwoord. Klik op de knop <strong>Apps</strong> in het lint (of op het menu met drie puntjes op het web). Kies <strong>Invoegtoepassingen ophalen</strong>. Zoek op <strong>Paramant</strong> en klik op <strong>Toevoegen</strong>.</p>
+      <p>Uw Microsoft 365-beheerder kan de invoegtoepassing ook voor de hele organisatie uitrollen vanuit het Microsoft 365-beheercentrum, onder <strong>Instellingen &rarr; Geïntegreerde apps</strong>.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Open the Paramant task pane</h2>
-      <p>After installation, open a compose window. A <strong>Paramant</strong> button appears in the ribbon under the <strong>Message</strong> tab. Click it to open the task pane on the right side of the window.</p>
-      <div class="tip"><p>If you don't see the Paramant button, close and reopen Outlook. On Outlook for the web, hard-refresh the page (Ctrl+Shift+R).</p></div>
+      <h2>Open het Paramant-taakvenster</h2>
+      <p>Open na het installeren een nieuw bericht. In het lint verschijnt onder het tabblad <strong>Bericht</strong> een knop <strong>Paramant</strong>. Klik erop om het taakvenster rechts in het venster te openen.</p>
+      <div class="tip"><p>Ziet u de Paramant-knop niet, sluit Outlook dan en open het opnieuw. Laad in Outlook op het web de pagina volledig opnieuw (Ctrl+Shift+R).</p></div>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">3</div>
     <div class="step-body">
-      <h2>Enter your API key</h2>
-      <p>The task pane shows an API key field on first run. Paste your Paramant API key and click <strong>Save</strong>. The key is stored in the add-in's local settings — it is not shared with Microsoft or stored on their servers.</p>
-      <p>Your API key is in Paramant Dashboard &rarr; API keys. If you don't have one, generate one there.</p>
+      <h2>Vul uw API-sleutel in</h2>
+      <p>De eerste keer toont het taakvenster een veld voor de API-sleutel. Plak uw Paramant API-sleutel en klik op <strong>Save</strong>. De sleutel staat in de lokale instellingen van de invoegtoepassing. Hij wordt niet met Microsoft gedeeld en niet op hun servers bewaard.</p>
+      <p>Uw API-sleutel staat in het Paramant-dashboard &rarr; API-sleutels. Heeft u er nog geen, maak er dan daar een.</p>
     </div>
   </div>
 
-  <h2>Sending a file</h2>
+  <h2>Een bestand versturen</h2>
 
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <h2>Open the task pane and select a file</h2>
-      <p>With a compose window open, click <strong>Paramant</strong> in the ribbon to open the task pane. Click <strong>Choose file</strong> and select the file you want to send. A progress bar appears during upload.</p>
+      <h2>Open het taakvenster en kies een bestand</h2>
+      <p>Klik met een nieuw bericht open op <strong>Paramant</strong> in het lint om het taakvenster te openen. Klik op <strong>Choose file</strong> en kies het bestand dat u wilt versturen. Tijdens het uploaden ziet u een voortgangsbalk.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Set expiry and click Send</h2>
-      <p>Choose how long the link should remain active (1 hour to 7 days). Click <strong>Upload and insert link</strong>. The task pane inserts a formatted line into your email body with the secure download URL.</p>
+      <h2>Kies de geldigheid en verstuur</h2>
+      <p>Kies hoe lang de link actief blijft (1 uur tot 7 dagen). Klik op <strong>Upload and insert link</strong>. Het taakvenster zet een opgemaakte regel met de beveiligde download-URL in uw e-mail.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">3</div>
     <div class="step-body">
-      <h2>Send your email normally</h2>
-      <p>The Paramant link is now in the email body. Edit surrounding text if needed, then send. Your recipient clicks the link, downloads the file once, and the link and file are deleted.</p>
+      <h2>Verstuur uw e-mail zoals altijd</h2>
+      <p>De Paramant-link staat nu in uw e-mail. Pas de tekst eromheen aan als dat nodig is en verstuur. Uw ontvanger klikt op de link en downloadt het bestand één keer. Daarna worden link en bestand gewist.</p>
     </div>
   </div>
 
-  <h2>Organisation-wide deployment</h2>
+  <h2>Uitrollen in de hele organisatie</h2>
 
-  <p>Microsoft 365 administrators can push the add-in to all users without requiring individual installation. In the Microsoft 365 admin center: <strong>Settings &rarr; Integrated apps &rarr; Get apps</strong>, search for Paramant, and deploy to specific users, groups, or the entire organisation.</p>
+  <p>Microsoft 365-beheerders kunnen de invoegtoepassing naar alle gebruikers uitrollen, zonder dat ieder zelf hoeft te installeren. In het Microsoft 365-beheercentrum: <strong>Instellingen &rarr; Geïntegreerde apps &rarr; Apps ophalen</strong>, zoek op Paramant en rol uit naar bepaalde gebruikers, groepen of de hele organisatie.</p>
 
-  <p>Users receive the add-in on next Outlook restart. API keys must be configured individually by each user unless your organisation provides a shared key via a managed deployment.</p>
+  <p>Gebruikers krijgen de invoegtoepassing bij de volgende herstart van Outlook. Ieder stelt zelf zijn API-sleutel in, tenzij uw organisatie via een beheerde uitrol een gedeelde sleutel meegeeft.</p>
 
-  <div class="warn"><p>Do not use a single shared API key across all users in a large organisation — transfers from all users will appear under one account, and revoking the shared key will lock everyone out simultaneously. Use per-user or per-team keys.</p></div>
-
-  <hr class="divider">
-
-  <h3>Troubleshooting</h3>
-
-  <div class="troubleshoot-item">
-    <div class="q">The Paramant button does not appear in the ribbon.</div>
-    <div class="a">Close and reopen Outlook. If the button is still missing, go to File &rarr; Manage Add-ins and verify Paramant is listed and enabled. On Outlook for the web, check that pop-ups are not blocked for outlook.office.com.</div>
-  </div>
-
-  <div class="troubleshoot-item">
-    <div class="q">Task pane opens but shows a blank screen.</div>
-    <div class="a">This is usually a network issue. The add-in task pane loads from addin.paramant.app. Ensure your firewall or proxy allows outbound HTTPS connections to paramant.app and addin.paramant.app. Check <a href="/status">paramant.app/status</a> for any active incidents.</div>
-  </div>
-
-  <div class="troubleshoot-item">
-    <div class="q">Upload fails with a network error on Exchange on-premises.</div>
-    <div class="a">Exchange 2019 add-ins require outbound internet access from the client machine (not from the server). The Outlook desktop client makes the upload request directly to paramant.app. Verify that client machines can reach api.paramant.app on port 443.</div>
-  </div>
-
-  <div class="troubleshoot-item">
-    <div class="q">Our IT policy requires add-ins to be approved before installation.</div>
-    <div class="a">Ask your Microsoft 365 administrator to approve Paramant in the admin center under <strong>Settings &rarr; Integrated apps &rarr; Add-ins</strong>. Alternatively, request admin-deployed installation so the button appears automatically for all users.</div>
-  </div>
+  <div class="warn"><p>Gebruik in een grote organisatie niet één gedeelde API-sleutel voor iedereen. Dan staan de verzendingen van alle gebruikers onder één account, en als u die sleutel intrekt, kan niemand er meer bij. Gebruik een sleutel per gebruiker of per team.</p></div>
 
   <hr class="divider">
 
-  <h3>Related</h3>
+  <h3>Problemen oplossen</h3>
+
+  <div class="troubleshoot-item">
+    <div class="q">De Paramant-knop staat niet in het lint.</div>
+    <div class="a">Sluit Outlook en open het opnieuw. Ontbreekt de knop nog steeds, ga dan naar Bestand &rarr; Invoegtoepassingen beheren en controleer of Paramant erbij staat en aan staat. Controleer in Outlook op het web of pop-ups voor outlook.office.com niet worden geblokkeerd.</div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">Het taakvenster opent maar blijft leeg.</div>
+    <div class="a">Meestal ligt dat aan het netwerk. Het taakvenster laadt vanaf addin.paramant.app. Zorg dat uw firewall of proxy uitgaande HTTPS-verbindingen naar paramant.app en addin.paramant.app toestaat. Kijk op <a href="/status">paramant.app/status</a> of er een storing is.</div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">De upload mislukt met een netwerkfout op Exchange on-premises.</div>
+    <div class="a">Invoegtoepassingen in Exchange 2019 hebben uitgaande internettoegang nodig vanaf de computer van de gebruiker (niet vanaf de server). De desktopclient van Outlook stuurt de upload rechtstreeks naar paramant.app. Controleer of de computers van gebruikers api.paramant.app op poort 443 kunnen bereiken.</div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">Volgens ons IT-beleid moeten invoegtoepassingen eerst worden goedgekeurd.</div>
+    <div class="a">Vraag uw Microsoft 365-beheerder Paramant goed te keuren in het beheercentrum, onder <strong>Instellingen &rarr; Geïntegreerde apps &rarr; Invoegtoepassingen</strong>. U kunt ook vragen om een uitrol door de beheerder, zodat de knop voor alle gebruikers vanzelf verschijnt.</div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Zie ook</h3>
   <div class="next-steps">
     <a href="/help/gmail-extension" class="next-step-card">
-      <h3>Gmail extension</h3>
-      <p>Same workflow for Gmail in Chrome.</p>
+      <h3>Extensie voor Gmail</h3>
+      <p>Dezelfde werkwijze voor Gmail in Chrome.</p>
     </a>
     <a href="/help/api-key-vs-totp" class="next-step-card">
-      <h3>API key vs TOTP</h3>
-      <p>Understanding the credentials used by the add-in.</p>
+      <h3>API-sleutel of TOTP</h3>
+      <p>Welke inloggegevens de invoegtoepassing gebruikt.</p>
     </a>
   </div>
 
 </main>
 
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/outlook-extension" hreflang="en" lang="en">This page in English</a></p>
+
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

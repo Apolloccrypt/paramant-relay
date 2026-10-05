@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paramant — Settings</title>
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <header>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" stroke="#0B3A6A" stroke-width="1.5" fill="none"/>
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#0B3A6A" stroke-width="1.5" fill="none"/>
+      <circle cx="12" cy="16" r="1.5" fill="#1D4ED8"/>
+    </svg>
+    <h1>Paramant <span data-i18n="settings">Settings</span></h1>
+  </header>
+
+  <section class="card">
+    <h2 data-i18n="opt_expiry_title">Link expiry</h2>
+    <p class="hint" data-i18n="opt_expiry_hint">How long a link stays downloadable. Each file is still single-download (burn-on-read); this is the upper limit before it is deleted. Your plan may cap the maximum.</p>
+    <label class="field">
+      <span data-i18n="opt_default_expiry">Default expiry</span>
+      <select id="ttl"></select>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="opt_format_title">Link format</h2>
+    <p class="hint" data-i18n="opt_format_hint">How the link looks when inserted into your email.</p>
+    <label class="radio">
+      <input type="radio" name="link_format" value="block">
+      <span><strong data-i18n="opt_format_block">Formatted block</strong>: a bordered card with the filename, expiry, and a Paramant note.</span>
+    </label>
+    <label class="radio">
+      <input type="radio" name="link_format" value="plain">
+      <span><strong data-i18n="opt_format_plain">Plain link</strong>: a single line with the filename as a link.</span>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="opt_relay_title">Relay (advanced)</h2>
+    <p class="hint" data-i18n="opt_relay_hint">Leave blank to auto-detect the relay for your API key. Set this only if you run a self-hosted relay.</p>
+    <label class="field">
+      <span data-i18n="opt_relay_url">Relay URL</span>
+      <input type="url" id="relay" placeholder="https://relay.paramant.app" spellcheck="false">
+    </label>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="opt_history_title">Transfer history</h2>
+    <p class="hint" data-i18n="opt_history_hint">A local list of files you have sent (name, size, time). It never leaves this browser and never contains keys or links.</p>
+    <button id="clear-history" class="btn-danger" data-i18n="opt_clear_history">Clear history</button>
+  </section>
+
+  <p id="saved" class="saved" role="status" aria-live="polite" hidden data-i18n="opt_saved">Saved</p>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

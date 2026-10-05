@@ -1,10 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Backup codes — PARAMANT Help</title>
-<meta name="description" content="How to generate, store, and use Paramant backup codes. Emergency access when you lose your authenticator app.">
+<title>Inloggen met een back-upcode · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:description" content="Authenticator-app niet bij de hand? Zo logt u in met een back-upcode, zo bewaart u de 10 codes veilig en zo maakt u een nieuwe set voor uw Paramant-account.">
+<meta name="twitter:title" content="Inloggen met een back-upcode · Paramant">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:title" content="Inloggen met een back-upcode · Paramant">
+<meta property="og:description" content="Authenticator-app niet bij de hand? Zo logt u in met een back-upcode, zo bewaart u de 10 codes veilig en zo maakt u een nieuwe set voor uw Paramant-account.">
+<meta property="og:url" content="https://paramant.app/help/backup-codes">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Paramant">
+<link rel="canonical" href="https://paramant.app/help/backup-codes">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/backup-codes">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/backup-codes">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/backup-codes">
+<meta name="description" content="Authenticator-app niet bij de hand? Zo logt u in met een back-upcode, zo bewaart u de 10 codes veilig en zo maakt u een nieuwe set voor uw Paramant-account.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -30,7 +46,7 @@ a:hover{opacity:.7}
 em{color:var(--cobalt)}
 .step{display:flex;gap:20px;margin-bottom:32px;padding-bottom:32px;border-bottom:1px solid var(--ink-ghost)}
 .step:last-of-type{border-bottom:none}
-.step-num{width:32px;height:32px;background:var(--cobalt);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-num{width:32px;height:32px;background:var(--cobalt);color: var(--on-ochre);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
 .step-body{flex:1}
 .step-body h2{margin-top:0}
 .app-list{list-style:none;margin:16px 0;display:flex;flex-direction:column;gap:8px}
@@ -61,8 +77,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
   display: inline-flex;
@@ -72,9 +89,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -85,26 +102,26 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -113,346 +130,270 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/help/backup-codes#webpage",
+      "url": "https://paramant.app/help/backup-codes",
+      "name": "Inloggen met een back-upcode · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Authenticator-app niet bij de hand? Zo logt u in met een back-upcode, zo bewaart u de 10 codes veilig en zo maakt u een nieuwe set voor uw Paramant-account."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/help/backup-codes#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Help",
+          "item": "https://paramant.app/help"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Back-upcodes"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 
-<div class="meta-bar">
-  <span>build 3.0.0</span>
-  <span class="sep">·</span>
-  <span>aes-256-gcm / ml-kem-768</span>
-  <span class="sep">·</span>
-  <span>eu/de · ram only</span>
-</div>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
-        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/backup-codes" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/backup-codes" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/dashboard">Dashboard</a>
-    </div>
-  </div>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
-</div><main>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/backup-codes" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/backup-codes" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
+</div>
+<main id="main-content" tabindex="-1">
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/help">Hulp</a>
     <span>/</span>
-    Backup codes
+    Back-upcodes
   </div>
 
-  <h1><em>Backup codes</em> — emergency access when your authenticator is gone.</h1>
+  <h1><em>Back-upcodes</em>: noodtoegang als uw authenticator-app weg is.</h1>
 
-  <p class="lead">Paramant generates 10 single-use backup codes when you set up your authenticator. Each code can substitute for a TOTP code exactly once. Use them if you lose access to your authenticator app.</p>
+  <p class="lead">Paramant maakt 10 back-upcodes als u uw authenticator-app instelt. Elke code vervangt precies één keer een TOTP-code. Gebruik ze als u niet meer bij uw authenticator-app kunt.</p>
 
-  <h2>What backup codes are</h2>
+  <h2>Wat back-upcodes zijn</h2>
 
-  <p>A backup code is a pre-generated 12-character token that works in place of your 6-digit TOTP code at login. Once used, a backup code is invalidated and cannot be used again. You start with 10. When they run out, you must contact support for a manual account reset.</p>
+  <p>Een back-upcode is een vooraf gemaakte code van 12 tekens die bij het inloggen uw TOTP-code van 6 cijfers vervangt. Na gebruik vervalt de code en werkt hij niet meer. U begint met 10. Zijn ze op, dan moet u support vragen uw account met de hand te herstellen.</p>
 
-  <div class="warn"><p>Backup codes are as sensitive as your API key. Anyone who has one can sign in to your account without your authenticator device.</p></div>
+  <div class="warn"><p>Back-upcodes zijn net zo gevoelig als uw API-sleutel. Wie er een heeft, kan inloggen op uw account zonder het toestel met uw authenticator-app.</p></div>
 
-  <h2>Where to find your current codes</h2>
+  <h2>Waar u uw huidige codes vindt</h2>
 
-  <p>Your backup codes are shown once during authenticator setup. If you saved them then, look in the location you stored them. If you did not save them, you need to regenerate a new set (this invalidates all existing codes).</p>
+  <p>Uw back-upcodes worden één keer getoond, bij het instellen van uw authenticator-app. Heeft u ze toen bewaard, kijk dan op die plek. Heeft u ze niet bewaard, dan moet u een nieuwe set maken (daarmee vervallen alle bestaande codes).</p>
 
-  <h2>How to use a backup code at login</h2>
+  <h2>Zo logt u in met een back-upcode</h2>
 
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <h2>Go to the login page</h2>
-      <p>Open <a href="/auth/login">paramant.app/auth/login</a> and enter your email and API key as usual.</p>
+      <h2>Ga naar de inlogpagina</h2>
+      <p>Open <a href="/auth/login">paramant.app/auth/login</a> en vul zoals altijd uw e-mailadres en API-sleutel in.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Click "Use a backup code"</h2>
-      <p>Below the TOTP field you will see a link: <strong>Use a backup code</strong>. Click it. The input switches from a 6-digit field to a text field that accepts your full backup code.</p>
+      <h2>Klik op "Inloggen met een back-upcode"</h2>
+      <p>Onder het TOTP-veld ziet u een link: <strong>Inloggen met een back-upcode</strong>. Klik erop. Het veld voor 6 cijfers wordt dan een tekstveld voor uw volledige back-upcode.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">3</div>
     <div class="step-body">
-      <h2>Enter the code</h2>
-      <p>Type or paste one of your unused backup codes and click <strong>Sign in</strong>. The code is consumed immediately — do not use the same code again.</p>
+      <h2>Vul de code in</h2>
+      <p>Typ of plak een van uw ongebruikte back-upcodes en klik op <strong>Inloggen met back-upcode</strong>. De code is meteen verbruikt. Gebruik dezelfde code niet nog eens.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">4</div>
     <div class="step-body">
-      <h2>Re-enroll your authenticator</h2>
-      <p>Once in the dashboard, go to <strong>Account &rarr; Security &rarr; Authenticator</strong> and set up a new authenticator app. Do this before the session expires (1 hour), so you do not get locked out again.</p>
+      <h2>Koppel uw authenticator-app opnieuw</h2>
+      <p>Ga in het dashboard naar <strong>Account &rarr; Beveiliging &rarr; Nieuwe authenticator-app instellen</strong> en koppel een nieuwe app. Doe dit voordat de sessie verloopt (1 uur), zodat u niet opnieuw buitengesloten raakt.</p>
     </div>
   </div>
 
-  <h2>How to regenerate backup codes</h2>
+  <h2>Nieuwe back-upcodes maken</h2>
 
-  <p>Dashboard &rarr; Account &rarr; Security &rarr; <strong>Backup codes</strong> &rarr; <strong>Regenerate</strong>. You will be asked to confirm your TOTP code. The old codes are invalidated the moment you confirm. Save the new set immediately.</p>
+  <p>Dashboard &rarr; Account &rarr; Beveiliging &rarr; <strong>Back-upcodes</strong> &rarr; <strong>Alle codes vernieuwen</strong>. U bevestigt met uw TOTP-code. Op dat moment vervallen de oude codes. Bewaar de nieuwe set meteen.</p>
 
-  <h2>Where to store backup codes</h2>
+  <h2>Waar u back-upcodes bewaart</h2>
 
   <ul class="app-list">
-    <li><strong>Password manager</strong><span class="tag">recommended</span> — 1Password, Bitwarden, or equivalent as a secure note</li>
-    <li><strong>Printed copy</strong> — printed and kept in a locked drawer, safe, or filing cabinet</li>
-    <li><strong>Encrypted file</strong> — password-protected archive stored on offline media</li>
+    <li><strong>Wachtwoordbeheerder</strong><span class="tag">aanbevolen</span>: 1Password, Bitwarden of vergelijkbaar, als beveiligde notitie</li>
+    <li><strong>Op papier</strong>: geprint en bewaard in een afgesloten la, kluis of archiefkast</li>
+    <li><strong>Versleuteld bestand</strong>: een archief met wachtwoord, bewaard op een offline drager</li>
   </ul>
 
-  <div class="warn"><p>Do not store backup codes in plain-text files, unencrypted cloud notes (Google Keep, Apple Notes default), email drafts, or screenshots in your camera roll.</p></div>
+  <div class="warn"><p>Bewaar back-upcodes niet in gewone tekstbestanden, onversleutelde notities in de cloud (Google Keep, standaard Apple Notities), conceptmails of schermafbeeldingen in uw foto&#39;s.</p></div>
 
   <hr class="divider">
 
-  <h3>Common questions</h3>
+  <h3>Veelgestelde vragen</h3>
 
   <div class="troubleshoot-item">
-    <div class="q">I used all 10 codes and still can't get in.</div>
-    <div class="a">Contact <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from the email address on your account. We will verify your identity and manually reset your authenticator enrollment. Response time is within 48 hours.</div>
+    <div class="q">Ik heb alle 10 codes gebruikt en kom er nog steeds niet in.</div>
+    <div class="a">Mail naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf het e-mailadres van uw account. We controleren wie u bent en zetten de koppeling met uw authenticator-app met de hand terug. U krijgt binnen 48 uur antwoord.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">Can I see which codes I have already used?</div>
-    <div class="a">No. The dashboard shows only how many codes remain. Once a code is used it is gone. If you are unsure which codes are still valid, regenerate a fresh set while you still have TOTP access.</div>
+    <div class="q">Kan ik zien welke codes ik al heb gebruikt?</div>
+    <div class="a">Nee. Het dashboard toont alleen hoeveel codes er over zijn. Een gebruikte code is weg. Weet u niet zeker welke codes nog gelden, maak dan een nieuwe set zolang u nog met TOTP kunt inloggen.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">Do backup codes expire?</div>
-    <div class="a">Unused backup codes do not expire on their own. They are invalidated only when you regenerate a new set, or when your account is reset.</div>
+    <div class="q">Verlopen back-upcodes?</div>
+    <div class="a">Ongebruikte back-upcodes verlopen niet vanzelf. Ze vervallen alleen als u een nieuwe set maakt of als uw account wordt hersteld.</div>
   </div>
 
   <hr class="divider">
 
-  <h3>Related</h3>
+  <h3>Zie ook</h3>
   <div class="next-steps">
     <a href="/help/lost-authenticator" class="next-step-card">
-      <h3>Lost authenticator access</h3>
-      <p>What to do when you have no backup codes left.</p>
+      <h3>Authenticator-app kwijt</h3>
+      <p>Wat u doet als u geen back-upcodes meer heeft.</p>
     </a>
     <a href="/help/authenticator-setup" class="next-step-card">
-      <h3>Set up your authenticator</h3>
-      <p>Full guide to enrolling a new authenticator app.</p>
+      <h3>Uw authenticator-app instellen</h3>
+      <p>De volledige uitleg voor het koppelen van een nieuwe authenticator-app.</p>
     </a>
   </div>
 
 </main>
 
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/backup-codes" hreflang="en" lang="en">This page in English</a></p>
+
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

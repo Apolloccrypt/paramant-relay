@@ -1,0 +1,52 @@
+name: product-heartbeat
+
+# Does the site still DO anything, in a real browser (tests/product-heartbeat.test.mjs).
+#
+# This is the pull-request gate: it runs against the checkout, before a break is
+# merged. The hourly half that ran against https://paramant.app moved to
+# heartbeat.yml on 2026-09-02, together with the two product canaries, so there
+# is one hourly alarm with one evidence artifact instead of a job whose green
+# tick meant different things in different steps.
+#
+# The July 2026 breaks (relative import 404, module loaded as classic script,
+# CSP-blocked signup) were all invisible to the Node suites and loud in a
+# browser console. This is the gate that sees them.
+#
+# Deliberately NOT path-gated. A required status check that is skipped never
+# reports, and a pull request then waits forever on a check that will not run.
+# A gate that only guards the changes it expects is not a gate: the ParaSend
+# break came from a CSP commit, and the signup break from an nginx rule. One
+# minute of CI per push buys a gate that is always there.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: heartbeat — this checkout
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install deps (browsers installed separately)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Heartbeat against frontend/
+        run: node --test tests/product-heartbeat.test.mjs
+
+      # Internal destinations only: resolved against frontend/ on disk, no
+      # network, about a second. It runs before nothing and after nothing, it
+      # just has to run: a typo like /login instead of /auth/login is invisible
+      # to every other gate we have.
+      - name: Where every internal link leads
+        run: node --test tests/links.test.mjs

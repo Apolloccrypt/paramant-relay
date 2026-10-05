@@ -2,7 +2,8 @@
 const crypto = require('crypto');
 const { redis } = require('./redis');
 
-const DIFFICULTY = 18;          // 2^18 ≈ 262k hashes, ~1-2s on modern CPU
+const DIFFICULTY = 18;          // 2^18 ~ 262k hashes: 1-2s in a browser (WebCrypto,
+                                // one await per hash), 150-250ms for a native solver
 const TTL = 300;                // 5 min to solve
 const PREFIX = 'paramant:pow:';
 

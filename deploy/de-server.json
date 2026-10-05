@@ -1,0 +1,81 @@
+{
+  "_": "De afspraak: wat productie hoort te doen, en waar die verwachting vandaan komt. Wat de repo zelf bepaalt (grootte-grens, HSTS, versie, sleutels) wordt hier niet herhaald maar uit de bronbestanden gelezen; zie scripts/meet-de-server.mjs. Wat hier wel staat is wat de repo niet bepaalt, met de reden dat het er toch is. Uitleg in deploy/de-server.md.",
+  "adres": {
+    "ip": "116.203.86.81",
+    "bron": "gemeten 2026-09-05; de repo noemt geen enkel productie-ip",
+    "opmerking": "Alle zeven hosts wijzen naar deze ene machine. Verandert dat, dan is er verhuisd of bijgezet en hoort dit bestand mee te bewegen."
+  },
+  "rand": {
+    "naam": "Caddy",
+    "viaKop": "1.1 Caddy",
+    "serverKop": "Caddy",
+    "httpStatus": 308,
+    "bron": "niet in de repo; verklaard op 2026-09-05",
+    "reden": "Caddy staat voor nginx en is de laag waar het internet mee praat: poort 80 antwoordt met een 308 en Server: Caddy, poort 443 zet via: 1.1 Caddy en alt-svc h3, en onbekende SNI wordt geweigerd zonder certificaat. Geen enkel bestand in de repo noemt hem. Zolang dat zo is staat hij hier als bewuste verwachting, zodat zijn verdwijnen een besluit is en geen verrassing. Het besluit wat er met hem moet gebeuren staat in deploy/de-server.md."
+  },
+  "cert": {
+    "uitgever": "Let's Encrypt",
+    "minimaleDagen": 21,
+    "bron": "nginx-paramant-public.conf wijst naar /etc/letsencrypt/live/paramant.app/",
+    "opmerking": "Een certificaat voor alle hosts tegelijk. Niets in de repo vernieuwt het en geen enkele fase van deploy-3.1.sh raakt certificaten aan; de vernieuwing gebeurt buiten git. Daarom bewaakt deze controle de vervaldatum: dat is het enige wat van buitenaf te zien is."
+  },
+  "hosts": [
+    {
+      "host": "paramant.app",
+      "sector": null,
+      "rol": "de site"
+    },
+    {
+      "host": "relay.paramant.app",
+      "sector": "relay",
+      "rol": "de enige relay met verkeer"
+    },
+    {
+      "host": "health.paramant.app",
+      "sector": "health",
+      "rol": "relay, in gebruik"
+    },
+    {
+      "host": "legal.paramant.app",
+      "sector": "legal",
+      "rol": "relay, tree_size 0"
+    },
+    {
+      "host": "finance.paramant.app",
+      "sector": "finance",
+      "rol": "relay, tree_size 0"
+    },
+    {
+      "host": "iot.paramant.app",
+      "sector": "iot",
+      "rol": "relay, tree_size 0"
+    },
+    {
+      "host": "addin.paramant.app",
+      "sector": null,
+      "rol": "de Outlook-invoeging; eigen conf in deploy/nginx/, ook zonder deploypad"
+    }
+  ],
+  "nietGemeten": [
+    "De inhoud van de nginx.conf op de server. Daar staat waarschijnlijk de client_max_body_size die productie werkelijk hanteert, en hij is van buitenaf alleen te meten, niet te lezen.",
+    "Wat Caddy precies doet: welke configuratie, welke poorten naar nginx, of hij een eigen grens kent.",
+    "Alles achter de rand: containers, volumes, timers, cron. Daar komt geen meting van buitenaf bij."
+  ],
+  "afwijkingen": [
+    {
+      "hosts": [
+        "paramant.app",
+        "relay.paramant.app",
+        "health.paramant.app",
+        "legal.paramant.app",
+        "finance.paramant.app",
+        "iot.paramant.app"
+      ],
+      "wat": "weigert boven de grens uit de repo",
+      "verwacht": "12582912 bytes",
+      "gemeten": "10485760 bytes",
+      "sinds": "2026-09-05",
+      "reden": "De repo zegt 12M sinds d8bf7a71 (2026-09-04). Productie weigert alles boven 10485760 bytes, precies 10 MiB, en dat getal staat in geen enkel repobestand. Dat kan ook niet anders: deploy/deploy-3.1.sh installeert deze conf nooit, het patcht de conf die op de server staat op ankerregels, en client_max_body_size is geen van die ankers. De grens komt waarschijnlijk uit het http-blok van de nginx.conf op de server zelf, met de hand gezet en buiten git, net als de vijf limit_req-zones die op 2026-09-04 alsnog in de repo zijn gehaald. Dit verschil verdwijnt pas als de conf wordt geinstalleerd in plaats van gepatcht; stap 3 in deploy/de-server.md."
+    }
+  ]
+}

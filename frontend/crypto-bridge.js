@@ -1,6 +1,6 @@
 /**
  * crypto-bridge.js — wraps the Rust/WASM hybrid KEM (ML-KEM-768 + ECDH P-256 + AES-256-GCM)
- * and re-exports the same API that parashare.html, drop.html, and ontvang.html use.
+ * and re-exports the same API that parashare.html and ontvang.html use.
  *
  * Wire format produced by WASM (current — magic 0x03, AAD-bound):
  *   0x03 | u32be(ctKemLen) | ctKem | u32be(senderPubLen) | senderPub | nonce(12) | u32be(ctLen) | ct
@@ -20,7 +20,7 @@ import init, {
 
 // SHA-256 of frontend/pkg/paramant_crypto_bg.wasm — update after each wasm-pack build.
 // Reproducible without binaryen: see [package.metadata.wasm-pack] in crypto-wasm/Cargo.toml.
-const WASM_SHA256 = '3a5b1a2bff915ce16f61a6f38f17195fd39bff14e2acc16056a015d957ce7e6f';
+const WASM_SHA256 = '30f1ae35af6dabbcdcca81842259bf4d63d7e4b508fb8badff81c65b9b993c79';
 
 let _ready = null;
 
@@ -39,7 +39,7 @@ async function _verifyAndInit() {
       'WASM integrity check failed.\n' +
       'Expected: ' + WASM_SHA256 + '\n' +
       'Got:      ' + hashHex + '\n' +
-      'Do not proceed — the crypto binary may have been tampered with.'
+      'Do not proceed: the crypto binary may have been tampered with.'
     );
   }
 

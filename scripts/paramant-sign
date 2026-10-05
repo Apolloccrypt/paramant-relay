@@ -28,6 +28,24 @@ function loadMlDsa() {
 }
 
 function sha3hex(buf) { return crypto.createHash('sha3-256').update(buf).digest('hex'); }
+
+// Domain-separated single-signer message (must be byte-identical to
+// relay/parasign.js singleSignerMessage). v2 binds the signature to the
+// notary protocol so it can't be replayed from another context (#3/#4).
+const SIGN_DOMAIN_NOTARY = 'paramant/parasign/notary/v1';
+function singleSignerMessage(docHashHex) {
+  return crypto.createHash('sha3-256')
+    .update(Buffer.from(SIGN_DOMAIN_NOTARY, 'utf8'))
+    .update(Buffer.from([0]))
+    .update(Buffer.from(docHashHex, 'hex'))
+    .digest();
+}
+// Bytes to verify a stored envelope's signer signature against, per version.
+function signerVerifyBytes(docHashHex, version) {
+  return String(version) === '2'
+    ? singleSignerMessage(docHashHex)
+    : Buffer.from(docHashHex, 'hex');
+}
 function die(msg) { console.error('error: ' + msg); process.exit(1); }
 
 function parseArgs(argv) {
@@ -87,8 +105,9 @@ async function cmdSign(args) {
 
   const docBuf = fs.readFileSync(args.document);
   const hashHex = sha3hex(docBuf);
-  // Sign the 32-byte hash locally; the secret key stays here.
-  const signature = mlDsa.sign(kp.secretKey, Buffer.from(hashHex, 'hex'));
+  // Sign the domain-separated v2 message locally; the secret key stays here.
+  // @noble/post-quantum ml_dsa65.sign is (message, secretKey).
+  const signature = mlDsa.sign(singleSignerMessage(hashHex), kp.secretKey);
 
   const resp = await postJson(relay.replace(/\/$/, '') + '/v2/sign', { 'X-Api-Key': apiKey }, {
     document_hash: hashHex,
@@ -117,9 +136,10 @@ async function cmdVerify(args) {
   const hashOk = hashHex === envelope.document_hash;
   let signerOk = false;
   try {
+    // v2 envelopes (domain-separated) and legacy v1 (bare hash) both verify here.
     signerOk = mlDsa.verify(
       Buffer.from(envelope.signature, 'base64'),
-      Buffer.from(envelope.document_hash, 'hex'),
+      signerVerifyBytes(envelope.document_hash, envelope.version),
       Buffer.from(envelope.signer.public_key, 'base64'));
   } catch (e) { signerOk = false; }
 

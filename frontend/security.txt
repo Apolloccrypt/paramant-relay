@@ -10,8 +10,9 @@ Expires: 2027-04-19T23:59:59.000Z
 # Preferred languages for reports
 Preferred-Languages: en, nl
 
-# Encryption key for sensitive reports
-Encryption: https://paramant.app/.well-known/openpgp-key.asc
+# No PGP key is published right now. /.well-known/openpgp-key.asc explains
+# how to request the current key out-of-band; an Encryption: field will
+# return once a real key is in place (RFC 9116: only advertise what exists).
 
 # Canonical URL (RFC 9116 requires this)
 Canonical: https://paramant.app/.well-known/security.txt

@@ -8,44 +8,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  sdk-js-tests:
-    name: sdk-js — node test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install sdk-js dependencies
-        working-directory: sdk-js
-        run: npm install
-      - name: Run sdk-js tests
-        working-directory: sdk-js
-        run: npm test
-
-  sdk-py-tests:
-    name: sdk-py — pytest
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-      - name: Install sdk-py with test extras
-        working-directory: sdk-py
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install pytest
-      - name: Run sdk-py tests
-        working-directory: sdk-py
-        run: pytest -v
-
+  # NOTE: sdk-js and sdk-py tests moved to the standalone repo
+  # https://github.com/Apolloccrypt/paramant-sdk (with the cross-impl
+  # conformance suite). This workflow now covers the relay only.
   shell-syntax:
-    name: shell — bash -n
+    name: shell, bash -n
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Bash syntax check on all .sh files
         run: |
           set -e
@@ -59,24 +29,141 @@ jobs:
           | xargs -0 -n1 bash -n
           echo "All shell scripts parse OK."
 
+  static-sanity:
+    name: static sanity, tests/static-sanity.sh
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 is load-bearing, not a habit. Check 10 delegates to
+      # scripts/check-commit-style.sh, which reads commit messages and the added
+      # diff lines of the commits under review. On a pull request the checkout is
+      # refs/pull/N/merge: HEAD is a merge commit with the message
+      # "Merge <sha> into <sha>" and no diff of its own, so the script's default
+      # (the last commit) would scan nothing and pass over anything. The script
+      # builds "origin/$GITHUB_BASE_REF..HEAD" instead, and that base branch is
+      # only in the clone with the full fetch. With the shallow default the check
+      # says so in the log rather than going quietly green.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Check 1 is `node --check` over admin/server.js, admin/lib/*.js and
+      # relay/relay.js; check 11 parses all 134 suites the same way. No npm
+      # install: nothing here resolves an import.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # Thirteen checks, no secrets, no server, no network. It was written as a
+      # pre-commit hook and deploy/deploy-3.1.sh phase 0b runs it against the
+      # commit being deployed, but until now it ran in NO workflow at all:
+      # security-posture.yml only mentioned it in a comment. Every
+      # "static-sanity PASS" on record was somebody's laptop. That is the exact
+      # shape of hole the deploy dry-run job below was added to close, and
+      # checks 10, 11 and 12 are precisely the ones a pull request can break for
+      # everybody: the style guard, the merge-collision guard on the shared test
+      # namespace, and the opt-in on the tracked brand screenshots.
+      - name: Static sanity (thirteen checks)
+        run: bash tests/static-sanity.sh
+
+  undefined-names:
+    name: static, every name must exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # The sibling of `bash -n`, for JavaScript. bash -n and node --check both
+      # parse; neither resolves names. An hourly setInterval swept a Map that no
+      # longer existed and took production down 425 times before anyone looked.
+      # Config: eslint.config.mjs, one rule, no style opinions.
+      # Runs BEFORE eslint, on purpose. A duplicate top-level declaration is a
+      # SyntaxError, and eslint reports it as a bare "Parsing error" in the tail
+      # of a run over the whole repo, with no hint of where it came from. This
+      # guard names the file, the line and the cause first, and emits a GitHub
+      # error annotation so the file shows up in the job summary. It also covers
+      # the half eslint never can: a duplicate top-level var/function is legal
+      # JavaScript, so it parses, lints clean, and silently replaces the earlier
+      # definition that the assertions above it were written against.
+      #
+      # Why it exists: on 2026-09-02 five pull requests each appended a block to
+      # the same flat test file within the hour. Each was green on its own; the
+      # merge of the last one put "Identifier 'tiers' has already been declared"
+      # and "'pricingVisible' has already been declared" on main and took two
+      # suites out entirely. This job is where that lands, so this is where it
+      # gets a name.
+      - name: Test-scope guard (suites parse, one declaration per name)
+        run: scripts/check-test-declarations.sh
+
+      - name: no-undef over the hand-written server code
+        run: npx --yes eslint@9 .
+
+  deploy-dryrun:
+    name: deploy - 3.1 dry run (no server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # deploy/deploy-3.1.sh is the only thing in this repo that recreates
+      # production containers and rewrites the nginx config, and it was the
+      # only thing with a self-test that ran nowhere: docs/ONBOARDING.md said
+      # so in as many words. So a green pull request said nothing about the
+      # deploy script, and two rounds of nginx changes landed on that silence.
+      #
+      # The suite needs no server and no secrets. It runs the script with
+      # --dry-run, which executes nothing, and it runs the real phase 5b, 5c,
+      # 8a and 8c remote blocks, extracted from the source, against synthetic
+      # nginx confs with nginx and systemctl stubbed. ubuntu-latest carries
+      # shellcheck, so the shellcheck leg of the suite runs here and is skipped
+      # on a laptop that has none.
+      - name: Deploy 3.1 dry-run self-test
+        run: bash tests/deploy-3.1-dryrun.test.sh
+
+  frontend-cache-bust:
+    name: frontend, cache-bust guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: All local css/js links must carry a single ?v= cache-bust
+        run: scripts/check-cache-bust.sh
+
   relay-crypto-tests:
     name: relay - crypto suite (@paramant/core)
     runs-on: ubuntu-latest
+    # The route suites (test/route-*.test.js) boot a real relay.js, and the
+    # envelope store is redis-only (relay.js:5650), without a server every
+    # /v2/envelopes route answers 503 and the whole ParaSign lifecycle is
+    # untestable. This is also what makes the FLEET-WIDE half of the
+    # envelope-create limiter testable: two relay processes, one budget.
+    # Same image tag as docker-compose.yml runs in production.
+    services:
+      redis:
+        image: redis:7.4.8-alpine
+        ports:
+          - 6399:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version: '24'
       # @paramant/core is the Rust NAPI binding in the sibling paramant-core
       # repo. Until it is published to npm it is a dev file-link, so build it
       # here (as paramant-core's own CI does) to gate the relay crypto suite's
       # byte-compatibility against the binding. Interim until publish.
       - name: Install liboqs build deps
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang libclang-dev
-      - name: Build @paramant/core (sibling checkout)
+      # Pin paramant-core to a fixed commit so the crypto byte-compat gate runs
+      # against a known revision, not a moving HEAD. Bump this SHA deliberately
+      # (and review the diff) when adopting a new paramant-core.
+      - name: Build @paramant/core (sibling checkout, pinned)
+        env:
+          PARAMANT_CORE_SHA: b90b3c52af5c3c30053766bfa108924aff4f9eec
         run: |
-          git clone --depth 1 https://github.com/Apolloccrypt/paramant-core.git "${GITHUB_WORKSPACE}/../paramant-core"
+          git clone --no-checkout https://github.com/Apolloccrypt/paramant-core.git "${GITHUB_WORKSPACE}/../paramant-core"
           cd "${GITHUB_WORKSPACE}/../paramant-core"
+          git checkout "${PARAMANT_CORE_SHA}"
           rustup show
           cargo build -p paramant-core-node --release
           cp target/release/libparamant_core_node.so crates/paramant-core-node/index.node
@@ -86,3 +173,464 @@ jobs:
       - name: Relay crypto suite
         working-directory: relay
         run: node --test $(find crypto -name '*.test.js')
+
+      # The ParaSign suites that need the ML-DSA-65 engine. They used to run in
+      # the unit job below, which installs nothing, so @paramant/core was never
+      # there: each one caught the load error, printed "skip - ...", and returned.
+      # A file that exits 0 is a PASS to `node --test`, so the job reported
+      # "ok 24" while four suites asserted nothing at all. The worst of them was
+      # parasign-sandbox-live-guard, the only guard on "a psk_live_ key must
+      # never reach the sandbox auto-signer". They run here instead, against the
+      # engine this job builds, and test/_requires.js now fails them outright if
+      # it is missing. These four need the engine but not redis, and the redis
+      # service now on this job is not exposed to them, so that one precondition
+      # stays declared by name rather than silently swallowed.
+      - name: Relay ParaSign engine suites
+        working-directory: relay
+        env:
+          RELAY_TEST_SKIP: redis
+        run: >-
+          node --test
+          test/parasign-sandbox.test.js
+          test/parasign-sandbox-live-guard.test.js
+          test/parasign-open-api-e2e.test.js
+          test/parasign-envelope-index.test.js
+
+      # inbound-hash-verify spawns a real relay.js, so it needs the installed
+      # dependencies and belongs here, not in the no-install unit job. It sat in
+      # that job from 2026-07-20 and failed every single run with "relay did not
+      # become healthy in time", which is what a missing `redis` module looks
+      # like through a spawn with stdio ignored. Thirty red runs in a row on
+      # main, and a suite nobody trusts is a suite nobody reads.
+
+      # The route layer of relay.js. Until 2026-09-02 the 6488 lines and 68
+      # routes of relay.js were loaded by NO unit test at all, the coverage
+      # table simply did not list the file. These suites boot it (test/
+      # _relay-server.js) and drive it over HTTP: the auth gate, the ParaSign
+      # envelope lifecycle end to end with real ML-DSA-65 signatures and an
+      # offline verification of the receipt, ParaSend burn-on-read and the
+      # per-tier ceilings, entitlement persistence across a restart (#315), and
+      # the rate limiters including the redis-backed fleet-wide one. They live
+      # here and not in the unit job below because relay.js requires `redis` and
+      # @paramant/core at load, and this is the job that installs both.
+      #
+      # parasign-party-index rides along for the same reason: it drives a real
+      # EnvelopeStore against redis and the real ML-DSA-65 engine, so the unit
+      # job below could only ever skip it, and a skipped suite is what this gate
+      # exists to catch.
+      #
+      # The three class gates from the 2026-09-05 repair round run here for the
+      # same reason as everything else in this job. counter-atomicity-gate fires
+      # concurrent requests at a cap and counts how many got through, which only
+      # means something against a real store: the bug it guards is invisible
+      # sequentially and cannot be staged at all in an in-memory stub.
+      # public-projection-gate and guess-budget-gate boot a real relay.js, which
+      # requires `redis` and @paramant/core at load, so the no-install job could
+      # only ever fail them. trusted-edge-gate is the exception and deliberately
+      # stays in that job: it reads the nginx configs off disk and calls one pure
+      # function, so it needs nothing, and the half of it that guards the edge
+      # config should run in the cheapest job there is.
+      # quota-gate, entitlements and did-principal all moved here on 2026-09-05,
+      # for one reason between them. The sign and transfer gates are Lua scripts
+      # since the review's finding 8 (read-decide-write in JavaScript let
+      # concurrent requests share one slot), and the in-memory redis stubs those
+      # three suites drove have no EVAL. Because quota fails open by design, a
+      # stub that cannot run the script does not turn a suite red: it turns every
+      # cap assertion into a pass over nothing, which is worse than the bug. That
+      # is the same shape as the four ParaSign suites above, so it gets the same
+      # answer: give the job the dependency rather than teach the stub to imitate
+      # the implementation.
+      # parasign-signs-quota rides along here because it needs the same redis and
+      # nothing else. It was the LAST suite in the repo that asserted nothing in
+      # any CI job: it ran only in the no-install unit job, where it has no redis
+      # and therefore skipped every time, so its five checks on the monthly
+      # signs cap (the metering that was once stuck behind a dead `&& false`)
+      # have never actually run on a pull request. With a redis service they do.
+      - name: Relay route suites (a booted relay.js) and the redis-backed units
+        working-directory: relay
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+        run: |
+          set -o pipefail
+          # --test-reporter=tap: see the unit job below. This gate parses the
+          # same TAP diagnostic lines, and its expected set is empty too, so
+          # the spec reporter would leave it green over anything.
+          # WIE HIER DRAAIT WORDT NIET MEER MET DE HAND BIJGEHOUDEN. Elke suite
+          # die relay.js opstart hoort in deze baan, want relay.js laadt redis
+          # en @paramant/core bij het laden en dit is de enige baan die beide
+          # bouwt. Dat stond als namen in de baan hieronder, en op 22-09 voegde
+          # een tak negentien suites toe die een relay opstarten zonder dat er
+          # een naam bij kwam: de baan zonder afhankelijkheden probeerde ze te
+          # draaien, de relay kwam nooit omhoog, en de stap bleef hangen tot hij
+          # werd afgekapt. Diezelfde stap duurt op main 43 seconden.
+          #
+          # scripts/relay-suites.mjs stelt de vraag aan de imports. Daarachter
+          # staan de suites die hier om een ANDERE reden horen: de ML-DSA-65
+          # engine of een echte redis. sort -u omdat de twee lijsten elkaar
+          # overlappen en node --test een naam die er twee keer staat ook twee
+          # keer draait.
+          suites=$(
+            { node ../scripts/relay-suites.mjs --met-relay
+              printf '%s\n' test/parasign-signs-quota.test.js test/parasign-party-index.test.js \
+                test/quota-gate.test.js test/entitlements.test.js test/did-principal.test.js \
+                test/counter-atomicity-gate.test.js test/public-projection-gate.test.js \
+                test/guess-budget-gate.test.js
+            } | sort -u)
+          echo "$suites" | sed 's/^/  /'
+          node --test --test-reporter=tap $suites 2>&1 | tee /tmp/relay-routes.log
+          # The same gate as the unit job below: a suite that runs and asserts
+          # NOTHING still reports green, and that is how four ParaSign suites
+          # came to mean nothing for weeks. This job has redis AND the engine,
+          # so nothing here has an excuse to be silent. The expected set is
+          # empty, by name.
+          # `|| true`: GitHub runs this block under `bash -e`, and grep exits 1
+          # when it matches nothing. Finding no silent suite is the GOOD case, so
+          # without this the step fails exactly when the gate is satisfied.
+          silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/relay-routes.log \
+                   | sed 's/^# //; s/: SKIPPED.*//' | sort || true)
+          echo "--- route suites that asserted nothing in this job:"
+          echo "${silent:-(none)}" | sed 's/^/      /'
+          if [ -n "$silent" ]; then
+            echo "::error::a route suite asserted nothing. It has redis and the"
+            echo "engine here, so a skip means a broken precondition, not a"
+            echo "missing dependency. Fix the suite; do not add it to a list."
+            exit 1
+          fi
+
+      # THE SAME ROUTE SUITES, THREE MORE TIMES.
+      #
+      # The step above runs them once, and once is what a flaky test survives.
+      # On 2026-09-05 route-ct-persistence "a relay that lost its tree refuses
+      # to sign a head contradicting one it already signed" went red on two
+      # unrelated pull requests and stayed green on main. Measured on the branch
+      # that fixed it: 0 failures in 100 runs of the suite alone, 3 in 60 with
+      # the other route suites alongside it on four cores. A single pass has no
+      # opinion about that; four passes catch it roughly one time in five, and
+      # then it has a name and a repeat number instead of being read as "CI
+      # being CI" on somebody else's branch.
+      #
+      # It is not a retry: the step is red if ANY repeat is red, and the report
+      # separates a suite that always fails from one that failed in some
+      # repeats and passed in others. The route step above takes about twenty
+      # seconds, so three more passes cost a minute in a job that spends two
+      # building the engine.
+      #
+      # The way out of a red flaky-watch is a fix, or a dated row in
+      # tests/known-flaky.tsv that expires after fourteen days (static-sanity
+      # check 13). Not a re-run.
+      - name: Flaky watch - the route suites, repeated under the same load
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+          FLAKY_WATCH_REPEATS: '3'
+        run: bash scripts/flaky-watch.sh
+
+      # The one admin suite that needs a REAL relay. Its backup-code case
+      # measures the cost of ten argon2 verifications, which is the whole
+      # finding, so a stub would be measuring the stub. This is the only job
+      # with the engine built, so it is the only job that can run it, and the
+      # admin job declares it as a skip by name.
+      - name: Install admin dependencies
+        working-directory: admin
+        run: npm ci
+      - name: Admin login timing against a real relay
+        working-directory: admin
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap test/login-timing.test.js 2>&1 | tee /tmp/admin-timing.log
+          # It must not have skipped here: this job has the engine.
+          if grep -q 'SKIP \[relay\]' /tmp/admin-timing.log; then
+            echo "::error::the backup-code timing case skipped in the job that builds the engine."
+            exit 1
+          fi
+          silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/admin-timing.log || true)
+          if [ -n "$silent" ]; then echo "silent suite(s):"; echo "$silent"; exit 1; fi
+
+      # THE WHOLE WAY OF A PAYING CUSTOMER, in a real browser against a real
+      # backend (tests/koper-hele-weg.test.mjs). It boots TWO relay.js
+      # processes (main and health, each with its own users.json, as in
+      # production) plus the admin server behind the dev proxy, because the bug
+      # poort 6 exists for -- rights granted on the relay that took the money
+      # and read from the relay every screen is served off -- is invisible on
+      # one relay.
+      #
+      # It lives here and not in sign-e2e for the same reason the route suites
+      # live here: relay.js requires `redis` and @paramant/core at load, and
+      # this is the only job that builds both. sign-e2e is self-contained by
+      # design and installs neither. The suite selects itself into this step
+      # (scripts/browser-suites.mjs --stack, which walks the imports and asks
+      # whether anything the suite reaches spawns relay.js), so the two lists
+      # partition the browser suites and a new full-stack suite lands here on
+      # the run after the commit.
+      #
+      # Root deps for playwright; the browser is a separate install, as in
+      # sign-e2e. The relay and admin dependencies are already installed above.
+      - name: Install root deps (playwright)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: The whole way of a paying customer (browser + a real backend)
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+        run: |
+          set -o pipefail
+          suites=$(node scripts/browser-suites.mjs --stack)
+          # An empty list here would be a green step over nothing, which is the
+          # exact failure this workflow keeps writing comments about.
+          if [ -z "$suites" ]; then
+            echo "::error::no full-stack browser suite was selected. Either the"
+            echo "suite was removed or the selector stopped recognising it."
+            exit 1
+          fi
+          echo "full-stack browser suites: $suites"
+          # One at a time. These suites each start real relay processes and a
+          # real browser; run in parallel they compete for the same backend and
+          # for the machine. Two of them was enough to make the billing numbers
+          # of one suite move under the other.
+          node --test --test-concurrency=1 $suites
+
+  relay-unit-tests:
+    name: relay - unit suite (no native deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # Pure-JS units: account-split schema (keys-table), static-serve, envelope
+      # binding, webauthn helpers. No @paramant/core build and no Redis, so the
+      # relay/test suite that previously had zero CI coverage now gates here.
+      # inbound-hash-verify is excluded: it spawns a real relay.js and needs the
+      # installed dependencies, so it runs in the crypto job above. The four
+      # parasign-* suites are excluded for the same reason: they need the
+      # ML-DSA-65 engine, which this job deliberately does not build. They used
+      # to run here and silently skip, which is what made "ok 24" mean nothing.
+      # The route-*.test.js suites are excluded for both reasons at once: they
+      # boot a real relay.js (which requires `redis` and @paramant/core at load)
+      # and the envelope ones need a reachable redis server. They run in the
+      # crypto job above, which installs the deps and has a redis service.
+      # A declared skip is better than a silent one, but it still exits 0 and
+      # still shows up as a green check. Two suites assert nothing at all in this
+      # job, by name and on purpose, and that is fine as long as it stays two and
+      # stays those two. What is not fine is a third joining them quietly, which
+      # is exactly how four ParaSign suites came to report "ok" over nothing for
+      # weeks. So the skips are counted, named, and held to a list, and that
+      # list is now empty: every suite that runs here asserts something.
+      - name: Relay unit suite
+        working-directory: relay
+        env:
+          # This job installs nothing on purpose, so the redis client is absent
+          # and parasign-store / parasign-signs-quota cannot reach a server.
+          # Declaring it here is what keeps them amber instead of red; anything
+          # NOT named here is now a hard failure (see relay/test/_requires.js).
+          RELAY_TEST_SKIP: redis
+        run: |
+          set -o pipefail
+          # --test-reporter=tap is not decoration; it is what keeps the gate
+          # below alive. That gate parses the diagnostic lines summary() in
+          # test/_requires.js prints, and TAP prefixes them with "# ". Node's
+          # DEFAULT reporter for a non-TTY changed from tap to spec between
+          # Node 20 and Node 24, and spec drops the prefix. With the expected
+          # set now empty, a missing prefix does not turn this red: the grep
+          # finds nothing, `silent` is empty, and the gate passes for the wrong
+          # reason. A dead gate that reports green is exactly the failure this
+          # job exists to prevent, so the reporter is pinned rather than
+          # inherited from whatever Node decides a default should be.
+          # NOG EEN GAT, GEVONDEN 22-09 EN NIET HIER GEDICHT:
+          # test/parasign-envelope-index.test.js draait wel, in de ParaSign
+          # engine-stap van de crypto-baan, maar die stap zet RELAY_TEST_SKIP op
+          # redis en deze suite heeft juist redis nodig. Hij slaat daar dus elke
+          # run over, en die stap heeft als enige geen TAP-poort die dat opmerkt.
+          # Netto toetst hij nergens iets: precies de stille toestand waar de
+          # tellingen hieronder tegen zijn bedacht, alleen een stap verderop.
+          #
+          # Hij hoort in de route-stap hierboven, want daar is de redis. Dat nu
+          # verplaatsen maakt die poort rood op iets wat niets met deze wijziging
+          # te maken heeft (de suite is ook inhoudelijk rood), dus het hoort in
+          # een eigen tak. Dit staat hier zodat de vondst niet verdwijnt.
+          #
+          # Wie een relay opstart hoort hier NIET, en dat wordt gevraagd aan de
+          # imports in plaats van aan een lijst met namen: zie de uitleg bij de
+          # route-stap in de crypto-baan. Wat daarachter staat is de tweede
+          # reden om hier niet te draaien, de ML-DSA-65 engine, en die is niet
+          # uit de imports af te leiden.
+          node --test --test-reporter=tap $(node ../scripts/relay-suites.mjs --zonder-relay | grep -vE \
+            'parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|quota-gate|entitlements.test|did-principal|counter-atomicity-gate|public-projection-gate|guess-budget-gate') \
+            2>&1 | tee /tmp/relay-units.log
+          # Which suites ran and asserted nothing. The line comes from
+          # summary() in test/_requires.js.
+          # `|| true`: under `bash -e` a grep that matches nothing exits 1, and
+          # since the expected set below is now empty, no match is the good case.
+          silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/relay-units.log \
+                   | sed 's/^# //; s/: SKIPPED.*//' | sort || true)
+          # EMPTY, and it is meant to stay empty. parasign-signs-quota used to be
+          # the one name here: it needs redis, this job has none, so it skipped
+          # on every run and its five checks never ran anywhere. It now runs in
+          # the crypto job against a real redis service and is excluded from the
+          # glob above, which leaves nothing in this job that asserts nothing.
+          # parasign-store also lacks redis here but has a memory fallback and
+          # still runs three checks, so it is not silent either.
+          expected=''
+          echo "--- suites that asserted nothing in this job:"
+          echo "${silent:-(none)}" | sed 's/^/      /'
+          if [ "$silent" != "$expected" ]; then
+            echo "::error::the set of suites that assert nothing has changed."
+            echo "expected:"; echo "$expected" | sed 's/^/      /'
+            echo "got:";      echo "${silent:-(none)}" | sed 's/^/      /'
+            echo "A suite that asserts nothing still reports green. If a new one"
+            echo "is here, give it its dependency or say why it may stay silent;"
+            echo "if one left, remove it from the expected list in test.yml."
+            exit 1
+          fi
+
+      # Root integration suites (tests/*.mjs): dependency-injected, node builtins
+      # only (no @paramant/core, no Redis, no npm install). The browser suites are
+      # excluded by what they import, not by a hand-kept list of names: this job
+      # installs nothing, so a file importing playwright can only fail here. That
+      # list had drifted, and six suites (cosign x2, developer dashboard,
+      # navigation shell, multi-verify, invite delivery, user dashboard) were
+      # failing on every run because they were never on it. They now run in the
+      # sign-e2e workflow, which installs Chromium.
+      # Gates the ParaSign open-API conformance suite + key-issuance + pdf-ops that
+      # previously ran in no workflow at all.
+      # tests/heartbeat-lib.test.mjs needs @noble/post-quantum to pin the
+      # ML-DSA-65 argument order, so the root dependencies go in here. Browsers
+      # are not downloaded and the browser suites stay excluded by what they
+      # import, one line below; the install changes nothing about which suites
+      # run. Making that test skip when the package is absent was the obvious
+      # alternative and it is exactly the bug being fixed: the canary it
+      # replaces skipped for weeks and reported green.
+      - name: Install root deps (browsers not needed here)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: Root integration suites (no browser)
+        # The canaries used to be excluded here by name because they talk to the
+        # LIVE relay. They now live in scripts/heartbeat/ as plain scripts rather
+        # than node:test files, run hourly by the heartbeat workflow, and are no
+        # longer matched by tests/*.mjs at all, so the exclusion list is gone.
+        # That is deliberate: the old exclusion is exactly how a suite ends up
+        # running in no workflow, which is what let a skipping canary report
+        # green for as long as it did. What guards scripts/heartbeat/ itself is
+        # tests/heartbeat-lib.test.mjs, picked up by the same glob.
+        #
+        # The half is chosen by scripts/browser-suites.mjs, not by a grep for
+        # "from 'playwright'" in the test file. That grep read one file deep and
+        # on 2026-09-04 it put tests/ui-elements-contrast.test.mjs in this job:
+        # the suite imports scripts/ui-contrast-sweep.mjs and the sweep is what
+        # imports playwright. This job installs no Chromium, the launch failed,
+        # the sweep's http server stayed up, and this step never returned. Three
+        # runs on main and a pull request hung on it. The selector now follows
+        # the imports as deep as they go; the sweep closes its server whatever
+        # happens (scripts/ui-contrast-sweep.mjs), so a job without a browser
+        # goes red in seconds instead of silent for hours.
+        run: node --test $(node scripts/browser-suites.mjs --no-browser)
+      # Een verouderde e-mailblocklist is een waarschuwing, geen rode check: een
+      # vergeten update mag nooit een spoedfix tegenhouden. Rood wordt alleen de
+      # wekelijkse workflow email-blocklist (RUNBOOK.md, sectie 8).
+      - name: E-mailblocklist, leeftijd van de bron
+        run: node scripts/update-email-blocklist.mjs --leeftijd
+
+  landen:
+    name: landen, geen tak te lang buiten main
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 is hier niet genoeg. actions/checkout haalt met een volle
+      # diepte wel de historie op, maar met een refspec die alleen de gevraagde
+      # ref schrijft, dus refs/remotes/origin/* blijft bijna leeg. De poort telt
+      # takken; op een gefilterde clone zou hij er nul zien en stil groen gaan.
+      # De fetch hieronder haalt ze alsnog binnen.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Alle takken van origin binnenhalen
+        run: git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+      # gh is op de runner aanwezig en GH_TOKEN zet laag 2 aan, de laag die
+      # squash-merges herkent. Valt die weg, dan draait de poort door op de drie
+      # git-lagen en meldt dat in de kop; hij faalt dan hooguit te streng.
+      - name: Poort
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-landen.mjs
+
+  admin-unit-tests:
+    name: admin - unit suite
+    runs-on: ubuntu-latest
+    # Three suites boot the real admin/server.js over HTTP (login-http,
+    # login-timing, redis-outage), so this job now needs a store and the admin's
+    # own dependencies. It used to install nothing, which is exactly why every
+    # admin suite was a lib test or a source-text assertion and the login
+    # handler itself was never run.
+    services:
+      redis:
+        image: redis:7.4.8-alpine
+        ports:
+          - 6399:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://127.0.0.1:6399
+      # login-timing's backup-code case boots a real relay.js for its argon2
+      # cost, and relay.js will not start without @paramant/core, which is a
+      # file-link to the sibling repo and is built only in relay-crypto-tests.
+      # Declared by name here, and that job runs the suite for real; see the
+      # step "Admin login timing against a real relay" there. Without the
+      # declaration the case is a hard failure, which is the point: it cannot
+      # quietly stop running in both jobs at once.
+      ADMIN_TEST_SKIP: relay
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Install admin dependencies
+        working-directory: admin
+        run: npm ci
+      - name: Admin unit suite
+        working-directory: admin
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap test/*.test.js | tee /tmp/admin.tap
+          # A suite that ran and asserted nothing prints this and would
+          # otherwise be a green tick over no coverage at all.
+          silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/admin.tap || true)
+          if [ -n "$silent" ]; then echo "silent suite(s):"; echo "$silent"; exit 1; fi
+
+  gitleaks:
+    name: secrets - gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Full-history secret scan. The repo-root .gitleaksignore (documented
+      # curl/PSS placeholder fingerprints) is honoured automatically, and so is
+      # .gitleaks.toml, which allowlists the two documentation placeholders.
+      # Pinned to a commit SHA, not a moving tag. License-free: Apolloccrypt is a
+      # personal account and paramant-relay is public, so gitleaks-action requires
+      # no GITLEAKS_LICENSE. Fails the job (and the PR) on any unignored finding.
+      #
+      # GITLEAKS_VERSION is pinned too, and it has to be. The action's own
+      # default resolved to 8.24.3, which parses a `[[allowlists]]` table in
+      # .gitleaks.toml and then IGNORES it: no error, no warning, the config
+      # simply does not apply. Measured on this branch, same repo, same config:
+      # 8.24.3 reports 2 findings and 8.28.0 reports 0. A config that is silently
+      # skipped is worse than one that fails to load, so the version that honours
+      # it is named here rather than inherited.
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.28.0"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"

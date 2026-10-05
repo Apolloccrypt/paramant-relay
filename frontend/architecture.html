@@ -1,20 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Architecture — PARAMANT</title>
-<meta name="description" content="How Paramant works: browser-side encryption, RAM-only relay, burn-on-read, URL fragment key delivery. Shown, not told.">
-<meta property="og:title" content="Architecture — PARAMANT">
-<meta property="og:description" content="How Paramant works: browser-side encryption, RAM-only relay, burn-on-read, URL fragment key delivery. Shown, not told.">
+<title>Zo worden uw bestanden versleuteld · Architectuur · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
+<meta property="og:title" content="Zo worden uw bestanden versleuteld · Architectuur · Paramant">
+<meta property="og:description" content="Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
 <meta property="og:url" content="https://paramant.app/architecture">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Architecture — PARAMANT">
-<meta name="twitter:description" content="How Paramant works: browser-side encryption, RAM-only relay, burn-on-read, URL fragment key delivery. Shown, not told.">
+<meta name="twitter:title" content="Zo worden uw bestanden versleuteld · Architectuur · Paramant">
+<meta name="twitter:description" content="Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
 <link rel="canonical" href="https://paramant.app/architecture">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/architecture">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/architecture">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/architecture">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -22,8 +29,9 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -33,105 +41,153 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 
 /* ── layout primitives ── */
 .arch-section{padding:80px 0}
-.arch-section--navy{background:#0B3A6A;color:#F8FAFC}
-.arch-section--tint{background:#EFF6FF}
+.arch-section--navy{background:var(--bone-2);color:var(--ink)}
+.arch-section--tint{background:var(--card)}
 .arch-inner{max-width:900px;margin:0 auto;padding:0 48px}
 
 /* ── eyebrow pill ── */
-.eyebrow{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:4px 12px;margin-bottom:20px}
+.eyebrow{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--ochre);color: var(--on-ochre);padding:4px 12px;margin-bottom:20px}
 
 /* ── hero ── */
-.page-hero{padding:100px 0 80px;border-bottom:1px solid var(--ink-hair,#e2e8f0)}
+.page-hero{padding:100px 0 80px;border-bottom:1px solid var(--ink-hair)}
 .page-hero-inner{max-width:900px;margin:0 auto;padding:0 48px}
 .page-hero h1{font-size:42px;font-weight:700;letter-spacing:-.03em;margin-bottom:16px;line-height:1.1}
-.lede{font-size:18px;color:#475569;line-height:1.7;max-width:600px}
-.lede a{color:#1D4ED8;text-decoration:none}
+.lede{font-size:18px;color:var(--ink-2);line-height:1.7;max-width:600px}
+.lede a{color:var(--cobalt);text-decoration:none}
 .lede a:hover{opacity:.7}
 
 /* ── section headings ── */
-.section-num{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px}
-.section-num--dark{color:#94a3b8}
+.section-num{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:8px}
+.section-num--dark{color:var(--ink-dim)}
 .section-title{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px}
-.section-desc{font-size:16px;line-height:1.75;color:#475569;max-width:640px;margin-bottom:40px}
-.arch-section--navy .section-desc{color:#cbd5e1}
-.arch-section--navy .section-title{color:#F8FAFC}
+.section-desc{font-size:16px;line-height:1.75;color:var(--ink-2);max-width:640px;margin-bottom:40px}
+.arch-section--navy .section-desc{color:var(--ink-dim)}
+.arch-section--navy .section-title{color:var(--ink)}
 
 /* ── diagram box ── */
-.arch-diagram{background:#fff;border:1px solid #e2e8f0;padding:40px;margin:32px 0;overflow-x:auto}
+.arch-diagram{background:var(--paper);border:1px solid var(--ink-hair);border-radius:var(--r);padding:40px;margin:32px 0;overflow-x:auto}
+
+/* ── the ink of the drawn figures ──
+   The figures sit on the cream paper of the design system, like a printed
+   sheet on the night desk, and that part was already right. Their INK was not.
+   It was the old light theme's navy, cobalt, lime and slate, written into the
+   SVG as presentation attributes, where no token could reach it: the stage
+   frames were #e2e8f0 on cream, which measures 1.03:1, and the arrow labels
+   were #94a3b8 at 2.13:1. WCAG 2.1 SC 1.4.11 asks 3:1 of the parts of a
+   graphic that carry its meaning, and a frame that is not there carries none.
+   scripts/ui-contrast-sweep.mjs measures exactly this and could not see it
+   before, because the text gate only ever looked at text.
+
+   So the ink is CSS now, and it is the paper palette. A presentation attribute
+   loses to a rule, which is why a class is enough. Measured on #F1EAD6:
+     --paper-ink    #1B1F22   13.8:1   the figure's own words
+     --paper-ink-2  #4A4A44    7.4:1   frames, arrows, secondary labels
+     --petrol       #155E75    6.4:1   the encrypted path
+     --ochre-ink    #8A5E10    4.7:1   the key, the root
+     --brick        #C4604F    3.7:1   the erasure                            */
+.arch-diagram .d-panel{fill:none;stroke:var(--paper-ink-2);stroke-width:1.5}
+.arch-diagram .d-slot{fill:none;stroke:var(--petrol);stroke-width:1}
+.arch-diagram .d-slot-bad{fill:none;stroke:var(--brick);stroke-width:1}
+.arch-diagram .d-gone{fill:none;stroke:var(--brick);stroke-width:1.5}
+.arch-diagram .d-bar{fill:var(--paper-ink)}
+.arch-diagram .d-bar-ink{fill:#B2FF3F}
+.arch-diagram .d-root{fill:var(--ochre-ink)}
+.arch-diagram .d-root-ink{fill:var(--paper)}
+.arch-diagram .d-h{fill:var(--paper-ink)}
+.arch-diagram .d-t{fill:var(--paper-ink-2)}
+.arch-diagram .d-accent{fill:var(--petrol)}
+.arch-diagram .d-bad{fill:var(--brick)}
+.arch-diagram .d-line{stroke:var(--paper-ink-2);stroke-width:1.5}
+.arch-diagram .d-arrow{fill:var(--paper-ink-2)}
+
+/* ── the location radar ──
+   Concentric rings on the deeper slab. The rings used to be white at 6-10% and
+   the two inner ones the old lime; the ring is ochre now, so the figure is in
+   the same hand as the rest of the night. The rings themselves fade out on
+   purpose, which is what a radar does: the place is named in the two lines of
+   type above and below it, and by the centre dot, which is the ochre at full
+   strength. tests/ui-elements-contrast.test.mjs carries that reading as a
+   named exception rather than as silence. */
+.loc-ring{fill:none;stroke:rgba(var(--tint), .10);stroke-width:1}
+.loc-ring-2{fill:none;stroke:rgba(29, 78, 216, .22);stroke-width:1}
+.loc-ring-3{fill:none;stroke:rgba(29, 78, 216, .38);stroke-width:1.5}
+.loc-dot{fill:var(--ochre)}
+.loc-cross{stroke:var(--cobalt);stroke-width:1}
+.loc-coord{fill:var(--ochre)}
 
 /* ── takeaway callout ── */
-.arch-takeaway{border-left:3px solid #B2FF3F;padding:16px 20px;background:#f0fdf4;margin-top:32px}
-.arch-takeaway--navy{border-left:3px solid #B2FF3F;padding:16px 20px;background:rgba(178,255,63,.07);margin-top:32px}
-.arch-takeaway p{font-size:14px;color:#374151;line-height:1.7;margin:0}
-.arch-takeaway--navy p{color:#cbd5e1}
-.arch-takeaway strong{color:#0B3A6A}
-.arch-takeaway--navy strong{color:#B2FF3F}
+.arch-takeaway{border-left:3px solid var(--ochre);padding:16px 20px;background:var(--card);margin-top:32px}
+.arch-takeaway--navy{border-left:3px solid var(--ochre);padding:16px 20px;background:rgba(29, 78, 216, .07);margin-top:32px}
+.arch-takeaway p{font-size:14px;color:var(--ink-2);line-height:1.7;margin:0}
+.arch-takeaway--navy p{color:var(--ink-dim)}
+.arch-takeaway strong{color:var(--ink)}
+.arch-takeaway--navy strong{color:var(--lime)}
 
 /* ── compare grid ── */
 .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
-.compare-col{padding:28px 32px;border:1px solid rgba(255,255,255,.12)}
-.compare-col--bad{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1)}
-.compare-col--good{background:rgba(178,255,63,.08);border-color:rgba(178,255,63,.3)}
+.compare-col{padding:28px 32px;border:1px solid rgba(var(--tint), .12)}
+.compare-col--bad{background:rgba(var(--tint), .04);border-color:rgba(var(--tint), .1)}
+.compare-col--good{background:rgba(29, 78, 216, .08);border-color:rgba(29, 78, 216, .3)}
 .compare-col h3{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
-.compare-col--bad h3{color:#f87171}
-.compare-col--good h3{color:#B2FF3F}
+.compare-col--bad h3{color:var(--brick-ink)}
+.compare-col--good h3{color:var(--lime)}
 .compare-col ul{list-style:none;display:flex;flex-direction:column;gap:10px}
-.compare-col li{font-size:14px;line-height:1.5;padding-left:22px;position:relative;color:#cbd5e1}
+.compare-col li{font-size:14px;line-height:1.5;padding-left:22px;position:relative;color:var(--ink-dim)}
 .compare-col li::before{position:absolute;left:0;font-weight:700}
-.compare-col--bad li::before{content:"✗";color:#f87171}
-.compare-col--good li::before{content:"✓";color:#B2FF3F}
+.compare-col--bad li::before{content:"✗";color:var(--brick-ink)}
+.compare-col--good li::before{content:"✓";color:var(--lime)}
 
 /* ── URL anatomy ── */
 .url-anatomy{margin:36px 0;position:relative}
-.url-display{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6;word-break:break-all;background:#fff;border:1px solid #e2e8f0;padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:0}
+.url-display{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6;word-break:break-all;background:var(--card);border:1px solid var(--ink-hair);padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:0}
 .url-part{display:inline}
-.url-sent{color:#1D4ED8}
-.url-not-sent{background:#B2FF3F;color:#0B3A6A;padding:2px 4px}
+.url-sent{color:var(--cobalt)}
+.url-not-sent{background:var(--ochre);color: var(--on-ochre);padding:2px 4px}
 .url-labels{display:flex;flex-wrap:wrap;gap:32px;margin-top:24px}
 .url-label-item{display:flex;flex-direction:column;gap:4px}
 .url-label-dot{width:10px;height:10px;display:inline-block;margin-right:6px;vertical-align:middle}
-.url-label-dot--blue{background:#1D4ED8}
-.url-label-dot--lime{background:#B2FF3F}
-.url-label-text{font-size:13px;color:#475569;line-height:1.6}
-.url-label-text strong{color:#0B3A6A;display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
+.url-label-dot--blue{background:var(--ochre)}
+.url-label-dot--lime{background:var(--ochre)}
+.url-label-text{font-size:13px;color:var(--ink-2);line-height:1.6}
+.url-label-text strong{color:var(--ink);display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
 
 /* ── lifecycle grid ── */
 .lifecycle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:32px 0}
-.lifecycle-state{padding:24px;border:1px solid #e2e8f0;background:#fff;position:relative}
-.lifecycle-state--active{border-color:#B2FF3F;border-width:2px}
+.lifecycle-state{padding:24px;border:1px solid var(--ink-hair);background:var(--card);position:relative}
+.lifecycle-state--active{border-color:var(--ochre);border-width:2px}
 .lifecycle-state--gone{opacity:.5}
-.lifecycle-num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;margin-bottom:12px}
-.lifecycle-state--active .lifecycle-num{color:#B2FF3F}
-.lifecycle-heading{font-size:15px;font-weight:700;color:#0B3A6A;margin-bottom:10px}
-.lifecycle-body{font-size:13px;color:#475569;line-height:1.6}
-.lifecycle-gone-icon{position:absolute;top:16px;right:16px;width:20px;height:20px;color:#ef4444}
+.lifecycle-num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:12px}
+.lifecycle-state--active .lifecycle-num{color:var(--lime)}
+.lifecycle-heading{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px}
+.lifecycle-body{font-size:13px;color:var(--ink-2);line-height:1.6}
+.lifecycle-gone-icon{position:absolute;top:16px;right:16px;width:20px;height:20px;color:var(--brick-ink)}
 
 /* ── modes table ── */
 .modes-table{width:100%;border-collapse:collapse;margin-top:32px}
-.modes-table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;border-bottom:2px solid #e2e8f0}
+.modes-table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);border-bottom:2px solid var(--ink-hair)}
 .modes-table th:not(:first-child){text-align:center}
-.modes-table td{padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #f1f5f9;vertical-align:top}
-.modes-table td:first-child{color:#0B3A6A;font-weight:600}
-.modes-table td:not(:first-child){text-align:center;color:#475569}
+.modes-table td{padding:12px 16px;font-size:14px;color:var(--ink-2);border-bottom:1px solid var(--ink-hair);vertical-align:top}
+.modes-table td:first-child{color:var(--ink);font-weight:600}
+.modes-table td:not(:first-child){text-align:center;color:var(--ink-2)}
 .modes-table tr:last-child td{border-bottom:none}
-.modes-table .mode-head{font-size:13px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.04em}
-.modes-table .mode-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;background:#eff6ff;color:#1D4ED8}
-.modes-table .mode-badge--lime{background:#f0fdf4;color:#166534}
+.modes-table .mode-head{font-size:13px;font-weight:700;color:var(--cobalt);text-transform:uppercase;letter-spacing:.04em}
+.modes-table .mode-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;background:var(--card);color:var(--cobalt)}
+.modes-table .mode-badge--lime{background:var(--card);color:var(--ok-ink)}
 
 /* ── going deeper ── */
 .going-deeper{text-align:center;padding:64px 48px}
-.going-deeper h2{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px;color:#0B3A6A}
-.going-deeper p{font-size:16px;color:#475569;margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
-.btn-arch{display:inline-block;background:#0B3A6A;color:#F8FAFC;text-decoration:none;padding:14px 32px;font-size:14px;font-weight:600;letter-spacing:.02em;transition:opacity .15s}
+.going-deeper h2{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px;color:var(--ink)}
+.going-deeper p{font-size:16px;color:var(--ink-2);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
+.btn-arch{display:inline-block;background:var(--bone-2);color:var(--ink);text-decoration:none;padding:14px 32px;font-size:14px;font-weight:600;letter-spacing:.02em;transition:opacity .15s}
 .btn-arch:hover{opacity:.85}
 
 /* ── SVG helpers ── */
 .diagram-label{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 
-footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
 .footer-links{display:flex;gap:20px;flex-wrap:wrap}
-.footer-links a{font-size:var(--text-xs,12px);color:var(--cobalt,#1D4ED8)}
-.footer-meta{font-size:var(--text-xs,12px);color:var(--ink-dim,#64748b)}
+.footer-links a{font-size:var(--text-xs,12px);color:var(--cobalt)}
+.footer-meta{font-size:var(--text-xs,12px);color:var(--ink-dim)}
 
 @media(max-width:900px){
   .arch-inner,.page-hero-inner{padding:0 24px}
@@ -158,9 +214,9 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -171,26 +227,26 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -199,182 +255,108 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/architecture#webpage",
+      "url": "https://paramant.app/architecture",
+      "name": "Zo worden uw bestanden versleuteld · Architectuur · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist."
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/architecture" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/architecture" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/architecture" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/architecture" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
 <main id="main-content">
@@ -382,9 +364,9 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <!-- ── HERO ── -->
 <section class="page-hero">
   <div class="page-hero-inner">
-    <span class="eyebrow">ARCHITECTURE</span>
-    <h1>How Paramant works.<br>Shown, not told.</h1>
-    <p class="lede">A plain-language walkthrough of every step: how your file is encrypted, how it travels, why the relay cannot read it, and what happens when the link is opened. For the cryptographic specification, see <a href="/security">the security page</a>.</p>
+    <span class="eyebrow">ARCHITECTUUR</span>
+    <h1>Zo werkt Paramant,<br>stap voor stap.</h1>
+    <p class="lede">Elke stap in gewone taal: hoe uw bestand wordt versleuteld, hoe het reist, waarom de relay (onze server die het bestand doorgeeft) het niet kan lezen en wat er gebeurt als de link wordt geopend. De cryptografische specificatie staat op <a href="/security">de beveiligingspagina</a>.</p>
   </div>
 </section>
 
@@ -392,72 +374,72 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">01</div>
-    <h2 class="section-title">The flow</h2>
-    <p class="section-desc">Four stages. The key never leaves the browsers. The relay only ever sees ciphertext it cannot read.</p>
+    <h2 class="section-title">De route</h2>
+    <p class="section-desc">Vier stappen. De sleutel verlaat de browsers nooit. De relay ziet alleen versleutelde tekst die hij niet kan lezen.</p>
 
-    <div class="arch-diagram" role="img" aria-label="Four-stage transfer diagram: browser encrypts, relay stores ciphertext in RAM, recipient browser decrypts, then ciphertext is erased">
+    <div class="arch-diagram" role="img" aria-label="Schema in vier stappen: de browser versleutelt, de relay bewaart de versleutelde tekst in RAM, de browser van de ontvanger ontsleutelt, daarna wordt de versleutelde tekst gewist">
       <svg viewBox="0 0 860 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:480px">
         <!-- Stage boxes -->
         <!-- 1: YOUR BROWSER -->
-        <rect x="0" y="40" width="180" height="140" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
-        <text x="90" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#0B3A6A">YOUR BROWSER</text>
-        <rect x="20" y="76" width="140" height="28" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
-        <text x="90" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#1D4ED8">file.pdf</text>
-        <text x="90" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">AES-256-GCM</text>
-        <text x="90" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">encrypt in browser</text>
-        <rect x="20" y="144" width="140" height="24" rx="2" fill="#0B3A6A"/>
-        <text x="90" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B2FF3F">🔑 key generated</text>
+        <rect x="0" y="40" width="180" height="140" rx="2" class="d-panel"/>
+        <text x="90" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">UW BROWSER</text>
+        <rect x="20" y="76" width="140" height="28" rx="2" class="d-slot"/>
+        <text x="90" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" class="d-accent">file.pdf</text>
+        <text x="90" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">AES-256-GCM</text>
+        <text x="90" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">versleutelen in browser</text>
+        <rect x="20" y="144" width="140" height="24" rx="2" class="d-bar"/>
+        <text x="90" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">&#x1F511; sleutel gemaakt</text>
 
         <!-- Arrow 1→2 -->
-        <line x1="183" y1="110" x2="227" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-        <text x="205" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">ciphertext</text>
+        <line x1="183" y1="110" x2="227" y2="110" class="d-line" marker-end="url(#arr)"/>
+        <text x="205" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">versleuteld</text>
 
         <!-- 2: PARAMANT RELAY -->
-        <rect x="230" y="40" width="180" height="140" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
-        <text x="320" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#0B3A6A">PARAMANT RELAY</text>
-        <rect x="250" y="76" width="140" height="52" rx="2" fill="#fef2f2" stroke="#fecaca" stroke-width="1"/>
-        <text x="320" y="98" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#dc2626">████████████</text>
-        <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#dc2626">opaque ciphertext</text>
-        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">RAM only — no disk write</text>
-        <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">no key, no plaintext</text>
+        <rect x="230" y="40" width="180" height="140" rx="2" class="d-panel"/>
+        <text x="320" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">PARAMANT RELAY</text>
+        <rect x="250" y="76" width="140" height="52" rx="2" class="d-slot-bad"/>
+        <text x="320" y="98" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bad">████████████</text>
+        <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-bad">onleesbare versleuteling</text>
+        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">alleen RAM, niets op schijf</text>
+        <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">geen sleutel, geen leesbare tekst</text>
 
         <!-- Arrow 2→3 -->
-        <line x1="413" y1="110" x2="457" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-        <text x="435" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">ciphertext</text>
+        <line x1="413" y1="110" x2="457" y2="110" class="d-line" marker-end="url(#arr)"/>
+        <text x="435" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">versleuteld</text>
 
         <!-- 3: RECIPIENT BROWSER -->
-        <rect x="460" y="40" width="180" height="140" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
-        <text x="550" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#0B3A6A">RECIPIENT BROWSER</text>
-        <rect x="480" y="76" width="140" height="28" rx="2" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
-        <text x="550" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#166534">file.pdf ✓</text>
-        <text x="550" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">key from link #fragment</text>
-        <text x="550" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">decrypt locally</text>
-        <rect x="480" y="144" width="140" height="24" rx="2" fill="#0B3A6A"/>
-        <text x="550" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B2FF3F">flagged for erasure</text>
+        <rect x="460" y="40" width="180" height="140" rx="2" class="d-panel"/>
+        <text x="550" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">BROWSER ONTVANGER</text>
+        <rect x="480" y="76" width="140" height="28" rx="2" class="d-slot"/>
+        <text x="550" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" class="d-accent">file.pdf ✓</text>
+        <text x="550" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">sleutel uit #fragment van link</text>
+        <text x="550" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">lokaal ontsleutelen</text>
+        <rect x="480" y="144" width="140" height="24" rx="2" class="d-bar"/>
+        <text x="550" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">gemarkeerd voor wissen</text>
 
         <!-- Arrow 3→4 -->
-        <line x1="643" y1="110" x2="687" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-        <text x="665" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">burn</text>
+        <line x1="643" y1="110" x2="687" y2="110" class="d-line" marker-end="url(#arr)"/>
+        <text x="665" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">wissen</text>
 
         <!-- 4: GONE -->
-        <rect x="690" y="40" width="170" height="140" rx="2" fill="#fff1f2" stroke="#fecdd3" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <text x="775" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#dc2626">GONE</text>
-        <text x="775" y="95" text-anchor="middle" font-size="28" fill="#dc2626">⌫</text>
-        <text x="775" y="126" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#dc2626">erased from RAM</text>
-        <text x="775" y="142" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#dc2626">410 Gone</text>
-        <text x="775" y="158" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#dc2626">no recovery</text>
+        <rect x="690" y="40" width="170" height="140" rx="2" class="d-gone" stroke-dasharray="4 3"/>
+        <text x="775" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-bad">WEG</text>
+        <text x="775" y="95" text-anchor="middle" font-size="28" class="d-bad">⌫</text>
+        <text x="775" y="126" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">gewist uit RAM</text>
+        <text x="775" y="142" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">410 Gone</text>
+        <text x="775" y="158" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">geen herstel</text>
 
         <!-- Arrowhead marker -->
         <defs>
           <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+            <path d="M0,0 L0,6 L8,3 z" class="d-arrow"/>
           </marker>
         </defs>
       </svg>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>The key only exists in browsers.</strong> The relay receives ciphertext, holds it in RAM, and forwards it. It has no key and cannot read the file. A fully compromised relay sees nothing useful.</p>
+      <p><strong>De sleutel bestaat alleen in browsers.</strong> De relay ontvangt versleutelde tekst, houdt die in RAM en geeft hem door. Hij heeft geen sleutel en kan het bestand niet lezen. Ook een volledig gekraakte relay ziet niets bruikbaars.</p>
     </div>
   </div>
 </section>
@@ -466,36 +448,36 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section arch-section--navy">
   <div class="arch-inner">
     <div class="section-num">02</div>
-    <h2 class="section-title">What we see</h2>
-    <p class="section-desc">Most cloud services store your file, index it, preview it. Paramant's relay sits in the middle and sees almost nothing. Here is the difference.</p>
+    <h2 class="section-title">Wat wij zien</h2>
+    <p class="section-desc">De meeste clouddiensten bewaren uw bestand, indexeren het en maken er een voorbeeld van. De relay van Paramant zit ertussen en ziet bijna niets. Dit is het verschil.</p>
 
     <div class="compare-grid">
       <div class="compare-col compare-col--bad">
-        <h3>Typical cloud storage</h3>
+        <h3>Gewone cloudopslag</h3>
         <ul>
-          <li>Readable file contents (stored in plaintext or decryptable by the provider)</li>
-          <li>Filename and metadata logged</li>
-          <li>Preview thumbnail generated server-side</li>
-          <li>Written to disk — survives restarts, subpoenas, breaches</li>
-          <li>Access logs tied to content</li>
-          <li>Subject to legal disclosure orders</li>
+          <li>Leesbare inhoud (onversleuteld opgeslagen of door de aanbieder te ontsleutelen)</li>
+          <li>Bestandsnaam en metadata gelogd</li>
+          <li>Voorbeeldafbeelding gemaakt op de server</li>
+          <li>Op schijf geschreven: overleeft herstarts, vorderingen en datalekken</li>
+          <li>Toegangslogs gekoppeld aan inhoud</li>
+          <li>Valt onder wettelijke bevelen tot afgifte</li>
         </ul>
       </div>
       <div class="compare-col compare-col--good">
-        <h3>Paramant relay</h3>
+        <h3>Relay van Paramant</h3>
         <ul>
-          <li>Ciphertext only — we cannot read it</li>
-          <li>No filename, no metadata</li>
-          <li>No preview possible — opaque bytes</li>
-          <li>RAM only — relay restart destroys everything</li>
-          <li>Nothing to disclose — we hold no plaintext</li>
-          <li>GDPR jurisdiction, no US CLOUD Act</li>
+          <li>Alleen versleutelde tekst: wij kunnen die niet lezen</li>
+          <li>Geen bestandsnaam, geen metadata</li>
+          <li>Geen voorbeeld mogelijk: onleesbare bytes</li>
+          <li>Alleen RAM: een herstart van de relay wist alles</li>
+          <li>Niets af te geven: wij hebben geen leesbare tekst</li>
+          <li>Valt onder de AVG, niet onder de Amerikaanse CLOUD Act</li>
         </ul>
       </div>
     </div>
 
     <div class="arch-takeaway--navy">
-      <p><strong>Legal disclosure is structurally impossible.</strong> We cannot hand over what we do not have. A court order served to the relay returns: encrypted bytes, no key, no plaintext, no filename.</p>
+      <p><strong>Wettelijke afgifte is door de opbouw onmogelijk.</strong> Wij kunnen niet afgeven wat wij niet hebben. Een gerechtelijk bevel aan de relay levert op: versleutelde bytes, geen sleutel, geen leesbare tekst, geen bestandsnaam.</p>
     </div>
   </div>
 </section>
@@ -504,8 +486,8 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">03</div>
-    <h2 class="section-title">The # in the link</h2>
-    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half — the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:#eff6ff;padding:2px 6px;color:#1D4ED8">#</code> — never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
+    <h2 class="section-title">De # in de link</h2>
+    <p class="section-desc">Elke Paramant-link bestaat uit twee delen. De linkerhelft gaat naar de relay. De rechterhelft, het deel na <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code>, verlaat uw browser nooit. Dat is geen afspraak van Paramant. Zo werken browsers.</p>
 
     <div class="url-anatomy">
       <div class="url-display">
@@ -515,22 +497,22 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--blue"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1D4ED8">Sent to relay</strong>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt)">Naar de relay</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The path <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">/r/a8f3c92d</code> identifies which blob to retrieve. The relay sees this and serves the matching ciphertext.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het pad <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">/r/a8f3c92d</code> geeft aan welke blob moet worden opgehaald. De relay ziet dit en levert de bijbehorende versleutelde tekst.</p>
         </div>
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--lime"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#166534">Never leaves the browser</strong>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ok-ink)">Verlaat de browser nooit</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never transmitted to any server — including ours.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is de sleutel om te ontsleutelen. Browsers halen het fragment weg voordat ze iets over het netwerk versturen. Het gaat nooit naar een server, ook niet naar de onze.</p>
         </div>
       </div>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>This is a browser standard, not a trust promise.</strong> RFC 3986 specifies that URL fragments are client-only. Even if Paramant wanted to log the key, the browser would never send it. The relay structurally cannot intercept it.</p>
+      <p><strong>Dit is een browserstandaard, geen belofte.</strong> RFC 3986 legt vast dat URL-fragmenten alleen bij de client blijven. Ook als Paramant de sleutel zou willen loggen, zou de browser hem nooit versturen. De relay kan hem door de opbouw niet onderscheppen.</p>
     </div>
   </div>
 </section>
@@ -539,33 +521,33 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section arch-section--tint">
   <div class="arch-inner">
     <div class="section-num">04</div>
-    <h2 class="section-title">Burn on read</h2>
-    <p class="section-desc">The ciphertext exists exactly once, for exactly one opening. Once the recipient downloads it, the relay zeroes the memory slot. There is no second copy to retrieve.</p>
+    <h2 class="section-title">Weg na lezen</h2>
+    <p class="section-desc">De versleutelde tekst bestaat precies één keer. De relay maakt het geheugenvak leeg na de laatste keer lezen die de link toestaat: één keer bij Community, tot 10 keer bij Firm en 100 keer bij Enterprise. Er is geen tweede kopie om op te halen.</p>
 
     <div class="lifecycle-grid">
       <div class="lifecycle-state">
-        <div class="lifecycle-num">State 01</div>
-        <div class="lifecycle-heading">Link sent</div>
-        <div class="lifecycle-body">Ciphertext is held in relay RAM. The decryption key lives only in the URL fragment on the sender's clipboard. The relay is waiting.</div>
+        <div class="lifecycle-num">Stand 01</div>
+        <div class="lifecycle-heading">Link verstuurd</div>
+        <div class="lifecycle-body">De versleutelde tekst staat in het RAM van de relay. De sleutel staat alleen in het URL-fragment op het klembord van de afzender. De relay wacht.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--active">
-        <div class="lifecycle-num">State 02 — active</div>
-        <div class="lifecycle-heading">Link opened</div>
-        <div class="lifecycle-body">Recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. File appears in the browser.</div>
+        <div class="lifecycle-num">Stand 02: actief</div>
+        <div class="lifecycle-heading">Link geopend</div>
+        <div class="lifecycle-body">De browser van de ontvanger haalt de versleutelde tekst op. De relay markeert het vak om direct te wissen. Het ontsleutelen gebeurt lokaal met de sleutel uit <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. Het bestand verschijnt in de browser.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--gone">
         <svg class="lifecycle-gone-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <circle cx="10" cy="10" r="9" stroke="#ef4444" stroke-width="1.5"/>
-          <path d="M6.5 6.5L13.5 13.5M13.5 6.5L6.5 13.5" stroke="#ef4444" stroke-width="1.75"/>
+          <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M6.5 6.5L13.5 13.5M13.5 6.5L6.5 13.5" stroke="currentColor" stroke-width="1.75"/>
         </svg>
-        <div class="lifecycle-num">State 03 — gone</div>
-        <div class="lifecycle-heading">Erased</div>
-        <div class="lifecycle-body">Memory slot zeroed. Any subsequent request for that ID returns HTTP 410 Gone. No recovery, no retry, no copy anywhere on disk.</div>
+        <div class="lifecycle-num">Stand 03: weg</div>
+        <div class="lifecycle-heading">Gewist</div>
+        <div class="lifecycle-body">Geheugenvak leeggemaakt. Elk later verzoek voor dat ID krijgt HTTP 410 Gone. Geen herstel, geen nieuwe poging, nergens een kopie op schijf.</div>
       </div>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>If you forward a link that still works, you forwarded the secret.</strong> Burn-on-read is a single-use guarantee. Once the link is opened, it is gone — for the recipient and for anyone who intercepts a copy of the URL.</p>
+      <p><strong>Stuurt u een link door die nog werkt, dan stuurt u het geheim door.</strong> Bij het Community-abonnement is weg-na-lezen een garantie voor eenmalig gebruik: zodra de link is geopend, is hij weg, voor de ontvanger en voor iedereen die een kopie van de URL onderschept. Een betaalde link is weg na de laatste keer lezen die hij toestaat, tot 10 keer bij Firm.</p>
     </div>
   </div>
 </section>
@@ -574,60 +556,60 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">05</div>
-    <h2 class="section-title">Verifiable history</h2>
-    <p class="section-desc">Every transfer event is appended to a Merkle tree. The root fingerprint is published. Changing any historical entry would change the root — which is publicly visible and tamper-evident.</p>
+    <h2 class="section-title">Controleerbare geschiedenis</h2>
+    <p class="section-desc">Elke verzending wordt toegevoegd aan een Merkle-boom. De vingerafdruk van de wortel wordt gepubliceerd. Wie een oude regel wijzigt, verandert de wortel, en dat is openbaar zichtbaar en valt dus op.</p>
 
-    <div class="arch-diagram" role="img" aria-label="Merkle tree diagram showing root hash derived from four leaf events">
+    <div class="arch-diagram" role="img" aria-label="Schema van een Merkle-boom: de hash van de wortel volgt uit vier gebeurtenissen in de bladeren">
       <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
         <!-- ROOT -->
-        <rect x="265" y="10" width="150" height="44" rx="2" fill="#B2FF3F"/>
-        <text x="340" y="30" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.06em" fill="#0B3A6A">MERKLE ROOT</text>
-        <text x="340" y="46" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#0B3A6A">SHA3-256 fingerprint</text>
+        <rect x="265" y="10" width="150" height="44" rx="2" class="d-root"/>
+        <text x="340" y="30" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.06em" class="d-root-ink">MERKLE-WORTEL</text>
+        <text x="340" y="46" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-root-ink">SHA3-256-vingerafdruk</text>
 
         <!-- Mid-level lines -->
-        <line x1="290" y1="54" x2="175" y2="110" stroke="#cbd5e1" stroke-width="1.5"/>
-        <line x1="390" y1="54" x2="505" y2="110" stroke="#cbd5e1" stroke-width="1.5"/>
+        <line x1="290" y1="54" x2="175" y2="110" class="d-line"/>
+        <line x1="390" y1="54" x2="505" y2="110" class="d-line"/>
 
         <!-- Mid-level nodes -->
-        <rect x="105" y="110" width="140" height="38" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
-        <text x="175" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#475569">hash(A + B)</text>
-        <text x="175" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">transfers 1–2</text>
+        <rect x="105" y="110" width="140" height="38" rx="2" class="d-panel"/>
+        <text x="175" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-t">hash(A + B)</text>
+        <text x="175" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">verzendingen 1 en 2</text>
 
-        <rect x="435" y="110" width="140" height="38" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
-        <text x="505" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#475569">hash(C + D)</text>
-        <text x="505" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">transfers 3–4</text>
+        <rect x="435" y="110" width="140" height="38" rx="2" class="d-panel"/>
+        <text x="505" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-t">hash(C + D)</text>
+        <text x="505" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">verzendingen 3 en 4</text>
 
         <!-- Leaf lines -->
-        <line x1="145" y1="148" x2="75" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
-        <line x1="205" y1="148" x2="265" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
-        <line x1="475" y1="148" x2="415" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
-        <line x1="545" y1="148" x2="605" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
+        <line x1="145" y1="148" x2="75" y2="196" class="d-line"/>
+        <line x1="205" y1="148" x2="265" y2="196" class="d-line"/>
+        <line x1="475" y1="148" x2="415" y2="196" class="d-line"/>
+        <line x1="545" y1="148" x2="605" y2="196" class="d-line"/>
 
         <!-- Leaf nodes -->
-        <rect x="25" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
-        <text x="75" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT A</text>
-        <text x="75" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 1</text>
-        <text x="75" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+        <rect x="25" y="196" width="100" height="48" rx="2" class="d-slot"/>
+        <text x="75" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS A</text>
+        <text x="75" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 1</text>
+        <text x="75" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
 
-        <rect x="215" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
-        <text x="265" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT B</text>
-        <text x="265" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 2</text>
-        <text x="265" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+        <rect x="215" y="196" width="100" height="48" rx="2" class="d-slot"/>
+        <text x="265" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS B</text>
+        <text x="265" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 2</text>
+        <text x="265" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
 
-        <rect x="365" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
-        <text x="415" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT C</text>
-        <text x="415" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 3</text>
-        <text x="415" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+        <rect x="365" y="196" width="100" height="48" rx="2" class="d-slot"/>
+        <text x="415" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS C</text>
+        <text x="415" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 3</text>
+        <text x="415" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
 
-        <rect x="555" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
-        <text x="605" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT D</text>
-        <text x="605" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 4</text>
-        <text x="605" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+        <rect x="555" y="196" width="100" height="48" rx="2" class="d-slot"/>
+        <text x="605" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS D</text>
+        <text x="605" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 4</text>
+        <text x="605" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
       </svg>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>The root fingerprints the whole tree.</strong> Edit any leaf event — even by one byte — and the root hash changes. Because the root is published in the CT log, any retroactive tampering is immediately detectable. This is the same principle used by certificate transparency in TLS.</p>
+      <p><strong>De wortel is de vingerafdruk van de hele boom.</strong> Wijzig één gebeurtenis in een blad, al is het één byte, en de hash van de wortel verandert. Omdat de wortel in de CT-log wordt gepubliceerd, valt elke latere vervalsing direct op. Het is hetzelfde principe als certificate transparency bij TLS.</p>
     </div>
   </div>
 </section>
@@ -636,45 +618,45 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section arch-section--navy">
   <div class="arch-inner">
     <div class="section-num">06</div>
-    <h2 class="section-title">Where it runs</h2>
-    <p class="section-desc">One jurisdiction. One data center. No CDN caching your files. No US entity in the chain.</p>
+    <h2 class="section-title">Waar het draait</h2>
+    <p class="section-desc">Eén rechtsgebied. Eén datacenter. Geen CDN dat uw bestanden opslaat. Geen Amerikaanse partij heeft versleutelde tekst of een sleutel. De enige Amerikaanse subverwerker verstuurt transactionele e-mail onder de standaardcontractbepalingen.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NEURENBERG · DUITSLAND · EU</div>
 
-      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentric circles showing relay location in Nuremberg, Germany">
+      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentrische cirkels met de locatie van de relay in Neurenberg, Duitsland">
         <!-- Concentric circles -->
-        <circle cx="180" cy="140" r="130" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-        <circle cx="180" cy="140" r="100" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-        <circle cx="180" cy="140" r="72" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-        <circle cx="180" cy="140" r="46" fill="none" stroke="rgba(178,255,63,0.2)" stroke-width="1"/>
-        <circle cx="180" cy="140" r="22" fill="none" stroke="rgba(178,255,63,0.35)" stroke-width="1.5"/>
+        <circle cx="180" cy="140" r="130" class="loc-ring"/>
+        <circle cx="180" cy="140" r="100" class="loc-ring"/>
+        <circle cx="180" cy="140" r="72" class="loc-ring"/>
+        <circle cx="180" cy="140" r="46" class="loc-ring-2"/>
+        <circle cx="180" cy="140" r="22" class="loc-ring-3"/>
         <!-- Center dot -->
-        <circle cx="180" cy="140" r="5" fill="#B2FF3F"/>
+        <circle cx="180" cy="140" r="5" class="loc-dot"/>
         <!-- Cross-hairs -->
-        <line x1="180" y1="110" x2="180" y2="118" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
-        <line x1="180" y1="162" x2="180" y2="170" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
-        <line x1="150" y1="140" x2="158" y2="140" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
-        <line x1="202" y1="140" x2="210" y2="140" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
+        <line x1="180" y1="110" x2="180" y2="118" class="loc-cross"/>
+        <line x1="180" y1="162" x2="180" y2="170" class="loc-cross"/>
+        <line x1="150" y1="140" x2="158" y2="140" class="loc-cross"/>
+        <line x1="202" y1="140" x2="210" y2="140" class="loc-cross"/>
         <!-- Coordinates label -->
-        <text x="196" y="128" font-family="'IBM Plex Mono',monospace" font-size="8" fill="rgba(178,255,63,0.7)">49.45°N 11.08°E</text>
+        <text x="196" y="128" font-family="'IBM Plex Mono',monospace" font-size="8" class="loc-coord">49.45°N 11.08°E</text>
       </svg>
 
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(178,255,63,0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(29, 78, 216, 0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px">
-      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">Jurisdiction</div>
-        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">EU / Germany<br><span style="font-size:12px;color:#94a3b8">GDPR · DSGVO</span></div>
+      <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Rechtsgebied</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">EU / Duitsland<br><span style="font-size:12px;color:var(--ink-dim)">AVG · DSGVO</span></div>
       </div>
-      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">US Cloud Act</div>
-        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">Not applicable<br><span style="font-size:12px;color:#94a3b8">no US entity</span></div>
+      <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">US Cloud Act</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Niet van toepassing<br><span style="font-size:12px;color:var(--ink-dim)">geen Amerikaanse partij</span></div>
       </div>
-      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">Storage</div>
-        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">RAM only<br><span style="font-size:12px;color:#94a3b8">no disk, no CDN</span></div>
+      <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Opslag</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Alleen RAM<br><span style="font-size:12px;color:var(--ink-dim)">geen schijf, geen CDN</span></div>
       </div>
     </div>
   </div>
@@ -684,44 +666,44 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">07</div>
-    <h2 class="section-title">Verified transfer</h2>
-    <p class="section-desc">Every Paramant transfer is account-bound and end-to-end encrypted in the browser. ParaShare adds post-quantum key exchange, ML-DSA-65 sender signatures, and CT-log proof of origin. There is no anonymous or lower-assurance tier.</p>
+    <h2 class="section-title">Geverifieerd versturen</h2>
+    <p class="section-desc">Elke verzending met Paramant hoort bij een account en wordt in de browser end-to-end versleuteld. De webapp Versturen voegt daar post-quantum sleuteluitwisseling, ML-DSA-65-handtekeningen van de afzender en herkomstbewijs in de CT-log aan toe. Er is geen anonieme of minder zekere variant.</p>
 
     <table class="modes-table">
       <thead>
         <tr>
-          <th>Property</th>
-          <th><span class="mode-badge mode-badge--lime">Verified<br>ParaShare</span></th>
+          <th>Eigenschap</th>
+          <th><span class="mode-badge mode-badge--lime">Geverifieerde<br>webapp</span></th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>Account needed</td>
-          <td>Yes</td>
+          <td>Account nodig</td>
+          <td>Ja</td>
         </tr>
         <tr>
-          <td>Encryption</td>
-          <td>Hybrid ML-KEM-768 + ECDH P-256, then AES-256-GCM</td>
+          <td>Versleuteling</td>
+          <td>Hybride ML-KEM-768 + ECDH P-256, daarna AES-256-GCM</td>
         </tr>
         <tr>
-          <td>Sender signature</td>
-          <td>ML-DSA-65, mathematically tied to sender identity</td>
+          <td>Handtekening afzender</td>
+          <td>ML-DSA-65, wiskundig gekoppeld aan de identiteit van de afzender</td>
         </tr>
         <tr>
-          <td>Reads allowed</td>
-          <td>One, burned on first open</td>
+          <td>Aantal keer lezen</td>
+          <td>Eén, gewist bij de eerste keer openen (de webapp vraagt nooit om meer)</td>
         </tr>
         <tr>
-          <td>Proof of origin</td>
-          <td>CT log entry, verifiable by recipient</td>
+          <td>Herkomstbewijs</td>
+          <td>Regel in de CT-log, te controleren door de ontvanger</td>
         </tr>
         <tr>
-          <td>Post-quantum safe</td>
-          <td>Yes, ML-KEM-768 defeats HNDL attacks</td>
+          <td>Bestand tegen quantumcomputers</td>
+          <td>Ja, ML-KEM-768 houdt HNDL-aanvallen (nu opslaan, later ontsleutelen) tegen</td>
         </tr>
         <tr>
-          <td>Good for</td>
-          <td>Legal, healthcare, financial, compliance workflows</td>
+          <td>Geschikt voor</td>
+          <td>Juridisch werk, zorg, financiën, compliance</td>
         </tr>
       </tbody>
     </table>
@@ -732,58 +714,53 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">08</div>
-    <h2 class="section-title">Components</h2>
-    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the WebApp tools (ParaShare, ParaDrop). Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
+    <h2 class="section-title">Onderdelen</h2>
+    <p class="section-desc">De relay is één onderdeel. Daaromheen zitten officiële SDK's, twee browserextensies en de webapp Versturen. Elk onderdeel staat op een ander punt in de overstap naar wire format v1. Dit is de eerlijke stand van vandaag.</p>
 
     <table class="modes-table">
       <thead>
         <tr>
-          <th>Component</th>
-          <th>What it does</th>
-          <th>Crypto today</th>
+          <th>Onderdeel</th>
+          <th>Wat het doet</th>
+          <th>Cryptografie nu</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td><strong>Relay</strong></td>
-          <td>Node.js, Hetzner Nuremberg. Validates inbound v1 blobs, advertises 3 KEMs and 18 signatures via <code>/v2/capabilities</code>, rejects unsupported algorithm IDs with HTTP 415.</td>
-          <td>Wire format v1. Full NIST suite (FIPS 203, 204, 205, 206) loaded.</td>
+          <td>Node.js, Hetzner Neurenberg. Controleert binnenkomende v1-blobs, meldt via <code>/v2/capabilities</code> welke algoritmen echt geladen zijn en weigert elk ander algoritme-ID met HTTP 415.</td>
+          <td>Wire format v1. Het image bevat 3 KEM's en 17 handtekeningalgoritmen. De standaardmodus core laadt er twee, ML-KEM-768 en ML-DSA-65, en alleen die twee noemt het endpoint.</td>
         </tr>
         <tr>
           <td><strong>sdk-py 3.0.0</strong></td>
-          <td>Python SDK. Default ML-KEM-768 + ML-DSA-65. Negotiates via the capabilities endpoint. Live on <a href="https://pypi.org/project/paramant-sdk/">PyPI</a> &mdash; <code>pip install paramant-sdk</code>.</td>
-          <td>Real post-quantum (pqcrypto). Produces v1 blobs.</td>
+          <td>Python-SDK. Standaard ML-KEM-768 + ML-DSA-65. Stemt af via het capabilities-endpoint. Beschikbaar op <a href="https://pypi.org/project/paramant-sdk/">PyPI</a>: <code>pip install paramant-sdk</code>.</td>
+          <td>Echte post-quantum (pqcrypto). Maakt v1-blobs.</td>
         </tr>
         <tr>
           <td><strong>sdk-js 3.0.0</strong></td>
-          <td>JavaScript / Node SDK. Same defaults and negotiation as the Python SDK. Live on <a href="https://www.npmjs.com/package/paramant-sdk">npm</a> &mdash; <code>npm install paramant-sdk</code>.</td>
-          <td>Real post-quantum (@noble/post-quantum). Produces v1 blobs.</td>
+          <td>JavaScript/Node-SDK. Zelfde standaarden en afstemming als de Python-SDK. Beschikbaar op <a href="https://www.npmjs.com/package/paramant-sdk">npm</a>: <code>npm install paramant-sdk</code>.</td>
+          <td>Echte post-quantum (@noble/post-quantum). Maakt v1-blobs.</td>
         </tr>
         <tr>
-          <td><strong>ParaShare (webapp)</strong></td>
-          <td>Verified, authenticated transfers from the browser.</td>
-          <td>Hybrid ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, client-side. Pre-v1 blob layout. Migration to v1 in progress.</td>
+          <td><strong>Webapp Versturen</strong></td>
+          <td>Geverifieerde, geauthenticeerde verzendingen vanuit de browser.</td>
+          <td>Hybride ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, bij de client. Blob-indeling van voor v1. Overstap naar v1 is bezig.</td>
         </tr>
         <tr>
-          <td><strong>ParaDrop (webapp)</strong></td>
-          <td>Device-to-device transfer over the relay, browser-to-browser.</td>
-          <td>Same WASM bridge as ParaShare. Pre-v1 layout. Migration to v1 in progress.</td>
+          <td><strong>Chromium-extensie</strong></td>
+          <td>Uploaden met de rechtermuisknop vanuit elk tabblad.</td>
+          <td>Versleutelt op uw eigen computer, maar met AES-256-GCM uit Web Crypto en de sleutel in het URL-fragment, niet met de ML-KEM-hybride. Geen sleuteluitwisseling, dus geen koppeling aan een bepaalde ontvanger. Een klaargezette ML-KEM-module staat ongebruikt in de code.</td>
         </tr>
         <tr>
-          <td><strong>Chromium extension</strong></td>
-          <td>Right-click upload from any tab.</td>
-          <td>Currently uses a server-side encryption path: the relay performs encryption with a per-blob key. Client-side ML-KEM crypto is staged in the codebase but not yet wired up.</td>
-        </tr>
-        <tr>
-          <td><strong>Outlook add-in</strong></td>
-          <td>Encrypts attachments inside Outlook before send.</td>
-          <td>Uploads attachment bytes to the relay, which performs encryption server-side. Migration to client-side hybrid crypto is in progress.</td>
+          <td><strong>Outlook-invoegtoepassing</strong></td>
+          <td>Versleutelt bijlagen in Outlook voordat ze worden verstuurd.</td>
+          <td>Zelfde route als de Chromium-extensie: AES-256-GCM in de invoegtoepassing, sleutel in het URL-fragment, geen sleuteluitwisseling. De overstap naar de ML-KEM-hybride is nog niet gedaan.</td>
         </tr>
       </tbody>
     </table>
 
     <div class="arch-takeaway">
-      <p><strong>The relay never sees plaintext for SDK and WebApp transfers.</strong> The two extensions currently take a server-side path while their client-side crypto is finished — that is called out openly here rather than papered over. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
+      <p><strong>De relay ziet nooit leesbare tekst, behalve bij de gehoste ondertekenceremonie op de <code>/v1</code>-API.</strong> Elke client in deze tabel versleutelt voordat hij uploadt, ook de twee extensies. De ceremonie is geen client in deze tabel: daar krijgt de relay de pdf zelf, omdat dat verzoek hem vraagt de ceremonie uit te voeren. Het verschil zit in de sleuteluitwisseling. De SDK's en de webapp koppelen het bestand aan de publieke sleutel van een ontvanger. De extensies en de in de browser versleutelde link zetten een symmetrische sleutel in het URL-fragment en koppelen die aan niemand. Iedereen met die link kan het bestand openen, dus de beveiliging zit in het kanaal waarover u hem verstuurt. Zie <a href="/crypto-agility#06">crypto-agility § 06</a> voor het wire format per client en de overstaptabel.</p>
     </div>
   </div>
 </section>
@@ -791,10 +768,10 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <!-- ── GOING DEEPER ── -->
 <section class="arch-section arch-section--tint">
   <div class="going-deeper">
-    <span class="eyebrow" style="display:block;text-align:center;margin-bottom:20px">GOING DEEPER</span>
-    <h2>Want the cryptographic specification?</h2>
-    <p>The security page covers every algorithm, the independent audit results, key verification layers, authentication model, and responsible disclosure. Written for cryptographers and security engineers.</p>
-    <a href="/security" class="btn-arch">Read the security spec &rarr;</a>
+    <span class="eyebrow" style="display:block;width:fit-content;margin:0 auto 20px;text-align:center">VERDER LEZEN</span>
+    <h2>De cryptografische specificatie lezen?</h2>
+    <p>De beveiligingspagina behandelt elk algoritme, de uitkomsten van de onafhankelijke audits, de lagen voor sleutelcontrole, het authenticatiemodel en het melden van kwetsbaarheden. Geschreven voor cryptografen en beveiligingsspecialisten.</p>
+    <a href="/security" class="btn-arch">Lees de beveiligingsspecificatie &rarr;</a>
   </div>
 </section>
 
@@ -802,60 +779,35 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

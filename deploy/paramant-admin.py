@@ -14,7 +14,7 @@ Omgeving:
   PARAMANT_SECTORS_DIR   Pad naar sector dirs (default: /home/paramant)
   PARAMANT_RELAY_BASE    Base URL voor /v2/check-key calls (default: https://health.paramant.app)
 """
-import os, sys, json, secrets, argparse, urllib.request, urllib.error
+import os, sys, json, secrets, argparse, re, urllib.request, urllib.error
 from datetime import datetime, timezone
 
 # ── Resend mail ───────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ def send_welcome_mail(to_email, api_key, plan):
   <p style="color:#555;font-size:13px;margin-bottom:8px">Get started:</p>
   <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888">pip install paramant-sdk
 
-from paramant_sdk import GhostPipe
+from paramant import GhostPipe
 gp = GhostPipe(api_key="{api_key}", device="device-001")
 hash_ = gp.send(b"hello world")
 data  = gp.receive(hash_)</pre>
@@ -74,14 +74,40 @@ data  = gp.receive(hash_)</pre>
     return False
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SECTORS_DIR = os.environ.get('PARAMANT_SECTORS_DIR', '/home/paramant')
-SECTORS = {
-    'health':  os.path.join(SECTORS_DIR, 'relay-health',   'users.json'),
-    'legal':   os.path.join(SECTORS_DIR, 'relay-legal',    'users.json'),
-    'finance': os.path.join(SECTORS_DIR, 'relay-finance',  'users.json'),
-    'iot':     os.path.join(SECTORS_DIR, 'relay-iot',      'users.json'),
-}
+# De compose-deploy bewaart /data van elke relay in een named docker volume.
+# Docker Compose gebruikt standaard de install-dir als projectnaam, dus
+# /opt/paramant krijgt volumes zoals paramant_relay-<sector>-data. De
+# /home/paramant/relay-*-bestanden zijn een artefact van de oude
+# systemd-topologie; daarop muteren is een stille no-op richting de relays.
+SECTORS_DIR     = os.environ.get('PARAMANT_SECTORS_DIR', '/home/paramant')
+VOLUMES_DIR     = os.environ.get('PARAMANT_DOCKER_VOLUMES_DIR', '/var/lib/docker/volumes')
+
+def _compose_project_name():
+    explicit = os.environ.get('PARAMANT_COMPOSE_PROJECT') or os.environ.get('COMPOSE_PROJECT_NAME')
+    if explicit:
+        return explicit
+    install_dir = os.environ.get('PARAMANT_DIR')
+    if not install_dir:
+        install_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    base = os.path.basename(os.path.abspath(install_dir)) or 'paramant'
+    project = re.sub(r'[^a-z0-9_-]', '', base.lower())
+    return project or 'paramant'
+
+COMPOSE_PROJECT = _compose_project_name()
+
+SECTOR_NAMES = ('main', 'health', 'legal', 'finance', 'iot')
+
+def _users_json_path(sector):
+    vol_dir = os.path.join(VOLUMES_DIR, f'{COMPOSE_PROJECT}_relay-{sector}-data', '_data')
+    vol = os.path.join(vol_dir, 'users.json')
+    if os.path.isdir(vol_dir):
+        return vol
+    legacy = os.path.join(SECTORS_DIR, f'relay-{sector}', 'users.json')
+    return legacy
+
+SECTORS = {s: _users_json_path(s) for s in SECTOR_NAMES}
 RELAY_URLS = {
+    'main':    'https://relay.paramant.app',
     'health':  'https://health.paramant.app',
     'legal':   'https://legal.paramant.app',
     'finance': 'https://finance.paramant.app',
@@ -123,7 +149,9 @@ def save_users(path, data):
         pass  # best-effort; systemd ExecStartPre also ensures this on next restart
 
 def gen_key():
-    return 'pgp_' + secrets.token_hex(16)
+    # 32 bytes, gelijk aan de signup-flow in admin/server.js (randomBytes(32));
+    # token_hex(16) gaf hier de helft van de serverside keysterkte.
+    return 'pgp_' + secrets.token_hex(32)
 
 def now_iso():
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')

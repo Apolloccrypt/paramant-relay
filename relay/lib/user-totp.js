@@ -45,6 +45,20 @@ async function storeBackupCodes(redisClient, userId, codes) {
   if (hashes.length > 0) await redisClient.sAdd(key, hashes);
 }
 
+// Mint a fresh set of backup codes for a user: drop any existing set (codes are
+// single-use, so a replace is correct both on activation and on explicit
+// regenerate), generate a new batch, store the hashes, and return the plaintext
+// codes to the caller exactly once. This is the ONLY place plaintext codes are
+// produced, which is why activation can hand them straight to the user with no
+// separate lookup — and why a reloaded or re-issued setup page can never strand
+// the user on an empty set.
+async function regenerateBackupCodes(redisClient, userId, count = 10) {
+  await redisClient.del(`paramant:user:backup_codes:${userId}`);
+  const codes = generateBackupCodes(count);
+  await storeBackupCodes(redisClient, userId, codes);
+  return codes;
+}
+
 async function consumeBackupCode(redisClient, userId, providedCode) {
   const key = `paramant:user:backup_codes:${userId}`;
   const hashes = await redisClient.sMembers(key);
@@ -57,15 +71,20 @@ async function consumeBackupCode(redisClient, userId, providedCode) {
   return { valid: false };
 }
 
+// AAD binds the TOTP secret blob to this user, so a Redis-write attacker can't
+// transplant one user's secret into another's key (decrypt is backward-compatible
+// with pre-AAD blobs; see encryption.js).
+function _totpAad(userId) { return `totp:${userId}`; }
+
 async function storeUserTotpSecret(redisClient, userId, base32Secret) {
-  const encrypted = encryptSecret(base32Secret);
+  const encrypted = encryptSecret(base32Secret, _totpAad(userId));
   await redisClient.set(`paramant:user:totp:${userId}`, encrypted);
 }
 
 async function getUserTotpSecret(redisClient, userId) {
   const encrypted = await redisClient.get(`paramant:user:totp:${userId}`);
   if (!encrypted) return null;
-  return decryptSecret(encrypted);
+  return decryptSecret(encrypted, _totpAad(userId));
 }
 
 async function deleteUserTotp(redisClient, userId) {
@@ -79,6 +98,7 @@ module.exports = {
   generateTotpSecret,
   generateBackupCodes,
   storeBackupCodes,
+  regenerateBackupCodes,
   consumeBackupCode,
   storeUserTotpSecret,
   getUserTotpSecret,

@@ -1,10 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gmail extension — PARAMANT Help</title>
-<meta name="description" content="Install and configure the Paramant Chrome extension for sending encrypted attachments from Gmail.">
+<title>Versleutelde bijlagen versturen vanuit Gmail · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:description" content="Installeer de Paramant-extensie voor Chrome en verstuur versleutelde bijlagen vanuit Gmail. De ontvanger krijgt een link die na de eerste download vervalt.">
+<meta name="twitter:title" content="Versleutelde bijlagen versturen vanuit Gmail · Paramant">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:title" content="Versleutelde bijlagen versturen vanuit Gmail · Paramant">
+<meta property="og:description" content="Installeer de Paramant-extensie voor Chrome en verstuur versleutelde bijlagen vanuit Gmail. De ontvanger krijgt een link die na de eerste download vervalt.">
+<meta property="og:url" content="https://paramant.app/help/gmail-extension">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Paramant">
+<link rel="canonical" href="https://paramant.app/help/gmail-extension">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/gmail-extension">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/gmail-extension">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/gmail-extension">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="extensions">
+<meta name="description" content="Installeer de Paramant-extensie voor Chrome en verstuur versleutelde bijlagen vanuit Gmail. De ontvanger krijgt een link die na de eerste download vervalt.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -30,7 +51,7 @@ a:hover{opacity:.7}
 em{color:var(--cobalt)}
 .step{display:flex;gap:20px;margin-bottom:32px;padding-bottom:32px;border-bottom:1px solid var(--ink-ghost)}
 .step:last-of-type{border-bottom:none}
-.step-num{width:32px;height:32px;background:var(--cobalt);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-num{width:32px;height:32px;background:var(--cobalt);color: var(--on-ochre);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
 .step-body{flex:1}
 .step-body h2{margin-top:0}
 .tip{border-left:3px solid var(--cobalt);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
@@ -63,8 +84,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
   display: inline-flex;
@@ -74,9 +96,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -87,26 +109,26 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -115,378 +137,302 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/help/gmail-extension#webpage",
+      "url": "https://paramant.app/help/gmail-extension",
+      "name": "Versleutelde bijlagen versturen vanuit Gmail · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Installeer de Paramant-extensie voor Chrome en verstuur versleutelde bijlagen vanuit Gmail. De ontvanger krijgt een link die na de eerste download vervalt."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/help/gmail-extension#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Help",
+          "item": "https://paramant.app/help"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Extensie voor Gmail"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 
-<div class="meta-bar">
-  <span>build 3.0.0</span>
-  <span class="sep">·</span>
-  <span>aes-256-gcm / ml-kem-768</span>
-  <span class="sep">·</span>
-  <span>eu/de · ram only</span>
-</div>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
-        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/gmail-extension" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/gmail-extension" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/dashboard">Dashboard</a>
-    </div>
-  </div>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
-</div><main>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/gmail-extension" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/gmail-extension" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
+</div>
+<main id="main-content" tabindex="-1">
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/help">Hulp</a>
     <span>/</span>
-    Gmail extension
+    Extensie voor Gmail
   </div>
 
-  <h1>Paramant for <em>Gmail</em> — send encrypted attachments without leaving your inbox.</h1>
+  <h1>Paramant voor <em>Gmail</em>: versleutelde bijlagen versturen zonder uw inbox te verlaten.</h1>
 
-  <p class="lead">The Paramant Chrome extension adds a button to Gmail's compose window. Select a file, the extension uploads it to Paramant, and inserts the burn-on-read link into your email. The recipient downloads it once; then it is gone.</p>
+  <p class="lead">De Paramant-extensie voor Chrome zet een knop in het opstelvenster van Gmail. U kiest een bestand, de extensie uploadt het naar Paramant en zet de link die na het lezen vervalt in uw e-mail. De webapp en de extensies wissen het bestand na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op Firm en 100 keer op Enterprise.</p>
 
-  <h2>Before you start</h2>
+  <h2>Voordat u begint</h2>
 
   <ul class="compat-list">
-    <li><span class="dot dot-yes"></span><strong>Chrome or Chromium</strong> — version 120 or later</li>
-    <li><span class="dot dot-yes"></span><strong>Gmail in a browser tab</strong> — gmail.com or Google Workspace</li>
-    <li><span class="dot dot-yes"></span><strong>Paramant account with an API key</strong> — <a href="/signup">create an account</a> if you don't have one</li>
-    <li><span class="dot dot-no"></span><strong>Firefox / Safari</strong> — not supported; use the <a href="/parashare">web uploader</a> instead</li>
-    <li><span class="dot dot-no"></span><strong>Gmail mobile app</strong> — extensions do not run in mobile apps</li>
+    <li><span class="dot dot-yes"></span><strong>Chrome of Chromium</strong>: versie 120 of nieuwer</li>
+    <li><span class="dot dot-yes"></span><strong>Gmail in een browsertabblad</strong>: gmail.com of Google Workspace</li>
+    <li><span class="dot dot-yes"></span><strong>Paramant-account met een API-sleutel</strong>: <a href="/signup">maak een account</a> als u er nog geen heeft</li>
+    <li><span class="dot dot-no"></span><strong>Firefox en Safari</strong>: niet ondersteund. Gebruik dan de <a href="/parashare">uploader op de website</a></li>
+    <li><span class="dot dot-no"></span><strong>Gmail-app op de telefoon</strong>: extensies werken niet in mobiele apps</li>
   </ul>
 
-  <h2>Installation</h2>
+  <h2>Installeren</h2>
 
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <h2>Install the extension</h2>
-      <p>Open Chrome and go to the Chrome Web Store. Search for <strong>Paramant</strong> or find it under the developer name <strong>Apolloccrypt</strong>. Click <strong>Add to Chrome</strong>, then <strong>Add extension</strong> in the confirmation dialog.</p>
-      <p>The Paramant icon (a small shield) will appear in your Chrome toolbar. If it is hidden, click the puzzle icon in the toolbar and pin Paramant.</p>
+      <h2>Installeer de extensie</h2>
+      <p>Open Chrome en ga naar de Chrome Web Store. Zoek op <strong>Paramant</strong> of op de ontwikkelaarsnaam <strong>Apolloccrypt</strong>. Klik op <strong>Toevoegen aan Chrome</strong> en daarna in het bevestigingsvenster op <strong>Extensie toevoegen</strong>.</p>
+      <p>Het Paramant-pictogram (een klein schild) verschijnt in de werkbalk van Chrome. Ziet u het niet, klik dan op het puzzelstukje in de werkbalk en zet Paramant vast.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Enter your API key</h2>
-      <p>Click the Paramant icon in the toolbar. A popup opens with a single field: <strong>API key</strong>. Paste your API key from your Paramant dashboard and click <strong>Save</strong>.</p>
-      <p>The extension stores the key locally in Chrome's extension storage — it is not transmitted anywhere except to paramant.app when you upload a file.</p>
-      <div class="tip"><p>Your API key is in Dashboard &rarr; API keys. If you don't see one, click <strong>Generate new key</strong>.</p></div>
+      <h2>Vul uw API-sleutel in</h2>
+      <p>Klik op het Paramant-pictogram in de werkbalk. Er opent een venster met één veld: <strong>API key</strong>. Plak de API-sleutel uit uw Paramant-dashboard en klik op <strong>Save</strong>.</p>
+      <p>De extensie bewaart de sleutel lokaal in de extensieopslag van Chrome. Hij gaat nergens anders heen dan naar paramant.app, en alleen als u een bestand uploadt.</p>
+      <div class="tip"><p>Uw API-sleutel staat in Dashboard &rarr; API-sleutels. Ziet u er geen, klik dan op <strong>Nieuwe sleutel maken</strong>.</p></div>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">3</div>
     <div class="step-body">
-      <h2>Verify the connection</h2>
-      <p>The popup shows a green indicator and your account email when the key is valid. If you see a red indicator, double-check that you copied the full 64-character key with no trailing spaces or line breaks.</p>
+      <h2>Controleer de verbinding</h2>
+      <p>Is de sleutel geldig, dan toont het venster een groen lampje en het e-mailadres van uw account. Ziet u een rood lampje, controleer dan of u de volledige sleutel van 64 tekens hebt gekopieerd, zonder spaties of regeleinden aan het eind.</p>
     </div>
   </div>
 
-  <h2>Sending a file from Gmail</h2>
+  <h2>Een bestand versturen vanuit Gmail</h2>
 
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <h2>Open a compose window</h2>
-      <p>In Gmail, click <strong>Compose</strong>. At the bottom of the compose window, you will see the Paramant shield icon alongside the standard Gmail toolbar icons.</p>
+      <h2>Open een opstelvenster</h2>
+      <p>Klik in Gmail op <strong>Opstellen</strong>. Onderaan het opstelvenster ziet u het schildje van Paramant naast de gewone pictogrammen van Gmail.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Click the Paramant icon and select a file</h2>
-      <p>Click the shield icon. A file picker opens. Select the file you want to send. The extension uploads it to Paramant in the background — you can see a progress indicator in the compose toolbar.</p>
-      <p>Files up to 5 GB are supported. Upload speed depends on your connection; a progress bar appears for large files.</p>
+      <h2>Klik op het Paramant-pictogram en kies een bestand</h2>
+      <p>Klik op het schildje. Er opent een venster om een bestand te kiezen. Kies het bestand dat u wilt versturen. De extensie uploadt het op de achtergrond naar Paramant. De voortgang ziet u in de werkbalk van het opstelvenster.</p>
+      <p>Bestanden tot 500 MB worden ondersteund. Dat is de grens per bestand op elk plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). De extensie knipt het bestand in stukken en uploadt per stuk één vast blok van 5 MB. Die 5 MB is dus het formaat onderweg, niet de grootte van het bestand dat u mag versturen.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">3</div>
     <div class="step-body">
-      <h2>The link is inserted automatically</h2>
-      <p>When the upload completes, the extension inserts a formatted line into your email body:</p>
-      <p style="font-family:var(--mono,ui-monospace);font-size:var(--text-sm);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:10px 14px;line-height:1.6">Secure file: [filename] &mdash; download once at paramant.app/get/XXXXX<br>(link expires in 24 hours, file deleted after download)</p>
-      <p>Edit the text around the link as needed, then send your email normally.</p>
+      <h2>De link wordt vanzelf ingevoegd</h2>
+      <p>Als de upload klaar is, zet de extensie een opgemaakte regel in uw e-mail:</p>
+      <p style="font-family:var(--mono,ui-monospace);font-size:var(--text-sm);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:10px 14px;line-height:1.6">Beveiligd bestand: [bestandsnaam], eenmalig te downloaden via paramant.app/get/XXXXX<br>(de link verloopt na 24 uur, het bestand wordt na het downloaden gewist)</p>
+      <p>Pas de tekst rond de link aan als dat nodig is en verstuur uw e-mail zoals altijd.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">4</div>
     <div class="step-body">
-      <h2>Recipient downloads the file</h2>
-      <p>Your recipient clicks the link. They see the file name and size, click <strong>Download</strong>, and the file is delivered. The link and file are deleted immediately after the first download. If the recipient tries the link again, they get a 404.</p>
+      <h2>De ontvanger downloadt het bestand</h2>
+      <p>Uw ontvanger klikt op de link, ziet de naam en grootte van het bestand, klikt op <strong>Downloaden</strong> en krijgt het bestand. Direct na die eerste download worden link en bestand gewist, op elk plan. De extensie vraagt de relay namelijk nooit om een tweede keer lezen, en een tweede poging krijgt een 404.</p>
     </div>
   </div>
 
-  <h2>Extension settings</h2>
+  <h2>Instellingen van de extensie</h2>
 
-  <p>Click the Paramant toolbar icon at any time to access settings:</p>
+  <p>Klik op elk moment op het Paramant-pictogram in de werkbalk voor de instellingen:</p>
   <ul style="margin:12px 0 12px 20px;display:flex;flex-direction:column;gap:8px">
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Default TTL</strong> — how long the link stays active before expiring without a download. Default is 24 hours; options range from 1 hour to 7 days.</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Link format</strong> — plain URL or formatted text block. Plain URL is better if the recipient's email client does not render HTML.</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Transfer history</strong> — a list of recent uploads with their status (active, downloaded, expired). Only stored locally, not synced.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Standaard geldigheid</strong>: hoe lang de link actief blijft als er niet wordt gedownload. Standaard is dat 24 uur. U kiest van 1 uur tot 7 dagen.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Vorm van de link</strong>: een kale URL of een opgemaakt tekstblok. Een kale URL is beter als het mailprogramma van de ontvanger geen HTML toont.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Verzendgeschiedenis</strong>: een lijst van recente uploads met hun status (actief, gedownload, verlopen). Alleen lokaal bewaard, niet gesynchroniseerd.</li>
   </ul>
 
   <hr class="divider">
 
-  <h3>Troubleshooting</h3>
+  <h3>Problemen oplossen</h3>
 
   <div class="troubleshoot-item">
-    <div class="q">The Paramant icon does not appear in the Gmail compose window.</div>
-    <div class="a">Reload the Gmail tab after installing the extension. If the icon still doesn't appear, check that the extension is enabled: Chrome menu &rarr; Extensions &rarr; Manage Extensions &rarr; Paramant should be toggled on.</div>
+    <div class="q">Het Paramant-pictogram staat niet in het opstelvenster van Gmail.</div>
+    <div class="a">Laad het tabblad van Gmail opnieuw na het installeren van de extensie. Staat het pictogram er nog niet, controleer dan of de extensie aan staat: Chrome-menu &rarr; Extensies &rarr; Extensies beheren &rarr; Paramant moet aan staan.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">Upload fails with "authentication error".</div>
-    <div class="a">Your API key may have been revoked or regenerated. Open the extension popup, clear the current key, paste the new one, and save. Get your current key from Dashboard &rarr; API keys.</div>
+    <div class="q">De upload mislukt met "authentication error".</div>
+    <div class="a">Misschien is uw API-sleutel ingetrokken of vervangen. Open het venster van de extensie, wis de huidige sleutel, plak de nieuwe en sla op. Uw huidige sleutel vindt u in Dashboard &rarr; API-sleutels.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">The extension stopped working after a Chrome update.</div>
-    <div class="a">Check the Extensions page for any error banners on the Paramant extension. If you see "This extension is disabled", re-enable it. If Chrome removed it automatically, reinstall from the Chrome Web Store.</div>
+    <div class="q">De extensie werkt niet meer na een update van Chrome.</div>
+    <div class="a">Kijk op de pagina Extensies of er een foutmelding bij de Paramant-extensie staat. Staat er dat de extensie is uitgeschakeld, zet hem dan weer aan. Heeft Chrome hem zelf verwijderd, installeer hem dan opnieuw uit de Chrome Web Store.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">My company's managed Chrome policy blocks extensions.</div>
-    <div class="a">Ask your IT administrator to allowlist the Paramant extension by its ID (visible in Chrome &rarr; Extensions &rarr; Details). Alternatively, use the <a href="/parashare">web uploader</a> or the API directly.</div>
+    <div class="q">Het Chrome-beleid van mijn organisatie blokkeert extensies.</div>
+    <div class="a">Vraag uw IT-beheerder de Paramant-extensie toe te staan op basis van haar ID (te zien in Chrome &rarr; Extensies &rarr; Details). U kunt ook de <a href="/parashare">uploader op de website</a> of rechtstreeks de API gebruiken.</div>
   </div>
 
   <hr class="divider">
 
-  <h3>Related</h3>
+  <h3>Zie ook</h3>
   <div class="next-steps">
     <a href="/help/outlook-extension" class="next-step-card">
-      <h3>Outlook add-in</h3>
-      <p>Same workflow for Microsoft Outlook and 365.</p>
+      <h3>Invoegtoepassing voor Outlook</h3>
+      <p>Dezelfde werkwijze voor Microsoft Outlook en 365.</p>
     </a>
     <a href="/help/api-key-vs-totp" class="next-step-card">
-      <h3>API key vs TOTP</h3>
-      <p>Understanding the credentials used by the extension.</p>
+      <h3>API-sleutel of TOTP</h3>
+      <p>Welke inloggegevens de extensie gebruikt.</p>
     </a>
   </div>
 
 </main>
 
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/gmail-extension" hreflang="en" lang="en">This page in English</a></p>
+
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

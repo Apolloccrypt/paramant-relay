@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Paramant — Encrypted Attachments",
+  "name": "__MSG_extName__",
   "version": "1.0.0",
-  "description": "Send Gmail and Outlook attachments through Paramant's post-quantum encrypted relay.",
+  "description": "__MSG_extDesc__",
   "default_locale": "en",
+  "minimum_chrome_version": "120",
 
   "icons": {
     "16":  "icons/icon-16.png",
@@ -12,16 +13,12 @@
   },
 
   "permissions": [
-    "storage",
-    "activeTab"
+    "storage"
   ],
 
   "host_permissions": [
-    "https://mail.google.com/*",
-    "https://outlook.live.com/*",
-    "https://outlook.office.com/*",
-    "https://outlook.office365.com/*",
-    "https://paramant.app/*"
+    "https://paramant.app/*",
+    "https://*.paramant.app/*"
   ],
 
   "background": {
@@ -37,10 +34,15 @@
     }
   },
 
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["content/shared/banner.js", "content/gmail.js"],
+      "js": ["content/gmail.js"],
       "css": ["content/shared/banner.css"],
       "run_at": "document_idle"
     },
@@ -50,21 +52,9 @@
         "https://outlook.office.com/*",
         "https://outlook.office365.com/*"
       ],
-      "js": ["content/shared/banner.js", "content/outlook.js"],
+      "js": ["content/outlook.js"],
       "css": ["content/shared/banner.css"],
       "run_at": "document_idle"
-    }
-  ],
-
-  "web_accessible_resources": [
-    {
-      "resources": ["icons/*.svg", "icons/*.png"],
-      "matches": [
-        "https://mail.google.com/*",
-        "https://outlook.live.com/*",
-        "https://outlook.office.com/*",
-        "https://outlook.office365.com/*"
-      ]
     }
   ],
 

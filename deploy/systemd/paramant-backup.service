@@ -1,0 +1,15 @@
+# Full-state backup of the hosted relay stack, age-encrypted.
+# Installed and started by paramant-backup.timer; see deploy/DEPLOY-3.1.md,
+# section "Daily backup (systemd timer)".
+[Unit]
+Description=Paramant full-state backup (relay data, redis, host config)
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/env bash /opt/paramant-relay/deploy/ops/backup-full-state.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30min

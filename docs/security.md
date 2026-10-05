@@ -9,6 +9,8 @@
 
 Ghost Pipe is a zero-plaintext, burn-on-read file transport. The relay is an _untrusted intermediary_: it stores only encrypted ciphertext and has no access to keys or plaintext. This document explains the four-layer key verification system that protects transfers even when the relay is fully compromised.
 
+ParaSign signing requests use a separate delivery lifecycle. The sender's browser encrypts the document with AES-256-GCM and uploads an opaque capsule tied to the envelope. The capsule can persist until envelope expiry so recipients can reopen it and recover after refresh. The document key is in the invite URL fragment and is not sent in relay requests. Ciphertext retrieval requires both the invite token and an authenticated session for the exact invited email address. A copied link or a session alone is insufficient. Optional Paramant email delivery processes the complete link but cannot retrieve ciphertext without the recipient identity check.
+
 ---
 
 ## Threat model
@@ -112,15 +114,32 @@ A compromised relay performing a MITM by swapping public keys. The relay cannot 
 
 ## Layer 3 — Pre-Shared Secret (PSS)
 
-**What it is:** An optional password agreed out-of-band. The PSS is added to the HKDF key derivation input. Even if the relay serves a completely wrong pubkey, the receiver cannot decrypt without the PSS.
+> **Status: the key-derivation half of this design is not implemented.** The
+> shipped client derives its AES key from two shared secrets and nothing else:
+> `hkdf_aes_key(ss_kem, ss_ecdh, salt)` in `crypto-wasm/src/lib.rs:29`. There is
+> no third input, and the word `pss` does not appear anywhere under `frontend/`.
+> What *is* implemented is the session-binding half, described under "What the
+> relay actually does" below. Read the rest of this section as the design, not
+> as the behaviour.
 
-**Key derivation with PSS:**
+**What it is:** An optional password agreed out-of-band, used to bind the
+receiver's public keys to a session before the sender encrypts to them.
+
+**What the relay actually does** (`relay/relay.js:5323` and `:4970`): the sender
+opens a session with `commitment = SHA3-256(pss)`. The receiver posts the PSS
+itself to `POST /v2/session/join`; the relay hashes it, compares it to the
+commitment, and on a match binds the receiver's ECDH and ML-KEM public keys to
+the session, first join wins. The PSS travels to the relay **in plain text at
+join time**, so the relay learns it. It is an authentication of the joining
+party, not an ingredient of the encryption.
+
+**Design not yet shipped, key derivation with PSS:**
 ```
 ikm = ecdh_shared_secret || kem_shared_secret || SHA3-256(pss)
 K   = HKDF-SHA256(salt=kct[:32], info="aes-key", ikm=ikm) → AES-256-GCM key
 ```
 
-Without PSS, `ikm = ecdh_ss || kem_ss` (unchanged — backward compatible).
+Today, and with or without a PSS, `ikm = ecdh_ss || kem_ss`.
 
 **API:**
 ```python
@@ -132,12 +151,11 @@ data = gp.receive(h, pre_shared_secret='correct-horse-battery-staple')
 ```
 
 **What it protects against:**  
-- Relay MITM on first contact (before any fingerprint is stored)
-- Relay-side key injection attacks at any time
-- Even a fully compromised relay cannot decrypt PSS-protected transfers
+- Key injection by an outsider who does not know the PSS: they cannot satisfy the commitment, so the relay will not bind their keys.
 
 **What it does NOT protect against:**  
-An attacker who knows the PSS. PSS is only as strong as its secrecy and entropy.
+- An attacker who knows the PSS. It is only as strong as its secrecy and entropy.
+- **The relay itself.** The receiver hands the PSS to the relay in plain text on join, and a relay running modified code can bind whatever keys it likes regardless of the commitment. A compromised relay is held off by TOFU pinning and by the out-of-band fingerprint comparison (Layers 1 and 2), not by this.
 
 **When to use PSS:**
 - Healthcare (DICOM) transfers between known systems → agree PSS during device commissioning
@@ -371,7 +389,7 @@ Or with ParaShare (browser):
 ## Audit
 
 Pentest by Ryan Williams · Smart Cyber Solutions Pty Ltd (AU) · April 2026  
-Report: [pentest-report-2026-04-08.txt](../pentest-report-2026-04-08.txt)  
+Report: `pentest-report-2026-04-08.txt`  
 Full writeup: [security-audit-2026-04.md](./security-audit-2026-04.md)
 
 All critical/high/medium findings addressed in v2.4.5.

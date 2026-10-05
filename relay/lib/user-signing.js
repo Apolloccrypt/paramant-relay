@@ -63,7 +63,9 @@ async function storeSigningPk(redisClient, userId, { pk_b64, label }) {
       }
     } catch (e) {
       if (e.message === 'pubkey already enrolled to a different account') throw e;
-      // malformed index entry — overwrite below
+      // Fail closed: an index entry exists but is unreadable. Overwriting it would
+      // be fail-open (could silently re-map a pubkey across accounts on corruption).
+      throw new Error('pubkey index unreadable; refusing to overwrite');
     }
   }
 

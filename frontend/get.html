@@ -1,20 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
+     before every module and deferred script that signals or awaits. -->
+<script src="/js/ready.js?v=1"></script>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Receive — PARAMANT</title>
-<meta name="description" content="Secure file waiting for you. Decrypts in your browser. Burns after one download.">
-<meta property="og:title" content="Receive — PARAMANT">
-<meta property="og:description" content="Secure file waiting for you. Decrypts in your browser. Burns after one download.">
+<title>Bestand ontvangen · Paramant</title>
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="link">
+<meta name="description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download.">
+<meta property="og:title" content="Er staat een beveiligd bestand klaar · Paramant">
+<meta property="og:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
 <meta property="og:url" content="https://paramant.app/get">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Receive — PARAMANT">
-<meta name="twitter:description" content="Secure file waiting for you. Decrypts in your browser. Burns after one download.">
+<meta name="twitter:title" content="Er staat een beveiligd bestand klaar · Paramant">
+<meta name="twitter:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/get">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/get">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/get">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/get">
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -23,29 +37,24 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/done-state.css?v=1">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
 main{max-width:520px;margin:0 auto;padding:80px 24px}
-main:has(#step-preview.active){max-width:880px}
-#preview-canvas-list canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);margin-bottom:12px;background:#fff}
-.page-wrap{position:relative;margin-bottom:12px}
-.page-wrap.placing{cursor:crosshair}
-.stamp-marker{position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,0.06);pointer-events:none;font-family:var(--mono);font-size:9px;color:var(--navy);padding:4px;box-sizing:border-box;line-height:1.25;overflow:hidden}
-.stamp-marker .sm-name{font-weight:700;font-size:10px}
-.stamp-marker .sm-meta{color:var(--ink-dim);font-size:8px}
-.stamp-marker .sm-pqtag{position:absolute;right:3px;bottom:2px;font-size:7px;letter-spacing:.08em;color:var(--cobalt)}
-.sign-toolbar{background:var(--bone-2);border:1px solid var(--ink-hair);padding:14px 16px;margin-bottom:12px;font-size:12px;color:var(--ink-dim)}
-.sign-toolbar .st-hint{font-family:var(--mono);font-size:11px;margin-bottom:6px}
-.sign-form{display:grid;gap:10px;margin-top:10px}
-.sign-form label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
-.sign-form input,.sign-form select{width:100%;padding:9px 10px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:12px}
-.disclaimer{background:#fff4d6;border:1px solid #d4a017;padding:10px 14px;font-size:12px;color:#5a3f00;margin-bottom:14px;line-height:1.5}
-.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:#7a5300}
-.btn-row{display:flex;gap:10px;flex-wrap:wrap}
-.btn-row .btn{flex:1;margin:0}
+/* The PDF, inside the end screen's payload slot. Capped and scrollable on
+   purpose: the answer ("you have it, here it is, save it") has to stay on one
+   phone screen, and a document is as long as it is. */
+.done-preview{max-height:min(40vh,460px);overflow-y:auto;border:1px solid var(--ink-hair);border-radius:10px;padding:8px;background:var(--bone-2,var(--bone))}
+/* A page is paper. PDF.js paints its own white ground into the bitmap; this
+   puts the same ground on the element, so a canvas that is sized but not yet
+   drawn does not flash the dark app background through the document. */
+.done-preview canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#ffffff}
+.done-preview .page-wrap{position:relative;margin-bottom:8px}
+.done-preview .page-wrap:last-child{margin-bottom:0}
 h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .sub{font-size:13px;color:var(--ink-dim);margin-bottom:32px;line-height:1.7}
 .step{display:none;animation:fadeIn .2s ease}
@@ -55,25 +64,21 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .card-head{padding:14px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
 .card-head-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
 .dot{width:6px;height:6px;background:var(--lime);border:1px solid var(--navy)}
-.dot.amber{background:#f59e0b}
-.dot.red{background:rgba(255,80,80,1)}
+.dot.amber{background:var(--ochre)}
+.dot.red{background:rgba(196, 96, 79, 1)}
 .card-body{padding:20px 18px}
 .progress-wrap{background:var(--bone-2);border:1px solid var(--ink-hair);height:3px;overflow:hidden;margin:14px 0 8px}
 .progress-bar{height:100%;background:var(--cobalt);width:0%;transition:width .4s}
 .status-line{font-family:var(--mono);font-size:11px;color:var(--ink-dim);padding:2px 0;line-height:1.7}
 .status-line.ok{color:var(--cobalt)}
-.status-line.err{color:rgba(200,30,30,1)}
-.file-name{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--navy);margin:8px 0 4px;word-break:break-all}
-.file-size{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+.status-line.err{color:rgba(196, 96, 79, 1)}
 .burned-icon{font-size:36px;margin-bottom:16px;display:block;text-align:center}
 .burned-msg{font-size:14px;color:var(--ink);text-align:center;line-height:1.7;margin-bottom:8px}
 .burned-sub{font-size:11px;color:var(--ink-dim);text-align:center;line-height:1.7}
-.btn{display:block;width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:16px;text-decoration:none;text-align:center}
+.btn{display:block;width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:16px;text-decoration:none;text-align:center}
 .btn:hover{opacity:.85}
 .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
 .btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
-.tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px;margin-top:4px}
-.tag.green{border-color:var(--cobalt);color:var(--cobalt)}
 @media(max-width:640px){main{padding:48px 16px}h1{font-size:19px}}
 </style>
 <style>
@@ -85,9 +90,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -98,26 +103,26 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -126,873 +131,180 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/get" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/get" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/get" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/get" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content">
 
 <!-- No token: public receive landing -->
 <div class="step" id="step-enter">
-  <h1>Receive a file</h1>
-  <p class="sub">Paste the secure link you were sent. The file decrypts in your browser &mdash; the relay never has the key.</p>
+  <h1>Bestand ontvangen</h1>
+  <p class="sub">Plak de eenmalige link die u kreeg. Het bestand wordt in uw browser geopend. Paramant heeft de sleutel nooit.</p>
   <div class="card">
     <div class="card-body">
       <input id="enter-link" type="text" placeholder="https://paramant.app/get?t=..." autocomplete="off" spellcheck="false" style="width:100%;padding:12px;border:1px solid var(--ink-hair);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--bone);color:var(--ink)">
       <div class="status-line err" id="enter-err" style="margin-top:8px"></div>
-      <button class="btn" onclick="goReceive()" style="margin-top:14px">Receive</button>
+      <button class="btn" data-click="goReceive" style="margin-top:14px">Ontvangen</button>
     </div>
   </div>
-  <p class="sub" style="margin-top:16px">Have a 6-digit code instead? Use <a href="/drop">ParaDrop</a>.</p>
 </div>
 
 <!-- Downloading + decrypting -->
 <div class="step active" id="step-loading">
-  <h1>Secure file incoming</h1>
-  <p class="sub">Downloading encrypted file and decrypting it in your browser. The relay never had the key.</p>
+  <h1>Er komt een beveiligd bestand binnen</h1>
+  <p class="sub">Het verzegelde bestand wordt gedownload en in uw browser geopend. Paramant heeft de sleutel nooit gehad.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title" id="loading-title">Preparing...</div></div>
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title" id="loading-title">Voorbereiden...</div></div>
     <div class="card-body">
       <div class="progress-indeterminate" id="indeterminate-bar" style="margin:14px 0 0"></div>
       <div class="progress-wrap" id="progress-wrap" hidden><div class="progress-bar" id="pbar"></div></div>
-      <div class="status-line" id="status-msg">Starting...</div>
+      <div class="status-line" id="status-msg">Starten...</div>
     </div>
   </div>
 </div>
 
-<!-- Done -->
+<!-- Done. The one end screen, shared with /ontvang and /parashare: see
+     done-state.css. Small mark, one heading, one sentence, one button, and the
+     technical account folded away rather than deleted. -->
 <div class="step" id="step-done">
-  <h1>File received</h1>
-  <p class="sub">Decrypted in your browser. The relay copy has been permanently destroyed.</p>
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h1 class="done-title">U hebt het bestand.</h1>
+    <p class="done-line" id="done-line">Het staat op uw apparaat. Onze kopie is voorgoed vernietigd.</p>
 
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Download complete</div></div>
-    <div class="card-body">
-      <div class="file-name" id="done-filename"></div>
-      <div class="file-size" id="done-filesize"></div>
+    <div class="done-payload"></div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain">Nog een keer opslaan</button>
+      <a class="done-quiet" href="/dashboard">Naar uw overzicht</a>
     </div>
-  </div>
 
-  <div style="margin-bottom:24px">
-    <span class="tag green">Decrypted locally</span>
-    <span class="tag green">Relay copy burned</span>
-    <span class="tag green">AES-256-GCM</span>
-  </div>
-
-  <a href="/dashboard" class="btn btn-outline">Open your dashboard</a>
-</div>
-
-<!-- PDF preview (rendered in-browser, no auto-download) -->
-<div class="step" id="step-preview">
-  <h1>Document received</h1>
-  <p class="sub">Decrypted in your browser. The relay copy has been permanently destroyed.</p>
-
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">PDF preview</div></div>
-    <div class="card-body">
-      <div class="file-name" id="preview-filename"></div>
-      <div class="file-size"><span id="preview-pagecount"></span> &middot; <span id="preview-filesize"></span></div>
-    </div>
-  </div>
-
-  <div class="sign-toolbar" id="sign-toolbar" hidden>
-    <div class="st-hint" id="sign-hint">Click on the page where you want to place your signature.</div>
-    <div class="sign-form" id="sign-form" hidden>
-      <div>
-        <label for="signer-name">Signer name</label>
-        <input type="text" id="signer-name" maxlength="80" autocomplete="name" placeholder="e.g. Mick Beer">
+    <details class="done-details">
+      <summary>Waarom dit veilig was</summary>
+      <div class="done-details-body">
+        <p>Het openen gebeurde hier, in uw browser. Het bestand kwam verzegeld binnen (<code>AES-256-GCM</code>) en is geopend met de sleutel die in de link achter de <code>#</code> stond. Dat deel van een link stuurt een browser nooit naar een server.</p>
+        <p>Een link uit deze webapp werkt één keer. Onze kopie is gewist zodra uw browser het bestand ophaalde.</p>
+        <p>De bestandsnaam zat in het verzegelde bestand, niet ernaast. Ook die konden wij dus nooit lezen.</p>
+        <p id="done-pdf-note" hidden>Deze browser heeft de pagina's hierboven zelf uit het bestand opgebouwd. Daarvoor is niets verstuurd. Sluit u dit tabblad, dan blijft er niets van het document achter.</p>
       </div>
-      <div>
-        <label for="signer-key-src">Signing key</label>
-        <select id="signer-key-src">
-          <option value="ephemeral">Generate one-time key for this signature</option>
-        </select>
-      </div>
-      <div class="btn-row">
-        <button class="btn" id="sign-confirm" type="button">Sign and download</button>
-        <button class="btn btn-outline" id="sign-move" type="button">Move stamp</button>
-        <button class="btn btn-outline" id="sign-cancel" type="button">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="preview-canvas-list" style="margin:16px 0"></div>
-
-  <div class="disclaimer" id="sign-disclaimer" hidden>
-    <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
-    The signature uses ML-DSA-65 (FIPS 204) and is produced locally in your browser.
-    The relay never sees the document. This is a cryptographic attestation, not a
-    qualified electronic signature under eIDAS or a notarised legal instrument.
-  </div>
-
-  <div style="margin-bottom:24px">
-    <span class="tag green">Decrypted locally</span>
-    <span class="tag green">Relay copy burned</span>
-    <span class="tag green">Rendered in browser</span>
-  </div>
-
-  <div class="btn-row" id="preview-actions">
-    <button class="btn" id="preview-sign" type="button">Sign this document</button>
-    <button class="btn btn-outline" id="preview-download" type="button">Download original PDF</button>
-  </div>
-  <a href="/dashboard" class="btn btn-outline" style="margin-top:12px">Open your dashboard</a>
-
-  <div class="card" id="sign-result" hidden style="margin-top:24px">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Signed</div></div>
-    <div class="card-body">
-      <div class="file-name" id="sign-result-name"></div>
-      <div class="file-size" id="sign-result-meta"></div>
-      <div class="btn-row" style="margin-top:14px">
-        <button class="btn" id="sign-download-pdf" type="button">Download signed PDF</button>
-        <button class="btn btn-outline" id="sign-download-psign" type="button">Download .psign envelope</button>
-      </div>
-      <p class="sub" style="margin-top:12px;font-size:11px">
-        Recipients can verify the envelope at <a href="/verify">/verify</a>.
-      </p>
-    </div>
+    </details>
   </div>
 </div>
 
 <!-- Burned / already used -->
 <div class="step" id="step-burned">
   <span class="burned-icon" style="margin-top:16px">&#x1F525;</span>
-  <p class="burned-msg">This file has already been downloaded and burned.</p>
-  <p class="burned-sub">Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay.</p>
-  <a href="/dashboard" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Open your dashboard</a>
+  <p class="burned-msg">Dit bestand is al gedownload en daarna gewist.</p>
+  <p class="burned-sub">Een link van Paramant werkt maar één keer. Na de download is het bestand voorgoed van onze server verwijderd.</p>
+  <a href="/dashboard" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Naar uw overzicht</a>
+</div>
+
+<!-- A link that did not arrive whole: wrong token shape, no key after #. -->
+<div class="step" id="step-invalid">
+  <h1>Deze link is ongeldig of onvolledig.</h1>
+  <p class="sub">Misschien is er bij het kopiëren een stuk afgevallen. Open hem opnieuw vanuit het bericht dat u kreeg, of plak hier de hele link.</p>
+  <a href="/get" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Link plakken</a>
 </div>
 
 <!-- Error -->
 <div class="step" id="step-error">
-  <h1>Something went wrong</h1>
-  <p class="sub">The link may be expired, invalid, or already used.</p>
+  <h1>Er ging iets mis</h1>
+  <p class="sub">De link is misschien verlopen, ongeldig of al gebruikt.</p>
   <div class="card">
-    <div class="card-head"><div class="dot red"></div><div class="card-head-title">Error</div></div>
+    <div class="card-head"><div class="dot red"></div><div class="card-head-title">Fout</div></div>
     <div class="card-body">
       <div class="status-line err" id="error-msg"></div>
     </div>
   </div>
-  <a href="/dashboard" class="btn btn-outline">Open your dashboard</a>
+  <a href="/dashboard" class="btn btn-outline">Naar uw overzicht</a>
 </div>
 
 </main>
+<p class="lang-switch" style="max-width:580px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/en/get" hreflang="en" lang="en" style="color:var(--ink)">This page in English</a></p>
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
-<script type="module" src="/vendor/parasign-bridge.js"></script>
-<script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script>
-const RELAY = 'https://health.paramant.app';
-
-function showStep(id) {
-  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-function setStatus(msg, pct) {
-  var ind = document.getElementById('indeterminate-bar');
-  var wrap = document.getElementById('progress-wrap');
-  if (pct > 0) {
-    if (ind)  ind.hidden = true;
-    if (wrap) wrap.hidden = false;
-    document.getElementById('pbar').style.width = pct + '%';
-  } else {
-    if (ind)  ind.hidden = false;
-    if (wrap) wrap.hidden = true;
-  }
-  document.getElementById('status-msg').textContent = msg;
-}
-
-function setTitle(t) {
-  document.getElementById('loading-title').textContent = t;
-}
-
-function showError(msg) {
-  document.getElementById('error-msg').textContent = msg;
-  showStep('step-error');
-}
-
-function fromB64url(s) {
-  try {
-    const b64 = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=');
-    const bin = atob(b64);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  } catch { return null; }
-}
-
-function formatSize(n) {
-  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
-  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
-  return n + ' B';
-}
-
-async function waitForPdfjs() {
-  if (window.__pdfjsLib) return window.__pdfjsLib;
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('PDF.js failed to load')), 10000);
-    window.addEventListener('pdfjs:ready', () => { clearTimeout(t); resolve(window.__pdfjsLib); }, { once: true });
-  });
-}
-
-// Cache the decrypted PDF bytes + filename so the sign-mode can re-use them
-// without going back to the relay (which has burned its copy by now).
-let __pdfBytes = null;
-let __pdfFilename = '';
-
-async function renderPdfPreview(bytes, name) {
-  __pdfBytes = bytes;
-  __pdfFilename = name;
-
-  const pdfjs = await waitForPdfjs();
-  // PDF.js mutates the input buffer. Pass a copy so the original stays intact
-  // for the download-original and sign-stamp paths.
-  const copy = new Uint8Array(bytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
-
-  const container = document.getElementById('preview-canvas-list');
-  container.innerHTML = '';
-  const MAX_PAGES = Math.min(pdf.numPages, 30);
-  for (let i = 1; i <= MAX_PAGES; i++) {
-    const page = await pdf.getPage(i);
-    const baseViewport = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(840, Math.floor(window.innerWidth * 0.9));
-    const scale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale });
-    const wrap = document.createElement('div');
-    wrap.className = 'page-wrap';
-    wrap.dataset.pageIndex = String(i - 1);
-    wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    wrap.appendChild(canvas);
-    container.appendChild(wrap);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-  }
-
-  document.getElementById('preview-filename').textContent = name;
-  document.getElementById('preview-pagecount').textContent =
-    pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
-    (pdf.numPages > MAX_PAGES ? ' (showing first ' + MAX_PAGES + ')' : '');
-  document.getElementById('preview-filesize').textContent = formatSize(bytes.length);
-
-  const dlBtn = document.getElementById('preview-download');
-  dlBtn.onclick = () => downloadBytes(bytes, name, 'application/pdf');
-
-  const signBtn = document.getElementById('preview-sign');
-  if (signBtn) signBtn.onclick = enterSignMode;
-}
-
-function downloadBytes(bytes, name, mime) {
-  const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
-}
-
-// ====================================================================
-// Sign-mode (Model 1: recipient signs the document they just received).
-// Zero-knowledge: relay never sees the document or the new signature.
-// ML-DSA-65 + SHA3-256 produced locally via /vendor/paramant-pqc.js.
-// ====================================================================
-
-const STAMP_PDF_W = 200;
-const STAMP_PDF_H = 70;
-
-let __stampState = null;     // { pageIndex, x, y, w, h } in PDF points
-let __signerKey  = null;     // { secretKey, publicKey } Uint8Arrays
-
-function toHex(u8) {
-  let s = '';
-  for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0');
-  return s;
-}
-
-function toB64(u8) {
-  let s = '';
-  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
-  return btoa(s);
-}
-
-async function waitForParasign() {
-  if (window.__parasign) return window.__parasign;
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('Signing library failed to load')), 10000);
-    window.addEventListener('parasign:ready', () => { clearTimeout(t); resolve(window.__parasign); }, { once: true });
-  });
-}
-
-async function waitForPdfLib() {
-  if (window.PDFLib) return window.PDFLib;
-  // pdf-lib is loaded with `defer` so it should be present after DOMContentLoaded.
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const tick = () => {
-      if (window.PDFLib) return resolve(window.PDFLib);
-      if (Date.now() - start > 10000) return reject(new Error('pdf-lib failed to load'));
-      setTimeout(tick, 50);
-    };
-    tick();
-  });
-}
-
-async function enterSignMode() {
-  document.getElementById('sign-toolbar').hidden = false;
-  document.getElementById('sign-disclaimer').hidden = false;
-  document.getElementById('sign-form').hidden = true;
-  document.getElementById('sign-hint').textContent = 'Click on the page where you want to place your signature.';
-  document.querySelectorAll('.page-wrap').forEach(wrap => {
-    wrap.classList.add('placing');
-    wrap.addEventListener('click', onPlaceClick);
-  });
-  document.getElementById('preview-actions').style.display = 'none';
-
-  // Populate key sources from vault (if any keys exist).
-  try {
-    const p = await waitForParasign();
-    if (await p.vaultAvailable()) {
-      const sel = document.getElementById('signer-key-src');
-      const items = await p.vaultList();
-      for (const it of items) {
-        const opt = document.createElement('option');
-        opt.value = 'vault:' + it.id;
-        opt.textContent = 'Vault: ' + (it.label || (it.pk_hash || '').slice(0, 12));
-        sel.appendChild(opt);
-      }
-    }
-  } catch {}
-
-  document.getElementById('sign-cancel').onclick = exitSignMode;
-  document.getElementById('sign-move').onclick = () => {
-    clearStampMarker();
-    document.getElementById('sign-form').hidden = true;
-    document.getElementById('sign-hint').textContent = 'Click again to reposition the signature.';
-    document.querySelectorAll('.page-wrap').forEach(wrap => {
-      wrap.classList.add('placing');
-      wrap.addEventListener('click', onPlaceClick);
-    });
-  };
-  document.getElementById('sign-confirm').onclick = confirmSign;
-}
-
-function exitSignMode() {
-  document.getElementById('sign-toolbar').hidden = true;
-  document.getElementById('sign-disclaimer').hidden = true;
-  document.getElementById('preview-actions').style.display = '';
-  clearStampMarker();
-  document.querySelectorAll('.page-wrap').forEach(wrap => {
-    wrap.classList.remove('placing');
-    wrap.removeEventListener('click', onPlaceClick);
-  });
-  __stampState = null;
-}
-
-function clearStampMarker() {
-  document.querySelectorAll('.stamp-marker').forEach(el => el.remove());
-}
-
-function onPlaceClick(e) {
-  const wrap = e.currentTarget;
-  const canvas = wrap.querySelector('canvas');
-  const rect = canvas.getBoundingClientRect();
-  const ratio = wrap._pdfPage.width / rect.width;   // pdf-points per displayed pixel
-  const pxX = e.clientX - rect.left;
-  const pxY = e.clientY - rect.top;
-  const stampPxW = STAMP_PDF_W / ratio;
-  const stampPxH = STAMP_PDF_H / ratio;
-  const left = Math.max(0, Math.min(rect.width  - stampPxW, pxX - stampPxW / 2));
-  const top  = Math.max(0, Math.min(rect.height - stampPxH, pxY - stampPxH / 2));
-  const pdfX = left * ratio;
-  const pdfYTop = top * ratio;
-  // pdf-lib uses bottom-left origin in PDF points.
-  const pdfYBottom = wrap._pdfPage.height - pdfYTop - STAMP_PDF_H;
-  __stampState = {
-    pageIndex: wrap._pdfPage.index,
-    x: pdfX, y: pdfYBottom, w: STAMP_PDF_W, h: STAMP_PDF_H
-  };
-  clearStampMarker();
-  renderStampMarker(wrap, left, top, stampPxW, stampPxH);
-  // Stop placing-mode until the user clicks Move.
-  document.querySelectorAll('.page-wrap').forEach(w => {
-    w.classList.remove('placing');
-    w.removeEventListener('click', onPlaceClick);
-  });
-  document.getElementById('sign-form').hidden = false;
-  document.getElementById('sign-hint').textContent = 'Signature position selected on page ' + (wrap._pdfPage.index + 1) + '. Fill in your name and confirm.';
-}
-
-function renderStampMarker(wrap, left, top, w, h) {
-  const m = document.createElement('div');
-  m.className = 'stamp-marker';
-  m.style.left = left + 'px';
-  m.style.top  = top  + 'px';
-  m.style.width  = w + 'px';
-  m.style.height = h + 'px';
-  const name = (document.getElementById('signer-name').value || 'Signer').slice(0, 40);
-  m.innerHTML =
-    '<div class="sm-name">Signed by ' + escapeHtml(name) + '</div>' +
-    '<div class="sm-meta">' + new Date().toISOString().slice(0, 10) + '</div>' +
-    '<div class="sm-meta">PQ key: pending</div>' +
-    '<div class="sm-pqtag">PARAMANT - PQ</div>';
-  wrap.appendChild(m);
-}
-
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-async function ensureSignerKey() {
-  const sel = document.getElementById('signer-key-src').value;
-  const p = await waitForParasign();
-  if (sel === 'ephemeral') {
-    const seed = crypto.getRandomValues(new Uint8Array(32));
-    const kp = p.ml_dsa65.keygen(seed);
-    __signerKey = { secretKey: kp.secretKey, publicKey: kp.publicKey };
-    return __signerKey;
-  }
-  if (sel.startsWith('vault:')) {
-    const id = parseInt(sel.slice('vault:'.length), 10);
-    const pass = prompt('Passphrase to unlock the vault key:');
-    if (!pass) throw new Error('Vault unlock cancelled');
-    const unlocked = await p.vaultUnlock(id, pass);
-    __signerKey = { secretKey: unlocked.secretKey, publicKey: unlocked.publicKey };
-    return __signerKey;
-  }
-  throw new Error('Unsupported key source');
-}
-
-async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
-  const PDFLib = await waitForPdfLib();
-  const pdfDoc = await PDFLib.PDFDocument.load(origBytes);
-  const page = pdfDoc.getPages()[stamp.pageIndex];
-  const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-  const navy = PDFLib.rgb(0.043, 0.227, 0.416);
-  const dim  = PDFLib.rgb(0.3, 0.3, 0.3);
-
-  page.drawRectangle({
-    x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h,
-    borderColor: navy, borderWidth: 1.2,
-    color: navy, opacity: 0.04
-  });
-  const padding = 6;
-  let yCursor = stamp.y + stamp.h - padding - 8;
-  page.drawText('Signed by ' + signerName, { x: stamp.x + padding, y: yCursor, size: 9, font: fontBold, color: navy });
-  yCursor -= 12;
-  page.drawText(dateStr, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
-  yCursor -= 10;
-  page.drawText('PQ key: ' + fingerprint8, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
-  page.drawText('PARAMANT - PQ', { x: stamp.x + stamp.w - 66, y: stamp.y + 4, size: 6, font: fontBold, color: navy });
-
-  return await pdfDoc.save();
-}
-
-async function confirmSign() {
-  if (!__stampState) return;
-  const name = (document.getElementById('signer-name').value || '').trim();
-  if (!name) { document.getElementById('sign-hint').textContent = 'Please enter your name.'; return; }
-
-  document.getElementById('sign-hint').textContent = 'Signing in browser (ML-DSA-65)...';
-  document.getElementById('sign-confirm').disabled = true;
-
-  try {
-    const p = await waitForParasign();
-    const key = await ensureSignerKey();
-    const fingerprint = toHex(p.sha3_256(key.publicKey)).slice(0, 16);
-    const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
-
-    const stampedPdfBytes = await buildStampedPdf(__pdfBytes, __stampState, name, dateStr, fingerprint);
-    const origHash = p.sha3_256(__pdfBytes);
-    const stampedHash = p.sha3_256(stampedPdfBytes);
-
-    const coords = { pageIndex: __stampState.pageIndex, x: __stampState.x, y: __stampState.y, w: __stampState.w, h: __stampState.h, name, date: dateStr };
-    const coordsBytes = new TextEncoder().encode(JSON.stringify(coords));
-
-    const msg = new Uint8Array(origHash.length + stampedHash.length + coordsBytes.length);
-    msg.set(origHash, 0);
-    msg.set(stampedHash, origHash.length);
-    msg.set(coordsBytes, origHash.length + stampedHash.length);
-
-    const signature = p.ml_dsa65.sign(key.secretKey, msg);
-
-    const envelope = {
-      version: 'parasign-visual-1',
-      algorithm: 'ML-DSA-65',
-      hash_algorithm: 'SHA3-256',
-      original_filename: __pdfFilename,
-      stamped_filename: 'signed-' + __pdfFilename,
-      original_hash: toHex(origHash),
-      stamped_hash: toHex(stampedHash),
-      coords,
-      signer_public_key: toB64(key.publicKey),
-      signer_pk_fingerprint: fingerprint,
-      signature: toB64(signature),
-      signed_at: dateStr,
-      disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.'
-    };
-
-    const stampedName = 'signed-' + __pdfFilename;
-    const psignName = stampedName.replace(/\.pdf$/i, '') + '.psign';
-
-    document.getElementById('sign-result').hidden = false;
-    document.getElementById('sign-result-name').textContent = stampedName;
-    document.getElementById('sign-result-meta').textContent = formatSize(stampedPdfBytes.length) + ' - ML-DSA-65 - fingerprint ' + fingerprint;
-    document.getElementById('sign-download-pdf').onclick = () => downloadBytes(stampedPdfBytes, stampedName, 'application/pdf');
-    document.getElementById('sign-download-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(envelope, null, 2)), psignName, 'application/json');
-
-    document.getElementById('sign-hint').textContent = 'Signed. Download the stamped PDF and the .psign envelope below.';
-  } catch (e) {
-    document.getElementById('sign-hint').textContent = 'Signing failed: ' + (e.message || e);
-    document.getElementById('sign-confirm').disabled = false;
-  }
-}
-
-function goReceive() {
-  const el = document.getElementById('enter-link');
-  const errEl = document.getElementById('enter-err');
-  if (errEl) errEl.textContent = '';
-  const v = (el && el.value || '').trim();
-  if (!v) return;
-  try { location.href = new URL(v, location.origin).href; }
-  catch { if (errEl) errEl.textContent = 'That does not look like a valid receive link.'; }
-}
-
-async function init() {
-  const params = new URLSearchParams(location.search);
-  const token = params.get('t');
-  const fragment = location.hash.slice(1);
-
-  if (!token && !fragment) {
-    showStep('step-enter');
-    return;
-  }
-  if (!token || !fragment) {
-    showError('Invalid link — missing download token or encryption key.');
-    return;
-  }
-
-  // Decode key+iv from fragment (44 bytes: first 32 = AES key, next 12 = IV)
-  const keyIv = fromB64url(fragment);
-  if (!keyIv || keyIv.length < 44) {
-    showError('Invalid link — encryption key is malformed or truncated.');
-    return;
-  }
-  const rawKey = keyIv.slice(0, 32);
-  const iv = keyIv.slice(32, 44);
-
-  try {
-    setTitle('Importing key...');
-    setStatus('Importing decryption key...', 10);
-    const aesKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
-
-    setTitle('Downloading...');
-    setStatus('Downloading encrypted file from relay...', 30);
-
-    const r = await fetch(RELAY + '/v2/dl/' + token + '/get', {
-      signal: AbortSignal.timeout(60000),
-    });
-
-    if (r.status === 410 || r.status === 404) {
-      showStep('step-burned');
-      return;
-    }
-    if (!r.ok) {
-      throw new Error('Download failed: HTTP ' + r.status);
-    }
-
-    setTitle('Decrypting...');
-    setStatus('Decrypting with AES-256-GCM...', 65);
-
-    const ciphertext = await r.arrayBuffer();
-    let plaintext;
-    try {
-      plaintext = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ciphertext));
-    } catch {
-      showError('Decryption failed. The link may be corrupted or tampered with.');
-      return;
-    }
-
-    // Parse header: [uint32-LE nameLen][nameBytes][fileBytes]
-    if (plaintext.length < 4) throw new Error('Decrypted payload too short');
-    const nameLen = new DataView(plaintext.buffer).getUint32(0, true);
-    if (plaintext.length < 4 + nameLen) throw new Error('Decrypted payload header corrupt');
-    const filename = new TextDecoder().decode(plaintext.slice(4, 4 + nameLen)) || 'download';
-    const fileData = plaintext.slice(4 + nameLen);
-
-    // Detect PDF via magic bytes (%PDF). No header schema change required.
-    const isPdf = fileData.length >= 4 &&
-                  fileData[0] === 0x25 && fileData[1] === 0x50 &&
-                  fileData[2] === 0x44 && fileData[3] === 0x46;
-
-    if (isPdf) {
-      setStatus('Rendering PDF in browser...', 90);
-      try {
-        await renderPdfPreview(fileData, filename);
-        setStatus('Done.', 100);
-        showStep('step-preview');
-        return;
-      } catch (e) {
-        // Fall through to download if preview fails for any reason.
-        setStatus('Preview unavailable, downloading instead...', 95);
-      }
-    }
-
-    setStatus('Saving file...', 90);
-
-    // Trigger browser download (non-PDF path, or PDF preview fallback)
-    const blob = new Blob([fileData]);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
-
-    setStatus('Done.', 100);
-
-    document.getElementById('done-filename').textContent = filename;
-    document.getElementById('done-filesize').textContent = formatSize(fileData.length);
-    showStep('step-done');
-
-  } catch (e) {
-    showError(e.message || 'Unknown error');
-  }
-}
-
-window.addEventListener('DOMContentLoaded', init);
-</script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
+<script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
+<script src="/js/delegate.js?v=1" defer></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/get.page.js?v=6" defer></script>
 </body>
 </html>

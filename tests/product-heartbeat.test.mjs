@@ -1,0 +1,300 @@
+// Product heartbeat: does the site still DO anything, in a real browser.
+//
+// Three breaks shipped silently in July 2026 and none of them was caught by a
+// test, because all three failed in the browser and nowhere else:
+//
+//   042b4c5 (07-02)  CSP extraction moved inline code into js/. A relative
+//                    import moved with it and 404'd. Sending a file was dead
+//                    for three weeks.
+//   before 7da4e39   Three pages loaded a module as a classic script. The
+//                    browser rejected the file as a SyntaxError and ran none
+//                    of it. Sending, receiving and the account page were dead.
+//   PR 278 (07)      Signup died on a CSP-blocked inline script.
+//
+// Every one of them is invisible to a Node test suite and loud in a browser
+// console. So this suite opens each page in Chromium and fails on:
+//
+//   1. any uncaught page error (SyntaxError, ReferenceError, ...)
+//   2. any console error, including CSP refusals
+//   3. any failed request for one of our own static assets (a 404 on a script,
+//      stylesheet, module import or wasm blob)
+//   4. a per-page heartbeat: the one global that proves the page's core
+//      machinery actually initialised
+//
+// Rules 1-3 need no maintenance and cover features nobody wrote a check for.
+// Rule 4 is where a product owner states what "alive" means for a page.
+//
+// Local  : node tests/product-heartbeat.test.mjs          (serves frontend/)
+// Prod   : PARAMANT_BASE_URL=https://paramant.app node tests/product-heartbeat.test.mjs
+// CI     : npx playwright install --with-deps chromium, then as local.
+import { chromium } from 'playwright';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
+const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
+const MIME = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.json':'application/json','.wasm':'application/wasm','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2','.ico':'image/x-icon' };
+
+// A page is alive when its core machinery left something behind on window.
+// Keep this list short and mean it: every entry is a promise to the user.
+const PAGES = [
+  {
+    url: '/parashare.html',
+    what: 'ParaSend, sending a file',
+    // parashare.page.js:304 refuses to encrypt without this. It was undefined
+    // on production from 2026-07-02 until 2026-07-26.
+    heartbeat: () => typeof window._cryptoBridge?.encryptBlob === 'function',
+    because: 'window._cryptoBridge.encryptBlob is missing, so the send aborts with "WASM crypto module not loaded"',
+    progressNote: 'encryption only starts once a signed-in user picks a file. The real path is covered end to end by scripts/heartbeat/parasend.mjs, which pushes a file through the live relay every hour and keeps the hashes as evidence.',
+  },
+  {
+    url: '/ontvang.html',
+    what: 'ParaSend, receiving a file',
+    // A well-formed token that no relay will accept. Enough to make the page
+    // run its real client-side work: generate the keypair and show the
+    // fingerprint. Whether the relay then knows the token is not our business
+    // here.
+    query: '?s=inv_00000000000000000000000000000000',
+    heartbeat: () => typeof window._cryptoBridge?.decryptBlob === 'function',
+    because: 'window._cryptoBridge.decryptBlob is missing, so ontvang.page.js throws "WASM crypto bridge not ready"',
+    // The globals above were all present on 2026-07-28 while the page sat on
+    // "Generating keypair..." forever: a lost readiness event meant init() was
+    // never called. Loaded is not the same as working, so this asserts the user
+    // actually gets somewhere.
+    progress: () => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test(document.getElementById('fp-display')?.textContent?.trim() || ''),
+    stuck: 'keygen never completed: no fingerprint on screen, so receiving a file is dead',
+  },
+  // Measured on production 2026-07-28: of the remaining pages, only /sign
+  // changes anything on screen after load. The others render their content from
+  // the HTML and only start doing work once the user acts, so a progress check
+  // there would assert a thing the page was never going to do. That is stated
+  // per page rather than left blank — see the coverage test below.
+  {
+    url: '/index.html',
+    what: 'homepage',
+    progressNote: 'static content, no load-time work to observe. The stuck-text rule below still applies.',
+  },
+  {
+    url: '/pricing.html',
+    what: 'pricing, the paid funnel',
+    progressNote: 'prices are in the HTML. The plan buttons go to checkout, which a heartbeat must not click.',
+  },
+  {
+    url: '/signup.html',
+    what: 'signup',
+    progressNote: 'the proof-of-work captcha only fetches its challenge on submit, and submitting would create an account on production every hour. Covered by tests/e2e-auth-flow.sh.',
+  },
+  {
+    url: '/sign.html',
+    what: 'ParaSign',
+    // The page asks the relay which signing key you have and rewrites this line
+    // with the answer. It is the same shape as the account page that sat on
+    // "Checking your account..." forever before 7da4e39, so it is exactly the
+    // kind of line that hangs.
+    progress: () => {
+      const t = document.getElementById('ds-signing-identity')?.textContent?.trim() || '';
+      return t.length > 0 && !/^checking\b/i.test(t);
+    },
+    stuck: 'the signing identity line never resolved, so the page is still asking the relay who you are',
+  },
+  {
+    url: '/verify.html',
+    what: 'signature verification',
+    progressNote: 'verification needs a .psign file dropped in. Covered by tests/parasign-multi-verify.test.mjs.',
+  },
+];
+
+// Only our own static assets. A 401 on /api/* without a session is correct
+// behaviour, not a break, and third party hosts are not ours to police.
+const OUR_ASSET = /\.(js|mjs|css|wasm|woff2?|svg|png|webp|ico)(\?|$)/i;
+
+// A page that finished loading must not still be telling the user to wait. This
+// runs on EVERY page, needs no per-page knowledge, and covers pages nobody has
+// written a progress check for — including ones added after this was written.
+//
+// It is the shape all four July 2026 breaks had in common: the page ends up
+// parked on a status line while its console stays clean. "Generating
+// keypair..." (/ontvang, 26 days) and "Checking your account..." (account page,
+// before 7da4e39) would both have been caught here.
+//
+// Deliberately verbs, not punctuation: an em dash or a bare "-" is a normal
+// empty-value placeholder in a table and says nothing about being stuck.
+const STUCK_TEXT = /\b(loading|checking|generating|verifying|connecting|initialising|initializing|please wait)\b[^.!?]*(\.\.\.|…)\s*$/i;
+
+async function stuckOnScreen(tab) {
+  return tab.evaluate((src) => {
+    const re = new RegExp(src.slice(1, src.lastIndexOf('/')), 'i');
+    const found = [];
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.children.length) continue;                  // leaf nodes only
+      if (!el.offsetParent) continue;                    // must be visible
+      const t = (el.textContent || '').trim();
+      if (t && t.length <= 80 && re.test(t)) found.push(`${el.id ? '#' + el.id : el.tagName.toLowerCase()}: "${t}"`);
+    }
+    return found;
+  }, STUCK_TEXT.toString());
+}
+
+const BASE = process.env.PARAMANT_BASE_URL?.replace(/\/$/, '');
+let server = null;
+let origin = BASE;
+
+if (!BASE) {
+  server = http.createServer((req, res) => {
+    const p = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    const base = path.join(ROOT, p);
+    if (!base.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
+    // Production serves /auth/login from auth/login.html. Without the same
+    // extension-less resolution here, a link that works locally can still 404
+    // for the visitor, and the reverse. Try what nginx tries, in that order.
+    const file = [base, base + '.html', path.join(base, 'index.html')]
+      .find((f) => f.startsWith(ROOT) && fs.existsSync(f) && fs.statSync(f).isFile());
+    if (!file) { res.writeHead(404); return res.end(); }
+    fs.readFile(file, (e, b) => {
+      if (e) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+      res.end(b);
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  origin = `http://127.0.0.1:${server.address().port}`;
+}
+
+const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePath: EXE } : {}) });
+
+test.after(async () => {
+  await browser.close();
+  server?.close();
+});
+
+for (const page of PAGES) {
+  test(`${page.url} — ${page.what}`, async () => {
+    const ctx = await browser.newContext();
+    const tab = await ctx.newPage();
+    const problems = [];
+
+    tab.on('pageerror', (e) => problems.push(`uncaught ${e.message}`));
+    // "Failed to load resource" carries no url, so it is useless on its own and
+    // duplicates what the response handler below reports with a path. Every
+    // other console error is kept, CSP refusals included.
+    tab.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      if (/^Failed to load resource/.test(m.text())) return;
+      problems.push(`console: ${m.text()}`);
+    });
+    tab.on('requestfailed', (r) => {
+      if (OUR_ASSET.test(r.url()) && new URL(r.url()).origin === new URL(origin).origin) {
+        problems.push(`request failed ${r.url()} (${r.failure()?.errorText})`);
+      }
+    });
+    tab.on('response', (r) => {
+      if (r.status() >= 400 && OUR_ASSET.test(r.url()) && new URL(r.url()).origin === new URL(origin).origin) {
+        problems.push(`HTTP ${r.status()} on our own asset ${new URL(r.url()).pathname}`);
+      }
+    });
+
+    // A page with a progress check opens a relay connection and keeps polling,
+    // so it never goes network-idle. The request and response handlers above
+    // stay attached either way, and the progress poll below keeps the page open
+    // long enough for a late 404 to still be caught.
+    const settled = page.progress ? 'load' : 'networkidle';
+    const resp = await tab.goto(origin + page.url + (page.query || ''), { waitUntil: settled, timeout: 45000 });
+    assert.ok(resp?.ok(), `${page.url} did not load: HTTP ${resp?.status()}`);
+    await tab.waitForTimeout(1200);   // let deferred modules and wasm settle
+
+    if (page.heartbeat) {
+      const alive = await tab.evaluate(page.heartbeat);
+      assert.ok(alive, `${page.what} is dead: ${page.because}`);
+    }
+
+    // Rule 5: does the page get the user anywhere? Every global can be present
+    // and correct while the page does nothing at all, which is precisely how
+    // /ontvang hung for three weeks. Poll rather than sleep: keygen is fast on a
+    // laptop and slow on a loaded CI runner.
+    if (page.progress) {
+      const moved = await tab.waitForFunction(page.progress, null, { timeout: 25000, polling: 250 })
+        .then(() => true).catch(() => false);
+      assert.ok(moved, `${page.what} does not work: ${page.stuck}`);
+    }
+
+    // Rule 6: nobody is left staring at a "...". Applies to every page, with or
+    // without a progress check of its own.
+    const stuck = await stuckOnScreen(tab);
+    assert.deepEqual(stuck, [],
+      `\n  ${page.url} is still asking the user to wait after it finished loading:\n  ` +
+      stuck.join('\n  ') + `\n  Whatever should have replaced this text never ran.\n`);
+
+    // The relay is a separate host with its own gate (scripts/heartbeat/parasend.mjs),
+    // and the test token is deliberately one no relay will accept, so a refused
+    // socket to it says nothing about the frontend. Filtering this is only safe
+    // BECAUSE the progress check above already proved the page did its work.
+    const RELAY_NOISE = /wss?:\/\/[^ ]*relay\.paramant\.app|WebSocket connection to/;
+
+    // A console error the page recovers from is still a break waiting to be
+    // reported by a user, so it fails here too. Drop the noise, not the signal.
+    const real = problems.filter((p) => !/favicon|\/api\/|401|403|Failed to load resource: the server responded with a status of 40[13]/.test(p) && !RELAY_NOISE.test(p));
+    assert.deepEqual(real, [], `\n  ${page.url}\n  ${real.join('\n  ')}\n`);
+
+    await ctx.close();
+  });
+}
+
+// The paid funnel is the one page where "it loaded fine" is worth nothing. On
+// 2026-08-08 /pricing.html passed every rule above while both ways out of it
+// were dead: the six static hrefs were Mollie payment links that all returned
+// 404, and pricing-billing.js sent signed-out visitors to /login, which does
+// not exist either (the page is /auth/login). Anyone who wanted to pay hit an
+// error page, and the suite stayed green because nothing on /pricing itself
+// was broken. So follow the buttons out of the page, not just into it.
+test('/pricing.html — every way out of the paid funnel exists', async () => {
+  const ctx = await browser.newContext();
+  const tab = await ctx.newPage();
+  await tab.goto(origin + '/pricing.html', { waitUntil: 'load', timeout: 45000 });
+
+  // Route 1: the href, which is what a visitor without JS follows.
+  const hrefs = await tab.$$eval('a[data-billing-product]', (els) =>
+    els.map((e) => e.getAttribute('href')).filter(Boolean));
+  assert.ok(hrefs.length >= 1, 'no price buttons found on /pricing.html at all');
+
+  // Route 2: where the script sends a signed-out visitor. Read it from the
+  // source rather than clicking: the click needs a real 401 from the relay,
+  // which a local run cannot produce, and this must hold in both modes.
+  const src = await (await fetch(origin + '/js/pricing-billing.js')).text();
+  const jump = [...src.matchAll(/location\.href\s*=\s*['"]([^'"]+)['"]/g)]
+    .map((m) => m[1].replace(/['"]?\s*\+.*$/, ''))     // strip the concatenated next= tail
+    .filter((u) => u.startsWith('/'));
+  assert.ok(jump.length >= 1, 'pricing-billing.js no longer redirects anywhere; has the flow changed?');
+
+  const dead = [];
+  for (const target of [...new Set([...hrefs, ...jump])]) {
+    const url = target.startsWith('http') ? target : origin + target;
+    // Same-origin targets resolve like any page; an external one (a payment
+    // provider) has to answer for itself. Either way, 4xx means the visitor
+    // is looking at an error page instead of paying.
+    const status = await fetch(url, { redirect: 'follow' })
+      .then((r) => r.status).catch((e) => `unreachable (${e.message})`);
+    if (typeof status !== 'number' || status >= 400) dead.push(`${target} -> ${status}`);
+  }
+  assert.deepEqual(dead, [],
+    `\n  A price button leads nowhere:\n  ` + dead.join('\n  ') +
+    `\n  Every route out of /pricing must reach a real page, with or without JS.\n`);
+
+  await ctx.close();
+});
+
+// Coverage, stated out loud. A page with neither a progress check nor a written
+// reason is a page nobody decided about, and that silence is what let /ontvang
+// stay broken for 26 days behind a green suite. Adding a page to PAGES now
+// forces the question.
+test('every page either checks progress or says why it does not', () => {
+  const undecided = PAGES.filter((p) => !p.progress && !p.progressNote).map((p) => p.url);
+  assert.deepEqual(undecided, [],
+    `\n  These pages have no progress check and no note explaining why:\n  ` +
+    undecided.join('\n  ') +
+    `\n\n  Add progress+stuck if the page does load-time work the user waits on,\n` +
+    `  or progressNote saying where that work is covered instead.\n`);
+});

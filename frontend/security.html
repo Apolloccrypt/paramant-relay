@@ -1,20 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Security — PARAMANT</title>
-<meta name="description" content="How PARAMANT approaches security: post-quantum crypto, independent audit, responsible disclosure, relay architecture.">
-<meta property="og:title" content="Security — PARAMANT">
-<meta property="og:description" content="How PARAMANT approaches security: post-quantum crypto, independent audit, responsible disclosure, relay architecture.">
+<title>Beveiliging · Wat u krijgt en zelf kunt nakijken · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V.">
+<meta property="og:title" content="Beveiliging · Wat u krijgt en zelf kunt nakijken · Paramant">
+<meta property="og:description" content="Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V.">
 <meta property="og:url" content="https://paramant.app/security">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Security — PARAMANT">
-<meta name="twitter:description" content="How PARAMANT approaches security: post-quantum crypto, independent audit, responsible disclosure, relay architecture.">
+<meta name="twitter:title" content="Beveiliging · Wat u krijgt en zelf kunt nakijken · Paramant">
+<meta name="twitter:description" content="Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V.">
 <link rel="canonical" href="https://paramant.app/security">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/security">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/security">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/security">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -22,18 +29,24 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-.page-hero--navy{background:var(--navy);border-color:transparent}
-.page-hero--navy .eyebrow{background:var(--lime);color:var(--navy)}
-.page-hero--navy h1{color:var(--bone)}
-.page-hero--navy .lede{color:rgba(248,250,252,.8)}
+.page-hero--navy{background:var(--invert);border-color:transparent}
+.page-hero--navy .eyebrow{background:var(--lime);color: var(--on-ochre)}
+.page-hero--navy h1{color:var(--invert-ink)}
+.page-hero--navy .lede{color:rgba(255, 255, 255, .8)}
+.hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:20px}
+.page-hero--navy .btn-secondary{color:var(--invert-ink);border-color:rgba(255, 255, 255, .45)}
+.page-hero--navy .btn-secondary:hover{background:var(--bone);color:var(--navy);border-color:var(--invert-ink)}
+.hero-by{color:rgba(255, 255, 255, .7);font-size:var(--text-sm);line-height:1.7;margin-top:16px;max-width:620px}
 main{max-width:780px;margin:0 auto;padding:48px 48px 120px}
 h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
 .lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
+.page-hero-inner .lede + .lede{margin-top:18px;font-size:var(--text-base)}
 h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:56px}
 h3{font-size:var(--text-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
 p{color:var(--ink-dim);line-height:1.8;margin-bottom:16px;font-size:var(--text-base)}
@@ -45,7 +58,7 @@ em{color:var(--cobalt)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .stat-n{font-size:32px;font-weight:600;color:var(--ink);margin-bottom:4px}
 .stat-l{font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:.04em}
-.check{color:var(--ink);margin-right:8px}
+.check{color:var(--lime);margin-right:8px}
 .table{width:100%;border-collapse:collapse}
 .table th{text-align:left;padding:10px 14px;color:var(--ink-dim);font-weight:500;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--ink-hair)}
 .table td{padding:10px 14px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost);vertical-align:top;font-size:var(--text-sm)}
@@ -78,9 +91,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -91,26 +104,26 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -119,461 +132,414 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/security#webpage",
+      "url": "https://paramant.app/security",
+      "name": "Beveiliging · Wat u krijgt en zelf kunt nakijken · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V."
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<style>
+/* De Nederlandse beveiligingspagina: de certificeringszin staat bovenaan en
+   leest als de rest van de hero, met onderstreepte links op het donkere vlak. */
+.page-hero--navy .cert-lede{color:var(--invert-ink)}
+.page-hero--navy .lede a{color:var(--invert-ink);text-decoration:underline;text-underline-offset:3px}
+.tech-ref-note{font-size:var(--text-sm);color:var(--ink-dim)}
+.lang-switch{max-width:780px;margin:0 auto;padding:24px 16px;font-size:14px}
+.lang-switch a{color:var(--ink);text-decoration:underline}
+</style>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/security" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/security" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
-
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/security" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/security" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
+</div>
 <section class="page-hero page-hero--navy">
 <div class="page-hero-inner">
-  <span class="eyebrow">DEFENSE IN DEPTH</span>
-  <h1>Security</h1>
-  <p class="lede">We treat security as infrastructure, not a feature. Every component is designed assuming the relay is compromised. This page documents how, what was audited, and how to report issues.</p>
+  <span class="eyebrow">BEWIJS</span>
+  <h1>Beveiliging</h1>
+  <!-- Bovenaan, en eerlijk (besluit van 23-09-2026): wat Paramant niet heeft,
+       en direct daarna wat u wel krijgt. Elk van de drie dingen heeft een link
+       naar het stuk zelf, en tests/site-claims.test.mjs faalt als een van die
+       stukken verdwijnt. -->
+  <p class="lede cert-lede" id="certificering">Paramant is nog niet NEN 7510- of ISO 27001-gecertificeerd. Wel krijgt u: een <a href="/dpa">verwerkersovereenkomst</a>, servers in Duitsland (Hetzner, Neurenberg) en een <a href="/docs/security-audit-2026-04.md">extern auditrapport (april 2026)</a>. Voor uw eigen NEN 7510-dossier leveren wij de beheersmaatregelen aan.</p>
+  <p class="lede">Breekt iemand in op onze eigen server, dan kan hij de documenten daar nog steeds niet lezen: ze worden op uw apparaat versleuteld voordat ze het verlaten, en de sleutel komt nooit bij ons. Dat geldt voor de webapp om te versturen en voor de offici&euml;le SDK's. De browserextensies voor Chromium en Outlook versleutelen nog op onze server; wat u daarmee uploadt, kunnen wij lezen tot dat is aangepast.</p>
+  <p class="hero-by">Paramant is een product van Paramantis Solutions B.V. in Harderwijk, KvK 42115132. Elk plan krijgt dezelfde bescherming, ook het gratis Community-plan.</p>
+  <div class="hero-cta">
+    <a href="/pricing" class="btn btn-primary">Bekijk de prijzen &rarr;</a>
+    <a href="/verify" class="btn btn-secondary">Controleer een document &rarr;</a>
+  </div>
 </div>
 </section>
 
 <main id="main-content">
-
-  <h3>Core principle</h3>
-  <div class="card">
-    <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. It stores only ciphertext and has no access to keys or plaintext. A fully compromised relay cannot read, forge, or retroactively recover any transfer. This is not a policy — it is a cryptographic guarantee.</p>
+  <h2 id="why-trust" style="margin-top:0">Waarom u ons kunt vertrouwen</h2>
+  <p>Vier dingen dragen dit product. Bij elk staat wat het voor u betekent en waar u het zelf nakijkt.</p>
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Uw documenten blijven onder Europees recht</div>
+      <p style="margin:0 0 10px" data-partners-rollen>De servers staan bij Hetzner in Neurenberg, Duitsland, onder de AVG. Geen Amerikaanse partij op de route van uw bestanden: uw bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Daarom zeggen we dat geen Amerikaanse partij een bestand of een sleutel aanraakt, en niet dat er nergens een bestaat. De lijst met subverwerkers staat op <a href="/privacy">privacy</a>. Elke partij met haar status: <a href="/partners">/partners</a>.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="#jurisdiction">De tabel met rechtsgebieden &rarr;</a></p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">De sleutel blijft op uw apparaat</div>
+      <p style="margin:0 0 10px">De ondertekeningssleutel wordt in uw browser gemaakt en komt nooit op onze server. Voor een verzoek dat u in de browser maakt, houdt de server alleen versleutelde gegevens vast.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="/crypto-agility">Het overzicht van algoritmen &rarr;</a></p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Het bewijs overleeft de leverancier</div>
+      <p style="margin:0 0 10px">Elke handtekening komt in een openbaar logboek waar alleen iets bij kan, niets uit. Een getekend document is te controleren zonder contact met ons.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="/ct-log">Het logboek &rarr;</a> &nbsp; <a href="/verify">Controleer een document &rarr;</a></p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">U kunt de code lezen</div>
+      <p style="margin:0 0 10px">De server is source-available onder BUSL-1.1. U kunt precies lezen wat hij met uw bestand doet, en hem op uw eigen server draaien.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="https://github.com/Apolloccrypt/paramant-relay">De code op GitHub &rarr;</a></p>
+    </div>
   </div>
 
   <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
-    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Where the zero-knowledge guarantee holds today</div>
-    <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0) and the WebApp tools (ParaShare, ParaDrop), each of which encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
+    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Waar uw documenten heen gaan, is een juridische vraag geworden</div>
+    <p style="margin:0;line-height:1.8">In een strafzaak bij de rechtbank Rotterdam had een cli&euml;nt vertrouwelijke informatie in ChatGPT gezet. Het was de cli&euml;nt, niet de advocaat. Op 12 juni 2026 oordeelde de rechter-commissaris dat het invoeren van zulke informatie in een externe AI-dienst als openbaarmaking kan gelden, waardoor de informatie haar vertrouwelijke karakter verliest (<a href="https://uitspraken.rechtspraak.nl/details?id=ECLI:NL:RBROT:2026:9319" target="_blank" rel="noopener">ECLI:NL:RBROT:2026:9319</a>, gepubliceerd op 30 juli 2026). Dat is &eacute;&eacute;n rechter-commissaris in &eacute;&eacute;n zaak, zonder hoger beroep. Het is geen vaste rechtspraak. Het laat wel zien dat een rechter nu vraagt waar een document terechtkomt. Het antwoord van Paramant zit in de bouw, niet in een contract: het bestand wordt in uw browser versleuteld en de server heeft nooit een leesbare kopie. Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.</p>
   </div>
 
-  <p style="font-size:var(--text-sm);color:var(--ink-dim)">For the full audit history, patch timeline, and cryptographic architecture, see the <a href="/architecture">architecture page</a>.</p>
-
-  <hr class="divider">
-
-  <h2>Cryptography</h2>
-  <p>All algorithms are from NIST post-quantum standards (FIPS 203, 204, 205, 206) or established symmetric primitives. Nothing custom. No proprietary key exchange. The relay loads 3 KEMs and 18 signatures; clients choose, the relay validates, and the live registry is at <a href="/v2/capabilities"><code>/v2/capabilities</code></a>. See <a href="/crypto-agility">crypto agility</a> for the wire format and full algorithm table.</p>
-
-  <table class="table" style="margin-top:20px">
-    <thead>
-      <tr><th>Algorithm</th><th>Role</th><th>Standard</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>ML-KEM-768</td><td>Key encapsulation — post-quantum KEM</td><td>NIST FIPS 203</td></tr>
-      <tr><td>ECDH P-256</td><td>Classical key exchange (hybrid)</td><td>NIST SP 800-56A</td></tr>
-      <tr><td>HKDF-SHA256</td><td>Key derivation from shared secrets</td><td>RFC 5869</td></tr>
-      <tr><td>AES-256-GCM</td><td>Symmetric encryption + authentication</td><td>NIST SP 800-38D</td></tr>
-      <tr><td>ML-DSA-65</td><td>Digital signatures — relay identity</td><td>NIST FIPS 204</td></tr>
-      <tr><td>Argon2id</td><td>Password-based blob encryption</td><td>RFC 9106</td></tr>
-      <tr><td>SHA3-256</td><td>CT log Merkle hashing</td><td>NIST FIPS 202</td></tr>
-    </tbody>
-  </table>
-
-  <h3>Hybrid key exchange</h3>
-  <p>ParaShare authenticated transfers use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
-
-  <p style="margin-top:10px;font-size:var(--text-sm);color:var(--ink-dim)">See also: <a href="/hndl">Harvest Now, Decrypt Later &rarr;</a> — why data collected today can be decrypted at Q-Day, and how RAM-only transfer removes the target.</p>
-
-  <h3>Pre-shared secret (PSS)</h3>
-  <p>An optional out-of-band password added to HKDF input. Even a fully compromised relay cannot decrypt PSS-protected transfers — the relay would need to serve the correct ciphertext <em>and</em> know the PSS. Recommended for healthcare and legal workflows.</p>
-
-  <hr class="divider">
-
-  <h2>Relay architecture</h2>
-
-  <div class="grid2" style="margin-top:20px">
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">RAM-only storage</div>
-      <p style="margin:0">Encrypted blobs are stored in process memory, never written to disk. A relay restart destroys all blobs. No database, no filesystem writes.</p>
-    </div>
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Burn-on-read</div>
-      <p style="margin:0">Each blob is destroyed after the first successful download. Memory is zeroed immediately. There is no second chance to retrieve it.</p>
-    </div>
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">5 MB padding</div>
-      <p style="margin:0">ParaShare authenticated uploads are padded to a fixed 5 MB block for DPI masking. An observer on the network cannot infer file size, type, or content.</p>
-    </div>
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">ML-DSA-65 relay identity</div>
-      <p style="margin:0">Each relay generates a post-quantum signing keypair on first boot. Registrations are signed and logged in the CT chain — verified_since proves continuous identity.</p>
-    </div>
-  </div>
-
-  <h3>What a compromised relay cannot do</h3>
+  <h3 id="audits">Wat er is geaudit</h3>
   <div class="card">
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div><span class="check">&#10003;</span><span>Read file contents — relay holds only ciphertext, never keys</span></div>
-      <div><span class="check">&#10003;</span><span>Substitute a registered public key (after TOFU or PSS is used)</span></div>
-      <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext — no key access</span></div>
-      <div><span class="check">&#10003;</span><span>Identify ParaShare transfer size — authenticated transfers look identical (fixed 5 MB padding)</span></div>
-      <div><span class="check">&#10003;</span><span>Recover burned blobs — memory is zeroed immediately on download</span></div>
-      <div><span class="check">&#10003;</span><span>Forge CT log entries — Merkle chain is append-only and tamper-evident</span></div>
-      <div><span class="check">&#10003;</span><span>Break ML-KEM-768 — NIST FIPS 203, post-quantum secure</span></div>
-    </div>
+    <p style="margin:0 0 12px;line-height:1.8">Drie externe beveiligingsaudits in april 2026 hebben de code van de server bekeken: twee door R. Zwarts, een door Ryan Williams van Smart Cyber Solutions. Samen leverden ze 40 bevindingen op, waarvan 4 kritiek. Data, aantallen en de commit die elke reeks oploste, staan in de audittabel op de <a href="/docs#audits">docs-pagina</a>, en elke bevinding staat beschreven in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a> in de openbare code.</p>
+    <p style="margin:0;line-height:1.8">De review van Smart Cyber Solutions staat volledig online, bevinding voor bevinding, als het <a href="/docs/security-audit-2026-04.md">auditrapport van april 2026</a>. Wat niet gepubliceerd is, is de ruwe pentest-uitvoer erachter. Een volgende externe review van versie 3.0.0 is gepland.</p>
   </div>
 
-  <hr class="divider">
-
-  <hr class="divider">
-
-  <h2>Authentication</h2>
-  <p>Paramant has no passwords. Humans authenticate with email and a time-based code from an authenticator app. Machines authenticate with long-lived API keys. What we do not have, we cannot leak.</p>
-
-  <div class="grid2" style="margin-top:20px">
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For humans</div>
-      <p style="margin:0">Sign in at paramant.app or through a browser extension with your email address and the current 6-digit code from your authenticator app. Sessions last one hour. TOTP verification uses SHA-256 HMAC, matching the cryptographic posture of the transport layer. Compatible authenticator apps are listed at <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
-    </div>
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For machines</div>
-      <p style="margin:0">Scripts, SDK calls, SCADA integrations, and IoT devices authenticate with an API key in the X-Api-Key HTTP header. No TOTP, no sessions, no human interaction required. Suitable for headless automation.</p>
-    </div>
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">What we do not store</div>
-      <p style="margin:0">No passwords. No password hashes. No security questions. No password reset tokens. Our database cannot leak a password because our database does not have the concept of one.</p>
-    </div>
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Session security</div>
-      <p style="margin:0">After TOTP verification, a 256-bit session token is issued as an httpOnly Secure SameSite=Strict cookie. The token lives in Redis with a one-hour sliding expiry. API keys never touch the browser.</p>
-    </div>
-  </div>
-
-  <h3>Rate limiting and replay protection</h3>
-  <p>TOTP codes expire thirty seconds after issue. Each code can be used exactly once across the system, enforced atomically in Redis. Login attempts are rate-limited to five per IP per fifteen minutes and ten per email per fifteen minutes. After ten consecutive failures, an account locks for thirty minutes.</p>
-
-  <h3>Compared to alternatives</h3>
-  <p>Most encrypted file transfer services use password authentication with optional two-factor as an upgrade. Paramant reverses this. TOTP is required for human access from day one. The surface for credential theft is close to zero because there is nothing to phish, stuff, or reset.</p>
-
-  <p style="margin-top:12px">
-    <a href="/help/authenticator-setup">Setting up your authenticator &rarr;</a> &nbsp;
-    <a href="/help/api-key-vs-totp">When to use API key vs TOTP &rarr;</a> &nbsp;
-    <a href="/help/backup-codes">Backup codes &rarr;</a>
-  </p>
-
-  <h2>Four-layer key verification</h2>
-  <p>The relay distributes public keys. An attacker who controls the relay could serve wrong keys. These four layers prevent that:</p>
-
-  <table class="table" style="margin-top:20px">
-    <thead>
-      <tr><th>Layer</th><th>Mechanism</th><th>Protects against</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>1 — TOFU</td>
-        <td>First-use fingerprint stored locally. Every subsequent fetch must match.</td>
-        <td>Key swap after first contact</td>
-      </tr>
-      <tr>
-        <td>2 — Out-of-band</td>
-        <td>Both parties compute the same SHA-256 fingerprint and compare via phone/Signal/QR.</td>
-        <td>Relay MITM on first contact</td>
-      </tr>
-      <tr>
-        <td>3 — PSS</td>
-        <td>Pre-shared secret mixed into HKDF. Wrong key = undecryptable ciphertext.</td>
-        <td>Relay MITM at any time</td>
-      </tr>
-      <tr>
-        <td>4 — CT log + ML-DSA-65</td>
-        <td>Key registrations are signed and logged in Merkle chain. Retroactive injection is impossible.</td>
-        <td>Key injection, timestamp fraud</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <hr class="divider">
-
-  <h2>Jurisdiction &amp; privacy</h2>
+  <h3 id="nen7510">Voor uw NEN 7510-dossier</h3>
   <div class="card">
-    <table class="table">
+    <p style="margin:0">Wat er nu ligt: een NEN 7510-tabel in de <a href="/docs/dicom-guide.md">DICOM-handleiding</a> en een IEC 62443-tabel in de <a href="/docs/ot-guide.md">OT-handleiding</a>, openbaar en gratis op elk plan. Dat is documentatie voor uw eigen dossier, geen certificaat. Mail <a href="mailto:privacy@paramant.app?subject=NEN%207510">privacy@paramant.app</a> voor de beheersmaatregelen die u nodig heeft.</p>
+  </div>
+
+  <hr class="divider">
+  <div class="tech-ref">
+  <p class="tech-ref-note">Hieronder volgt de technische uitwerking, voor uw IT-leverancier of auditor.</p>
+  <h2 id="jurisdiction">Rechtsgebied en privacy</h2>
+  <div class="card" style="margin-bottom:14px;border-left:3px solid var(--cobalt)">
+    <p style="margin:0;line-height:1.8">Een Nederlands bedrijf is de eigenaar: Paramantis Solutions B.V. in Harderwijk, KvK 42115132. Een aantal bekendere Nederlandse namen in deze markt valt inmiddels onder een eigenaar in het buitenland; deze niet. De tabel hieronder toont elk punt dat het product raakt, ook de ene Amerikaanse uitzondering. Zo kunt u het zelf nagaan in plaats van ons op ons woord te geloven.</p>
+  </div>
+  <div class="card">
+    <table class="table" data-partners-rollen>
       <tbody>
-        <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
-        <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
-        <tr><td>US CLOUD Act</td><td>Not applicable — no US infrastructure, no US company</td></tr>
-        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for ParaShare), view count. Deleted on burn.</td></tr>
-        <tr><td>IP logging</td><td>Nginx access logs. Not linked to transfer content. Retention: 7 days.</td></tr>
-        <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
+        <tr><td>Locatie van de servers</td><td>Hetzner Neurenberg, Duitsland</td></tr>
+        <tr><td>Rechtsgebied</td><td>EU / Duitsland (AVG)</td></tr>
+        <tr><td>Amerikaanse CLOUD Act</td><td>Geen Amerikaanse partij op de route van uw gegevens: bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Zie <a href="/privacy">privacy</a>. Actuele status: <a href="/partners">/partners</a>.</td></tr>
+        <tr><td>Wat bewaard wordt</td><td>Geen leesbare inhoud, geen sleutels. Alleen: de hash van de overdracht, het tijdstip van aanmaken, de geschatte versleutelde grootte per blok (tot 5 MB; precies 5 MB voor de webapp Versturen) en het aantal keer bekeken. Verwijderd na de laatste keer lezen.</td></tr>
+        <tr><td>IP-logging</td><td>De toegangslog van Nginx staat uit in de deploy-configuratie (<code>access_log off</code> op elk serverblok dat de site en de relays bedient in <code>deploy/nginx-paramant-live.conf</code>). Niet gekoppeld aan de inhoud van een overdracht. Er wordt geen aparte bewaartermijn beloofd. Bij een relay die u zelf host is het andersom: <code>deploy/nginx-selfhost.conf</code> schrijft een toegangslog met als eerste veld het adres van de client. Zet die uit als u dat niet wilt.</td></tr>
+        <tr><td>Analytics</td><td>Geen. Geen scripts van derden op de relay of de API.</td></tr>
       </tbody>
     </table>
   </div>
 
+
   <hr class="divider">
 
-  <h2 id="responsible-disclosure">Responsible disclosure</h2>
+  <h3 id="core-principle">Uitgangspunt</h3>
   <div class="card">
-    <p style="margin-bottom:16px">Report to <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> &mdash; encrypted with our <a href="/.well-known/openpgp-key.asc">PGP key</a> if the details are sensitive. Do not open a public GitHub issue before coordinating.</p>
-    <p style="margin:0 0 16px;font-size:var(--text-sm);color:var(--ink-dim)">PGP key fingerprint &mdash; verify before encrypting:<br><code style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink);letter-spacing:.04em">09AA 452A 69DE F4A4 EB4B&nbsp;&nbsp;72DC 5A34 D82F DAF3 54CD</code></p>
+    <p style="margin:0;line-height:1.8">De relay is een <strong>tussenpersoon die niet vertrouwd hoeft te worden</strong>. Voor overdrachten en voor ondertekenverzoeken die in een browser zijn gemaakt, bewaart hij alleen versleutelde gegevens en heeft hij geen toegang tot sleutels of leesbare inhoud. Ook een volledig overgenomen relay kan daarvan niets lezen, vervalsen of achteraf terughalen. Dat is geen beleid, het is een cryptografische garantie. Die garantie geldt niet voor de gehoste ondertekenprocedure op de <code>/v1</code>-API. Daar krijgt de relay het document om de procedure uit te voeren, en daar is de bescherming beleid. Dat zeggen we liever dan de garantie te laten gelden waar ze niet kan gelden.</p>
+  </div>
+
+  <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
+    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Waar de zero-knowledge-garantie nu geldt</div>
+    <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">De garantie hierboven geldt voor overdrachten vanuit de offici&euml;le SDK's (sdk-py 3.0.0, sdk-js 3.0.0) en de webapp Versturen. Die versleutelen allemaal in de client, voordat er iets het apparaat verlaat. De extensies voor Chromium en Outlook versleutelen nu nog op de server, terwijl hun versleuteling in de client wordt afgemaakt. Tot die overstap klaar is, behandelt u uploads via een extensie als versleuteld op de relay, niet als zero-knowledge. Status per client: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--ink-dim)">De volledige cryptografische architectuur staat op de <a href="/architecture">architectuurpagina</a>.</p>
+
+  <hr class="divider">
+
+  <h2>Cryptografie</h2>
+  <p>Alle algoritmen komen uit de post-quantumstandaarden van NIST (FIPS 203, 204, 205, 206) of zijn gevestigde symmetrische bouwstenen. Niets zelfgemaakt. Geen eigen sleuteluitwisseling. De relay levert 3 KEMs en 17 signature-algoritmen mee. De standaardmodus core laadt ML-KEM-768 en ML-DSA-65; de modus extended laadt ze allemaal. De client kiest, de relay controleert, en het actuele register staat op <a href="/v2/capabilities"><code>/v2/capabilities</code></a>. Zie <a href="/crypto-agility">crypto-agility</a> voor het berichtformaat en de volledige tabel met algoritmen.</p>
+
+  <table class="table" style="margin-top:20px">
+    <thead>
+      <tr><th>Algoritme</th><th>Rol</th><th>Standaard</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>ML-KEM-768</td><td>Sleutelinkapseling (post-quantum KEM)</td><td>NIST FIPS 203</td></tr>
+      <tr><td>ECDH P-256</td><td>Klassieke sleuteluitwisseling (hybride)</td><td>NIST SP 800-56A</td></tr>
+      <tr><td>HKDF-SHA256</td><td>Sleutelafleiding uit gedeelde geheimen</td><td>RFC 5869</td></tr>
+      <tr><td>AES-256-GCM</td><td>Symmetrische versleuteling en authenticatie</td><td>NIST SP 800-38D</td></tr>
+      <tr><td>ML-DSA-65</td><td>Digitale handtekeningen (identiteit van de relay)</td><td>NIST FIPS 204</td></tr>
+      <tr><td>Argon2id</td><td>Wachtwoord op een overdracht (hash, optionele module)</td><td>RFC 9106</td></tr>
+      <tr><td>SHA3-256</td><td>Merkle-hashing van het CT-log</td><td>NIST FIPS 202</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Hybride sleuteluitwisseling</h3>
+  <p>Geauthenticeerde overdrachten vanuit de webapp Versturen gebruiken ML-KEM-768 <em>en</em> ECDH P-256 tegelijk. Het gedeelde geheim is de aaneenschakeling van beide, dus wie er één breekt, wint daar niets mee. Dit beschermt tegen aanvallen waarbij nu wordt opgeslagen om later te ontsleutelen, en blijft werken met klassieke infrastructuur.</p>
+
+  <h3>Vooraf gedeeld geheim (PSS)</h3>
+  <p>Een optioneel wachtwoord dat verzender en ontvanger buiten Paramant om afspreken. De verzender opent een sessie met als commitment de SHA3-256 van dat wachtwoord. De client van de ontvanger stuurt daarna het wachtwoord zelf naar <code>/v2/session/join</code>. De relay hasht het, vergelijkt het met het commitment en koppelt pas dan de publieke sleutels van de ontvanger aan de sessie; wie het eerst aansluit, krijgt de plek. Wat dat oplevert, is sleutelbinding: een derde die het wachtwoord niet kent, kan geen eigen sleutels registreren als die van de ontvanger.</p>
+  <p>Wat het niet oplevert, is vertrouwelijkheid tegenover ons. Het wachtwoord gaat niet mee in de sleutelafleiding: <code>hkdf_aes_key</code> in <code>crypto-wasm/src/lib.rs</code> neemt de gedeelde geheimen van ML-KEM en ECDH en verder niets. De ontvanger stuurt het wachtwoord leesbaar naar de relay. Een relay met code die wij niet schreven, leest het dus, en kan zijn eigen sleutels koppelen wat het commitment ook zegt. PSS maakt het een buitenstaander moeilijker om sleutels te injecteren; het is geen verdediging tegen de relay zelf. Het is een functie van de relay-API, en de webapp op deze site gebruikt het niet.</p>
+
+  <hr class="divider">
+
+  <h2>Opbouw van de relay</h2>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Alleen in het werkgeheugen</div>
+      <p style="margin:0">Versleutelde blobs staan in het procesgeheugen en worden nooit naar schijf geschreven. Een herstart van de relay wist alle blobs. Geen database, geen schrijfacties naar het bestandssysteem.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Weg na lezen</div>
+      <p style="margin:0">Elke blob wordt vernietigd na de laatste keer lezen die de link toestaat. De webapp en de extensies verwijderen het bestand op elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot 10 keer op Firm en 100 keer op Enterprise. Het geheugen wordt direct overschreven met nullen. Er is geen tweede kans om het op te halen.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Opvulling tot 5 MB</div>
+      <p style="margin:0">Geauthenticeerde uploads vanuit de webapp Versturen worden opgevuld tot een vast blok van 5 MB, zodat DPI er niets uit kan afleiden. Eén blok verraadt geen bestandsgrootte, type of inhoud. Heeft een overdracht meer dan één blok nodig, dan gaat het aantal blokken onversleuteld mee. Het aantal blokken is dus zichtbaar, en de grootte is tot op een orde van grootte in te schatten (auditbevinding 5, geaccepteerd).</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Identiteit van de relay met ML-DSA-65</div>
+      <p style="margin:0">Elke relay maakt bij de eerste start een post-quantum sleutelpaar voor ondertekenen. Registraties worden ondertekend en vastgelegd in de CT-keten, en verified_since bewijst een doorlopende identiteit.</p>
+    </div>
+  </div>
+
+  <h3>Wat een overgenomen relay niet kan</h3>
+  <div class="card">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><span class="check">&#10003;</span><span>De inhoud van bestanden lezen: buiten de gehoste ondertekenprocedure op <code>/v1</code> heeft de relay alleen versleutelde gegevens, nooit sleutels</span></div>
+      <div><span class="check">&#10003;</span><span>Een geregistreerde publieke sleutel vervangen zodra uw eigen browser die heeft vastgelegd (TOFU), of zodra u de korte code buiten Paramant om hebt vergeleken</span></div>
+      <div><span class="check">&#10003;</span><span>Opgeslagen versleutelde gegevens ontsleutelen: geen toegang tot sleutels</span></div>
+      <div><span class="check">&#10003;</span><span>Een exacte bestandsgrootte lezen: elk blok van de webapp is precies 5 MB, en alleen het aantal blokken is zichtbaar</span></div>
+      <div><span class="check">&#10003;</span><span>Verbrande blobs terughalen: het geheugen wordt overschreven op het moment dat de laatste keer lezen op is</span></div>
+      <div><span class="check">&#10003;</span><span>Ongemerkt een regel in het CT-log vervalsen: de Merkle-keten kan alleen aangevuld worden, dus een herschrijving spreekt elke ondertekende tree head van daarvoor tegen</span></div>
+      <div><span class="check">&#10003;</span><span>ML-KEM-768 breken: NIST FIPS 203, bestand tegen quantumcomputers</span></div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <hr class="divider">
+
+  <h2>Inloggen</h2>
+  <p>Paramant heeft geen wachtwoorden. Mensen loggen in met hun e-mailadres en een tijdgebonden code uit een authenticator-app. Machines gebruiken API-sleutels die lang geldig blijven. Wat we niet hebben, kunnen we ook niet lekken.</p>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Voor mensen</div>
+      <p style="margin:0">U logt in op paramant.app of via een browserextensie met uw e-mailadres en de huidige code van 6 cijfers uit uw authenticator-app. Een sessie duurt een uur. De TOTP-controle accepteert HMAC met SHA-256 en SHA-1, dus elke gangbare authenticator-app werkt; SHA-1 is de standaard van RFC 6238 en een aantal veelgebruikte apps kent niets anders. Geschikte authenticator-apps staan op <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Voor machines</div>
+      <p style="margin:0">Scripts, SDK-aanroepen, SCADA-koppelingen en IoT-apparaten melden zich aan met een API-sleutel in de HTTP-header X-Api-Key. Geen TOTP, geen sessies, geen mens nodig. Geschikt voor automatisering zonder scherm.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Wat we niet bewaren</div>
+      <p style="margin:0">Geen wachtwoorden. Geen wachtwoordhashes. Geen beveiligingsvragen. Geen tokens om een wachtwoord te herstellen. Onze database kan geen wachtwoord lekken, want onze database kent het begrip niet.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Beveiliging van de sessie</div>
+      <p style="margin:0">Na de TOTP-controle krijgt u een sessietoken van 256 bits als cookie met httpOnly, Secure en SameSite=Lax. Lax en niet Strict, zodat een uitgenodigde ondertekenaar die via een link in zijn mailprogramma binnenkomt niet terug naar het inlogscherm wordt gestuurd; een POST vanaf een andere site draagt nog steeds geen cookie. Het token staat in Redis en verloopt na een uur zonder activiteit. API-sleutels komen nooit in de browser.</p>
+    </div>
+  </div>
+
+  <h3>Beperking van pogingen en bescherming tegen hergebruik</h3>
+  <p>Een TOTP-code verloopt dertig seconden nadat hij is gemaakt. Elke code wordt bij de eerste acceptatie als gebruikt gemarkeerd, met een atomaire sleutel voor eenmalig gebruik in Redis. Is Redis niet bereikbaar, dan wordt het inloggen geweigerd in plaats van doorgelaten, zodat een code nooit wordt geaccepteerd zonder markering. Inlogpogingen zijn beperkt tot vijf per IP-adres per kwartier. Een e-mailadres wordt nooit geblokkeerd door die beperking: mislukte pogingen worden per adres geteld en gewist door een geslaagde. Na tien binnen een kwartier moet de volgende poging een proof-of-work meesturen, in plaats van dat hij wordt geweigerd. Niemand kan u dus buitensluiten door op uw adres te gokken.</p>
+
+  <h3>Vergeleken met alternatieven</h3>
+  <p>De meeste diensten voor versleutelde bestandsoverdracht werken met een wachtwoord, met tweestapsverificatie als optie erbij. Paramant draait dat om. TOTP is vanaf de eerste dag verplicht voor mensen. Er is vrijwel niets om inloggegevens mee te stelen, want er valt niets te phishen, uit te proberen of te herstellen.</p>
+
+  <p style="margin-top:12px">
+    <a href="/help/authenticator-setup">Uw authenticator instellen &rarr;</a> &nbsp;
+    <a href="/help/api-key-vs-totp">Wanneer een API-sleutel en wanneer TOTP &rarr;</a> &nbsp;
+    <a href="/help/backup-codes">Reservecodes &rarr;</a>
+  </p>
+
+  <h2>Sleutelcontrole in vier lagen</h2>
+  <p>De relay verspreidt publieke sleutels. Een aanvaller die de relay in handen heeft, zou verkeerde sleutels kunnen uitgeven. Deze vier lagen voorkomen dat:</p>
+
+  <table class="table" style="margin-top:20px">
+    <thead>
+      <tr><th>Laag</th><th>Werking</th><th>Beschermt tegen</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1 · TOFU</td>
+        <td>De vingerafdruk van het eerste gebruik wordt lokaal bewaard. Elke volgende keer moet die overeenkomen.</td>
+        <td>Sleutelwissel na het eerste contact</td>
+      </tr>
+      <tr>
+        <td>2 · Buiten Paramant om</td>
+        <td>Beide partijen berekenen dezelfde SHA-256-vingerafdruk en vergelijken die via telefoon, Signal of QR-code.</td>
+        <td>MITM door de relay bij het eerste contact</td>
+      </tr>
+      <tr>
+        <td>3 · PSS</td>
+        <td>De ontvanger bewijst een gedeeld wachtwoord te kennen voordat de relay zijn sleutels aan de sessie koppelt. Het gaat niet mee in de versleuteling.</td>
+        <td>Sleutelinjectie door een buitenstaander. Niet door de relay zelf, die het wachtwoord leest bij het aansluiten</td>
+      </tr>
+      <tr>
+        <td>4 · CT-log + ML-DSA-65</td>
+        <td>Sleutelregistraties worden ondertekend en aan een Merkle-keten toegevoegd. Wie er achteraf een tussenvoegt, spreekt elke ondertekende tree head van daarvoor tegen. Dat ziet iedereen die er een heeft bewaard.</td>
+        <td>Sleutelinjectie, fraude met tijdstempels</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="responsible-disclosure">Een kwetsbaarheid melden</h2>
+  <div class="card">
+    <p style="margin-bottom:16px">Meld het bij <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, versleuteld met onze <a href="/.well-known/openpgp-key.asc">PGP-sleutel</a> als de details gevoelig zijn. Open geen openbare GitHub-issue voordat we het samen hebben afgestemd.</p>
+    <p style="margin:0 0 16px;font-size:var(--text-sm);color:var(--ink-dim)">Vingerafdruk van de PGP-sleutel, controleer die voordat u versleutelt:<br><code style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink);letter-spacing:.04em">09AA 452A 69DE F4A4 EB4B&nbsp;&nbsp;72DC 5A34 D82F DAF3 54CD</code></p>
     <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--ink-hair)">
       <div style="font-size:var(--text-base);line-height:1.8">
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Acknowledgement</span>Within 48 hours</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Initial assessment</span>Within 5 working days</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Status updates</span>Every 7 days until resolved</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Disclosure window</span>90 days (coordinated)</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Credit</span><a href="/security/acknowledgements">Acknowledgements page</a> (with permission)</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Safe harbor</span>No legal action against good-faith researchers</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Ontvangstbevestiging</span>Binnen 48 uur</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Eerste beoordeling</span>Binnen 5 werkdagen</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Tussenstand</span>Elke 7 dagen tot het is opgelost</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Openbaarmaking</span>Na 90 dagen (in overleg)</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Vermelding</span><a href="/security/acknowledgements">Pagina met dankbetuigingen</a> (met uw toestemming)</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Vrijwaring</span>Geen juridische stappen tegen onderzoekers die te goeder trouw handelen</div>
       </div>
     </div>
   </div>
   <div class="card" style="margin-top:0;border-top:none">
-    <h3>What we ask</h3>
-    <p style="margin-bottom:8px;font-size:var(--text-sm)">Do not publicly disclose before we have had a reasonable chance to fix. Do not access or modify data that does not belong to you. Do not run automated scans at volume that impacts service availability. Report to us first, not to third parties.</p>
-    <h3 style="margin-top:20px">Scope</h3>
-    <p style="margin-bottom:4px;font-size:var(--text-sm)"><strong>In scope:</strong> paramant.app, *.paramant.app, browser extensions published by us, API endpoints at <a href="/docs#api">docs/api</a>.</p>
-    <p style="margin-bottom:8px;font-size:var(--text-sm)"><strong>Out of scope:</strong> social engineering, physical attacks, denial of service, third-party services (Resend, Hetzner, Cloudflare).</p>
-    <h3 style="margin-top:20px">Rewards</h3>
-    <p style="margin-bottom:0;font-size:var(--text-sm)">No monetary bounty at this time. Credit on our <a href="/security/acknowledgements">acknowledgements page</a>, and priority access to new features.</p>
+    <h3>Wat we vragen</h3>
+    <p style="margin-bottom:8px;font-size:var(--text-sm)">Maak niets openbaar voordat wij redelijkerwijs de kans hebben gehad het op te lossen. Bekijk of wijzig geen gegevens die niet van u zijn. Draai geen geautomatiseerde scans op een schaal die de dienst verstoort. Meld het eerst bij ons, niet bij derden.</p>
+    <h3 style="margin-top:20px">Reikwijdte</h3>
+    <p style="margin-bottom:4px;font-size:var(--text-sm)"><strong>Binnen de reikwijdte:</strong> paramant.app, *.paramant.app, browserextensies die wij publiceren, API-endpoints op <a href="/docs#api">docs/api</a>.</p>
+    <p style="margin-bottom:8px;font-size:var(--text-sm)"><strong>Buiten de reikwijdte:</strong> social engineering, fysieke aanvallen, denial of service, diensten van derden (Resend, Hetzner, Bunny, Mollie).</p>
+    <h3 style="margin-top:20px">Beloning</h3>
+    <p style="margin-bottom:0;font-size:var(--text-sm)">Op dit moment geen geldbeloning. Wel een vermelding op onze <a href="/security/acknowledgements">pagina met dankbetuigingen</a>, en voorrang bij nieuwe functies.</p>
   </div>
 
+    <h2 id="customer-transparency">Openheid naar klanten</h2>
+  <p>Beveiliging gaat ook over weten wat de leverancier wel en niet kan. De <a href="/trust">pagina Vertrouwen en controle</a> legt in gewone taal uit hoe de licentiecontrole werkt, wat Paramant van uw relay kan zien (en wat nooit), hoe u uw installatie controleert, en welke acties op afstand mogelijk zijn en welke door de bouw onmogelijk. Elke bewering daar is gemarkeerd als nu actief of gepland, met links naar de openbare protocolspecificaties.</p>
+
+  </div>
   <hr class="divider">
-
-  <h2>ParamantOS</h2>
-  <p>The official installer image for self-hosted relay deployments. Hardened NixOS with the relay pre-installed.</p>
-  <table class="table" style="margin-top:16px">
-    <thead><tr><th>Component</th><th>Configuration</th></tr></thead>
-    <tbody>
-      <tr><td>SSH KEX</td><td>mlkem768x25519-sha256 + curve25519 — ML-KEM FIPS 203</td></tr>
-      <tr><td>SSH host key</td><td>Ed25519 only — no RSA, no ECDSA</td></tr>
-      <tr><td>SSH auth</td><td>Public key only — no passwords, no GSSAPI, no forwarding</td></tr>
-      <tr><td>Kernel</td><td>unprivileged_bpf_disabled=1, kptr_restrict=2, bpf_jit_harden=2</td></tr>
-      <tr><td>Firewall</td><td>Ports 22 + 3000–3004 only</td></tr>
-      <tr><td>Service isolation</td><td>Dedicated system user, systemd NoNewPrivileges, ProtectSystem=strict</td></tr>
-      <tr><td>CVEs mitigated</td><td>CVE-2023-51767, CVE-2025-26465, CVE-2025-26466, CVE-2025-32728</td></tr>
-    </tbody>
-  </table>
-  <p style="margin-top:12px"><a href="https://github.com/Apolloccrypt/ParamantOS" target="_blank">ParamantOS on GitHub &rarr;</a></p>
-
-  <h2 id="customer-transparency">Customer transparency</h2>
-  <p>Security is also about knowing what the vendor can and cannot do. The <a href="/trust">Trust &amp; Transparency page</a> documents, in plain terms, how license-check works, what Paramant can see of your relay (and what it never can), how to verify your deployment, and which remote actions are possible versus structurally impossible. Each claim there is tagged as live today or planned, with links to the public protocol specifications.</p>
-
+  <h2 id="next">Wat nu</h2>
+  <p>Elk plan krijgt wat deze pagina beschrijft. Community is gratis, voor altijd, zonder betaalkaart. Met het kantoorplan koopt u hogere limieten, geen betere versleuteling.</p>
+  <div class="hero-cta">
+    <a href="/pricing" class="btn btn-primary">Bekijk de prijzen &rarr;</a>
+    <a href="/verify" class="btn btn-secondary">Controleer een document &rarr;</a>
+  </div>
 </main>
-
+<p class="lang-switch"><a href="/en/security" hreflang="en" lang="en">This page in English</a></p>
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

@@ -24,15 +24,45 @@ const crypto = require('crypto');
 const https  = require('https');
 const fs     = require('fs');
 const path   = require('path');
+// Same module, second name. The request handler declares `const path =
+// parsed.pathname`, which shadows the module for the whole body of that
+// function, so a path.join() below that line is a method call on a string and
+// throws. Inside a try/catch that is not a crash but a permanent wrong answer:
+// the storage probe of /v2/health/deep has reported "not writable: path.join
+// is not a function" on every request since it was written. Code inside the
+// request handler uses nodePath.
+const nodePath = path;
 const url_   = require('url');
 const { createClient } = require('redis');
+const clientIpLib = require('./lib/client-ip');
 const userTotp      = require('./lib/user-totp');
+const totpLib       = require('./lib/totp');
+const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
+const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
+const rateLimit     = require('./lib/rate-limit');
+const mailer        = require('./lib/mail');            // one way out, carrier is a setting
+const authThrottle  = require('./lib/auth-throttle');
+const authGate      = require('./lib/auth-gate');
+const sessionTokens = require('./lib/session-token'); // pst_ ParaSend session tokens
 const userSigning   = require('./lib/user-signing');
 const userWebauthn  = require('./lib/user-webauthn');
 const tiers         = require('./lib/tiers');
+const entitlements  = require('./lib/entitlements'); // product+tier separation (ParaSend vs ParaSign)
 const quota         = require('./lib/quota');
+const keysTable     = require('./lib/keys-table');
 
-const VERSION    = '3.0.0';
+// Single source of truth for the relay version: relay/package.json, held equal
+// to the root package.json, both Docker labels and the deploy check by
+// tests/version-consistency.test.mjs. This used to be a literal, and that
+// literal said 3.1.0 while relay/package.json and the image label both said
+// 3.0.0 -- four places, three answers, which is what made a tag meaningless.
+// package.json is COPY'd into the runtime stage of relay/Dockerfile for exactly
+// this read; the fallback only covers a stripped deployment and is deliberately
+// loud rather than a plausible wrong number.
+const VERSION    = (() => {
+  try { return require('./package.json').version; }
+  catch { return '0.0.0-unknown'; }
+})();
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 
@@ -45,23 +75,59 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of wsTickets) if (
 // ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
 let argon2Lib = null;
 try { argon2Lib = require('argon2'); } catch(e) { /* npm install argon2 */ }
-let bip39Lib  = null;
-try { bip39Lib  = require('bip39');  } catch(e) { /* npm install bip39  */ }
+// A redis call that answers inside a deadline, or an outage. node-redis queues
+// commands while it reconnects, so against an unreachable server a GET neither
+// resolves nor rejects: the route waits, forever.
+//
+// #368 bounded exactly one read, on the TOTP path, and wrote the rest up in
+// SECURITY.md as open: "every other redis-backed route still inherits it". It
+// does not any more. The bound now lives on the CLIENT (lib/redis-deadline),
+// so every command in relay.js, relay/lib/* and envelope.js is bounded by
+// construction rather than by a list somebody has to keep correct. The name of
+// the knob is unchanged, PARAMANT_REDIS_DEADLINE_MS, and it is now the single
+// configuration source for both services.
+const REDIS_DEADLINE_MS = redisDeadlines.redisDeadlineMs();
+function redisDeadline(promise, ms = REDIS_DEADLINE_MS) {
+  return redisDeadlines.withRedisDeadline(promise, { ms, op: 'redis' });
+}
+
 // Redis client for user TOTP endpoints
 const RELAY_REDIS_URL = process.env.REDIS_URL || '';
 let redisClient = null;
 if (RELAY_REDIS_URL) {
-  redisClient = createClient({ url: RELAY_REDIS_URL });
+  // guardRedisClient is what makes the bound unconditional; redisClientBounds
+  // adds disableOfflineQueue, without which a command issued during a reconnect
+  // is held rather than refused. Neither is sufficient alone: the queue is what
+  // hangs a dead socket, the deadline is what catches a black hole, where the
+  // client still believes it is ready.
+  redisClient = redisDeadlines.guardRedisClient(
+    createClient({ url: RELAY_REDIS_URL, ...redisDeadlines.redisClientBounds() }),
+    { ms: REDIS_DEADLINE_MS, label: 'relay/redis' });
   redisClient.on('error', (err) => console.error('[relay/redis] error:', err.message));
   redisClient.connect()
     .then(() => console.log('[relay/redis] connected'))
     .catch(e => console.error('[relay/redis] connect failed:', e.message));
 }
+
 const PORT       = parseInt(process.env.PORT       || '3000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
+// The largest single BLOB the relay accepts on the wire, in bytes. Every blob a
+// client sends is padded to exactly this size (crypto-wasm BLOCK), so the length
+// of an upload says nothing about the file inside it.
+//
+// THIS IS NOT THE FILE SIZE LIMIT, and reading it as one is the bug this file
+// carried for a long time. The relay never sees a file: a 500 MB file arrives as
+// 112 separate padded blobs, each one of these. The file ceiling is a product
+// number and lives in relay/lib/tiers.js as `file_mb`; it is enforced by
+// counting a file's blocks (see FILE_CEILING below), not by comparing one blob
+// against it. `Math.min(MAX_BLOB, file_mb * 1048576)` on a single blob was that
+// confusion written down, and it held every file on every tier to 5 MB.
+//
+// Move this number only when the wire format or the memory budget changes.
 const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
 const MAX_AUDIT  = parseInt(process.env.MAX_AUDIT  || '1000');
+const CLAIM_TTL_SECONDS = parseInt(process.env.CLAIM_TTL_SECONDS || String(7 * 86400)); // one-time API-key claim link lifetime
 const _RAW_MODE  = process.env.RELAY_MODE          || 'full';
 const RELAY_MODE = ['ghost_pipe', 'iot', 'full'].includes(_RAW_MODE) ? _RAW_MODE : (() => {
   console.error(`[paramant] Invalid RELAY_MODE="${_RAW_MODE}". Must be ghost_pipe|iot|full. Defaulting to ghost_pipe.`);
@@ -86,6 +152,33 @@ const wireFormat = require('./crypto/wire-format');
 const cryptoErrors = require('./crypto/errors');
 const parasign = require('./parasign');
 const envelopeMod = require('./envelope');
+const parasignOpenApi = require('./lib/parasign-open-api'); // ParaSign Open Developer-API (/v1)
+const billingCatalog  = require('./lib/billing-catalog');   // server-side price + entitlement map
+const mollie          = require('./lib/mollie');            // Mollie Payments API client
+const billing         = require('./lib/billing');           // Mollie webhook decision state machine
+const billingRecurring = require('./lib/billing-recurring'); // subscription + mandate layer
+const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
+const sendMod       = require('./lib/send');            // sends to named recipients
+const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
+const qes           = require('./lib/qes');                   // qualified-signature layer, off unless flagged
+const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
+const userHistory      = require('./lib/user-history');      // GET /v2/user/history (Pro+)
+const usagePurpose     = require('./lib/usage-purpose');     // POST /v2/user/usage-purpose (internal)
+const parasignAuditExport = require('./lib/parasign-audit-export'); // GET /v2/parasign/audit-export (Business+)
+const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upload/download mail
+const invoiceMod       = require('./lib/invoice');            // invoice numbering, records and VAT split
+const invoicePdf       = require('./lib/invoice-pdf');        // one-page PDF writer, no dependency
+const vatMod           = require('./lib/vat');                // 21% or reverse charged, VIES check at checkout
+const creditNote       = require('./lib/credit-note');        // credit notes (CN series) for money that goes back
+const billingMail      = require('./lib/billing-mail');       // bilingual (NL, then EN) text of the invoice and credit-note mails
+const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
+const billingExport    = require('./lib/billing-export');     // period export of both series, CSV/JSON, for the books
+const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
+const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
+const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
+const coupon           = require('./lib/coupon');             // gift codes: a term given away, never a sale
+const sharedGrants     = require('./lib/shared-grants');     // one paid term, visible on every relay container
+const partyBackfill    = require('./lib/parasign-party-backfill'); // one-shot fill of the party worklist index
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -152,28 +245,112 @@ try {
 } catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'build/install @paramant/core', err: e.message }); }
 
 const ALLOWED = {
-  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
+  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
-               '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
+               '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
-  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session','/v2/session-token',
+               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
+               '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
+  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
-               '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
+               '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
-               '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session','/v2/session-token',
+               '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/v2/transfers',
+               '/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
   full:       null,
 };
 
 function modeAllows(p) {
   const a = ALLOWED[RELAY_MODE];
   return !a || a.some(x => p === x || p.startsWith(x + '/'));
+}
+
+// The footer every mail to a non-customer carries.
+//
+// A stranger's first question is "why am I getting this", and the second is
+// "who are you". A transactional mail that answers neither is indistinguishable
+// from a phishing attempt, and a corporate spam filter will treat it as one.
+// Answering both costs three lines and is the difference between a document
+// that arrives and a ticket at somebody's IT desk.
+function VOET(wie, antwoordAdres, taal) {
+  const wieHtml = escHtml(wie || '');
+  const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
+                                                   : 'een klant van Paramant')
+       + ' uw adres heeft ingevuld. Paramant verstuurt het bestand versleuteld en '
+       + 'kan het zelf niet openen.'
+       + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
+  const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
+                                                   : 'a Paramant customer')
+       + ' entered your address. Paramant carries the file in encrypted form and '
+       + 'cannot open it.'
+       + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
+  const tekst = taal === 'en' ? en
+              : taal === 'nl' ? nl
+              : nl + '<br><br><span lang="en">' + en + '</span>';
+  return '<hr style="border:0;border-top:1px solid #e3e7e9;margin:22px 0 12px">'
+       + '<p style="color:#8a949a;font-size:12px;line-height:1.6;margin:0">'
+       + tekst
+       + '<br>Paramantis Solutions B.V., Harderwijk' + (taal === 'en' ? ', the Netherlands' : '')
+       + ' &middot; '
+       + '<a href="https://paramant.app/privacy" style="color:#8a949a">privacy</a>'
+       + '</p>';
+}
+
+// The language of a mail to a recipient. The sending page passes the language
+// it was shown in ('nl' or 'en'); a send without one gets Dutch with the
+// English text underneath, so a recipient abroad is never left with a mail
+// they cannot read.
+function mailTaal(waarde) {
+  return waarde === 'nl' || waarde === 'en' ? waarde : '';
+}
+function tweetaligTekst(taal, nl, en) {
+  if (taal === 'en') return en;
+  if (taal === 'nl') return nl;
+  return nl + '\n\n-- English --\n\n' + en;
+}
+function tweetaligHtml(taal, nl, en) {
+  if (taal === 'en') return en;
+  if (taal === 'nl') return nl;
+  return nl + '<hr style="border:0;border-top:1px solid #e3e7e9;margin:22px 0 12px">'
+       + '<div lang="en">' + en + '</div>';
+}
+function mailDatum(ms, taal, opties) {
+  return new Date(ms).toLocaleString(taal === 'en' ? 'en-GB' : 'nl-NL', opties);
+}
+
+// Which sector an account lives on, from its key label -- the same derivation
+// GET /v2/key-sector already answers the sender's page with.
+//
+// The invitation link has to carry it. An account is valid on exactly ONE
+// sector, and /ontvang/<token> is served by the apex, whose /v2/ goes to
+// health. Without `?r=`, every recipient of a legal or finance sender asks
+// health for a token health has never seen and is told the link cannot be
+// used. The one-link flow learned this already and puts `&r=` in its URL; this
+// is the same fix for the same reason.
+function sectorOfKey(kd) {
+  const label = ((kd && kd.label) || '').toLowerCase();
+  return label.includes('legal')   ? 'legal'
+       : label.includes('finance') ? 'finance'
+       : label.includes('iot')     ? 'iot'
+       : 'health';
+}
+
+// encodeURIComponent that cannot throw.
+//
+// It raises URIError on a lone surrogate, and every call site here is a
+// response header built after work that cannot be undone. Replacing the
+// unpaired half keeps the name readable and the response alive.
+function veiligCodeer(waarde) {
+  try { return encodeURIComponent(String(waarde == null ? '' : waarde)); }
+  catch (e) {
+    try {
+      return encodeURIComponent(String(waarde).replace(/[\uD800-\uDFFF]/g, ''));
+    } catch (e2) { return 'file'; }
+  }
 }
 
 // HTML-escape user-supplied strings before embedding in email templates.
@@ -231,18 +408,29 @@ initNats();
 
 // Fix B: per-device delivery queue — stream-next returns real blob hashes
 // deviceQueues[apiKey:deviceId] = [sha256_hash, ...]
-const deviceQueues = new Map(); // `${apiKey}:${deviceId}` → string[]
+const deviceQueues = new Map(); // `${acctOf(apiKey)}:${deviceId}` → string[]
+
+// Cap per-device queue length. The read-side drain (/v2/stream-next) only shifts
+// entries whose blob already expired, so a device that never polls would grow its
+// queue without bound. Cap it and drop the oldest hash (FIFO) past the limit.
+const MAX_DEVICE_QUEUE = parseInt(process.env.MAX_DEVICE_QUEUE || '1000');
 
 function deviceQueuePush(apiKey, deviceId, hash) {
   if (!deviceId) return;
-  const k = `${apiKey}:${deviceId}`;
+  const k = `${acctOf(apiKey)}:${deviceId}`;
   if (!deviceQueues.has(k)) deviceQueues.set(k, []);
   const q = deviceQueues.get(k);
   if (!q.includes(hash)) q.push(hash); // dedup
+  while (q.length > MAX_DEVICE_QUEUE) q.shift(); // bound per-device memory
 }
 
 // ── DID — Decentralized Identity (W3C) ───────────────────────────────────────
 const didRegistry = new Map();
+// Per-API-key DID counter so the MAX_DID_PER_KEY cap is enforced in O(1) instead
+// of an O(n) full scan of didRegistry on every registration. Kept in sync at the
+// single didRegistry.set site (only incremented when a genuinely-new did is added,
+// not on re-registration of an existing did).
+const didKeyCounts = new Map(); // apiKey → count
 
 function generateDid(deviceId, pubKeyHex) {
   const hash = crypto.createHash('sha3-256').update(deviceId + pubKeyHex).digest('hex').slice(0,32);
@@ -274,10 +462,48 @@ function createDidDocument(did, deviceId, ecdhPubHex, dsaPubHex) {
 }
 
 // ── Certificate Transparency Log ─────────────────────────────────────────────
-const ctLog = [];
 const CT_MAX = 10000;
-const CT_FILE     = process.env.CT_FILE     || null; // opt-in only — auto-derive disabled to preserve RAM-only default
+// Bounded, monotonically-indexed window (see lib/ct-window). Past CT_MAX the
+// logical index keeps advancing (no duplicates / frozen STH) and lookups for a
+// pruned index return null instead of the wrong entry.
+const { CtWindow, reindexEntries } = require('./lib/ct-window');
+const ctWindow = new CtWindow(CT_MAX);
+// Where the transparency log lives on disk.
+//
+// This used to be `process.env.CT_FILE || null`: opt-in, RAM-only unless a
+// deployment remembered to set it. docker-compose.yml does set it, so
+// production was fine and nobody looked again. Every other relay - a self-host,
+// a community node, a `node relay.js` on a laptop - kept its whole log in
+// memory and lost it on restart, and losing it is not the worst part.
+//
+// Measured on a booted relay: four entries, restart, and the log comes back at
+// size 0 while RELAY_IDENTITY_FILE brings the SAME signing key back, and
+// STH_FILE brings the old signed heads back with it. The relay then signs
+// tree_size 1 again over a different root, so /v2/sth/history ends up holding
+// two contradictory heads for the same tree size under one key. Not an empty
+// log: a forked one, published, signed, and indistinguishable from tampering.
+// Every receipt issued before the restart also stops resolving - /v2/ct/proof
+// answers 404 for an index that is now beyond the log's own size.
+//
+// So persistence is the default now, and it lands wherever the signed heads
+// already land: the head and the tree it attests to belong on the same volume,
+// and a deployment that sets STH_FILE to a writable path was already saying
+// where that is. An explicitly EMPTY CT_FILE still selects RAM-only, for the
+// caller who means it; unset no longer means it by accident.
+const _ctFileDefault = () => {
+  const sth = process.env.STH_FILE;
+  return sth ? nodePath.join(nodePath.dirname(sth), 'ct-log.json') : '/data/ct-log.json';
+};
+const CT_FILE = process.env.CT_FILE !== undefined
+  ? (process.env.CT_FILE || null)   // explicit, empty means RAM-only on purpose
+  : _ctFileDefault();
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
+
+// Set the moment a shutdown starts, and never cleared. Both append logs check
+// it before taking another line out of their queue, so from that point the exit
+// flush is the only writer left and no line can be shifted out of a queue into
+// a stream that has already been ended. See _flushAppendLogsOnExit.
+let _shuttingDown = false;
 
 // Fix 8: async CT write stream with queued writes and log rotation
 let _ctStream    = null;
@@ -286,8 +512,21 @@ let _ctDraining  = false;
 
 function _ctOpenStream() {
   if (!CT_FILE) return;
-  _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
-  _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+  // mkdir first, as _sthOpenStream already did. Without it a fresh volume that
+  // has no /data yet takes the CT log back to RAM-only silently, which is the
+  // state this default exists to end.
+  try {
+    fs.mkdirSync(nodePath.dirname(CT_FILE), { recursive: true });
+    _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
+    _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+  } catch (e) {
+    log('error', 'ct_log_not_persisted', {
+      err: e.message, file: CT_FILE,
+      hint: 'The transparency log is RAM-only: it is lost on restart and the relay '
+          + 'will refuse to sign a tree head that contradicts one it already signed. '
+          + 'Point CT_FILE at a writable path.',
+    });
+  }
 }
 
 async function _ctRotate() {
@@ -305,24 +544,27 @@ async function _ctRotate() {
 async function _ctDrain() {
   if (_ctDraining || !_ctStream) return;
   _ctDraining = true;
-  while (_ctWriteQueue.length > 0) {
+  while (_ctWriteQueue.length > 0 && !_shuttingDown) {
     const line = _ctWriteQueue.shift();
     await new Promise((resolve, reject) => {
       _ctStream.write(line, err => err ? reject(err) : resolve());
     }).catch(e => log('warn', 'ct_write_error', { err: e.message }));
   }
   _ctDraining = false;
-  // Check rotation after draining
-  _ctRotate().catch(() => {});
+  // Check rotation after draining. Not during a shutdown: rotation ends the
+  // stream and opens a new one, and the exit flush is already ending this one.
+  if (!_shuttingDown) _ctRotate().catch(() => {});
 }
 
 function ctWrite(entry) {
-  if (!CT_FILE || !_ctStream) return;
+  if (!CT_FILE || !_ctStream || _shuttingDown) return;
   _ctWriteQueue.push(JSON.stringify(entry) + '\n');
   setImmediate(_ctDrain);
 }
 
-// Flush CT queue on graceful shutdown
+// Hand whatever is still queued to the stream on a graceful shutdown. This only
+// gets the bytes as far as the stream; _flushAppendLogsOnExit is what waits for
+// them to reach the fd.
 function _flushCtOnExit() {
   if (!_ctStream || _ctWriteQueue.length === 0) return;
   for (const line of _ctWriteQueue) { try { _ctStream.write(line); } catch {} }
@@ -333,19 +575,43 @@ function _flushCtOnExit() {
 if (CT_FILE) {
   try {
     const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
+    const loaded = [];
     for (const line of lines) {
       try {
         const parsed = JSON.parse(line);
         if (Array.isArray(parsed)) {
           for (const entry of parsed) {
-            if (entry && typeof entry === 'object' && !Array.isArray(entry)) ctLog.push(entry);
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
           }
         } else {
-          ctLog.push(parsed);
+          loaded.push(parsed);
         }
       } catch {}
     }
-    if (ctLog.length) log('info', 'ct_log_loaded', { entries: ctLog.length, file: CT_FILE });
+    // One-shot, idempotent recount of the stored index field (2026-09). The
+    // public log had five entries whose persisted .index was stale after an
+    // April rebuild: positions 42..46 carried indices 4..8, so /v2/ct/log
+    // listed duplicates while /v2/ct/proof, which resolves by position, was
+    // right all along. The index of an entry IS its position, so recount from
+    // position here, before the window is built, and persist the correction so
+    // the next boot finds nothing to do. Only the index field is rewritten:
+    // the line order and every leaf_hash stay exactly as they were, which is
+    // what keeps the Merkle root byte-identical. One log line per log.
+    const ctFixed = reindexEntries(loaded);
+    if (ctFixed > 0) {
+      log('info', 'ct_log_reindexed', { fixed: ctFixed, entries: loaded.length, file: CT_FILE });
+      // Write to a sibling temp file and rename over the original, so a crash
+      // mid-write leaves the old log intact rather than a half-written one.
+      try {
+        const tmp = CT_FILE + '.reindex.tmp';
+        fs.writeFileSync(tmp, loaded.map(e => JSON.stringify(e) + '\n').join(''));
+        fs.renameSync(tmp, CT_FILE);
+      } catch (e) {
+        log('warn', 'ct_log_reindex_write_failed', { err: e.message, file: CT_FILE });
+      }
+    }
+    ctWindow.load(loaded);
+    if (ctWindow.windowLength) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, file: CT_FILE });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message });
   }
@@ -363,7 +629,7 @@ let _sthDraining  = false;
 
 function _sthOpenStream() {
   try {
-    fs.mkdirSync(path.dirname(STH_FILE), { recursive: true });
+    fs.mkdirSync(nodePath.dirname(STH_FILE), { recursive: true });
     _sthStream = fs.createWriteStream(STH_FILE, { flags: 'a' });
     _sthStream.on('error', e => log('warn', 'sth_stream_error', { err: e.message }));
   } catch (e) { log('warn', 'sth_stream_open_failed', { err: e.message }); }
@@ -372,7 +638,7 @@ function _sthOpenStream() {
 async function _sthDrain() {
   if (_sthDraining || !_sthStream) return;
   _sthDraining = true;
-  while (_sthWriteQueue.length > 0) {
+  while (_sthWriteQueue.length > 0 && !_shuttingDown) {
     const line = _sthWriteQueue.shift();
     await new Promise((resolve, reject) => {
       _sthStream.write(line, err => err ? reject(err) : resolve());
@@ -382,6 +648,7 @@ async function _sthDrain() {
 }
 
 function sthWrite(entry) {
+  if (_shuttingDown) return;
   _sthWriteQueue.push(JSON.stringify(entry) + '\n');
   setImmediate(_sthDrain);
 }
@@ -405,6 +672,26 @@ try {
 }
 _sthOpenStream();
 
+// What this relay has already put its name to. Two things, because they catch
+// two different halves of the same break:
+//   _sthSignedRoots  tree_size -> sha3_root, for the heads still in sthLog. It
+//                    is pruned in step with sthLog, so it stays bounded by
+//                    STH_MAX and does not grow with the log.
+//   _sthMaxSignedSize the largest tree_size ever signed. One number, never
+//                    pruned, and the half that survives the window: a tree that
+//                    walked BACKWARDS is a contradiction even when the head it
+//                    contradicts has aged out of memory.
+const _sthSignedRoots = new Map();
+let _sthMaxSignedSize = -1;
+for (const s of sthLog) {
+  if (!s || typeof s.tree_size !== 'number' || !s.sha3_root) continue;
+  _sthSignedRoots.set(s.tree_size, s.sha3_root);
+  if (s.tree_size > _sthMaxSignedSize) _sthMaxSignedSize = s.tree_size;
+}
+// Set once the relay has caught a contradiction. It is not cleared: a log that
+// has forked stays forked until someone looks at it.
+let ctLogForked = null;
+
 // ── Relay identity — ML-DSA-65 keypair for relay authentication ───────────────
 let relayIdentity = null; // { sk: Buffer, pk: Buffer, pk_hash: string }
 
@@ -421,7 +708,20 @@ function loadOrCreateRelayIdentity() {
     relayIdentity = { sk, pk, pk_hash };
     log('info', 'relay_identity_loaded', { pk_hash: pk_hash.slice(0, 16) + '…', file: RELAY_IDENTITY_FILE });
   } catch (e) {
-    if (e.code !== 'ENOENT') log('warn', 'relay_identity_load_failed', { err: e.message, file: RELAY_IDENTITY_FILE });
+    // Only a file that does not exist yet earns a new identity. A file that is
+    // there but unreadable (EACCES, EISDIR) or not valid JSON is an identity
+    // this relay HAD: minting a fresh one over it would silently change the
+    // key every receipt and signed head was issued under, and overwrite the
+    // only copy of the old one. Stop instead and let the operator look.
+    if (e.code !== 'ENOENT') {
+      log('error', 'relay_identity_unreadable', {
+        err: e.message, code: e.code || e.name, file: RELAY_IDENTITY_FILE,
+        hint: 'refusing to generate a new identity over an existing file; restore it from backup or move it aside deliberately',
+      });
+      // 78 is EX_CONFIG. console.log is synchronous on files and pipes, so
+      // the line above is out before the exit.
+      process.exit(78);
+    }
     // Generate new keypair
     try {
       const kp = registry.getSig(0x0002).generateKeyPair();
@@ -430,7 +730,7 @@ function loadOrCreateRelayIdentity() {
       const pk_hash = crypto.createHash('sha3-256').update(pk).digest('hex');
       relayIdentity = { sk, pk, pk_hash };
       try {
-        fs.mkdirSync(path.dirname(RELAY_IDENTITY_FILE), { recursive: true });
+        fs.mkdirSync(nodePath.dirname(RELAY_IDENTITY_FILE), { recursive: true });
         fs.writeFileSync(RELAY_IDENTITY_FILE,
           JSON.stringify({ sk: sk.toString('base64'), pk: pk.toString('base64'), created_at: new Date().toISOString() }),
           { mode: 0o600 });
@@ -450,21 +750,28 @@ const relayRegistry = new Map();
 const MAX_RELAY_REGISTRY = parseInt(process.env.MAX_RELAY_REGISTRY || '10000');
 
 function relayRegistryFromCTLog() {
-  for (const entry of ctLog) {
+  // ct_index is taken from the window position, not from the entry's stored
+  // index field: this runs over entries rehydrated from disk, and that field
+  // is the one a rebuild can leave stale. The startup recount above already
+  // repairs it, but reading position keeps this correct even when the log is
+  // fed from somewhere the recount did not touch.
+  for (let p = 0; p < ctWindow.entries.length; p++) {
+    const entry = ctWindow.entries[p];
     if (entry.type !== 'relay_reg') continue;
     const key = entry.relay_pk_hash;
     if (!key) continue;
+    const ctIndex = ctWindow.logicalIndexAt(p);
     const existing = relayRegistry.get(key);
     if (!existing) {
       relayRegistry.set(key, {
         url: entry.relay_url, sector: entry.relay_sector,
         version: entry.relay_version, edition: entry.relay_edition || 'community',
         pk_hash: key, verified_since: entry.ts, last_seen: entry.ts,
-        ct_index: entry.index, last_ct_index: entry.index
+        ct_index: ctIndex, last_ct_index: ctIndex
       });
     } else {
       existing.last_seen    = entry.ts;
-      existing.last_ct_index = entry.index;
+      existing.last_ct_index = ctIndex;
       existing.version      = entry.relay_version;
       existing.edition      = entry.relay_edition || existing.edition;
     }
@@ -486,59 +793,89 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
   return crypto.createHash('sha3-256').update(Buffer.from([0x00])).update(data).digest('hex');
 }
 
-function ctNodeHash(left, right) {
-  return crypto.createHash('sha3-256')
-    .update(Buffer.from([0x01]))
-    .update(Buffer.from(left, 'hex'))
-    .update(Buffer.from(right, 'hex'))
-    .digest('hex');
-}
+// CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
+const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
 
-function ctTreeHash(entries) {
-  if (entries.length === 0) return '0'.repeat(64);
-  let hashes = entries.map(e => e.leaf_hash);
-  while (hashes.length > 1) {
-    const next = [];
-    for (let i = 0; i < hashes.length; i += 2) {
-      next.push(i + 1 < hashes.length ? ctNodeHash(hashes[i], hashes[i+1]) : hashes[i]);
-    }
-    hashes = next;
+// The field gate. Every name that reaches a log entry, a leaf preimage or an
+// entry type is declared in ./lib/ct-fields, and relay/test/ct-fields.test.js
+// holds that declaration against a hand-written copy AND against the literals
+// this file really passes. The log is the one place where a stray field is
+// permanent and public at once, so it is the one place worth this much
+// ceremony. See the header of ct-fields.js for what went wrong without it.
+const ctFields = require('./lib/ct-fields');
+
+// Strip anything undeclared off an entry before it is stored, written to
+// CT_FILE or projected onto a public route, and say loudly that it happened.
+// Stripping rather than throwing: an undeclared field is by construction one no
+// reader knows about, so dropping it breaks nothing that exists, while letting
+// it through publishes it forever.
+function ctGateEntry(family, entry) {
+  const { entry: gated, rejected } = ctFields.gateEntry(family, entry);
+  if (rejected.length) {
+    log('error', 'ct_entry_field_rejected', {
+      family, type: entry.type || 'key_reg', rejected,
+      hint: 'A field reached a CT log entry without being declared in relay/lib/ct-fields.js. '
+          + 'It was dropped. If the log should carry it, add it there and to '
+          + 'relay/test/ct-fields.test.js, which is where someone has to write down why.',
+    });
   }
-  return hashes[0];
+  return gated;
 }
 
-// Returns the Merkle audit path for `idx` in the given entries array.
-// Each element is { hash, position: 'left'|'right' } so verifiers know how to combine.
-// Verification: start with leaf_hash, for each step combine with sibling per position.
-function ctInclusionProof(entries, idx) {
-  if (entries.length <= 1) return [];
-  let hashes = entries.map(e => e.leaf_hash);
-  const path = [];
-  let i = idx;
-  while (hashes.length > 1) {
-    const sibling = i % 2 === 0 ? i + 1 : i - 1;
-    if (sibling < hashes.length) {
-      path.push({ hash: hashes[sibling], position: i % 2 === 0 ? 'right' : 'left' });
-    }
-    const next = [];
-    for (let j = 0; j < hashes.length; j += 2) {
-      next.push(j + 1 < hashes.length ? ctNodeHash(hashes[j], hashes[j+1]) : hashes[j]);
-    }
-    hashes = next;
-    i = Math.floor(i / 2);
+// The same gate for a payload, applied BEFORE the leaf is hashed. Order is
+// load-bearing: the leaf commits to the payload, so gating after hashing would
+// commit to a field the stored entry no longer has, and every recomputation of
+// that leaf would then fail.
+function ctGatePayload(eventType, payload) {
+  const { payload: gated, rejected } = ctFields.gatePayload(eventType, payload);
+  if (rejected.length) {
+    log('error', 'ct_payload_field_rejected', {
+      type: eventType, rejected,
+      hint: 'Declare it in PAYLOAD_FIELDS in relay/lib/ct-fields.js, or leave it out of the log.',
+    });
   }
-  return path;
+  return gated;
 }
 
-// Leaf hash for blob/transfer entries — domain separator 0x02 (0x00=pubkey, 0x01=inner node)
-// Commits to transfer hash + sector without exposing payload content.
-function blobLeafHash(blobHash, sector, ts) {
-  const data = Buffer.concat([
-    Buffer.from(blobHash, 'hex'),                                        // 32 bytes — transfer hash
-    crypto.createHash('sha3-256').update(sector || 'relay').digest(),    // 32 bytes — sector identity
-    Buffer.from(ts, 'utf8')                                              // ISO timestamp
-  ]);
-  return crypto.createHash('sha3-256').update(Buffer.from([0x02])).update(data).digest('hex');
+// An event type is a leaf format: it is concatenated into the entry type and,
+// for the signing-key and envelope families, hashed into the leaf preimage. An
+// undeclared one throws, and that is safe to do BECAUSE ct-fields.test.js scans
+// this file and envelope.js for the literals actually passed and fails if any
+// of them is missing from the list. Without that scan this is exactly the guard
+// that silently broke trust-on-first-use enrolment for months.
+function ctRequireEventType(family, eventType) {
+  if (!ctFields.isAllowedEventType(family, eventType)) {
+    throw new Error(`ct-fields: undeclared ${family} event type "${eventType}": `
+      + 'add it to EVENT_TYPES in relay/lib/ct-fields.js and say why in relay/test/ct-fields.test.js');
+  }
+}
+
+// ── The hour, defined once ───────────────────────────────────────────────────
+// Everything the CT log publishes about WHEN something happened is rounded to
+// the top of its hour, and every route that does that rounding goes through one
+// of these two functions. One definition, so a new public projection cannot
+// quietly pick a different resolution, and so relay/test/route-ct-public-time.test.js
+// has a single thing to hold every route to.
+//
+// The full-precision timestamp stays in the stored entry (it is committed in
+// the leaf hash, so a receipt must carry it back for /v2/verify-receipt) and in
+// the receipt the customer keeps. Precision belongs in the private receipt;
+// coarseness belongs in the public log.
+const CT_HOUR_MS = 3_600_000;
+
+// Epoch milliseconds -> the top of that hour, still epoch milliseconds.
+function ctCoarseMs(ms) {
+  const n = typeof ms === 'number' ? ms : Number(ms);
+  if (!Number.isFinite(n)) return ms;
+  return Math.floor(n / CT_HOUR_MS) * CT_HOUR_MS;
+}
+
+// ISO timestamp -> the top of its hour, as an ISO timestamp.
+function ctCoarseTs(ts) {
+  if (!ts) return ts;
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  return new Date(ctCoarseMs(d.getTime())).toISOString();
 }
 
 // Recursive canonical JSON (sorted keys, no whitespace) — used for signing receipts + STH.
@@ -548,20 +885,25 @@ function canonicalJSON(obj) {
   return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k])).join(',') + '}';
 }
 
+// Every ctAppend* below takes its index from ctWindow.nextIndex(), which is
+// base + window length: the position the new leaf is about to occupy. The
+// value is stored on the entry as a convenience for the response it goes into,
+// and CtWindow.append() rejects an entry whose index is not nextIndex(), so a
+// freshly appended entry can never disagree with its position. Read paths that
+// serve entries back out do not rely on that field regardless; see /v2/ct/log.
 function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
   const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index); // real audit path, not a slice
-  const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1); // real audit path at the new leaf position
+  const entry = ctGateEntry('key_reg', { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof });
+  ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -573,23 +915,22 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   const urlSectorHash = crypto.createHash('sha3-256').update(relayUrl + '|' + sector).digest('hex');
   // ctLeafHash(deviceIdHash, pubKeyHex, ts) — reuse with urlSectorHash as identity, pkHash as key
   const leaf_hash = ctLeafHash(urlSectorHash, pkHash, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
-  const entry = {
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const entry = ctGateEntry('relay_reg', {
     index, type: 'relay_reg', leaf_hash, tree_hash,
     device_hash: pkHash,          // reused field — relay public key hash
     relay_url: relayUrl, relay_sector: sector,
     relay_version: version, relay_edition: edition,
     relay_pk_hash: pkHash,
     ts, proof
-  };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  });
+  ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -600,18 +941,17 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
 function ctAppendTransfer(blobHash, sector) {
   const ts = new Date().toISOString();
   const leaf_hash = blobLeafHash(blobHash, sector, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
-  const entry = {
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const entry = ctGateEntry('transfer', {
     index, type: 'transfer', leaf_hash, tree_hash,
     blob_hash: blobHash, sector, ts, proof
-  };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  });
+  ctWindow.append(entry);
   ctWrite(entry);
-  const sth = produceSth(entry.index + 1, entry.tree_hash);
+  const sth = produceSth(allEntries.length, entry.tree_hash);
   return { ...entry, sth };
 }
 
@@ -622,18 +962,17 @@ function ctAppendTransfer(blobHash, sector) {
 function ctAppendParasign(documentHashHex, signerPkHash) {
   const ts = new Date().toISOString();
   const leaf_hash = ctLeafHash(signerPkHash, documentHashHex, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
-  const entry = {
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const entry = ctGateEntry('parasign', {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
-  };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  });
+  ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -641,49 +980,69 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
 // the CT log. The relay never sees the document - the leaf commits only to
 // the envelope id, event type, and a sha3-256 over the structured payload.
 function ctAppendEnvelope(eventType, envelopeId, payload) {
+  // `type` is the event name as given, not 'envelope_' + it. Every call site in
+  // envelope.js already passes the full name ('envelope_sign', 'envelope_void',
+  // ...), so the old concatenation published 'envelope_envelope_sign', and
+  // scripts/heartbeat/parasign.mjs has been filtering the public log for
+  // `type === 'envelope_sign'` against a value that never existed. That check
+  // is the strongest evidence the ParaSign heartbeat collects, and it could not
+  // fire. The declared list below is what would have caught it, which is why
+  // this repair rides along with the gate rather than as a separate errand.
+  //
+  // Nothing already signed moves: the leaf preimage is
+  // ctLeafHash(envelopeId, sha3(eventType|id|payload), ts) and takes the raw
+  // eventType, never this string. `type` lives on the entry and in the public
+  // projection only, so no inclusion proof and no receipt changes value.
+  const type = eventType;
+  ctRequireEventType('envelope', type);
+  // Gated first, then hashed: the leaf commits to this object, so it must be
+  // the same object the entry stores.
+  const gatedPayload = ctGatePayload(type, payload);
   const ts = new Date().toISOString();
   const valueHash = crypto.createHash('sha3-256')
     .update(eventType).update('|').update(envelopeId).update('|')
-    .update(JSON.stringify(payload || {})).digest('hex');
+    .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
-  const entry = {
-    index, type: 'envelope_' + eventType, leaf_hash, tree_hash,
-    envelope_id: envelopeId, payload: payload || {}, ts, proof
-  };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const entry = ctGateEntry('envelope', {
+    index, type, leaf_hash, tree_hash,
+    envelope_id: envelopeId, payload: gatedPayload, ts, proof
+  });
+  ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
 // Appends a signing-pubkey lifecycle event (enroll / revoke) to the CT log so
 // identity changes are tamper-evident. user_id is hashed (SHA3-256) before
 // emission — verifiers see a stable identity-handle without the raw API key.
-// `eventType` must be 'signing_pk_enrolled' or 'signing_pk_revoked'.
+// `eventType` is one of EVENT_TYPES.signing_pk in relay/lib/ct-fields.js.
 function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
-  if (eventType !== 'signing_pk_enrolled' && eventType !== 'signing_pk_revoked') {
-    throw new Error('invalid eventType: ' + eventType);
-  }
+  // This guard used to name two of the four types its own call sites pass:
+  // 'signing_pk_enrolled_tofu' and 'signing_pk_enrolled_attested' threw here,
+  // the route's outer catch turned that into a 500 AFTER the key was stored,
+  // and neither enrolment path ever reached the transparency log. The list now
+  // lives in ct-fields.js with a test that scans the call sites, so a name can
+  // no longer be missing from it without the build saying so.
+  ctRequireEventType('signing_pk', eventType);
   const ts = new Date().toISOString();
   const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
   const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
-  const entry = {
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const entry = ctGateEntry('signing_pk', {
     index, type: eventType, leaf_hash, tree_hash,
     user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
-  };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  });
+  ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -693,7 +1052,61 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
 function produceSth(tree_size, sha3_root) {
   if (!mlDsa || !relayIdentity) return null;
   const relay_id = RELAY_SELF_URL || (SECTOR + '.paramant.app');
-  const payload  = { relay_id, sha3_root, timestamp: Date.now(), tree_size, version: 1 };
+  // Append-only, enforced. A transparency log's whole claim is that tree_size
+  // only ever grows and that a size, once signed, keeps its root forever. Both
+  // break at once when the tree is lost but the key and the head history are
+  // not: the relay walks back to tree_size 1 and signs a second, different root
+  // for it. That signature is real, so no verifier can tell it from tampering,
+  // and the relay produced it without a single warning.
+  //
+  // So a head that contradicts one already signed is not produced at all. A
+  // missing head is visible and recoverable; a forged-looking one is neither.
+  // Re-signing the SAME root at the same size is allowed: that is idempotent,
+  // not a contradiction.
+  const priorRoot = _sthSignedRoots.get(tree_size);
+  const contradicts = priorRoot !== undefined && priorRoot !== sha3_root;
+  const wentBackwards = tree_size < _sthMaxSignedSize;
+  if (contradicts || wentBackwards) {
+    if (!ctLogForked) {
+      ctLogForked = {
+        tree_size, max_signed_size: _sthMaxSignedSize,
+        signed_root: priorRoot || null, refused_root: sha3_root,
+        reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+        at: new Date().toISOString(),
+      };
+    }
+    log('error', 'sth_refused_would_fork', {
+      tree_size, max_signed_size: _sthMaxSignedSize,
+      reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+      signed_root: priorRoot ? priorRoot.slice(0, 16) + '…' : null,
+      refused_root: String(sha3_root).slice(0, 16) + '…',
+      hint: 'This relay has already signed a larger or different tree. The usual cause is a '
+          + 'restart with a persisted STH log and a CT log that was not persisted. Restore CT_FILE '
+          + 'from backup, or start a new relay identity; do not delete the STH log.',
+    });
+    return null;
+  }
+  // The timestamp is coarsened to the hour BEFORE it is signed, because it is
+  // the sharpest of the three doors onto the exact time of a leaf, not the
+  // mildest. An STH is produced on every single append, so tree_size N is leaf
+  // N-1, and this timestamp used to be Date.now() taken microseconds after that
+  // leaf's own ts. Measured on a booted relay: given the leaf hash from
+  // /v2/ct/log and the STH at tree_size = index + 1 from /v2/sth/history, a
+  // candidate document was confirmed in ONE hash. That is worse than the feed
+  // was: the feed carried fifty entries, the history carries a thousand, the
+  // heads are mirrored to every peer, and the leak was inside a signature, so
+  // coarsening it in the projection would have been a lie rather than a fix.
+  // Hence at production. Old heads on disk keep the precise timestamp they were
+  // signed with and still verify: verification recomputes the canonical payload
+  // from whatever fields the head carries, both in receipt-verify.js and in
+  // /v2/sth/ingest, and neither pins a resolution.
+  //
+  // The cost is real and worth naming: an archiver can no longer tell from a
+  // head alone where in the hour it was signed. tree_size still orders the
+  // heads, monotonically and per append, so freshness monitoring and the
+  // consistency proofs are untouched. The log's own resolution has been an hour
+  // everywhere else all along; the head was the one place still saying more.
+  const payload  = { relay_id, sha3_root, timestamp: ctCoarseMs(Date.now()), tree_size, version: 1 };
   // Canonical JSON: keys sorted alphabetically
   const sortedKeys = Object.keys(payload).sort();
   const canonical  = JSON.stringify(Object.fromEntries(sortedKeys.map(k => [k, payload[k]])));
@@ -705,8 +1118,12 @@ function produceSth(tree_size, sha3_root) {
     return null;
   }
   const sth = { ...payload, signature };
+  _sthSignedRoots.set(tree_size, sha3_root);
+  if (tree_size > _sthMaxSignedSize) _sthMaxSignedSize = tree_size;
   sthLog.push(sth);
-  if (sthLog.length > STH_MAX) sthLog.shift();
+  // Prune the root map in step with the head window so it stays bounded.
+  // _sthMaxSignedSize is what keeps the guard whole past this point.
+  if (sthLog.length > STH_MAX) { const dropped = sthLog.shift(); _sthSignedRoots.delete(dropped.tree_size); }
   sthWrite(sth);
   // Broadcast to peers asynchronously — non-blocking, best-effort
   setImmediate(() => broadcastSTH(sth).catch(() => {}));
@@ -716,7 +1133,14 @@ function produceSth(tree_size, sha3_root) {
 // ── Peer STH storage — mirrors signed tree heads from other relays ─────────────
 const PEER_STH_DIR = process.env.PEER_STH_DIR || '/data/peer-sths';
 const PEER_STH_MAX = parseInt(process.env.PEER_STH_MAX || '500'); // per peer
-// peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string }
+// Cap the NUMBER of distinct peers we mirror. /v2/sth/ingest only verifies an
+// ML-DSA-65 ownership signature (no API-key/admin gate), so an attacker can mint
+// unlimited fresh relay keypairs and have each add a Map entry + an open write
+// fd + a growing .jsonl file. Per-peer records are already capped (peer.sths
+// shift), but the count of peers/fds/files was unbounded — so cap it and evict
+// the least-recently-updated peer (closing its fd) when full.
+const PEER_STH_MAX_PEERS = parseInt(process.env.PEER_STH_MAX_PEERS || '256');
+// peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string, last: epoch_ms }
 const peerSths = new Map();
 const _peerSthStreams = new Map(); // pk_hash → fs.WriteStream
 
@@ -725,13 +1149,35 @@ function _peerSthStreamFor(pkHash) {
   try {
     fs.mkdirSync(PEER_STH_DIR, { recursive: true });
     const safe = pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64);
-    const stream = fs.createWriteStream(path.join(PEER_STH_DIR, safe + '.jsonl'), { flags: 'a' });
+    const stream = fs.createWriteStream(nodePath.join(PEER_STH_DIR, safe + '.jsonl'), { flags: 'a' });
     stream.on('error', e => log('warn', 'peer_sth_stream_error', { id: pkHash.slice(0, 16), err: e.message }));
     _peerSthStreams.set(pkHash, stream);
     return stream;
   } catch (e) {
     log('warn', 'peer_sth_stream_open_failed', { err: e.message });
     return null;
+  }
+}
+
+// Close + drop the write stream for an evicted peer so its fd is released.
+function _peerSthStreamClose(pkHash) {
+  const stream = _peerSthStreams.get(pkHash);
+  if (stream) { try { stream.end(); } catch {} _peerSthStreams.delete(pkHash); }
+}
+
+// Evict least-recently-updated peers until under PEER_STH_MAX_PEERS. Keeps the
+// fd table and .jsonl set bounded regardless of how many keys an attacker mints.
+function _evictPeerSthsIfNeeded() {
+  if (peerSths.size <= PEER_STH_MAX_PEERS) return;
+  const ordered = [...peerSths.entries()].sort((a, b) => (a[1].last || 0) - (b[1].last || 0));
+  for (const [pkHash] of ordered) {
+    if (peerSths.size <= PEER_STH_MAX_PEERS) break;
+    peerSths.delete(pkHash);
+    _peerSthStreamClose(pkHash);
+    // Reclaim the evicted peer's on-disk .jsonl so the file set is actually
+    // bounded (not just the fd table); a later re-ingest re-creates it fresh.
+    try { fs.unlinkSync(nodePath.join(PEER_STH_DIR, pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64) + '.jsonl')); } catch {}
+    log('info', 'peer_sth_evicted', { id: pkHash.slice(0, 16), peers: peerSths.size });
   }
 }
 
@@ -748,23 +1194,25 @@ function loadPeerSths() {
     for (const file of files) {
       const id = file.replace(/\.jsonl$/, '');
       try {
-        const lines = fs.readFileSync(path.join(PEER_STH_DIR, file), 'utf8').split('\n').filter(l => l.trim());
+        const lines = fs.readFileSync(nodePath.join(PEER_STH_DIR, file), 'utf8').split('\n').filter(l => l.trim());
         const sths = [];
         for (const line of lines) { try { sths.push(JSON.parse(line)); } catch {} }
         const recent = sths.slice(-PEER_STH_MAX);
         const pk_b64 = recent.length > 0 ? (recent[recent.length - 1].public_key || '') : '';
-        peerSths.set(id, { sths: recent, pk_b64 });
+        const lastRec = recent.length > 0 ? Date.parse(recent[recent.length - 1].received_at || '') : 0;
+        peerSths.set(id, { sths: recent, pk_b64, last: Number.isFinite(lastRec) ? lastRec : 0 });
       } catch {}
     }
+    _evictPeerSthsIfNeeded();
     if (peerSths.size > 0) log('info', 'peer_sths_loaded', { peers: peerSths.size });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'peer_sths_load_failed', { err: e.message });
   }
 }
 
-function _flushPeerSthsOnExit() {
-  for (const stream of _peerSthStreams.values()) { try { stream.end(); } catch {} }
-}
+// The peer streams are ended by _flushAppendLogsOnExit along with the CT and STH
+// logs, and awaited there: a mirrored head is evidence too, and ending a stream
+// without waiting for it was the bug.
 
 // ── Gossip — broadcast our latest STH to all registered peers ─────────────────
 // Outbound HTTPS goes through safeHttpsRequest so the per-request DNS guard
@@ -819,11 +1267,13 @@ function _subproof(m, nodes, b) {
   return [_merkleRootOf(nodes.slice(0, k))].concat(_subproof(m - k, nodes.slice(k), false));
 }
 
-// 0 ≤ fromSize ≤ toSize ≤ ctLog.length
+// Consistency proof over the retained window. fromSize/toSize are leaf counts
+// within the in-memory tree (0 ≤ from ≤ to ≤ windowLength); entries pruned past
+// the CT_MAX window cannot participate.
 function ctConsistencyProof(fromSize, toSize) {
-  if (fromSize < 0 || toSize < fromSize || toSize > ctLog.length) return null;
+  if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) return null;
   if (fromSize === 0 || fromSize === toSize) return [];
-  const leaves = ctLog.slice(0, toSize).map(e => e.leaf_hash);
+  const leaves = ctWindow.entries.slice(0, toSize).map(e => e.leaf_hash);
   return _subproof(fromSize, leaves, fromSize === leaves.length);
 }
 
@@ -872,7 +1322,12 @@ function renderPrometheus() {
     L.push(`# TYPE paramant_${k} counter`);
     L.push(`paramant_${k}{sector="${SECTOR}",v="${VERSION}"} ${v}`);
   }
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctLog.length],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  // ct_log_persisted and ct_log_forked are the two the transparency log is
+  // actually judged on. A relay whose log is RAM-only is one restart away from
+  // signing a second history, and a relay that has refused to sign has stopped
+  // producing heads entirely. Both were invisible before: the first showed as
+  // nothing at all, the second as a log that simply went quiet.
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -893,31 +1348,9 @@ if (TOTP_SECRET) {
   catch(e) { log('error', 'totp_secret_invalid', { err: e.message, hint: 'TOTP_SECRET must be valid Base32 (A-Z, 2-7)' }); process.exit(1); }
 }
 
-function base32Decode(s) {
-  const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = 0, value = 0, output = [];
-  s = s.toUpperCase().replace(/=+$/, '');
-  for (const c of s) {
-    const idx = alpha.indexOf(c);
-    // Fix 14: throw on invalid Base32 character instead of silently using -1
-    if (idx === -1) throw new Error(`Invalid Base32 character: '${c}'`);
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) { output.push((value >>> (bits - 8)) & 0xFF); bits -= 8; }
-  }
-  return Buffer.from(output);
-}
+function base32Decode(s) { return totpLib.base32Decode(s); }
 
-function totpCode(secret, counter, algorithm = 'sha256') {
-  const key = base32Decode(secret);
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64BE(BigInt(counter));
-  const mac = crypto.createHmac(algorithm, key).update(buf).digest();
-  const offset = mac[mac.length - 1] & 0xf;
-  const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
-  zeroBuffer(key); zeroBuffer(mac);
-  return code.toString().padStart(6, '0');
-}
+function totpCode(secret, counter, algorithm = 'sha256') { return totpLib.totpCode(secret, counter, algorithm); }
 
 // Fix 5: used-code tracking — window = 30s each side → 3 windows × 30s = 90s expiry
 const _usedTotpCodes = new Map(); // code+counter → expiry ms
@@ -928,46 +1361,31 @@ function verifyTotp(token) {
   const tokenBuf = Buffer.from(String(token || ''), 'utf8');
   if (tokenBuf.length !== 6) return false;
   const counter = Math.floor(Date.now() / 1000 / 30);
-  // Fix 5a: evaluate ALL windows — never short-circuit (constant-time scan)
+  // Dual-verify: accept a code valid under SHA-256 OR SHA-1 (the RFC 6238 default),
+  // so admin login works with Google/Microsoft Authenticator and iCloud Keychain.
+  // Both algorithm passes and every window run in full (never short-circuit) so the
+  // scan stays constant-time, and the per-slot replay guard is preserved unchanged.
   let matched = false;
-  for (let i = -TOTP_WINDOW; i <= TOTP_WINDOW; i++) {
-    const c = counter + i;
-    const expected = totpCode(TOTP_SECRET, c);
-    const expectedBuf = Buffer.from(expected, 'utf8');
-    // Fix 5b: timingSafeEqual (lengths guaranteed equal — both are 6-char strings)
-    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
-    if (eq) {
-      // Fix 5c: reject reused codes — key = token + counter slot
-      const useKey = `${token}:${c}`;
-      if (_usedTotpCodes.has(useKey)) { matched = false; continue; }
-      _usedTotpCodes.set(useKey, (c + 2) * 30 * 1000); // expire after 2 windows past use
-      matched = true;
+  for (const algorithm of ['sha256', 'sha1']) {
+    for (let i = -TOTP_WINDOW; i <= TOTP_WINDOW; i++) {
+      const c = counter + i;
+      const expected = totpCode(TOTP_SECRET, c, algorithm);
+      const expectedBuf = Buffer.from(expected, 'utf8');
+      const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
+      if (eq) {
+        // Fix 5c: reject reused codes: key = token + counter slot
+        const useKey = `${token}:${c}`;
+        if (_usedTotpCodes.has(useKey)) { matched = false; continue; }
+        _usedTotpCodes.set(useKey, (c + 2) * 30 * 1000); // expire after 2 windows past use
+        matched = true;
+      }
     }
   }
   return matched;
 }
 async function verifyTotpGeneric(token, secret, opts = {}) {
-  const { window = 1, replayKey, algorithm = 'sha256' } = opts;
-  const tokenBuf = Buffer.from(String(token || ''), 'utf8');
-  if (tokenBuf.length !== 6) return { valid: false };
-  const counter = Math.floor(Date.now() / 1000 / 30);
-  let matched = false;
-  let matchedSlot = null;
-  for (let i = -window; i <= window; i++) {
-    const c = counter + i;
-    const expected = totpCode(secret, c, algorithm);
-    const expectedBuf = Buffer.from(expected, 'utf8');
-    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
-    if (eq) { matched = true; matchedSlot = c; }
-  }
-  if (!matched) return { valid: false };
-  if (replayKey && redisClient) {
-    const slot = String(matchedSlot);
-    const existing = await redisClient.get(replayKey).catch(() => null);
-    if (existing === slot) return { valid: false };
-    await redisClient.set(replayKey, slot, { EX: 90 }).catch(() => {});
-  }
-  return { valid: true };
+  // Delegates to the extracted pure core; redisClient is the injected replay store.
+  return totpLib.verifyTotpGeneric(token, secret, opts, redisClient);
 }
 
 
@@ -1068,6 +1486,35 @@ p{color:#666;font-size:.82rem}
 </div>
 </body></html>`;
 }
+
+// A /v2/dl link whose token is not 48 hex characters: cut off when copied, or
+// never ours. Before this it fell through to the auth gate and the receiver
+// saw a 401 about API keys. Nothing was burned, so the burned page is wrong too.
+function _dlInvalidPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT - Link invalid</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e0e0e0;font-family:system-ui,sans-serif;display:flex;
+  align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:#161616;border:1px solid #2a2a2a;border-radius:12px;
+  max-width:440px;width:100%;padding:36px 32px;text-align:center}
+h1{font-size:1.05rem;font-weight:600;margin-bottom:8px}
+p{color:#999;font-size:.9rem;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>This link is invalid or incomplete.</h1>
+  <p>Part of it may have been cut off when it was copied. Open it again from the message you were sent.</p>
+</div>
+</body></html>`;
+}
+const DL_INVALID = { error: 'invalid_link', message: 'This link is invalid or incomplete.' };
 
 // ── CT Log public web UI ──────────────────────────────────────────────────────
 const CT_PAGE = (() => {
@@ -1260,32 +1707,74 @@ const sessions = new Map();
 setInterval(() => {
   const now = Date.now();
   for (const [id, s] of sessions.entries()) {
-    if (now > s.expires_ms) sessions.delete(id);
+    if (!authGate.sessionValid(s, now)) sessions.delete(id);
   }
 }, 60000);
 
 
 // ── RAM guard ────────────────────────────────────────────────────────────────
+// Blobs live in RAM and only in RAM. That is a promise this product makes in
+// terms.html, in press.html and in the Art. 28 processing register in dpa.html,
+// so the way to carry bigger files is to hold each one for a shorter time, not
+// to spill it to disk. Capacity here is therefore a memory budget.
+//
+// THE TWO NUMBERS, and this is the meaning scripts/check-guards.mjs enforces:
+// RAM_LIMIT_MB is what blobs may occupy, and RAM_RESERVE_MB is headroom ADDED
+// on top of it for the process itself. The guard trips at the SUM, so the sum
+// is what has to stay below the container's cgroup limit. It did not: the
+// health relay ran 8192 + 512 inside a container capped at 8192, so the kernel
+// always got there first and the guard was dead code. That was fixed by moving
+// the numbers to 6656 + 512, and check-guards.mjs now fails the build if the
+// sum ever climbs back to the cap.
+//
+// What changes here is only HOW the budget is spent, not what the two numbers
+// mean: the ceiling used to be a count of 5 MB slots, which stopped being the
+// right unit once a single transfer could be a hundred of them. It is bytes
+// now. Do not reinterpret RAM_RESERVE_MB as a slice held back below the limit;
+// operators and self-host installs set these, and check-guards.mjs reads them
+// the way they are described above.
 const RAM_LIMIT_MB    = parseInt(process.env.RAM_LIMIT_MB    || '512');
 const RAM_RESERVE_MB  = parseInt(process.env.RAM_RESERVE_MB  || '256');
+// What blobs may occupy, in bytes.
+const BLOB_BUDGET_BYTES = Math.max(32 * 1048576, RAM_LIMIT_MB * 1048576);
+// Kept as a blob COUNT for the status view and the self-host installs that read
+// it, but derived from the byte budget rather than being the budget itself.
 const BLOB_SIZE_MB    = 5;
-const MAX_BLOBS       = Math.floor(RAM_LIMIT_MB / BLOB_SIZE_MB);
+const MAX_BLOBS       = Math.floor(BLOB_BUDGET_BYTES / (BLOB_SIZE_MB * 1048576));
+
+// Running total of blob bytes, kept as blobs are stored and dropped. The old
+// version summed the whole map on every call, and ramOk() runs on every upload:
+// at a hundred blobs per transfer that is a full scan per chunk.
+let blobBytesHeld = 0;
 
 function ramStats() {
   const mem    = process.memoryUsage();
   const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
   const rssMB  = Math.round(mem.rss      / 1024 / 1024);
-  let blobBytes = 0;
-  for (const e of blobStore.values()) blobBytes += (e.size || 0);
-  const blobMB  = Math.round(blobBytes / 1024 / 1024);
-  return { heapMB, rssMB, blobMB, blobCount: blobStore.size };
+  return {
+    heapMB, rssMB,
+    blobBytes: blobBytesHeld,
+    blobMB: Math.round(blobBytesHeld / 1024 / 1024),
+    blobCount: blobStore.size,
+  };
 }
 
+// Is there room for one more blob? Two independent questions, and both have to
+// answer yes.
+//
+//   1. the blob budget: what is already held, plus what is mid-upload, plus the
+//      one being asked about, must fit in BLOB_BUDGET_BYTES.
+//   2. actual process memory: RSS must stay under RAM_LIMIT_MB + RAM_RESERVE_MB,
+//      which scripts/check-guards.mjs holds below the container's cgroup limit,
+//      so this branch can actually fire. It catches the memory a blob costs on the way
+//      in that the budget does not model -- a 5 MiB blob arrives base64'd inside
+//      a JSON body, so it is roughly 19 MB of transient buffers before it
+//      becomes a 5 MiB Buffer.
 function ramOk() {
-  const { rssMB, blobCount } = ramStats();
-  const effective = blobCount + inFlightInbound;
-  if (effective >= MAX_BLOBS) return false;
-  if (rssMB + BLOB_SIZE_MB * (inFlightInbound + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  const { rssMB } = ramStats();
+  const wouldHold = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB;
+  if (wouldHold > BLOB_BUDGET_BYTES) return false;
+  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
   return true;
 }
 
@@ -1299,8 +1788,10 @@ function ramStatus() {
     heap_mb:          s.heapMB,
     rss_mb:           s.rssMB,
     ram_limit_mb:     RAM_LIMIT_MB,
+    blob_budget_mb:   Math.round(BLOB_BUDGET_BYTES / 1048576),
+    blob_budget_free_mb: Math.max(0, Math.round((BLOB_BUDGET_BYTES - s.blobBytes) / 1048576)),
     ram_ok:           ramOk(),
-    available_slots:  Math.max(0, MAX_BLOBS - s.blobCount - inFlightInbound),
+    available_slots:  Math.max(0, Math.floor((BLOB_BUDGET_BYTES - s.blobBytes) / MAX_BLOB) - inFlightInbound),
   };
 }
 
@@ -1315,43 +1806,342 @@ setInterval(() => {
 
 // ── RAM_GUARD marker
 // ── RAM-only stores ───────────────────────────────────────────────────────────
-const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub}
+const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub, account_id, is_primary, scope, kid}
+const accounts   = new Map();  // account_id → {account_id, plan, email, primary_api_key, label}  (stap 1: account_id == key)
+const accountKeys = new Map(); // account_id → Set<api_key>  (reverse index for per-account cap + listing)
+const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/listings)
+// sha256(api_key) → api_key. A ParaSend session-token record names its owner by
+// hash, never in the clear, so a read-only leak of the store (an RDB snapshot,
+// a replica, a backup, a MONITOR session) carries no live pgp_ key. This map is
+// the way back, and it exists only in this process's memory: nothing derives a
+// key from a hash, it is looked up in the table the relay already has.
+const apiKeyByHash = new Map();
+let _hashIndexBuiltAt = 0;
+function rebuildApiKeyHashIndex() {
+  apiKeyByHash.clear();
+  for (const k of apiKeys.keys()) apiKeyByHash.set(sessionTokens.keyHash(k), k);
+  _hashIndexBuiltAt = Date.now();
+  return apiKeyByHash.size;
+}
+// Resolve a hash, self-healing. The index is rebuilt on load and on
+// /v2/reload-users, which is where the table normally changes, but keys are
+// also created at run time (/v2/admin/keys, team keys, the claim flow) without
+// going through either. So a miss rebuilds and asks again, and a hit is checked
+// against apiKeys, which means a stale entry can never resolve to a key that is
+// gone. The rebuild is bounded: it runs when the table changed size, and
+// otherwise at most once a second, so a flood of invented hashes cannot turn a
+// lookup into a full scan per request.
+function apiKeyFromHash(hash) {
+  const hit = apiKeyByHash.get(hash);
+  if (hit && apiKeys.has(hit)) return hit;
+  if (apiKeyByHash.size !== apiKeys.size || Date.now() - _hashIndexBuiltAt > 1000) {
+    rebuildApiKeyHashIndex();
+    const again = apiKeyByHash.get(hash);
+    if (again && apiKeys.has(again)) return again;
+  }
+  return null;
+}
+// Resolve a key to its account_id. For every loaded key account_id is preset
+// (stap 1); for a legacy 1:1 key account_id === apiKey, so device/pubkey/webhook
+// keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
+// ones — behaviour-neutral now, account-shared once a second key is added.
+function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
+
+// WHO THE DASHBOARD MEANS when it says user_id, translated to who the send
+// store filed the send under. These are not the same string, and that cost the
+// whole feature.
+//
+// admin/server.js puts `user_id: user.key` in the session -- the API key. The
+// send is filed under acctOf(apiKey), which is `account_id` when the record has
+// one. Every account created through the admin has one. So a real customer's
+// dashboard asked for sends belonging to `pgp_...` while every send they had
+// ever made was filed under `acct_...`: an empty list, nothing to open, nothing
+// to withdraw. Measured, and it is exactly the tracking the product is sold on.
+//
+// Translating here rather than in the admin keeps it working from both sides:
+// an old account without account_id still resolves to itself, and a caller that
+// already sends the account id is untouched.
+function accountVan(userId) {
+  const v = String(userId || '');
+  if (!v) return v;
+  return apiKeys.has(v) ? acctOf(v) : v;
+}
+// How an account is named to somebody it sent a signing request to. The address
+// on the account, because that is exactly what the invitation mail already put
+// in front of this reader: admin/server.js sends signingInviteEmail with
+// senderLabel = the sender's session address. Showing the same string back on
+// the worklist tells the recipient nothing new and lets them match the row to
+// the mail. Precedence is the one _indexAccountExpiry() uses: a member key's
+// address first, the account summary second.
+//
+// Returns '' when the account cannot be named. The caller then says so rather
+// than dropping a document somebody is waiting on: an unnamed sender is a worse
+// row, an invisible request is a worse product.
+function senderLabelOf(accountId) {
+  if (!accountId) return '';
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.email) return mv.email; }
+  return (accounts.get(accountId) || {}).email || '';
+}
+// Resolve the record an ENTITLEMENT decision must read. The accounts map is a
+// summary ({account_id, plan, email, primary_api_key, label}) and never carries
+// the per-product plans: setProductPlan writes plan_parasign/plan_parasend onto
+// the apiKeys records (and users.json), not here. A gate that reads accounts
+// alone therefore misses a paid upgrade entirely and falls back to legacy
+// `plan` -> free. That is exactly what the ParaSign web sign gate did: a paying
+// Pro account kept hitting the 2-signature free wall. Merge both, taking the
+// HIGHEST per-product tier any key of the account carries so a stale free key
+// can never hold a paid account down.
+// What the admin projections (/v2/admin/keys and the key reveal) show for one
+// product of one key record, read at the moment of the request:
+//   plan        the tier that runs NOW (or the one on file when none runs).
+//               The stored pair says what was on top when it was written; a
+//               Business month that ended yesterday still sits there, while the
+//               Pro year under it is what every gate grants today.
+//   paid_until  the day this product's paid access ends: the last of its
+//               terms, or null when one has no end. That is the day every
+//               screen means when it says "your plan ends on", followed by "and
+//               falls back to Community". With a Business month over a Pro year
+//               the end of the month is not that day.
+// Every screen in admin/ is built on this projection, so it has to say what the
+// gates say. A record with one term reads exactly as before; a record from
+// before per-product plans keeps the no-downgrade derivation from its legacy
+// plan.
+function _termView(v, product) {
+  const planField = entitlements.PRODUCT_PLAN_FIELD[product];
+  if (!v || !v[planField]) {
+    return {
+      tier: product === 'parasign' ? entitlements.derivePlanParasign(v && v.plan, v && v.parasign) : entitlements.derivePlanParasend(v && v.plan),
+      paidUntil: (v && v[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null,
+    };
+  }
+  const now = entitlements.currentTermOf(v, product);
+  if (entitlements.termsOf(v, product).length === 0) return { tier: now.tier, paidUntil: now.paidUntil };
+  const last = entitlements.finalTermOf(v, product);
+  return { tier: now.tier, paidUntil: last ? last.paidUntil : null };
+}
+
+function entitlementRecordOf(accountId) {
+  if (!accountId) return null;
+  const acct = accounts.get(accountId);
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  return entitlements.mergeAccountRecord(acct, [...members].map(m => apiKeys.get(m)));
+}
+
+// May this account start new ParaSign API work? One answer for both doors: POST
+// /v2/user/parasign-keys asks it before it mints a psk_ key, and the /v1 router
+// asks it before every new envelope such a key creates (injected there as
+// parasignEntitled). The rule is keys-table.accountHasParasignEntitlement: a live
+// grant on any member key, or a legacy plan that includes ParaSign. Reading,
+// fetching the evidence of and voiding the account's own earlier envelopes do
+// not ask it, so a customer keeps the proof of what was already signed.
+//
+// The /v1 router used to ask only whether the KEY carried the parasign scope,
+// and a psk_ key carries it for life. A chargeback or a lapsed term therefore
+// shut the mint door and left every key minted before it creating envelopes
+// (finding R1 of the payment-flow test of 2026-09-25).
+function parasignApiEntitled(accountId) {
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  const memberRecords = [...members].map(k => apiKeys.get(k)).filter(Boolean);
+  const acct = accounts.get(accountId);
+  const plan = (acct && acct.plan) || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
+  return keysTable.accountHasParasignEntitlement(memberRecords, plan);
+}
+
+// EVERY ParaSend ceiling a request is held to, off the product axis and nowhere
+// else. Reading `keyData.plan` for a limit is the fault this function exists to
+// end: the Mollie webhook upgrades an account through setProductPlan ->
+// entitlements.applyProductTier, which writes plan_parasend and deliberately
+// never touches the unified `plan`. A gate reading `plan` therefore cannot see
+// a paid ParaSend upgrade at all, so a Pro buyer would keep the community hour,
+// the single read and the 5-device cap while /pricing sells him 24 hours, 10
+// reads and 50 devices. Only the manual admin route sets `plan` as well, which
+// is why nothing was visible before self-serve billing.
+//
+// A record with no tier on file resolves to community, the strictest ParaSend
+// tier. A missing plan is not evidence of a paid one; the previous `|| 'pro'`
+// defaults on the device cap and the pubkey TTL were the mirror image of that
+// rule and handed an unplanned key the Pro ceiling.
+function parasendLimitsOf(rec) {
+  return entitlements.getEntitlements(rec || null).parasend;
+}
+
+// An entitlement number as the admin views report it. The entitlement layer
+// says Infinity for an uncapped structural limit; the admin JSON has always
+// said -1 (tiers.UNLIMITED), and JSON.stringify turns Infinity into null, which
+// an operator reads as "no data" rather than "no cap".
+function _reportLimit(v) {
+  return v === Infinity ? tiers.UNLIMITED : v;
+}
+
+// The file ceiling an upload is really held to, in MB.
+//
+// This used to return min(MAX_BLOB, file_mb) because the gate compared a single
+// blob against file_mb, which meant every tier was really held to one 5 MB
+// block. It no longer does: a file is carried as many blobs and the ceiling is
+// enforced by counting them (FILE_MAX_BLOCKS below), so the number an operator
+// sees here is the tier's own, and MAX_BLOB does not enter into it.
+function _effectiveFileMb(ent) {
+  // Through _reportLimit, so an uncapped row reports -1 and not null.
+  //
+  // This used to be Math.min(MAX_BLOB / 1048576, file_mb), which happened to
+  // launder Infinity into a finite 5 on the way out. Removing the min removed
+  // that accident too: the enterprise row is Infinity, JSON.stringify turns
+  // Infinity into null, and an operator reads null as "no data" rather than
+  // "no cap". The whole point of _reportLimit is that -1 is how this API says
+  // uncapped.
+  return _reportLimit(ent.parasend.limits.file_mb);
+}
+
+// How many padded blocks a file of `fileMb` may occupy.
+//
+// The relay cannot see a file. It sees blobs, and it learns which blobs belong
+// together from the `meta.file_id` the sender already sends for quota dedup. So
+// the file ceiling is enforced as a block count, and the conversion needs the
+// plaintext each block actually carries.
+//
+// CLIENT_CHUNK_PLAIN is the chunk size the web app uses (parashare.page.js
+// CHUNK_PLAIN). It is deliberately under MAX_BLOB so the wire prelude, the AEAD
+// tag and the per-chunk metadata header fit in the same block. A client that
+// chunks smaller than this simply gets fewer bytes through before it hits the
+// ceiling; that is its own problem and not a security boundary. The security
+// boundaries are MAX_BLOB, the relay's memory budget and the monthly quota, and
+// all three sit underneath this. Hence the slack: this number is a product
+// limit, and it should err towards letting an honest 500 MB file finish.
+const CLIENT_CHUNK_PLAIN = 4.5 * 1024 * 1024;
+const FILE_BLOCK_SLACK   = 4;
+function fileMaxBlocks(fileMb) {
+  if (!Number.isFinite(fileMb) || fileMb < 0) return Infinity;
+  return Math.ceil((fileMb * 1048576) / CLIENT_CHUNK_PLAIN) + FILE_BLOCK_SLACK;
+}
+
+// Blocks seen per file, so a file ceiling can be enforced across the uploads
+// that make up one file. Keyed by the sender's file_id, scoped to the account so
+// two accounts cannot collide or interfere. Entries are short-lived: a transfer
+// is minutes, and the sweep below drops anything idle for an hour.
+const fileBlocks = new Map(); // `${account}:${file_id}` → { blocks, ts }
+const FILE_BLOCKS_TTL_MS = 3600_000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of fileBlocks.entries()) {
+    if (now - v.ts > FILE_BLOCKS_TTL_MS) fileBlocks.delete(k);
+  }
+}, 300_000).unref?.();
+
+// Blobs currently held per account, for the concurrent_blobs ceiling. Kept as a
+// counter rather than scanned out of blobStore: this is read on every upload.
+const accountBlobs = new Map(); // account_id → count
+function accountBlobsAdd(acct, n) {
+  if (!acct) return;
+  const next = (accountBlobs.get(acct) || 0) + n;
+  if (next <= 0) accountBlobs.delete(acct); else accountBlobs.set(acct, next);
+}
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
-// Trial key request rate limiting (in-memory)
-const trialRequests   = new Map(); // email_lc → last_request_ts
-const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
-const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
+// Every write to blobStore goes through these two, so blobBytesHeld cannot drift
+// away from what is really held. It is the number the capacity guard decides on,
+// and a guard reading a stale total is worse than no guard: it refuses uploads
+// the relay could take, or accepts ones it cannot.
+function blobPut(hash, entry) {
+  const prev = blobStore.get(hash);
+  if (prev) { blobBytesHeld -= (prev.size || 0); accountBlobsAdd(prev.account_id, -1); }
+  blobBytesHeld += (entry.size || 0);
+  accountBlobsAdd(entry.account_id, 1);
+  blobStore.set(hash, entry);
+}
+// Drops the entry and wipes the bytes. zeroBuffer is what makes "destroyed"
+// true rather than "dereferenced", so it belongs here and not at each call site
+// where it can be forgotten.
+// wipe=false is for the one case where the bytes are still needed: a burn-on-read
+// drops the entry BEFORE the response is written, so that a second reader cannot
+// find it, but the buffer itself is what is being sent. Those callers wipe on
+// 'finish' instead. Everywhere else the default is right.
+function blobDrop(hash, wipe = true) {
+  const e = blobStore.get(hash);
+  if (!e) return false;
+  blobBytesHeld -= (e.size || 0);
+  if (blobBytesHeld < 0) blobBytesHeld = 0;
+  accountBlobsAdd(e.account_id, -1);
+  blobStore.delete(hash);
+  if (wipe) zeroBuffer(e.blob);
+  return true;
+}
 
+const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
+const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
+const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest (unauthenticated)
+// Same window, same reason, for POST /v2/relays/register. The STH ingest route
+// got one because it is "unauthenticated (ownership-signature only), so a flood
+// of attacker-minted relay keypairs is otherwise unbounded". Its neighbour
+// registers those very keypairs and had nothing: every registration appends to
+// the CT log (on disk since the persistence fix) and every append gossips a
+// fresh head to every peer in the registry, so one unauthenticated POST bought
+// an amplified fan-out and unbounded disk. The 2026-09-05 review, finding 21.
+const relayRegisterIpRequests = new Map(); // ip → [timestamps] for /v2/relays/register (unauthenticated)
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
+
+// Eviction sweep for the limiter maps that lacked one (the other limiters already
+// self-evict). Without this they grow unbounded — slow memory/audit creep,
+// especially with spoofable client IPs. Mirrors the dpa*/usedTotp sweeps.
+setInterval(() => {
+  const now = Date.now();
+  const HOUR = 3_600_000;
+  for (const [k, times] of anonInboundIpRequests){ const kept = times.filter(t => now - t < HOUR); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
+  for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
+  for (const [k, times] of sthIngestIpRequests)  { const kept = times.filter(t => now - t < HOUR); if (kept.length) sthIngestIpRequests.set(k, kept);  else sthIngestIpRequests.delete(k); }
+  for (const [k, times] of relayRegisterIpRequests) { const kept = times.filter(t => now - t < HOUR); if (kept.length) relayRegisterIpRequests.set(k, kept); else relayRegisterIpRequests.delete(k); }
+  for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
+}, 3_600_000);
+
 function checkTeamRateLimit(teamId, limit) {
   if (!teamId) return true;
-  const now = Date.now();
-  const b = teamRateLimits.get(teamId) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= limit) return false;
-  b.count++; teamRateLimits.set(teamId, b); return true;
+  return rateLimit.fixedWindowAllow(teamRateLimits, teamId, limit, 60000);
 }
 
 // M2: Per-IP rate limit for /v2/admin/verify-mfa (max 5 attempts per minute)
 const mfaRateLimits = new Map(); // ip → { count, resetAt }
 function checkMfaRateLimit(ip) {
-  const now = Date.now();
-  const b = mfaRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 5) return false;
-  b.count++; mfaRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(mfaRateLimits, ip, 5, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of mfaRateLimits) if (now > v.resetAt + 60000) mfaRateLimits.delete(k); }, 120_000);
+
+// Per-USER throttle for /v2/user/{verify-totp,consume-backup}. The internal-auth
+// guard proves the caller (admin proxy), not that the end user isn't brute-forcing
+// their own 6-digit TOTP (10^6 space). Cap attempts per user in a sliding window;
+// reset on success so legit retries never lock out. In-memory, mirrors
+// checkMfaRateLimit; fails open on nothing (pure counter).
+const USER_MFA_MAX = 10;            // failures before the delay starts, not a cap
+const USER_MFA_WINDOW_MS = 300_000; // 5 min
+const userMfaAttempts = new Map(); // user_id → { count, resetAt } (failures)
+// Counts FAILURES, not attempts, and answers with a delay rather than a refusal.
+// Was: an increment on the way IN plus a 429 at USER_MFA_MAX, which meant ten
+// posts naming somebody else's user_id locked that account out of verify-totp
+// and consume-backup for the whole window. The user_id is request input, so a
+// refusal keyed on it is a weapon aimed at the account, not at the guesser.
+// lib/auth-throttle.js holds the (unit-tested) decision; the Map and its sweep
+// stay here, as with the other limiters.
+function userMfaDelayMs(user_id) {
+  return authThrottle.throttleDelayMs(
+    authThrottle.failureCount(userMfaAttempts, user_id),
+    { threshold: USER_MFA_MAX });
+}
+function userMfaNoteFailure(user_id) { authThrottle.noteFailure(userMfaAttempts, user_id, USER_MFA_WINDOW_MS); }
+function userMfaAttemptReset(user_id) { authThrottle.clearFailures(userMfaAttempts, user_id); }
+setInterval(() => { const now = Date.now(); for (const [k, v] of userMfaAttempts) if (now > v.resetAt + USER_MFA_WINDOW_MS) userMfaAttempts.delete(k); }, 300_000);
+
+// Per-IP rate limit for the public /v2/claim/reveal (max 20/min) — a claim token
+// is a 256-bit random hex, so this just caps abusive polling, not real guessing.
+const claimRateLimits = new Map();
+function claimRateOk(ip) {
+  return rateLimit.fixedWindowAllow(claimRateLimits, ip, 20, 60000);
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of claimRateLimits) if (now > v.resetAt + 60000) claimRateLimits.delete(k); }, 120_000);
+
 // Per-IP rate limit for /v2/check-key (max 30/min) — prevents API key brute-force
 const checkKeyRateLimits = new Map();
 function checkKeyRateOk(ip) {
-  const now = Date.now();
-  const b = checkKeyRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 30) return false;
-  b.count++; checkKeyRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(checkKeyRateLimits, ip, 30, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of checkKeyRateLimits) if (now > v.resetAt + 60000) checkKeyRateLimits.delete(k); }, 120_000);
 
@@ -1359,13 +2149,31 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of checkKeyRateLim
 // enumeration of (pubkey → email) bindings even though only exact hash matches.
 const lookupSignerRateLimits = new Map();
 function lookupSignerRateOk(ip) {
-  const now = Date.now();
-  const b = lookupSignerRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 30) return false;
-  b.count++; lookupSignerRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(lookupSignerRateLimits, ip, 30, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of lookupSignerRateLimits) if (now > v.resetAt + 60000) lookupSignerRateLimits.delete(k); }, 120_000);
+
+// ── Guessing budget for POST /v2/session/join ────────────────────────────────
+// The route takes a pre-shared secret and answers whether it was right. It has
+// no API key on purpose (the PSS is the authentication), and until the
+// 2026-09-05 review, finding 6, it had nothing else either: a wrong secret got a
+// 403 and left the session sitting there, so whoever had the session id could
+// try passphrases at wire speed. A PSS is a human-chosen phrase -- the docs
+// spell one out as an example -- so minutes of that is enough.
+//
+// Two budgets, because they stop different attackers. The per-IP window is the
+// same shape as every other limiter here and stops one host hammering. The
+// per-session budget is the one that matters: it survives a rotating source
+// address, and it is bounded by the thing being attacked rather than by who is
+// attacking it. Five wrong answers destroys the session, which is the correct
+// end state anyway -- a session whose secret has been guessed at five times is
+// not a session anyone should still be able to join.
+const sessionJoinLimits = new Map();      // ip -> { count, resetAt }
+const SESSION_JOIN_MAX_ATTEMPTS = 5;
+function sessionJoinRateOk(ip) {
+  return rateLimit.fixedWindowAllow(sessionJoinLimits, ip, 10, 60_000);
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of sessionJoinLimits) if (now > v.resetAt + 60_000) sessionJoinLimits.delete(k); }, 120_000);
 
 // Per-IP rate limits for /v2/envelopes/* (Model 2 multi-party signing).
 // Create is throttled per API key to prevent quota abuse; view/sign are
@@ -1374,25 +2182,13 @@ const envCreateLimits = new Map();        // apiKey  -> { count, resetAt }
 const envViewLimits   = new Map();        // ip      -> { count, resetAt }
 const envSignLimits   = new Map();        // ip      -> { count, resetAt }
 function envCreateRateOk(apiKey) {
-  const now = Date.now();
-  const b = envCreateLimits.get(apiKey) || { count: 0, resetAt: now + 3600_000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 3600_000; }
-  if (b.count >= 50) return false;          // 50/hour/key
-  b.count++; envCreateLimits.set(apiKey, b); return true;
+  return rateLimit.fixedWindowAllow(envCreateLimits, apiKey, 50, 3600_000);
 }
 function envViewRateOk(ip) {
-  const now = Date.now();
-  const b = envViewLimits.get(ip) || { count: 0, resetAt: now + 60_000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60_000; }
-  if (b.count >= 30) return false;          // 30/min/ip
-  b.count++; envViewLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(envViewLimits, ip, 30, 60_000);
 }
 function envSignRateOk(ip) {
-  const now = Date.now();
-  const b = envSignLimits.get(ip) || { count: 0, resetAt: now + 60_000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60_000; }
-  if (b.count >= 10) return false;          // 10/min/ip
-  b.count++; envSignLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(envSignLimits, ip, 10, 60_000);
 }
 setInterval(() => {
   const now = Date.now();
@@ -1401,59 +2197,82 @@ setInterval(() => {
   for (const [k, v] of envSignLimits)   if (now > v.resetAt + 60_000) envSignLimits.delete(k);
 }, 120_000);
 
-// Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
+// Fleet-wide envelope-create rate limit. The per-process envCreateLimits above
+// only bound ONE relay instance; behind the multi-instance deployment a client
+// got N times the intended 50/hour. This shares the counter in redis: INCR a
+// per-key hourly bucket, EXPIRE it on first hit. Fails OPEN to the per-process
+// limiter when redis is down, so an outage never hard-blocks paying integrators
+// (they still get the local 50/hour cap). The bucket rolls hourly by wall clock.
+const ENV_CREATE_LIMIT = 50;
+async function envCreateRateOkShared(apiKey) {
+  if (!redisClient || !redisClient.isReady) return envCreateRateOk(apiKey);
+  try {
+    const bucket = Math.floor(Date.now() / 3600_000);
+    const rk = `paramant:rl:envcreate:${bucket}:${apiKey}`;
+    const n = await redisCounter.incrInWindow(redisClient, rk, 3600);
+    return n <= ENV_CREATE_LIMIT;
+  } catch (e) {
+    log('warn', 'env_create_rl_redis_fail', { err: e.message });
+    return envCreateRateOk(apiKey);
+  }
+}
+
+// ── ParaSign /v1 durable side-store (documents + webhook meta) ────────────────
+// Encrypted-at-rest in redis (AES-256-GCM), in-memory fallback without a key.
+// A SINGLE instance is shared by the /v1 router and the /v2 sign path (the
+// completion-webhook emit reads the same webhook meta). Key: PARASIGN_STORE_KEY,
+// else the already-required TOTP master key.
+function _parasignStoreKey() {
+  return process.env.PARASIGN_STORE_KEY || process.env.PARAMANT_TOTP_MASTER_KEY || null;
+}
+// ── ParaSend durable store for sends to named recipients ─────────────────────
+// Same machinery, its own namespace. Ordinary transfers keep living in the
+// in-memory Map: five minutes and one reader survive a process fine. A send to
+// thirty people can stand open for a week, and a restart would quietly destroy
+// something a customer is still waiting on, so those go through here.
+//
+// The prefix AND the AAD prefix differ from signing, so neither product can read
+// or unseal the other's documents.
+function _sendStore() {
+  if (!_sendStore._inst) {
+    const store = parasignStoreMod.createParaSignStore({
+      redis: redisClient, encKey: _parasignStoreKey(), log,
+      prefix: 'psend', aadPrefix: 'parasend',
+    });
+    _sendStore._inst = sendMod.createSendStore({ store, log });
+    _sendStore._backend = store.backend;
+    log('info', 'send_store_backend', { backend: store.backend });
+  }
+  return _sendStore._inst;
+}
+
+function _parasignStore() {
+  if (!_parasignStore._inst) {
+    _parasignStore._inst = parasignStoreMod.createParaSignStore({
+      redis: redisClient, encKey: _parasignStoreKey(), log,
+    });
+    log('info', 'parasign_store_backend', { backend: _parasignStore._inst.backend });
+  }
+  return _parasignStore._inst;
+}
+
+// Per-IP rate limit for /v2/status/:hash.
+//
+// Raised from 60/min. A streaming send asks this once per block to see whether
+// the receiver has taken the one it is waiting on, and a 500 MB file is 112
+// blocks: at 60/min a fast upload tripped its own back-pressure check and fell
+// back to sending blind, which is the behaviour the window exists to prevent.
+//
+// The old comment called this an anti-enumeration limit. It is not really doing
+// that work: the argument is a 64-hex hash, so guessing one is not something a
+// rate limit is holding back. What it bounds is cost, and 240/min is still a
+// small number of map lookups.
 const statusRateLimits = new Map();
 function statusRateOk(ip) {
-  const now = Date.now();
-  const b = statusRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 60) return false;
-  b.count++; statusRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(statusRateLimits, ip, 240, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of statusRateLimits) if (now > v.resetAt + 60000) statusRateLimits.delete(k); }, 120_000);
 
-// Per-token rate limits for /v2/drop/pickup (10/min) and /v2/drop/status
-// (30/min). Closes pentest H1: without these limits a mnemonic-spray
-// attacker can probe blobStore far faster than the human-typing model the
-// BIP-39 mnemonic was designed for. Token = apiKey when authed, else IP.
-const dropPickupLimits = new Map();
-function dropPickupRateOk(token) {
-  const now = Date.now();
-  const b = dropPickupLimits.get(token) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 10) return false;
-  b.count++; dropPickupLimits.set(token, b); return true;
-}
-setInterval(() => { const now = Date.now(); for (const [k, v] of dropPickupLimits) if (now > v.resetAt + 60000) dropPickupLimits.delete(k); }, 120_000);
-
-const dropStatusLimits = new Map();
-function dropStatusRateOk(token) {
-  const now = Date.now();
-  const b = dropStatusLimits.get(token) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 30) return false;
-  b.count++; dropStatusLimits.set(token, b); return true;
-}
-setInterval(() => { const now = Date.now(); for (const [k, v] of dropStatusLimits) if (now > v.resetAt + 60000) dropStatusLimits.delete(k); }, 120_000);
-
-// Per-lookupHash password-fail counter with exponential backoff. After 5
-// failed Argon2id verifies on the same hash, refuse for an expanding window
-// (60s, 2m, 4m, ... cap 1h). Defends pw-protected drops against guessing.
-const dropPwFails = new Map();
-function dropPwBackoffMs(lookupHash) {
-  const e = dropPwFails.get(lookupHash);
-  if (!e || e.fails < 5) return 0;
-  const elapsed = Date.now() - e.lastAt;
-  const wait = Math.min(60000 * Math.pow(2, e.fails - 5), 3_600_000);
-  return Math.max(0, wait - elapsed);
-}
-function dropPwRecordFail(lookupHash) {
-  const e = dropPwFails.get(lookupHash) || { fails: 0, lastAt: 0 };
-  e.fails++; e.lastAt = Date.now();
-  dropPwFails.set(lookupHash, e);
-}
-function dropPwClear(lookupHash) { dropPwFails.delete(lookupHash); }
-setInterval(() => { const now = Date.now(); for (const [k, v] of dropPwFails) if (now - v.lastAt > 3_600_000) dropPwFails.delete(k); }, 300_000);
 
 const pubkeys    = new Map();  // device:key → {ecdh_pub, kyber_pub, dsa_pub, ts}
 const webhooks   = new Map();  // device:key → [{url, secret}]
@@ -1466,14 +2285,44 @@ function log(level, msg, data = {}) {
 
 function J(o) { return JSON.stringify(o); }
 
-// ── Client IP — prefers CF-Connecting-IP (production), falls back to X-Real-IP set by nginx ──
-function getClientIp(req) {
-  return req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
-}
+// ── Client IP: X-Real-IP, but only from a peer we put there ourselves ───────
+// Every per-IP limit in this file keys on this. It used to read the header
+// unconditionally, on the stated assumption that nginx sets it authoritatively.
+// nginx does that on the apex and on relay.paramant.app; it did not on the four
+// sector hostnames or in the /rp/<sector>/ blocks, and nginx forwards unknown
+// client headers by default. So on those hosts a caller chose their own address
+// and rotated past every limiter. See lib/client-ip.js for the whole story and
+// for why the trusted set has to include the docker bridge and not just
+// loopback. The edge configs now set the header everywhere, and
+// test/trusted-edge-gate.test.js keeps them that way; this is the lock on the
+// other side of that door, so a single missed nginx block is no longer a bypass.
+const getClientIp = clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS });
 
 // ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
 function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Mask an email for logs: keep first local char + full domain, drop the rest.
+// e.g. "alice@example.com" -> "a***@example.com". Keeps logs debuggable without
+// writing raw PII to stdout/journald.
+function maskEmail(e) {
+  const s = String(e || '');
+  const at = s.indexOf('@');
+  if (at < 1) return s ? '***' : '';
+  return s[0] + '***' + s.slice(at);
+}
+
+// Mask a client IP for logs: keep the network prefix, drop the host part.
+// IPv4 1.2.3.4 -> "1.2.x.x"; IPv6 keeps the first two hextets. Enough to spot a
+// noisy /16 or subnet without storing a full, identifying address.
+function maskIp(ip) {
+  const s = String(ip || '');
+  if (!s) return '';
+  if (s.includes(':')) { const p = s.split(':'); return p.slice(0, 2).join(':') + '::x'; }
+  const p = s.split('.');
+  if (p.length === 4) return p[0] + '.' + p[1] + '.x.x';
+  return '***';
 }
 
 // ── Key zeroization ───────────────────────────────────────────────────────────
@@ -1502,36 +2351,63 @@ function hkdf(ikm, salt, info, length) {
   }
 }
 
-// Leid relay lookup-hash af van BIP39 mnemonic (zelfde als Python SDK)
-function mnemonicToLookupHash(phrase) {
-  if (!bip39Lib) throw new Error('bip39 not available (npm install bip39)');
-  if (!bip39Lib.validateMnemonic(phrase)) throw new Error('Invalid BIP39 mnemonic (checksum error)');
-  const entropy = Buffer.from(bip39Lib.mnemonicToEntropy(phrase), 'hex');
-  const idBytes = hkdf(entropy, 'paramant-drop-v1', 'lookup-id', 32);
-  const hash    = crypto.createHash('sha3-256').update(idBytes).digest('hex');
-  zeroBuffer(entropy);
-  return hash;
-}
-
 // ── Merkle audit chain ────────────────────────────────────────────────────────
-// Elke entry bevat hash van vorige entry — tamper-evident log
+// Tamper-evident log. chain_hash commits to EVERY field of the entry except
+// itself (canonical encoding, see relay/lib/audit-chain.js). The old preimage
+// covered only {ts,event,hash,bytes,prev_hash} so the richer fields (device,
+// views_left, sig, sig-validity) were unprotected, and verifyChain never
+// recomputed the hash at all — chain_valid was a false assurance (#19).
+const { auditEntryHash, verifyChain } = require('./lib/audit-chain');
+
 function auditAppend(key, event, data = {}) {
   if (!key) return;
   if (!auditChain.has(key)) auditChain.set(key, []);
   const chain    = auditChain.get(key);
   const prevHash = chain.length > 0 ? chain[chain.length - 1].chain_hash : '0'.repeat(64);
   const entry    = { ts: new Date().toISOString(), event, prev_hash: prevHash, ...data };
-  const entryStr = JSON.stringify({ ts: entry.ts, event, hash: data.hash||'', bytes: data.bytes||0, prev_hash: prevHash });
-  entry.chain_hash = crypto.createHash('sha3-256').update(entryStr).digest('hex');
+  entry.chain_hash = auditEntryHash(entry);
   chain.push(entry);
   if (chain.length > MAX_AUDIT) chain.shift();
 }
 
-function verifyChain(entries) {
-  // Verifieer integriteit van de audit chain
-  for (let i = 1; i < entries.length; i++) {
-    if (entries[i].prev_hash !== entries[i-1].chain_hash) return false;
-  }
+// ── Reusable Resend mailer ────────────────────────────────────────────────────
+// Fire-and-forget. Returns false (no-op) when RESEND_API_KEY is unset or there is
+// no recipient, so a caller never blocks on mail and mail stays optional. Used by
+// the ParaSend Pro transfer notifications (upload/download) and by the invoice
+// mail, which is the one caller that passes an attachment; the DPA and
+// inbound-claim flows keep their own richly-templated inline sends.
+// Now a thin front for lib/mail.js, which decides who actually carries the
+// message. The name and the fire-and-forget contract are unchanged, so every
+// caller above stays as it was: returns immediately, never throws, never blocks
+// a request on a mail server.
+//
+// The point of the move: Paramant promises European handling in the footer of
+// this very mail, and the carrier is now a setting (MAIL_PROVIDER) instead of a
+// hostname compiled into this function.
+// Send and move on, logging whatever came back.
+//
+// Renamed from sendResendEmail, which stopped being true the day mail went
+// through one door: it has carried Mailjet, Scaleway or Resend depending on a
+// setting for a while now, and a function named after one carrier is how
+// somebody later assumes the switch does not apply here.
+//
+// Fire-and-forget is right ONLY where nobody is told the mail is on its way.
+// The invitation, the pickup code and the reminder all await instead, because
+// each one puts a sentence on somebody's screen claiming post has left.
+function mailLater({ to, subject, text, html, from, cc, attachments } = {}) {
+  if (!to) return false;
+  const cfg = mailer.config();
+  // Nothing configured is not a failure worth waking anyone for; it is how a
+  // relay without mail credentials has always behaved.
+  if (cfg.provider === 'resend' && !cfg.resendKey) return false;
+  mailer.stuur({ to, subject, text, html, cc, attachments,
+                 from: from || 'PARAMANT <privacy@paramant.app>' })
+    .then(r => {
+      if (r.ok) log('info', 'mail_sent', { provider: r.provider, count: r.count, subject });
+      else log('warn', 'mail_failed', { provider: r.provider, reason: r.reason,
+                                        detail: r.detail, subject });
+    })
+    .catch(e => log('warn', 'mail_failed', { reason: 'threw', err: e && e.message }));
   return true;
 }
 
@@ -1556,11 +2432,20 @@ let inFlightInbound = 0;
 // ── Per-key outbound rate limiting (finding #12) ──────────────────────────────
 // Limits how fast a key holder can burn blobs via /v2/outbound — reduces
 // ability to probe or burn other users' blobs via intercepted download tokens.
-const OUTBOUND_RATE = { free: 50, pro: 500, enterprise: Infinity };
+// The ceiling per tier lives in lib/tiers.js (outbound_per_hour) with every
+// other per-tier number. It used to be a local three-key table keyed on the raw
+// plan string, { free, pro, enterprise }, with a `?? free` fallback: 'community'
+// and 'business' were not in it, so a Business account, which pays for the
+// highest volume of all, was rate limited at the free 50 per hour. tiers.js
+// normalises the plan name (free/dev -> community, licensed -> enterprise), so
+// every plan the pricing page sells now resolves to its own ceiling. It takes
+// the KEY RECORD, not a plan string: outbound_per_hour is a ParaSend ceiling
+// and resolves on the product axis with the other five, so a webhook upgrade
+// (plan_parasend only) raises it.
 const OUTBOUND_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour sliding window
 const outboundRateMap = new Map(); // apiKey → { count, resetAt }
-function outboundRateOk(apiKey, plan) {
-  const max = OUTBOUND_RATE[plan] ?? OUTBOUND_RATE.free;
+function outboundRateOk(apiKey, rec) {
+  const max = parasendLimitsOf(rec).limits.outbound_per_hour;
   if (max === Infinity) return true;
   const now = Date.now();
   let c = outboundRateMap.get(apiKey);
@@ -1570,6 +2455,207 @@ function outboundRateOk(apiKey, plan) {
   return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
+
+// ── The brake on invitations ────────────────────────────────────────────
+//
+// WHY THIS IS SEPARATE FROM outboundRateOk. That one counts DOWNLOADS: work a
+// recipient asks for, on a link they already hold. This counts MAIL WE SEND to
+// people who are not our customers, which is a different kind of thing to get
+// wrong. An account with thirty recipients per send and no brake is a way to
+// put unlimited mail into strangers' inboxes with paramant.app on the envelope,
+// and the cost of that is not a bill, it is the domain's reputation.
+//
+// It became urgent the moment Firm went from ten recipients to thirty.
+//
+// ALL OR NOTHING, and asked BEFORE the send is made. Counting per mail as the
+// loop runs would let a send half-happen: twelve people invited, eighteen not,
+// a send record that says thirty, and no way for the sender to tell which is
+// which. So the whole send asks for its seats up front and is refused as one.
+const inviteRateMap = new Map(); // account → { count, resetAt }
+const INVITE_RATE_WINDOW_MS = 3_600_000;
+
+function inviteRateOk(account, rec, aantal) {
+  const max = parasendLimitsOf(rec).limits.outbound_per_hour;
+  if (max === Infinity) return { ok: true };
+  const n = Math.max(1, Number(aantal) || 1);
+  const now = Date.now();
+  let c = inviteRateMap.get(account);
+  if (!c || now > c.resetAt) c = { count: 0, resetAt: now + INVITE_RATE_WINDOW_MS };
+  if (c.count + n > max) {
+    return { ok: false, limit: max, used: c.count, asked: n,
+             retry_after_s: Math.max(1, Math.ceil((c.resetAt - now) / 1000)) };
+  }
+  c.count += n;
+  inviteRateMap.set(account, c);
+  return { ok: true, used: c.count, limit: max };
+}
+
+// Give the seats back when a send never happened, so a refusal further down
+// does not quietly cost somebody an hour of their ceiling.
+function inviteRateGeef(account, aantal) {
+  const c = inviteRateMap.get(account);
+  if (!c) return;
+  c.count = Math.max(0, c.count - (Number(aantal) || 0));
+  inviteRateMap.set(account, c);
+}
+
+setInterval(() => { const now = Date.now();
+  for (const [k, v] of inviteRateMap) if (now > v.resetAt) inviteRateMap.delete(k);
+}, 3_600_000).unref?.();
+
+// ── Delivery receipt store (PR #341, finding 2) ─────────────────────────
+// The signed delivery receipt used to ride out on the download itself, in the
+// X-Paramant-Receipt response header. It carries a full ML-DSA-65 signature and
+// an inclusion proof, so that header measured 18551 bytes and the response
+// header block 19560. Node's own default maxHeaderSize is 16384, so a client
+// using fetch() or a default http.request could not download a blob at all
+// (UND_ERR_HEADERS_OVERFLOW), and nginx's default proxy_buffer_size of 4k/8k
+// answers 502 on an upstream header block that size.
+//
+// So the receipt is handed over by REFERENCE instead: the download carries a
+// receipt id and the hash of the receipt bytes, and the bytes themselves are
+// fetched from GET /v2/transfers/:receipt_id/receipt. Same receipt, same
+// signature, same verification through POST /v2/verify-receipt.
+//
+// Kept in RAM like everything else on this relay, and deliberately short-lived:
+// a client fetches its receipt in the same breath as the download.
+//
+// The budget is PER ACCOUNT, not one shared queue. A single global LRU is a
+// cross-tenant eviction channel: one account doing enough downloads pushes
+// another account's receipt out inside its own 15 minute window, and before
+// this route the receipt was guaranteed to be on the response itself. So an
+// account can only ever evict its OWN oldest receipt, and the global ceiling is
+// a backstop that takes from the LARGEST holder, which can never be the small
+// tenant it would be protecting.
+//
+// Where it lives. REDIS when the relay has one, which is what the envelope
+// store already runs on, and the in-process Map only as the fallback for a
+// relay without redis. A Map alone means every restart 404s every outstanding
+// receipt: a deploy in the middle of somebody's download window silently costs
+// them their proof of delivery, and a restart is a thing operators do on
+// purpose. With redis the receipt survives the process that issued it.
+//
+// Memory. The stored form is the receipt JSON, not its base64url wrapper: the
+// wrapper is 4/3 the size and re-encoding it on the way out is deterministic,
+// so the hash stays stable and about 4.6 KB per receipt is not held. That puts
+// a receipt at roughly 14 KB.
+//
+// The per-account cap is DERIVED from the tier's own outbound ceiling: two
+// hours of downloading at the rate that tier pays for. A flat 200 was wrong for
+// exactly the tier that pays most, business at 2000 downloads an hour would
+// lose its oldest receipts after six minutes of steady use, inside the 15
+// minute window it was promised. Enterprise has no outbound ceiling to double,
+// so it takes an explicit one.
+//
+//   community  50/h  ->   100      pro   500/h  ->  1000
+//   business 2000/h  ->  4000      enterprise   -> RECEIPT_UNCAPPED_TIER_MAX
+//
+// The global backstop applies to the Map path only, where the memory is this
+// process's. With redis the bound is the TTL, the per-account cap, and redis'
+// own maxmemory policy.
+const RECEIPT_TTL_MS = 15 * 60 * 1000;
+const RECEIPT_TTL_S = Math.round(RECEIPT_TTL_MS / 1000);
+const RECEIPT_UNCAPPED_TIER_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_UNCAPPED_MAX || '10000', 10) || 10000);
+// A fixed override, for tests that need to drive the eviction rule without
+// making thousands of downloads. Unset in production, where the tier decides.
+const RECEIPT_PER_ACCOUNT_OVERRIDE = parseInt(process.env.PARAMANT_RECEIPT_PER_ACCOUNT_MAX || '0', 10) || 0;
+// The retention cap rides on outbound_per_hour, so it is a ParaSend ceiling too
+// and takes the key record rather than a plan string.
+function receiptCapFor(rec) {
+  if (RECEIPT_PER_ACCOUNT_OVERRIDE > 0) return RECEIPT_PER_ACCOUNT_OVERRIDE;
+  const rate = parasendLimitsOf(rec).limits.outbound_per_hour;
+  const cap = Number.isFinite(rate) ? rate * 2 : RECEIPT_UNCAPPED_TIER_MAX;
+  return Math.max(1, Math.min(cap, RECEIPT_UNCAPPED_TIER_MAX));
+}
+const RECEIPT_TOTAL_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_TOTAL_MAX || '4000', 10) || 4000);
+const RECEIPT_RK = (id) => `paramant:receipt:${id}`;
+const RECEIPT_AK = (owner) => `paramant:receipts:acct:${owner}`;
+const deliveryReceipts = new Map(); // receipt_id -> { json, hash, apiKey, owner, expiresAt }
+const receiptsByOwner = new Map();  // owner (account_id) -> Set<receipt_id>, insertion ordered
+function _dropReceipt(id) {
+  const rec = deliveryReceipts.get(id);
+  if (!rec) return;
+  deliveryReceipts.delete(id);
+  const own = receiptsByOwner.get(rec.owner);
+  if (own) { own.delete(id); if (own.size === 0) receiptsByOwner.delete(rec.owner); }
+}
+function _dropOldestOf(owner) {
+  const own = receiptsByOwner.get(owner);
+  if (!own) return false;
+  const oldest = own.values().next();
+  if (oldest.done) return false;
+  _dropReceipt(oldest.value);
+  return true;
+}
+async function storeDeliveryReceipt(json, hash, apiKey, owner, rec) {
+  const id = crypto.randomBytes(16).toString('hex');
+  const bucket = owner || apiKey || '_anonymous';
+  const cap = receiptCapFor(rec);
+  if (redisClient && redisClient.isReady) {
+    try {
+      const ak = RECEIPT_AK(bucket);
+      await redisClient.set(RECEIPT_RK(id), JSON.stringify({ json, hash, apiKey: apiKey || null }), { EX: RECEIPT_TTL_S });
+      await redisClient.zAdd(ak, { score: Date.now(), value: id });
+      await redisClient.expire(ak, RECEIPT_TTL_S);
+      // The cap is per account and enforced against that account's own index,
+      // so a busy tenant can only ever drop its own oldest.
+      const over = (await redisClient.zCard(ak)) - cap;
+      if (over > 0) {
+        const stale = await redisClient.zRange(ak, 0, over - 1);
+        if (stale.length) {
+          await redisClient.del(stale.map(RECEIPT_RK));
+          await redisClient.zRemRangeByRank(ak, 0, over - 1);
+        }
+      }
+      return id;
+    } catch (e) {
+      // Never fail a download over its receipt: fall through to the Map.
+      log('warn', 'receipt_store_redis_failed', { err: e.message });
+    }
+  }
+  // Sets preserve insertion order and every entry has the same TTL, so the head
+  // of a bucket is always that owner's entry closest to expiring.
+  while ((receiptsByOwner.get(bucket)?.size || 0) >= cap) {
+    if (!_dropOldestOf(bucket)) break;
+  }
+  // Global backstop. Take from whoever holds the most, never from whoever
+  // happens to be oldest, so a burst cannot evict a quiet tenant.
+  while (deliveryReceipts.size >= RECEIPT_TOTAL_MAX) {
+    let biggest = null; let most = 0;
+    for (const [o, set] of receiptsByOwner) if (set.size > most) { most = set.size; biggest = o; }
+    if (biggest === null || !_dropOldestOf(biggest)) break;
+  }
+  deliveryReceipts.set(id, { json, hash, apiKey: apiKey || null, owner: bucket, expiresAt: Date.now() + RECEIPT_TTL_MS });
+  if (!receiptsByOwner.has(bucket)) receiptsByOwner.set(bucket, new Set());
+  receiptsByOwner.get(bucket).add(id);
+  return id;
+}
+setInterval(() => { const now = Date.now(); for (const [id, r] of deliveryReceipts) if (now > r.expiresAt) _dropReceipt(id); }, 60_000).unref?.();
+
+// Read one back. Redis first, so a receipt issued by a process that has since
+// been restarted is still there; the Map is the fallback for a relay with no
+// redis. Returns { json, hash, apiKey } or null.
+async function fetchDeliveryReceipt(id) {
+  if (redisClient && redisClient.isReady) {
+    try {
+      const raw = await redisClient.get(RECEIPT_RK(id));
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      log('warn', 'receipt_fetch_redis_failed', { err: e.message });
+    }
+  }
+  const rec = deliveryReceipts.get(id);
+  if (!rec) return null;
+  if (Date.now() > rec.expiresAt) { _dropReceipt(id); return null; }
+  return rec;
+}
+
+// Deprecation window for the fat header. Nothing in this repo reads it outside
+// its own tests, but an out-of-tree client might, so an operator can put it back
+// for one release with PARAMANT_INLINE_RECEIPT_HEADER=1. It is off by default
+// because on a default nginx the fat header is a 502, not a feature. To be
+// removed after 2026-12-01; see docs/api.md.
+const INLINE_RECEIPT_HEADER = process.env.PARAMANT_INLINE_RECEIPT_HEADER === '1';
 
 // Serialized async write queue for users.json — prevents lost-update race.
 // _writeUsersJson: low-level write (caller must already hold the snapshot).
@@ -1598,9 +2684,837 @@ function _mutateUsersJson(fn) {
   return _usersWriteQueue;
 }
 
+// ── Billing auto-grant: paid Pro plan → parasign entitlement ──────────────
+// /*MARK:parasign_billing_autograt*/ Called from the plan-change path when an
+// account moves to a paid plan (pro/licensed/enterprise). Reuses the exact
+// account-level fan-out + persistence of /v2/admin/keys/set-parasign: flips the
+// `parasign` flag on every member key of the account, then persists to users.json.
+// Idempotent and additive - safe to call on every paid update-plan.
+const PARASIGN_PAID_PLANS = new Set(['pro', 'business', 'licensed', 'enterprise']);
+function grantParasignOnPaidPlan(accountId) {
+  if (!accountId) return { ok: false, reason: 'no_account' };
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  if (members.size === 0) return { ok: false, reason: 'no_keys' };
+  let changed = 0;
+  for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.parasign !== true) { mv.parasign = true; changed++; } }
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) {
+      if ((entry.account_id || entry.key) === accountId) entry.parasign = true;
+    }
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_grant_on_paid_plan', { account: String(accountId).slice(0, 12), keys: members.size, changed, persisted: true }))
+    .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+  return { ok: true, keys: members.size, changed };
+}
+
+// ── Per-product entitlement setter (billing) ──────────────────────────────
+// Set ONE product's plan (plan_parasign OR plan_parasend) for an account,
+// independently of the other product, then persist. This is what the Mollie
+// webhook calls on a paid payment. Models grantParasignOnPaidPlan's account
+// fan-out + users.json persistence. Idempotent (a repeat call with the same tier
+// changes nothing -> changed:0). For parasign it also flips the `parasign` access
+// flag on when the tier is paid (non-free). NEVER touches the other product.
+// paidUntil travels with the tier: a Date (or ISO string) sets the period this
+// grant is paid for, null clears it, and undefined leaves whatever is on record
+// alone. That last case keeps every admin grant behaving exactly as before.
+//
+// A GRANT NEVER LOWERS A RUNNING HIGHER TIER. With a date (the webhook, a gift
+// code) that holds by construction: a product keeps a term per tier and a
+// dated write sets the term of its own tier and no other
+// (entitlements.applyProductTier), so a Pro payment on a Business account adds
+// a Pro term under the Business one. Until 2026-09-25 it wrote Pro over the
+// Business term here, on this relay only: the others refuse a lower grant from
+// redis, so the fleet then disagreed about what the customer had (R3).
+//
+// Without a date (an admin grant) the running term moves to the new tier, so
+// a lower tier would lower it. That happens only when the caller says so
+// (opts.downgrade), and then the term keeps its end date; otherwise this
+// answers lower_than_running and changes nothing. The floor tier is not a
+// grant: a chargeback, a refund and an admin taking a plan back still land.
+function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
+  if (!accountId || (product !== 'parasend' && product !== 'parasign')) return { ok: false, reason: 'bad_args' };
+  const norm = product === 'parasign'
+    ? entitlements.normaliseParasignTier(tier)
+    : entitlements.normaliseParasendTier(tier);
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  if (members.size === 0) return { ok: false, reason: 'no_keys' };
+  if (paidUntil === undefined && norm !== entitlements.floorTierOf(product) && !(opts && opts.downgrade)) {
+    const running = entitlements.effectiveProductTier(entitlementRecordOf(accountId), product);
+    if (entitlements.termRelation(product, norm, running.tier) === 'higher_running') {
+      return {
+        ok: false, reason: 'lower_than_running', product, tier: norm,
+        running: { tier: running.tier, paidUntil: running.paidUntil ? new Date(running.paidUntil).toISOString() : null },
+      };
+    }
+  }
+  let changed = 0;
+  for (const m of members) {
+    const mv = apiKeys.get(m);
+    if (!mv) continue;
+    // Single field-level rule (writes only this product's field + the parasign
+    // access flag; never the other product or the unified `plan`).
+    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle).changed) changed++;
+  }
+  // Mirror onto the accounts summary too. Readers that only hold an account_id
+  // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
+  // but keeping the summary in step means a stale accounts record can never
+  // outvote a paid grant on any future read path either.
+  const _acct = accounts.get(accountId);
+  if (_acct) {
+    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle);
+    _acct.plan_updated = new Date().toISOString();
+  }
+  // paidUntil is passed on to the DISK write as well. Without it the period
+  // lived only in memory: applyProductTier leaves the field alone when it is
+  // undefined, so users.json kept a bare tier and a relay restart handed every
+  // paying account an unbounded grant again. That is the bug this branch is
+  // for, surviving the very restart it was supposed to end.
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) {
+      if ((entry.account_id || entry.key) === accountId) {
+        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle);
+        entry.plan_updated = new Date().toISOString();
+      }
+    }
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'billing_entitlement_set', { account: String(accountId).slice(0, 12), product, tier: norm, keys: members.size, changed, persisted: true }))
+    .catch(we => log('warn', 'billing_entitlement_persist_failed', { err: we.message }));
+  // Keep the shared expiry index in step with the period that was just written.
+  // This is the ONLY thing that lets a container which has never seen this
+  // account mail its owner: users.json is per container, redis is not.
+  _indexAccountExpiry(accountId, product);
+  // And into the ONE store all five relay containers share. Everything above
+  // this line is local: the api-key records are in this process, users.json is
+  // on this container's own volume (docker-compose.yml gives every relay a
+  // volume of its own), so without this the term is true on exactly the relay
+  // that happened to serve the request. nginx sends public /v2/ to relay-main,
+  // which is where both customer grant paths land -- the Mollie webhook and
+  // POST /v2/billing/redeem -- while every screen and the ParaSign signature
+  // gate are served off relay-health by the admin plane. See lib/shared-grants.
+  _publishSharedGrant(accountId);
+  return { ok: true, product, tier: norm, keys: members.size, changed };
+}
+
+// ── The shared half of a grant (lib/shared-grants) ───────────────────────────
+// Publish what this container now holds for the account, so the other four can
+// hydrate it. Reads the record back rather than trusting the arguments, exactly
+// as _indexAccountExpiry does, so a grant that left one product alone publishes
+// what is really on file for both. Fire-and-forget: a redis outage may delay the
+// other containers, never the grant itself.
+function _publishSharedGrant(accountId) {
+  if (!redisClient || !redisClient.isReady || !accountId) return;
+  const rec = entitlementRecordOf(accountId);
+  if (!rec) return;
+  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec))
+    .then((r) => {
+      if (!r || r.ok) return;
+      log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: r.error });
+    })
+    .catch(e => log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: e.message }));
+}
+
+// Apply a shared grant to THIS container's own records: every member key, the
+// accounts summary, and users.json. After this the local table is the one that
+// answers /v2/admin/keys, /v2/admin/entitlements and the signs_month gate, so
+// nothing downstream needs to know that the term was granted elsewhere.
+//
+// Never publishes. This is the read side of the same row, and a hydration that
+// published would have five containers writing each other's messages forever.
+//
+// Never downgrades either: sharedGrants.applyTo is entitlements
+// .mergeProductGrantInto, which copies a grant only when it beats the one on
+// file. An account this container has no key for is skipped; it will be picked
+// up by the reseed once the admin key fan-out has reached this sector.
+// `revoked` says the shared row carries revoked_at: the fleet's record is that
+// this account has no paid term at all. That is the ONE downgrade this path
+// applies, and it exists because the container that took the money back is not
+// the container the customer's screens are served from.
+function _hydrateSharedGrant(accountId, grant, revoked) {
+  if (!accountId || (!grant && !revoked)) return [];
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  if (members.size === 0) return [];
+  // Decide once, against the account's best current grant, so five member keys
+  // do not each answer the question differently.
+  const merged = { ...(entitlementRecordOf(accountId) || {}) };
+  const moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
+  if (moved.length === 0) return [];
+  for (const product of moved) {
+    // The decision was taken on `merged`; every store gets exactly that, every
+    // term included, so a Pro year that came in under a Business month is on
+    // this container's keys, summary and users.json too.
+    for (const m of members) {
+      const mv = apiKeys.get(m);
+      if (mv) entitlements.copyProductGrant(mv, merged, product);
+    }
+    const acct = accounts.get(accountId);
+    if (acct) {
+      entitlements.copyProductGrant(acct, merged, product);
+      acct.plan_updated = new Date().toISOString();
+    }
+    _mutateUsersJson(ud => {
+      for (const entry of ud.api_keys) {
+        if ((entry.account_id || entry.key) === accountId) {
+          entitlements.copyProductGrant(entry, merged, product);
+          entry.plan_updated = new Date().toISOString();
+        }
+      }
+      ud.updated = new Date().toISOString();
+    }).catch(we => log('warn', 'shared_grant_persist_failed', { err: we.message }));
+  }
+  log(revoked && !grant ? 'warn' : 'info', revoked && !grant ? 'shared_grant_revoked' : 'shared_grant_hydrated', {
+    account: String(accountId).slice(0, 12), products: moved.join(','), keys: members.size });
+  return moved;
+}
+
+// Pull one account's shared grant and apply it. Used by the subscriber.
+async function _pullSharedGrant(accountId) {
+  if (!redisClient || !redisClient.isReady || !accountId) return [];
+  const row = await sharedGrants.readRow(redisClient, accountId);
+  if (!row) return [];
+  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt);
+}
+
+// One reconciliation pass, both directions, over the accounts that have a term.
+// Runs shortly after boot and then on a slow timer. This is the net under the
+// channel, and it is what makes the mechanism safe rather than clever: a
+// container that was down for the deploy, a subscriber that lost its socket, a
+// message published while this process was still loading users.json -- all of
+// them heal here, without anybody noticing and without a customer having to
+// redeem twice.
+//
+// THE OUTBOUND HALF IS NOT OPTIONAL, and it is the half that matters on the day
+// this ships. Every term granted BEFORE this existed lives only on the container
+// that granted it and has no shared row at all, so a pass that only pulled would
+// leave exactly the customers this change is for -- the ones already holding a
+// term nobody else can see -- untouched until they bought a second one.
+//
+// It fills in accounts redis has NO row for, and nothing else. That restriction
+// is the whole safety of the downgrade half: a container holding a record that
+// is a minute out of date must never be able to write it over a fresher fact,
+// and a revoked account keeps its row precisely so this pass leaves it alone.
+// Before the restriction, relay-health reseeding its own still-paid record put a
+// charged-back customer straight back on Pro, one second after relay-main had
+// taken it away.
+async function _reseedSharedGrants() {
+  if (!redisClient || !redisClient.isReady) return 0;
+  let rows = [];
+  try { rows = await sharedGrants.readAll(redisClient); }
+  catch (e) { log('warn', 'shared_grant_reseed_failed', { err: e.message }); return 0; }
+  const shared = new Map(rows.map((r) => [r.accountId, r]));
+
+  // Outbound: terms this container holds that redis has never heard of.
+  for (const { accountId, record } of accountsWithTerms()) {
+    if (shared.has(accountId)) continue;
+    const local = sharedGrants.grantOf(record);
+    if (!local) continue;
+    const out = await sharedGrants.publish(redisClient, accountId, local);
+    if (!out.ok) { log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: out.error }); continue; }
+    shared.set(accountId, { grant: local, revokedAt: null });
+    log('info', 'shared_grant_seeded', { account: String(accountId).slice(0, 12) });
+  }
+
+  // Inbound: what the shared row holds that this container does not, in both
+  // directions -- a term it has not been told about, and a term it should no
+  // longer be handing out.
+  let hydrated = 0;
+  for (const [accountId, row] of shared) {
+    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt).length) hydrated++;
+  }
+  return hydrated;
+}
+
+// Mirror one product's paid period into the redis expiry index (lib/plan-expiry).
+// Reads back the record it just wrote rather than trusting the argument, so an
+// admin grant that passed paidUntil undefined (leave whatever is on file) is
+// indexed with what is actually on file. Fire-and-forget: a redis outage may
+// delay a reminder, never a grant.
+function _indexAccountExpiry(accountId, product) {
+  if (!redisClient || !redisClient.isReady) return;
+  const rec = entitlementRecordOf(accountId);
+  if (!rec) return;
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  let email = (accounts.get(accountId) || {}).email || '';
+  for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.email) { email = mv.email; break; } }
+  const products = product ? [product] : entitlements.PRODUCTS;
+  for (const prod of products) {
+    // The day the product falls to its floor (the last term to end), not the
+    // end of whichever term happens to be on top: a Business month over a Pro
+    // year warns about the end of the year.
+    const last = entitlements.finalTermOf(rec, prod);
+    planExpiry.upsertExpiry(redisClient, {
+      accountId,
+      product: prod,
+      tier: last ? last.tier : rec[entitlements.PRODUCT_PLAN_FIELD[prod]],
+      paidUntil: last ? last.paidUntil : null,
+      bundle: last ? last.bundle : null,
+      email,
+    }).catch(e => log('warn', 'plan_expiry_index_failed', { product: prod, err: e.message }));
+  }
+}
+
+// ── Mollie pointers (customer + per-product subscription) ────────────────────
+// Where the recurring layer keeps its two ids. They live on the same records as
+// the entitlement fields, and on the same serialized users.json queue, so a
+// restart does not lose the link between an account and what it is subscribed
+// to. Written per ACCOUNT (every member key gets the same pointer), because a
+// customer belongs to the buyer, not to one of his keys.
+function _setMolliePointer(accountId, field, value) {
+  if (!accountId || !field) return { ok: false, reason: 'bad_args' };
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) {
+    const mv = apiKeys.get(m);
+    if (!mv) continue;
+    if (value === null || value === undefined) delete mv[field];
+    else mv[field] = value;
+  }
+  const acct = accounts.get(accountId);
+  if (acct) { if (value === null || value === undefined) delete acct[field]; else acct[field] = value; }
+  _mutateUsersJson(ud => {
+    for (const entry of (ud.api_keys || [])) {
+      if ((entry.account_id || entry.key) === accountId) {
+        if (value === null || value === undefined) delete entry[field];
+        else entry[field] = value;
+      }
+    }
+    ud.updated = new Date().toISOString();
+  }).catch(we => log('warn', 'billing_pointer_persist_failed', { field, err: we.message }));
+  return { ok: true };
+}
+
+// The record the recurring layer reads its pointers from. Same resolution as
+// the entitlement path: the per-key record carries the fields, the accounts
+// summary is only a mirror.
+function _billingRecordOf(accountId) {
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) { const mv = apiKeys.get(m); if (mv) return mv; }
+  return accounts.get(accountId) || null;
+}
+
+// Every change to a subscription pointer goes through here, so three things
+// stay one: the pointer, the payment that created it (which tells a new
+// purchase from the same payment arriving twice), and the shared renewals hash
+// that the paid-term reminder reads on whichever container holds its lock.
+async function _saveSubscriptionPointer(accountId, product, id, meta) {
+  _setMolliePointer(accountId, billingRecurring.subscriptionFieldOf(product), id);
+  _setMolliePointer(accountId, billingRecurring.subscriptionPaymentFieldOf(product),
+    id ? ((meta && meta.paymentId) || null) : null);
+  // The customer the subscription hangs under, so a cancel or a replacement
+  // asks Mollie under that one and not under whatever customer the account
+  // holds by then.
+  _setMolliePointer(accountId, billingRecurring.subscriptionCustomerFieldOf(product),
+    id ? ((meta && meta.customerId) || null) : null);
+  if (!redisClient || !redisClient.isReady) return;
+  try {
+    if (id) await billingRecurring.recordRenewal(redisClient, accountId, product, Object.assign({}, meta || {}, { subscriptionId: id }));
+    else await billingRecurring.forgetRenewal(redisClient, accountId, product);
+  } catch (e) {
+    log('warn', 'billing_renewal_marker_failed', { account: String(accountId).slice(0, 12), product, err: e.message });
+  }
+}
+
+// The subscription pointers this container holds, one per account and line,
+// for the boot seed of the renewals hash.
+function* _subscriptionPointers() {
+  const seen = new Set();
+  for (const [key, rec] of apiKeys) {
+    const accountId = (rec && rec.account_id) || key;
+    if (seen.has(accountId)) continue;
+    seen.add(accountId);
+    for (const line of Object.keys(billingRecurring.PRODUCT_SUBSCRIPTION_FIELD)) {
+      const subscriptionId = rec && rec[billingRecurring.subscriptionFieldOf(line)];
+      if (subscriptionId) yield { accountId, line, subscriptionId };
+    }
+  }
+}
+
+// One webhook at a time per account. Checking "already processed" is a read,
+// not a claim: ten webhooks for one first payment used to pass it together,
+// grant twice and create two Mollie subscriptions, so two collections a month.
+// The claim is redis SET NX, shared by every container, with a map in this
+// process for when redis is down. Whoever does not get it answers 503 and
+// Mollie comes back later, by which time the payment reads as processed. Both
+// halves expire after BILLING_LOCK_TTL_S, so a handler that dies halfway can
+// hold an account up for a minute and never longer.
+const BILLING_LOCK_TTL_S = 60;
+const _billingBusy = new Map(); // lock key -> { until (epoch ms), token }, this process
+
+// Delete the lock only while it is still ours, in one step. A GET and then a
+// DEL could delete a lock that expired in between and was taken by another
+// container, which would then run unguarded next to a third.
+const BILLING_LOCK_RELEASE_LUA = `if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+end
+return 0`;
+
+async function _claimBillingLock(key) {
+  const now = Date.now();
+  const held = _billingBusy.get(key);
+  if (held && held.until > now) return null;
+  const token = crypto.randomBytes(12).toString('hex');
+  _billingBusy.set(key, { until: now + BILLING_LOCK_TTL_S * 1000, token });
+  const redisKey = `paramant:billing:lock:${key}`;
+  let shared = false;
+  if (redisClient && redisClient.isReady) {
+    let got = false;
+    try { got = (await redisClient.set(redisKey, token, { NX: true, EX: BILLING_LOCK_TTL_S })) === 'OK'; }
+    catch (e) { log('warn', 'billing_lock_failed', { err: e.message }); }
+    if (!got) {
+      if ((_billingBusy.get(key) || {}).token === token) _billingBusy.delete(key);
+      return null;
+    }
+    shared = true;
+  }
+  return {
+    async release() {
+      if ((_billingBusy.get(key) || {}).token === token) _billingBusy.delete(key);
+      if (!shared || !redisClient || !redisClient.isReady) return;
+      try { await redisClient.eval(BILLING_LOCK_RELEASE_LUA, { keys: [redisKey], arguments: [token] }); }
+      catch { /* the EX is the backstop */ }
+    },
+  };
+}
+
+// The cancellation admin scheduled, for every key of the account: the marker
+// is keyed on the session's user id (admin/server.js, /user/billing/cancel),
+// which is one of the account's keys. Best effort: a marker left behind hides
+// a button, it moves no money.
+async function _clearScheduledCancel(accountId) {
+  if (!accountId || !redisClient || !redisClient.isReady) return;
+  const members = accountKeys.get(accountId) || new Set();
+  const keys = [...new Set([accountId, ...members])].map((k) => `paramant:user:plan_cancel_at:${k}`);
+  try {
+    const removed = await redisClient.del(keys);
+    if (removed) log('info', 'billing_cancel_marker_cleared', { account: String(accountId).slice(0, 12) });
+  } catch (e) {
+    log('warn', 'billing_cancel_marker_failed', { account: String(accountId).slice(0, 12), err: e.message });
+  }
+}
+
+// A collection the subscription tried and did not get. Nothing is granted for
+// it, and before this the customer heard nothing: the next thing he got was the
+// reminder that his plan was ending, promising that nothing is ever charged
+// automatically.
+//
+// Only for the subscription that is on file now: a collection of one that was
+// since replaced or stopped concerns a subscription the customer no longer
+// has, and his current one runs fine. And one mail per subscription per paid
+// period, not per payment: Mollie tries a failed collection again, each try is
+// a new payment, and a mail per try would be a mail a day. Reserved in redis
+// before it is sent and given back when it did not leave, like the reminders.
+async function _noticeFailedCollection(payment) {
+  const md = (payment && payment.metadata) || {};
+  const accountId = md.accountId;
+  if (!accountId) return;
+  const rec = _billingRecordOf(accountId);
+  const line = billingRecurring.currentLineOf(rec, payment.subscriptionId);
+  const order = billingCatalog.resolveOrder({ product: md.product, plan: md.plan, interval: md.interval });
+  const ent = entitlementRecordOf(accountId) || {};
+  const paidUntil = ((order && order.grants) || [])
+    .map((g) => ent[entitlements.PRODUCT_PAID_UNTIL_FIELD[g.product]])
+    .filter(Boolean).sort()[0] || null;
+  const email = (rec && rec.email) || (accounts.get(accountId) || {}).email || '';
+  const trail = {
+    payment_id: payment.id, account: String(accountId).slice(0, 12), product: md.product,
+    status: payment.status, paid_until: paidUntil, subscription_id: payment.subscriptionId || null,
+  };
+  if (!line) {
+    log('info', 'billing_collection_failed', { ...trail, mailed: false, reason: 'not_the_current_subscription' });
+    return;
+  }
+  const msg = billingRecurring.failedCollectionMail({
+    order, paidUntil, now: new Date(), amount: payment.amount,
+    siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
+  });
+  if (!email || !msg) {
+    log('warn', 'billing_collection_failed', { ...trail, mailed: false, reason: !email ? 'no_address' : 'unknown_plan' });
+    return;
+  }
+  const key = `paramant:billing:collection_failed:${payment.subscriptionId}:${paidUntil || 'none'}`;
+  if (redisClient && redisClient.isReady) {
+    let reserved = 'OK';
+    try { reserved = await redisClient.set(key, String(Date.now()), { NX: true, EX: 400 * 86400 }); }
+    catch { reserved = 'OK'; }
+    if (reserved !== 'OK') { log('info', 'billing_collection_failed', { ...trail, mailed: false, reason: 'already_told' }); return; }
+  }
+  const sent = mailLater({
+    to: email, from: 'PARAMANT <billing@paramant.app>',
+    subject: msg.subject, text: msg.text, html: msg.html,
+  });
+  if (!sent && redisClient && redisClient.isReady) {
+    try { await redisClient.del(key); } catch { /* the next webhook tries again */ }
+  }
+  log('warn', 'billing_collection_failed', { ...trail, mailed: !!sent });
+}
+
+// ── Billing profile: the customer half of an invoice ─────────────────────────
+// Three optional fields the account owner fills in himself (company name,
+// address, VAT id).
+//
+// IN REDIS, NOT IN users.json. Every relay container has its own /data volume
+// (docker-compose.yml: relay-main-data, relay-health-data, ...), so a profile
+// saved through the container the account page happens to talk to would be
+// invisible to the container nginx routes the Mollie webhook to, and the
+// invoice would go out without the company details the customer had just
+// entered. Redis is the one store all five relays share.
+const BILLING_PROFILE_KEY = (accountId) => `paramant:billing:profile:${accountId}`;
+
+async function _setBillingProfile(accountId, profile) {
+  if (!accountId || !profile) return { ok: false, reason: 'bad_args' };
+  if (!redisClient || !redisClient.isReady) return { ok: false, reason: 'no_redis' };
+  const clean = {
+    company: profile.company || '',
+    address: profile.address || '',
+    vat: profile.vat || '',
+    updated_at: new Date().toISOString(),
+  };
+  // No TTL. These details are part of documents that must be kept.
+  try { await redisClient.set(BILLING_PROFILE_KEY(accountId), JSON.stringify(clean)); }
+  catch (e) { return { ok: false, reason: e.message }; }
+  return { ok: true };
+}
+
+// What goes in the "Billed to" block. The email address always: it is the only
+// customer detail an account is guaranteed to have, and it comes off the
+// account record rather than out of redis, so a document is still addressed to
+// someone even when the profile store is empty or unreachable.
+async function _billingBuyerOf(accountId) {
+  const rec = _billingRecordOf(accountId) || {};
+  const buyer = { email: rec.email || '', company: '', address: '', vat: '' };
+  if (!redisClient || !redisClient.isReady) return buyer;
+  try {
+    const raw = await redisClient.get(BILLING_PROFILE_KEY(accountId));
+    if (raw) {
+      const p = JSON.parse(raw);
+      buyer.company = p.company || '';
+      buyer.address = p.address || '';
+      buyer.vat = p.vat || '';
+    }
+  } catch { /* an unreadable profile must not cost the customer his document */ }
+  return buyer;
+}
+
+// The VAT terms of one checkout (lib/vat.js): 21%, or reverse charged for a
+// business in another EU member state whose VAT number, name and country VIES
+// confirms now. Never throws and never blocks the sale: anything that goes
+// wrong is a 21% sale and a log line. The log names the country and the
+// reason, never the number or a name. A buyer without a VAT number is the
+// ordinary case and gets no line of its own.
+//
+// Reverse charged only once the proof is stored: what VIES answered, under
+// its consultation number, before the payment that points at it exists.
+async function _vatTermsForCheckout(accountId) {
+  let terms;
+  try {
+    const buyer = await _billingBuyerOf(accountId);
+    terms = await vatMod.decide({
+      buyerVat: buyer.vat, buyerCompany: buyer.company, buyerAddress: buyer.address,
+      sellerVat: invoiceMod.sellerFromEnv(process.env).vat,
+    });
+    if (vatMod.isReverseCharge(terms)) {
+      const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+      const saved = await vatMod.saveProof(terms, redis, { accountId, company: buyer.company, address: buyer.address });
+      if (!saved.ok) terms = { treatment: 'standard', reason: 'proof_unsaved', level: 'warn', country: terms.country, detail: saved.reason };
+    }
+  } catch (e) {
+    terms = { treatment: 'standard', reason: 'vat_check_failed', level: 'warn', detail: e.message };
+  }
+  if (terms.reason !== 'no_vat_id') {
+    log(terms.level || 'info', 'billing_vat', {
+      account: String(accountId).slice(0, 12), treatment: terms.treatment, reason: terms.reason,
+      country: terms.country, detail: terms.detail,
+    });
+  }
+  return terms;
+}
+
+// One warning per process, not one per payment: a missing BILLING_SELLER_VAT is
+// a configuration fact, and repeating it on every sale would bury the log line
+// that means something.
+let _sellerVatWarned = false;
+
+// Issue the document for a payment that is settled and matched. Deliberately
+// runs for a REPEAT webhook too (an 'already_processed' outcome on a paid
+// payment): issueDocument is idempotent per payment id, so a retry cannot
+// produce a second invoice, and a first attempt that lost redis gets a second
+// chance instead of leaving the customer with nothing. Never throws: an
+// entitlement that was granted must not be undone by paperwork.
+async function _issueInvoiceForPayment(payment, outcome) {
+  try {
+    const md = (payment && payment.metadata) || {};
+    const order = billingCatalog.resolveOrder({ product: md.product, plan: md.plan, interval: md.interval });
+    if (order.error) return;
+    const seller = invoiceMod.sellerFromEnv(process.env);
+    // The terms the payment was sold under, from its own metadata: what the
+    // buyer was charged decides what the document says. A reverse-charged one
+    // also gets the name and address VIES gave at the checkout.
+    const vatTerms = vatMod.termsFromMetadata(md);
+    if (vatMod.isReverseCharge(vatTerms)) {
+      const proof = await vatMod.loadProof(vatTerms.consultation, (redisClient && redisClient.isReady) ? redisClient : null);
+      if (proof) Object.assign(vatTerms, { viesName: proof.name || '', viesAddress: proof.address || '' });
+      else log('warn', 'billing_vat_proof_missing', { payment_id: payment.id, country: vatTerms.country });
+    }
+    if (!seller.vat && !_sellerVatWarned) {
+      _sellerVatWarned = true;
+      log('warn', 'billing_invoice_no_vat_number', {
+        reason: 'BILLING_SELLER_VAT is not set',
+        effect: 'documents go out as a payment receipt, not a VAT invoice',
+      });
+    }
+    const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+    const out = await invoiceMod.issueDocument({
+      payment,
+      order: Object.assign({ accountId: md.accountId }, order),
+      seller,
+      buyer: await _billingBuyerOf(md.accountId),
+      periodEnd: outcome && outcome.paidUntil,
+      vat: vatTerms,
+    }, redis);
+
+    // The invoice exists, so the VIES proof it rests on is kept as long as the
+    // invoice is: its checkout TTL goes (lib/vat.keepProof). Idempotent, so a
+    // repeat webhook or a renewal simply does it again.
+    if (vatMod.isReverseCharge(vatTerms) && (out.result === 'issued' || out.result === 'existing')) {
+      const kept = await vatMod.keepProof(vatTerms.consultation, redis);
+      if (!kept.ok) log('warn', 'billing_vat_proof_keep_failed', { payment_id: payment.id, reason: kept.reason });
+    }
+
+    if (out.result !== 'issued') {
+      log(out.result === 'existing' ? 'info' : 'warn', 'billing_invoice', {
+        payment_id: payment.id, result: out.result, reason: out.reason, number: out.number,
+      });
+      return;
+    }
+    log('info', 'billing_invoice', {
+      payment_id: payment.id, result: 'issued', number: out.number, kind: out.record.kind,
+      account: String(md.accountId).slice(0, 12), total: out.record.amount_gross,
+    });
+    _mailInvoice(out.record);
+    _moneybirdPush(out.record);
+  } catch (e) {
+    log('error', 'billing_invoice_failed', { payment_id: payment && payment.id, err: e.message });
+  }
+}
+
+// The document into Mick's bookkeeping, if and only if a Moneybird token and an
+// administration id are configured. AFTERCARE: fired and not awaited, so a slow
+// or unreachable Moneybird cannot hold up a webhook, and pushDocument itself
+// never throws. A failure queues the document for the six-hour sweep started at
+// the bottom of this file; see lib/moneybird.js.
+function _moneybirdPush(record) {
+  if (!record) return;
+  if (!moneybird.configured(moneybird.configFromEnv(process.env))) return;
+  Promise.resolve()
+    .then(() => moneybird.pushDocument({
+      record,
+      redis: (redisClient && redisClient.isReady) ? redisClient : null,
+      env: process.env,
+      renderPdf: (r) => invoicePdf.render(r, { buyerHint: invoiceMod.BUYER_HINT }),
+      log,
+    }))
+    .catch((e) => log('warn', 'moneybird_push_failed', { number: record.number, err: e.message }));
+}
+
+// The document as mail, with the PDF attached. No mail path configured means no
+// mail and no error: the record exists and /v2/billing/invoices still serves it,
+// which is the half that has to work.
+function _mailInvoice(record) {
+  if (!record || !record.buyer || !record.buyer.email) return false;
+  let pdf;
+  try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
+  catch (e) { log('warn', 'billing_invoice_pdf_failed', { number: record.number, err: e.message }); return false; }
+  const { subject, text } = billingMail.invoiceMail(record);
+  return mailLater({
+    to: record.buyer.email,
+    from: 'PARAMANT <billing@paramant.app>',
+    subject,
+    text,
+    attachments: [{ filename: `${record.number}.pdf`, content: pdf.toString('base64') }],
+  });
+}
+
+// The document for money that goes back. A chargeback or a refund reaches us on
+// the SAME tr_ id as the payment, so the invoice it reverses is found from that
+// id alone; the credit note gets its own number in its own series and refers to
+// the invoice by number and date, because an issued invoice may not be
+// withdrawn (see lib/credit-note.js).
+//
+// Runs for a repeat webhook too, and for a partial refund, on the same
+// reasoning as _issueInvoiceForPayment: issueCreditNote is idempotent per
+// reversal, so a retry can only ever repair. Never throws: paperwork must not
+// be able to fail a webhook.
+async function _creditNoteForPayment(payment) {
+  try {
+    const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+    if (!redis) return;
+    const out = await creditNote.issueCreditNote({ payment }, redis);
+    if (out.result !== 'issued') {
+      // 'none' is the ordinary answer for a payment that has no invoice (money
+      // taken before the invoice module existed) and for a repeat of a reversal
+      // already credited in full. Neither is a fault, and neither is silent.
+      log(out.result === 'existing' || out.result === 'none' ? 'info' : 'warn', 'billing_credit_note', {
+        payment_id: payment.id, result: out.result, reason: out.reason, number: out.number,
+      });
+      return out;
+    }
+    log('warn', 'billing_credit_note', {
+      payment_id: payment.id, result: 'issued', number: out.number, credits: out.credited,
+      account: String(out.record.account_id || '').slice(0, 12),
+      total: out.record.amount_gross, reason: out.record.reason, partial: out.record.partial,
+    });
+    _mailCreditNote(out.record);
+    _moneybirdPush(out.record);
+    return out;
+  } catch (e) {
+    log('error', 'billing_credit_note_failed', { payment_id: payment && payment.id, err: e.message });
+    return { result: 'unavailable', reason: e.message };
+  }
+}
+
+// The credit note as mail, with the PDF attached. Same shape and same
+// no-mail-path-is-not-an-error rule as _mailInvoice: the record exists and
+// /v2/billing/invoices serves it either way.
+function _mailCreditNote(record) {
+  if (!record || !record.buyer || !record.buyer.email) return false;
+  let pdf;
+  try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
+  catch (e) { log('warn', 'billing_credit_pdf_failed', { number: record.number, err: e.message }); return false; }
+  const { subject, text } = billingMail.creditNoteMail(record);
+  return mailLater({
+    to: record.buyer.email,
+    from: 'PARAMANT <billing@paramant.app>',
+    subject,
+    text,
+    attachments: [{ filename: `${record.number}.pdf`, content: pdf.toString('base64') }],
+  });
+}
+
+// Per-key persistence for the ParaSign entitlement toggle. Injected into
+// lib/parasign-open-api.js so its grantParaSignScope/setParaSignEnabled are no
+// longer in-memory-only stubs: the flip on the live apiKeys record is mirrored
+// to users.json (so it survives a restart) and an audit entry records it. Write
+// runs on the serialized users-queue; returns immediately. Scoped to ONE key,
+// unlike grantParasignOnPaidPlan which fans out over a whole account.
+function _persistParaSignScope(key, { parasign, plan } = {}) {
+  if (!key) return { ok: false, reason: 'no_key' };
+  const rec = apiKeys.get(key);
+  const acct = (rec && rec.account_id) || key;
+  _mutateUsersJson(ud => {
+    for (const entry of (ud.api_keys || [])) {
+      if (entry.key === key) {
+        if (parasign !== undefined) entry.parasign = !!parasign;
+        if (plan) entry.plan = plan;
+      }
+    }
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_scope_persisted', { account: String(acct).slice(0, 12), parasign: !!parasign, plan: plan || null }))
+    .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+  try { auditAppend(key, 'parasign_scope_change', { parasign: !!parasign, plan: plan || null }); } catch {}
+  return { ok: true };
+}
+
+// -- ParaSign /v1 key issuance -- THE single generator -------------------------
+// Used by BOTH /v2/user/parasign-keys (self-serve) and /v2/admin/keys/mint-parasign
+// (admin), so there is exactly one psk_ format + one storage path (no drift).
+// Mirrors the pgp_ mint in /v2/admin/keys: a CSPRNG token, inserted into the live
+// apiKeys/accounts/accountKeys/kidIndex maps and persisted to users.json, bound to
+// `accountId` and carrying the parasign grant so /v1 auth accepts it. Inherits the
+// account's plan+email so the key clicks straight into the tiers.js/quota.js
+// entitlement layer (quota is keyed by account_id + plan). Returns the FULL key
+// ONCE (caller shows it a single time) plus a masked form for logging/listing.
+function mintParasignKey(accountId, opts = {}) {
+  if (!accountId) throw new Error('accountId required');
+  const acct = accounts.get(accountId);
+  const anchorRec = apiKeys.get(accountId);
+  const plan = opts.plan || (acct && acct.plan) || (anchorRec && anchorRec.plan) || 'community';
+  const email = (acct && acct.email) || (anchorRec && anchorRec.email) || '';
+  // THE CAP, and it lives HERE rather than at the two routes on purpose. The
+  // 2026-09-05 review found the self-serve route minting without one: fourteen
+  // keys in a row on a Pro account, nine on a community account whose cap is
+  // five, and users.json growing by one entry per HTTP request. The admin route
+  // twenty lines away did it correctly, which is the whole story of how this
+  // happens. One generator, one cap, and a third mint route cannot drift.
+  //
+  // Checked with the insert below and nothing awaited in between, so it is
+  // atomic in the event loop, the same property the /v2/admin/keys mint relies
+  // on. Throws rather than answering, because the two callers own their own
+  // response shape; both map `code` to a 402.
+  const _capPlan = tiers.normalisePlan((acct && acct.plan) || plan);
+  const _cap = ACCOUNT_KEY_LIMIT[_capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+  const _active = [...(accountKeys.get(accountId) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+  if (_active >= _cap) {
+    const e = new Error(`Account key limit reached (${_cap} keys on the ${_capPlan} plan).`);
+    e.code = 'account_key_limit'; e.cap = _cap; e.current = _active; e.plan = _capPlan;
+    throw e;
+  }
+  if (EDITION !== 'licensed' && LICENSE_MAX_KEYS !== Infinity) {
+    const relayActive = [...apiKeys.values()].filter((v) => v.active !== false).length;
+    if (relayActive >= LICENSE_MAX_KEYS) {
+      const e = new Error(`License limit reached (${LICENSE_MAX_KEYS} keys).`);
+      e.code = 'relay_key_limit'; e.cap = LICENSE_MAX_KEYS; e.current = relayActive; e.plan = _capPlan;
+      throw e;
+    }
+  }
+  // The new key inherits the account's EFFECTIVE per-product tiers, resolved
+  // over every key the account holds. Minting used to pass the legacy `plan`
+  // only, which silently issued a free-tier ParaSign key to a paying account.
+  // EFFECTIVE, not the tier on file: the new key record carries no paid_until,
+  // so re-issuing a lapsed tier here would turn an expired subscription into a
+  // permanent one. A record with no per-product tier at all is left undefined,
+  // so buildParasignKeyRecord still derives from the legacy plan as before.
+  const eff = entitlementRecordOf(accountId) || {};
+  // Tier AND period, together, or the new key is an unbounded copy of a bounded
+  // grant. An ALREADY expired grant is minted as the floor tier with no period
+  // at all (effectiveProductTier reports it as expired), so a lapsed account
+  // does not get a stale date on a fresh key either.
+  // The end is the end of the term that grants (effectiveProductTier), not
+  // the stored date: with a Pro year under a Business month that has ended, the
+  // stored date is the month's, and a Pro key with it would be born lapsed.
+  const _effGrant = (product) => {
+    if (eff[entitlements.PRODUCT_PLAN_FIELD[product]] == null) return {};
+    const g = entitlements.effectiveProductTier(eff, product);
+    return { tier: g.tier, paidUntil: g.expired || g.paidUntil === null ? null : new Date(g.paidUntil).toISOString() };
+  };
+  const _pg = _effGrant('parasign');
+  const _ps = _effGrant('parasend');
+  const built = keysTable.buildParasignKeyRecord({
+    accountId, plan, email, label: opts.label, test: !!opts.test,
+    planParasign: opts.planParasign || _pg.tier,
+    planParasend: opts.planParasend || _ps.tier,
+    paidUntilParasign: _pg.paidUntil,
+    paidUntilParasend: _ps.paidUntil,
+    randomHex: crypto.randomBytes(32).toString('hex'),
+  });
+  const { key, record, usersEntry } = built;
+  apiKeys.set(key, record);
+  if (!accounts.has(accountId)) accounts.set(accountId, { account_id: accountId, plan, email, primary_api_key: null, label: '' });
+  if (!accountKeys.has(accountId)) accountKeys.set(accountId, new Set());
+  accountKeys.get(accountId).add(key);
+  const kid = keysTable.assignKid(kidIndex, key, log);
+  record.kid = kid;
+  kidIndex.set(kid, key);
+  _mutateUsersJson(ud => {
+    ud.api_keys.push(usersEntry);
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_key_minted', { account: String(accountId).slice(0, 12), kid, mode: opts.test ? 'test' : 'live', plan: record.plan, persisted: true }))
+    .catch(we => log('warn', 'parasign_key_persist_failed', { err: we.message }));
+  // The same pass the pgp_ mint runs. Without it a psk_ key was invisible to
+  // over_limit until the next reload-users, which is only ever manual.
+  applyKeyLimitEnforcement();
+  return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+}
+
+// A mint refused by a cap is a 402 with the numbers, not a 400 or a 500. Shared
+// by both mint routes so the answer cannot differ per door.
+function keyCapReject(err, res) {
+  if (!err || (err.code !== 'account_key_limit' && err.code !== 'relay_key_limit')) return false;
+  res.writeHead(402, { 'Content-Type': 'application/json' });
+  res.end(J({ error: err.message, current_keys: err.current, max_keys: err.cap === Infinity ? null : err.cap, upgrade_url: 'https://paramant.app/pricing' }));
+  return true;
+}
+
 function loadUsers() {
   if (process.env.USERS_JSON) {
-    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true}); }); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
+    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); rebuildApiKeyHashIndex(); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
   }
   try {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
@@ -1611,8 +3525,12 @@ function loadUsers() {
         is_trial: !!(k.plan === 'community' && k.trial_metadata),
         trial_created: k.created ? new Date(k.created).getTime() : null,
         uploads_today: 0, last_upload_day: '',
+        created: k.created || null,
+        ...keysTable.parseAccountFields(k),
       });
     });
+    keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
+    rebuildApiKeyHashIndex();
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
   } catch(e) { log('warn', 'no_users_file'); }
 }
@@ -1632,12 +3550,13 @@ function loadTrialKeys() {
             daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
             is_trial: true, trial_created: k.created || Date.now(),
             uploads_today: 0, last_upload_day: '',
+            ...keysTable.parseAccountFields(k),
           });
           loaded++;
         }
       } catch {}
     }
-    if (loaded > 0) log('info', 'trial_keys_loaded', { count: loaded });
+    if (loaded > 0) { keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log); rebuildApiKeyHashIndex(); log('info', 'trial_keys_loaded', { count: loaded }); }
   } catch(e) { /* file may not exist yet */ }
 }
 
@@ -1647,7 +3566,19 @@ function loadTrialKeys() {
 // devices count + view TTL + max views + monthly quotas + file size).
 // _pubkeyMax now reads device caps from TIER_LIMITS via tiers.tierLimitNum so
 // there is one source of truth for the per-tier device count.
-const _pubkeyTtl = { free: 7 * 86_400_000, pro: 30 * 86_400_000, enterprise: 365 * 86_400_000 };
+// Keyed on the ParaSend tier the callers resolve, plus `free`, which is what an
+// anonymous keyless DID registration passes. It used to hold three rows and a
+// `?? free` fallback, so `community` and `business` were not in it and reached
+// the free row by accident, the same kind of hole tiers.js closed for the other
+// dimensions. Every name a caller can produce now has its own row, so a value
+// is never the result of a miss.
+const _pubkeyTtl = {
+  free:        7 * 86_400_000,
+  community:   7 * 86_400_000,
+  pro:        30 * 86_400_000,
+  business:   30 * 86_400_000, // legacy plan name; never below pro
+  enterprise: 365 * 86_400_000,
+};
 const _pubkeyMax = new Proxy({}, {
   get(_t, plan) { return tiers.tierLimitNum(plan, 'devices'); },
 });
@@ -1667,8 +3598,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [h, e] of blobStore.entries()) {
     if (now - e.ts > e.ttl) {
-      zeroBuffer(e.blob);
-      blobStore.delete(h);
+      blobDrop(h);
       log('info', 'blob_ttl_expired', { hash: h.slice(0,16) });
     }
   }
@@ -1678,38 +3608,8 @@ setInterval(() => {
 // Blocks: RFC1918, loopback, link-local, IPv6 ULA, cloud metadata,
 //         and all alternate IP representations (decimal, hex, octal, short-form,
 //         IPv4-mapped IPv6) that bypass naive string-based checks.
-function isSsrfSafeUrl(urlStr) {
-  try {
-    const u = new URL(urlStr);
-    if (u.protocol !== 'https:') return false;
-    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, ''); // strip IPv6 brackets
-    // Reject non-hostname forms: pure decimal (2130706433), hex (0x7f000001), short octal
-    if (/^\d+$/.test(h)) return false;                  // decimal IP
-    if (/^0x[0-9a-f]+$/i.test(h)) return false;          // hex IP
-    if (/^(0\d+\.){1,3}\d+$/.test(h)) return false;    // octal octets (0177.0.0.1)
-    if (/^\d+\.\d+$/.test(h)) return false;             // short-form (127.1)
-    // IPv4-mapped IPv6 ::ffff:x.x.x.x
-    if (/^::ffff:/i.test(h)) {
-      const v4part = h.replace(/^::ffff:/i, '');
-      return isSsrfSafeUrl('https://' + v4part + '/');
-    }
-    if (h === 'localhost' || h === '0.0.0.0' || h === '0') return false;
-    if (/^127\./.test(h)) return false;
-    if (/^::1$/.test(h)) return false;
-    if (/^169\.254\./.test(h)) return false;
-    if (/^fe80/i.test(h)) return false;
-    if (/^10\./.test(h)) return false;
-    if (/^192\.168\./.test(h)) return false;
-    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
-    if (/^f[cd]/i.test(h)) return false;                  // IPv6 ULA (fc00::/7)
-    if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return false;
-    if (h === 'metadata.google.internal' || h === 'metadata.aws.internal') return false;
-    // Fix 11: restrict to standard HTTPS ports only
-    const ALLOWED_PORTS = new Set(['', '443']);
-    if (!ALLOWED_PORTS.has(u.port)) return false;
-    return true;
-  } catch { return false; }
-}
+// URL-level SSRF guard, extracted to relay/lib/ssrf-guard.js for unit coverage.
+const { isSsrfSafeUrl } = require('./lib/ssrf-guard');
 
 // ── Safe outbound HTTPS request ───────────────────────────────────────────────
 // Single helper used by every outbound request the relay makes (gossip,
@@ -1758,11 +3658,17 @@ async function safeHttpsRequest(urlStr, opts = {}) {
 
 // ── Webhook push ──────────────────────────────────────────────────────────────
 async function pushWebhooks(apiKey, deviceId, event, data) {
-  const hooks = webhooks.get(`${deviceId}:${apiKey}`) || [];
+  const hooks = webhooks.get(`${deviceId}:${acctOf(apiKey)}`) || [];
   for (const hook of hooks) {
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
-    const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
     try {
+      // Inside the try, and that is the second lock. The registration above
+      // coerces, but a record written by an older build, or any future path
+      // into this map, must not be able to take the process down. A webhook
+      // that cannot be signed is a webhook that is not sent; it is not a
+      // reason to zero every customer's file.
+      const sig = hook.secret
+        ? crypto.createHmac('sha256', String(hook.secret)).update(payload).digest('hex') : '';
       await safeHttpsRequest(hook.url, {
         method:  'POST',
         timeout: 5000,
@@ -1787,36 +3693,82 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
 const P256_SPKI_PREFIX = Buffer.from('3059301306072a8648ce3d020106082a8648ce3d030107034200', 'hex');
 
 // ── Constant-time token comparison — prevents timing-side-channel on admin token (finding) ──
-function safeEqual(a, b) {
-  try {
-    const ba = Buffer.from(String(a || ''), 'utf8');
-    const bb = Buffer.from(String(b || ''), 'utf8');
-    if (ba.length !== bb.length) {
-      // Still do the compare to avoid length oracle, but result is always false
-      const pad = Buffer.alloc(Math.max(ba.length, bb.length));
-      crypto.timingSafeEqual(pad, pad);
-      return false;
-    }
-    return crypto.timingSafeEqual(ba, bb);
-  } catch { return false; }
+function safeEqual(a, b) { return authGate.safeEqual(a, b); }
+
+// Mask a secret API key for list/observation output. Canonical implementation
+// lives in lib/keys-table.js (unit-tested); aliased here for the admin handlers.
+const maskKey = keysTable.maskApiKey;
+
+// ── DID-auth replay protection ────────────────────────────────────────────────
+// The previous DID-auth signed ONLY req.url, so any captured (X-DID,
+// X-DID-Signature) pair replayed forever against the same URL. We now bind a
+// freshness window (X-DID-TS, ±DID_AUTH_SKEW_MS) and a one-time nonce
+// (X-DID-Nonce) into the signed message, and reject any (did|nonce) we have
+// already accepted. The nonce cache self-evicts after the freshness window
+// (mirrors the _usedTotpCodes sweep) and is hard-capped to bound memory under a
+// nonce flood (evict-oldest, like the relay registry).
+const DID_AUTH_SKEW_MS  = 300_000;        // ±5 min, matches the /v2/relays/register window
+const MAX_DID_NONCES     = 50_000;        // hard cap on the in-flight nonce cache
+const _usedDidNonces = new Map();         // `${did}|${nonce}` → expiry ms
+setInterval(() => { const now = Date.now(); for (const [k, exp] of _usedDidNonces) if (now > exp) _usedDidNonces.delete(k); }, 30_000);
+
+// Canonical bytes a DID client must sign. Binding the method + url + timestamp +
+// nonce makes each signature single-use and non-transferable across requests.
+// Byte-identical recipe MUST be reproduced by the SDK:
+//   `${method}\n${url}\n${ts}\n${nonce}`
+function didAuthMessage(method, url, ts, nonce) {
+  return Buffer.from(`${String(method || '').toUpperCase()}\n${url}\n${ts}\n${nonce}`, 'utf8');
 }
 
-function authByDid(didStr, signature, payload) {
+// authByDid: verify a DID-auth credential with replay protection. `ctx` carries
+// the request method and the freshness headers (ts, nonce). A missing/stale ts,
+// missing/oversized nonce, or a previously-seen (did|nonce) yields NO principal
+// (fail-closed) — the legacy bare-url signature is no longer accepted.
+function authByDid(didStr, signature, ctx) {
   const entry = didRegistry.get(didStr);
   if (!entry) return null;
   const vm = entry.doc.verificationMethod?.[0];
   if (!vm || !vm.publicKeyHex) return null;
+
+  const { method = 'GET', url = '', ts = '', nonce = '' } = (ctx && typeof ctx === 'object') ? ctx : { url: ctx };
+  // Freshness: timestamp must be a finite ms-epoch within the skew window.
+  const tsNum = Number(ts);
+  if (!ts || !Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > DID_AUTH_SKEW_MS) {
+    log('warn', 'did_auth_stale_or_missing_ts', { did: didStr.slice(0,30) });
+    return null;
+  }
+  // Nonce: required, hex, bounded length (128 hex = 64 random bytes is plenty).
+  if (!nonce || !/^[0-9a-fA-F]{16,128}$/.test(nonce)) {
+    log('warn', 'did_auth_bad_nonce', { did: didStr.slice(0,30) });
+    return null;
+  }
+  const nonceKey = `${didStr}|${nonce.toLowerCase()}`;
+  if (_usedDidNonces.has(nonceKey)) {
+    log('warn', 'did_auth_replay_blocked', { did: didStr.slice(0,30) });
+    return null;
+  }
+
   try {
     const rawKey = Buffer.from(vm.publicKeyHex, 'hex');
     // Wrap raw uncompressed P-256 point in DER-SPKI if not already encoded (0x30 = SEQUENCE tag)
     const spkiKey = rawKey[0] === 0x30 ? rawKey : Buffer.concat([P256_SPKI_PREFIX, rawKey]);
     const valid = crypto.verify(
       'SHA256',
-      Buffer.from(payload),
+      didAuthMessage(method, url, ts, nonce),
       { key: spkiKey, format: 'der', type: 'spki' },
       Buffer.from(signature, 'hex')
     );
-    if (valid) return entry;
+    if (valid) {
+      // Burn the nonce only after a valid signature, so an attacker cannot pre-
+      // poison the cache with arbitrary nonces. Expires one skew-window out;
+      // evict the oldest entry first if the cache is at capacity (flood guard).
+      if (_usedDidNonces.size >= MAX_DID_NONCES) {
+        const oldest = _usedDidNonces.keys().next().value;
+        if (oldest !== undefined) _usedDidNonces.delete(oldest);
+      }
+      _usedDidNonces.set(nonceKey, Date.now() + DID_AUTH_SKEW_MS);
+      return entry;
+    }
   } catch(e) {
     log('warn', 'did_auth_verify_error', { err: e.message, did: didStr.slice(0,30) });
   }
@@ -1837,17 +3789,61 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-DID, X-DID-Signature');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
   res.setHeader('Strict-Transport-Security',    'max-age=63072000; includeSubDomains; preload');
   res.setHeader('Referrer-Policy',              'no-referrer');
-  res.setHeader('Permissions-Policy',           'interest-cohort=()');
+  // A relay answers json to script, never inside a frame. frame-ancestors in
+  // the CSP above already says so to a current browser; this is the same
+  // sentence for the ones that only read the older header. Measured on
+  // 2026-09-03: all five sector relays sent no X-Frame-Options at all, while
+  // paramant.app itself did.
+  res.setHeader('X-Frame-Options',              'DENY');
+  // interest-cohort was never a registered Permissions-Policy feature. FLoC was
+  // withdrawn in 2022 and the name was never added to the feature registry, so
+  // a policy consisting only of it parses to an empty policy: the header is
+  // present, looks like hardening in a scan that only checks presence, and
+  // governs nothing. These are registered features, and denying them costs a
+  // json api nothing.
+  res.setHeader('Permissions-Policy',           'geolocation=(), microphone=(), camera=(), payment=(), usb=()');
   // X-Paramant-Version intentionally omitted — version disclosure via response header removed (security hardening v2.3.3)
   res.setHeader('X-Paramant-Sector',            SECTOR);
   res.setHeader('X-Crypto-Version',             'ML-KEM-768+AES-256-GCM');
   res.setHeader('X-Hybrid-Mode',                'available');
+}
+
+
+// ── Code-transparency manifest: in-memory + /data, CT-verankerd bij publish ──
+const CODE_MANIFEST_FILE = process.env.CODE_MANIFEST_FILE || '/data/code-manifest.json';
+let codeManifest = null;
+try { codeManifest = JSON.parse(require('fs').readFileSync(CODE_MANIFEST_FILE, 'utf8')); }
+catch (e) { if (e.code !== 'ENOENT') log('warn', 'code_manifest_load_error', { err: e.message }); }
+
+// Append one event to the CT log and produce a fresh STH. Named for ParaID
+// when it was written, but the code-transparency manifest anchors through
+// this same function, so it outlives the product it was named after. `did`
+// is any opaque subject identifier, not necessarily a DID.
+function ctAppendEvent(eventType, did, payload) {
+  ctRequireEventType('did_event', eventType);
+  // Gated before it is hashed, as in ctAppendEnvelope: the leaf commits to this
+  // object, so the entry must store the same one.
+  const gatedPayload = ctGatePayload(eventType, payload);
+  const ts = new Date().toISOString();
+  const valueHash = crypto.createHash('sha3-256')
+    .update(eventType).update('|').update(did).update('|')
+    .update(JSON.stringify(gatedPayload)).digest('hex');
+  const leaf_hash = ctLeafHash(did, valueHash, ts);
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const entry = ctGateEntry('did_event', { index, type: eventType, leaf_hash, tree_hash, did, payload: gatedPayload, ts, proof });
+  ctWindow.append(entry);
+  ctWrite(entry);
+  produceSth(allEntries.length, entry.tree_hash);
+  return entry;
 }
 
 function readBody(req, max = MAX_BLOB * 2) {
@@ -1871,12 +3867,71 @@ const _static = require('./lib/static-serve').createStaticHandler({
 });
 if (_static.serveFrontend) log('info', 'static_serving_enabled', { root: _static.frontendRoot });
 
-const server = http.createServer(async (req, res) => {
+// Every request, with one catch around the lot.
+//
+// The handler below is 4000 lines of `await`, and until now it was passed
+// straight to createServer as an async callback with nothing behind it. An
+// async callback that throws produces an unhandled rejection: the client gets
+// no answer at all, and on Node 22 the process exits. That was survivable only
+// because almost nothing in here could reject -- a redis call against a dead
+// server hung instead. Now that every redis call fails inside a bound, the
+// throw is the normal outage path, so it needs an answer and not a crash.
+//
+// Redis unreachable is 503 (the service could not answer, the caller did
+// nothing wrong); anything else is 500.
+const server = http.createServer((req, res) => {
+  handleRelayRequest(req, res).catch((err) => relayRequestFailed(req, res, err));
+});
+
+// A route-level catch that is about to answer 4xx or 5xx for what is really the
+// store being unreachable. One line at the top of each such catch turns that
+// into the honest answer instead.
+//
+// WHY IT IS NEEDED AT ALL. Every redis command is bounded now, so an outage
+// arrives as a rejection rather than as a hang -- but this file catches its own
+// errors on 31 routes and answers 400 "bad_request" or 500 "internal" for them.
+// A caller reading either of those has no way to tell "you sent nonsense" or
+// "we have a bug" from "come back in ten seconds", and a monitor watching for
+// 5xx sees a bug where there is an outage. Whoever adds the 32nd route is
+// covered by the top-level catch in relayRequestFailed, which answers the same
+// way; this is for the routes that already swallow.
+function redisOutage503(err, res) {
+  if (!redisDeadlines.isRedisOutage(err)) return false;
+  log('error', 'redis_unavailable', { err: (err && err.message) || String(err) });
+  if (res.headersSent || res.writableEnded) return true;
+  res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+  res.end(J({ error: 'redis_unavailable', hint: 'the relay store did not answer inside its deadline' }));
+  return true;
+}
+
+function relayRequestFailed(req, res, err) {
+  const outage = redisDeadlines.isRedisOutage(err);
+  log('error', outage ? 'redis_unavailable' : 'request_failed', {
+    method: req.method, url: String(req.url || '').split('?')[0],
+    err: (err && err.message) || String(err),
+  });
+  // A handler that already started writing cannot be given a status any more.
+  if (res.headersSent || res.writableEnded) { try { res.end(); } catch (_) { /* gone */ } return; }
+  const headers = { 'Content-Type': 'application/json' };
+  if (outage) headers['Retry-After'] = '5';
+  res.writeHead(outage ? 503 : 500, headers);
+  res.end(J(outage
+    ? { error: 'redis_unavailable', hint: 'the relay store did not answer inside its deadline' }
+    : { error: 'internal_error' }));
+}
+
+async function handleRelayRequest(req, res) {
   setHeaders(res, req);
   const parsed  = url_.parse(req.url, true);
   const path    = parsed.pathname;
   const query   = parsed.query;
-  const apiKey  = (req.headers['x-api-key'] || '').trim();
+  // `let`, not `const`: a ParaSend session token (pst_) resolves BELOW into the
+  // api-key it was minted for, and everything downstream -- acctOf, the audit
+  // chain, the device queues, the quota gates -- then behaves exactly as it
+  // would for a request that carried that key itself. That identity is the
+  // point: a token is a narrower way to present the same account, never a
+  // second account with a history of its own.
+  let apiKey = (req.headers['x-api-key'] || '').trim();
   // Reject any request that passes the API key as a query-string parameter.
   // Query strings appear in server logs, browser history, and proxy access logs.
   if (query.k) {
@@ -1885,18 +3940,66 @@ const server = http.createServer(async (req, res) => {
   }
   const didHeader = req.headers['x-did'] || '';
   const didSig    = req.headers['x-did-signature'] || '';
+  // Freshness factors that make a DID-auth credential single-use (replay guard):
+  // the client signs `${method}\n${url}\n${ts}\n${nonce}` and sends ts/nonce here.
+  const didTs     = req.headers['x-did-ts']    || '';
+  const didNonce  = req.headers['x-did-nonce'] || '';
   let didAuthEntry = null;
   if (!apiKey && didHeader && didSig) {
-    didAuthEntry = authByDid(didHeader, didSig, req.url);
+    didAuthEntry = authByDid(didHeader, didSig, { method: req.method, url: req.url, ts: didTs, nonce: didNonce });
     if (didAuthEntry) log('info', 'did_auth_mode', { did: didHeader.slice(0,30) });
   }
+  // ── ParaSend session token (Authorization: Bearer pst_...) ─────────────────
+  // Only when no X-Api-Key was sent: a request that carries a real key is that
+  // key's request, and a token may never widen or narrow it. The token resolves
+  // to the api-key it was minted for; from here on the request IS that key's,
+  // with one difference, enforced a few lines down: the scope allowlist.
+  //
+  // The refusals are all silent by design. A bad token yields no principal and
+  // the ordinary 401 gate answers it, the same 401 an unknown api-key gets, so
+  // nothing here separates "no such token" from "expired" from "revoked".
+  //
+  // Redis down is NOT a refusal. Without a store no token can be checked, and
+  // answering 401 would tell a legitimate holder their credential is bad. It is
+  // a 503, so the browser retries instead of throwing the sender back to login.
+  const _bearer = sessionTokens.bearerToken(req.headers['authorization'] || '');
+  let viaSessionToken = false;
+  // Which allowlist this token is judged against, set from the record the token
+  // resolves to and never from anything the caller sent. A browser picks a
+  // purpose when it MINTS (through the admin plane, on a signed-in session);
+  // once minted, the purpose is a property of the credential.
+  let sessionTokenPurpose = null;
+  if (!apiKey && sessionTokens.isSessionToken(_bearer)) {
+    if (!redisClient) {
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+      return res.end(J({ error: 'redis_unavailable', hint: 'session tokens need the relay store' }));
+    }
+    try {
+      const _pst = await sessionTokens.resolve(redisClient, _bearer, apiKeyFromHash);
+      if (_pst) { apiKey = _pst.key; viaSessionToken = true; sessionTokenPurpose = _pst.purpose; }
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      throw err;
+    }
+  }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
-  const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
-  // account_id is what Phase 3 counters key on. For now it is 1:1 with apiKey
-  // (or with the DID device for DID-auth), which means existing single-device
-  // users see no change. Once multi-device sharing of an account_id lands, the
-  // counter math automatically aggregates across devices.
-  if (keyData && !keyData.account_id) keyData.account_id = apiKey || (didAuthEntry && didAuthEntry.device_id) || null;
+  // DID-auth NEVER mints its own principal. A DID only authenticates as the API
+  // key it was REGISTERED under: inherit that key's real plan/active. Keyless DIDs
+  // (e.g. 'inv_' receiver-session DIDs, registered without an API key) therefore
+  // grant NO authenticated principal here — they keep working only through the
+  // per-endpoint INVITE_RE pubkey-exchange bypass, never as a general auth subject.
+  // (Previously any valid DID-auth forged {plan:'pro',active:true}, which let an
+  // anonymous attacker self-register an inv_ DID and ride it into a pro session.)
+  // The decision itself lives in lib/auth-gate didPrincipal (pure, unit-tested):
+  // it also refuses a revoked enrollment (revoked/revoked_at on the registry
+  // entry) and guarantees account_id = owner key, so getEntitlements and the
+  // transfers_month/signs_month gates below run against the owner's REAL plan,
+  // identical to a request carrying the owner's X-Api-Key.
+  const keyData = apiKeys.get(apiKey)
+    || authGate.didPrincipal(didAuthEntry, (k) => apiKeys.get(k));
+  // account_id is what Phase 3 counters key on: the owning API key (1:1 today),
+  // or for DID-auth the key the DID was registered under — never the device id.
+  if (keyData && !keyData.account_id) keyData.account_id = apiKey || (didAuthEntry && didAuthEntry.key) || null;
   const clientIp = getClientIp(req);
 
   // Community Edition limit: block keys that exceed the 5-key cap
@@ -1923,6 +4026,129 @@ const server = http.createServer(async (req, res) => {
   }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
 
+  // ── The scope of a ParaSend session token ──────────────────────────────────
+  // Here, and not inside the five routes it opens. A gate that each route had
+  // to remember to call is a gate that the sixty-ninth route forgets, and the
+  // whole value of this credential is that it is provably narrower than an
+  // api-key. So it sits above every route comparison in this function: an
+  // allowlist, checked once, with no way past it.
+  //
+  // 403 rather than 401 on purpose. The token is real and the account is real;
+  // what is missing is authority for THIS route, and a 401 would send the page
+  // off to mint a replacement that would be refused in exactly the same way.
+  if (viaSessionToken && !sessionTokens.scopeAllows(req.method, path, sessionTokenPurpose)) {
+    log('warn', 'session_token_out_of_scope', { method: req.method, path, purpose: sessionTokenPurpose });
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      error: 'session_token_out_of_scope',
+      hint: 'a pst_ session token opens the short list of routes it was minted for; use an API key for anything else',
+    }));
+  }
+
+  // -- The scope of a v2 API key ----------------------------------------------
+  // Beside the session-token allowlist above, and for the same reason: one
+  // choke point above every route comparison, so no route has to remember it.
+  //
+  // A key is minted read-only / send-only / sign-only, the relay stores that
+  // scope and shows it back in the key list and on the dashboard, and until now
+  // it enforced none of it. Every key, whatever its label said, could write
+  // anywhere on the v2 plane. The route table and the scope matrix both live in
+  // lib/keys-table.js (pure, unit-tested); relay.js only asks the question.
+  //
+  // Only runs when a real key resolved. Keyless and public routes keep keyData
+  // null and are untouched, as does the inv_ receiver-session bypass. A legacy
+  // key without a scope, and any key minted 'full', is allowed every action by
+  // construction, so nothing that works today stops working.
+  //
+  // 403, not 401: the key is real and active, it just does not carry authority
+  // for this route, and a 401 would send the caller off to re-authenticate with
+  // the same key and be refused again.
+  if (keyData) {
+    const _scopeAction = keysTable.scopeActionFor(req.method, path);
+    if (!keysTable.requireScope(keyData, _scopeAction)) {
+      log('warn', 'insufficient_scope', { method: req.method, path, scope: keyData.scope || 'full', required: _scopeAction });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        error: 'insufficient_scope',
+        required_action: _scopeAction,
+        scope: keyData.scope || 'full',
+        hint: 'this API key was issued with a narrower scope than this route needs',
+      }));
+    }
+  }
+
+  // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
+  // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
+  // Independent monitors fetch this and compare it against the live assets.
+  if (path === '/v1/code-manifest' && req.method === 'GET') {
+    if (!codeManifest) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'no manifest published yet' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    return res.end(J(codeManifest));
+  }
+
+  // ── ParaSign Open Developer-API (/v1) ────────────────────────────────────────
+  // Thin public layer over the internal /v2 envelope machinery. Owns its own
+  // Bearer psk_ auth + parasign-scope gate (independent of the X-Api-Key path).
+  // All relay internals it needs are injected; see lib/parasign-open-api.js.
+  if (path === '/v1' || path.startsWith('/v1/')) {
+    // publicOrigin drives the sign_url handed out to signers, so it must NOT be
+    // attacker-controllable via a spoofed Host / X-Forwarded-Host header (else an
+    // attacker poisons the signing links -> phishing). Precedence:
+    //   1) PARASIGN_PUBLIC_ORIGIN — explicit operator config, always wins. Every
+    //      self-hosted / non-paramant.app deploy MUST set this.
+    //   2) the request Host, but ONLY when it is on the paramant.app allowlist,
+    //      and then forced to https (the proxy always terminates TLS in prod).
+    //   3) a hard-coded safe default otherwise.
+    const _host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    const _hostOk = /^([a-z0-9-]+\.)*paramant\.app$/i.test(_host);
+    const _publicOrigin = process.env.PARASIGN_PUBLIC_ORIGIN
+      || (_hostOk ? `https://${_host}` : 'https://paramant.app');
+    return parasignOpenApi.route({
+      req, res, method: req.method, path, query, clientIp,
+      authHeader: req.headers['authorization'] || '',
+      publicOrigin: _publicOrigin,
+      apiKeys,
+      // The ACCOUNT's right to start new work, asked before every new envelope
+      // and not only when a key is minted: the scope on a psk_ key outlives a
+      // chargeback and a lapsed term, the account's entitlement does not.
+      parasignEntitled: (key) => parasignApiEntitled(acctOf(key)),
+      envStore: _envStore(),
+      store: _parasignStore(),
+      stamp: parasignStamp,
+      envCreateRateOk: envCreateRateOkShared,
+      persistParaSignScope: _persistParaSignScope,
+      safeHttpsRequest,
+      canonicalJSON: parasign.canonicalJSON,
+      sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
+      relayIdentity,
+      // READ-ONLY gate: reject a /v1 create when the account is already over
+      // its monthly signs cap, but do NOT increment here. signs_month counts
+      // actual SIGNATURES and is incremented per accepted party-signature in the
+      // /v2/envelopes/:id/sign path; counting at create too would double-count a
+      // /v1 envelope (its signers post back through that same sign path). The
+      // LIMIT comes from entitlements (plan_parasign, legacy-plan fallback), the
+      // per-product ParaSign tier, never the product-blind tiers.js helpers.
+      // Decision is shared with the R018 sign path (quota.signGateDecision):
+      // every tier blocks AT its included quota, this one included.
+      signQuotaGate: async (accountId, rec) => {
+        const ent = entitlements.getEntitlements(rec || {}).parasign;
+        if (!accountId || !Number.isFinite(ent.quotas.signs_month)) return { allowed: true, over_limit: false };
+        try {
+          const u = await quota.readUsage(redisClient, accountId);
+          if (!u.available || !Number.isFinite(u.signs_this_month)) return { allowed: true, over_limit: false };
+          const dec = quota.signGateDecision(u.signs_this_month, ent);
+          return {
+            allowed: dec.allowed, over_limit: !dec.allowed,
+            reason: dec.reason, plan: ent.tier, limit: dec.limit,
+            used: u.signs_this_month,
+            reset_date: quota.nextResetDate(),
+          };
+        } catch { return { allowed: true, over_limit: false }; }
+      },
+      readBody, J, log,
+    });
+  }
+
   // ── GET /health ─────────────────────────────────────────────────────────────
   if (path === '/health') {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
@@ -1935,7 +4161,7 @@ const server = http.createServer(async (req, res) => {
       webhooks: [...webhooks.values()].flat().length, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
       encryption: 'ML-KEM-768 + ECDH P-256 + AES-256-GCM',
-      signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
+      signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ML-DSA-65 unavailable: signing disabled',
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
       padding: '5MB fixed (DPI-masking)',
@@ -1956,6 +4182,100 @@ const server = http.createServer(async (req, res) => {
     return res.end(J(registry.listSupported()));
   }
 
+  // ── POST /v2/qes/sign, a qualified signature over a hash (flag-gated) ────
+  // Off unless PARASIGN_QES_PROVIDER names a provider: without the flag this
+  // path does not exist and /sign shows no option for it.
+  //
+  // The document is prepared here (signature dictionary plus ByteRange), the
+  // SHA-256 of the CAdES signed attributes goes to the QTSP, and the signature
+  // comes back. Only that digest leaves the relay; the PDF does not.
+  //
+  // Without a service token and a SAD there is nothing to sign with, so the
+  // route answers 409 and hands back the authorisation URL. That is not a
+  // shortcut we chose: the Cleverbase Signing API only offers authType
+  // "oauth2code", so a natural person has to authorise in the Cleverbase app
+  // for every batch of signatures. There is no machine-to-machine route.
+  //
+  // WHO MAY CALL IT. Finding 22c of the 2026-09-05 review: nothing but the flag
+  // check. The route sits above the API-key gate, read a 32 MB body from anyone,
+  // and two of the relay's own policy files already said otherwise --
+  // keys-table.js lists /v2/qes/sign in SIGN_PATHS, the scope class that needs a
+  // sign-capable key, and public-routes.js does NOT declare it, while promising
+  // that no keyless route joins the surface unannounced. The scope check is
+  // wrapped in `if (keyData)` and keyData is always null here, so the
+  // classification was dead policy.
+  //
+  // It is not moved below the gate, because the caller this route exists for is
+  // an external signing party who has no API key: the same person POST /sign
+  // serves. So it takes the same capability that route takes, the per-party
+  // invite token, checked against the store. A key-holding caller passes on the
+  // key instead. Either way there is now a named account or a named party behind
+  // every request, and 12 MB rather than 32.
+  //
+  // Not separately metered, and that is a decision rather than an omission: the
+  // qualified signature is a second signature over a document whose ParaSign
+  // signature the sign route already counted, and the QTSP call itself cannot be
+  // made without the signer's own service token and SAD.
+  if (path === '/v2/qes/sign' && req.method === 'POST') {
+    if (!qes.enabled()) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+    if (!envSignRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 12 * 1024 * 1024)).toString());
+      if (!keyData?.active) {
+        const _qStore = _envStore();
+        if (!_qStore) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+        const _qEnv = String(d.envelope_id || '');
+        const _qPi = parseInt(d.party_index, 10);
+        const _qTok = String(d.invite_token || d.token || '');
+        const _qBad = () => { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(J({ error: 'qes_capability_required', message: 'A qualified signature needs the envelope and the party invite token it belongs to.' })); };
+        if (!/^[A-Za-z0-9_-]{20,64}$/.test(_qEnv) || !Number.isInteger(_qPi) || _qPi < 0 || !_qTok) return _qBad();
+        let _qParty = null;
+        try { _qParty = await _qStore.getForParty(_qEnv, _qPi, _qTok); } catch (qe) { if (redisOutage503(qe, res)) return; }
+        if (!_qParty) return _qBad();
+      }
+      const pdf = Buffer.from(String(d.document || ''), 'base64');
+      if (pdf.subarray(0, 5).toString('latin1') !== '%PDF-') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'document must be a base64 PDF' }));
+      }
+      const client = qes.clientFor();
+      if (!d.service_token || !d.sad || !d.credential_id) {
+        let authorizeUrl = null;
+        let reason = 'A qualified signature needs the signer to authorise it in the provider app.';
+        try {
+          authorizeUrl = client.authorizeUrl({ scope: 'service', state: crypto.randomBytes(16).toString('hex') });
+        } catch (e) { reason = e.message; }
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({
+          error: 'qes_authorisation_required',
+          provider: qes.provider(),
+          authorize_url: authorizeUrl,
+          reason,
+        }));
+      }
+      const out = await qes.signPdf({
+        pdf, client,
+        credentialID: String(d.credential_id),
+        serviceToken: String(d.service_token),
+        authorise: () => String(d.sad),
+        signerName: d.signer_name ? String(d.signer_name).slice(0, 120) : null,
+        reason: d.reason ? String(d.reason).slice(0, 200) : null,
+        providerName: qes.provider(),
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        document: out.pdf.toString('base64'),
+        level: out.level,
+        tsa_url: out.tsaUrl,
+        qes: out.qes,
+      }));
+    } catch (e) {
+      log('warn', 'qes_sign_failed', { error: e.message });
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
   // ── GET /v2/auth/capabilities — public, no auth ─────────────────────────────
   if (req.method === 'GET' && path === '/v2/auth/capabilities') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1965,6 +4285,10 @@ const server = http.createServer(async (req, res) => {
       user_totp_status: process.env.ENABLE_USER_TOTP === 'true'
         ? 'live'
         : 'rolling_out_q2_2026',
+      // Qualified electronic signature layer. Empty string means off, which is
+      // the default: with no provider configured nothing about signing changes
+      // and the /sign page shows no extra option at all.
+      parasign_qes: qes.provider(),
       capabilities_version: 1,
     }));
   }
@@ -2091,7 +4415,7 @@ const server = http.createServer(async (req, res) => {
       }).catch(we => log('warn', 'setup_persist_failed', { err: we.message }));
 
       // -- write .env (atomic temp+rename, back up existing) --
-      const envPath = process.env.SETUP_ENV_FILE || path.join(process.cwd(), '.env');
+      const envPath = process.env.SETUP_ENV_FILE || nodePath.join(process.cwd(), '.env');
       const envLines = [
         '# Generated by Paramant /setup on ' + new Date().toISOString(),
         'SECTORS=' + sectors.join(','),
@@ -2141,8 +4465,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   // GET /v2/health/deep -- aggregated readiness check for the post-setup page.
-  // Public read (no auth) so the setup wizard and /all-systems-go can show it.
+  // In full mode this is a public read (no auth) so the setup wizard and
+  // /all-systems-go can show it. In ghost_pipe and iot the same payload is an
+  // information leak (version, key count, free disk, cert age), so there it
+  // sits behind the X-Internal-Auth header that already gates the user
+  // endpoints: monitoring on the host can read it, the open internet cannot.
+  // With no INTERNAL_AUTH_TOKEN configured the route stays closed (the gate
+  // treats missing config as closed), which is the pre-existing behaviour of
+  // every internal endpoint.
   if (req.method === 'GET' && path === '/v2/health/deep') {
+    if (RELAY_MODE !== 'full' && !_internalOk()) return _internalReject();
     const checks = [];
     const add = (name, status, detail) => checks.push({ name, status, detail });
 
@@ -2152,27 +4484,39 @@ const server = http.createServer(async (req, res) => {
     add('crypto', mlDsa ? 'green' : 'yellow',
       mlDsa ? ('ML-DSA-65 loaded, mode=' + cmode) : ('ML-DSA-65 unavailable (build @paramant/core), mode=' + cmode));
 
+    // The directory the relay really writes to, which in the shipped compose is
+    // NOT the working directory. Every relay container runs with
+    // read_only: true and WORKDIR /app (docker-compose.yml x-relay-hardening,
+    // relay/Dockerfile), so a probe in process.cwd() throws EROFS on a
+    // perfectly healthy relay. The state lives on the /data volume named by
+    // USERS_FILE and CT_FILE, and that is the only directory whose
+    // writability this check has any reason to care about. cwd stays the
+    // fallback for a bare-metal install that sets neither.
+    const dataDir = process.env.SETUP_ENV_FILE ? nodePath.dirname(process.env.SETUP_ENV_FILE)
+      : (process.env.USERS_FILE ? nodePath.dirname(process.env.USERS_FILE) : process.cwd());
+
     try {
-      const dir = process.env.SETUP_ENV_FILE ? path.dirname(process.env.SETUP_ENV_FILE) : process.cwd();
-      const probe = path.join(dir, '.health-write-' + process.pid);
+      const probe = nodePath.join(dataDir, '.health-write-' + process.pid);
       fs.writeFileSync(probe, 'ok'); fs.unlinkSync(probe);
-      add('storage', 'green', 'data dir writable');
-    } catch (e) { add('storage', 'red', 'not writable: ' + (e.code || e.message)); }
+      add('storage', 'green', 'data dir writable (' + dataDir + ')');
+    } catch (e) { add('storage', 'red', 'not writable (' + dataDir + '): ' + (e.code || e.message)); }
 
     const rs = ramStatus();
     add('memory', rs.ram_ok ? 'green' : 'yellow', rs.rss_mb + 'MB rss / ' + rs.ram_limit_mb + 'MB limit');
 
     try {
       if (typeof fs.statfsSync === 'function') {
-        const st = fs.statfsSync(process.cwd());
+        // Same directory as the write probe: free space on the /app image
+        // layer says nothing about the volume the relay fills.
+        const st = fs.statfsSync(dataDir);
         const freeGb = (st.bsize * st.bavail) / 1e9;
-        add('disk', freeGb > 1 ? 'green' : 'yellow', freeGb.toFixed(1) + 'GB free');
+        add('disk', freeGb > 1 ? 'green' : 'yellow', freeGb.toFixed(1) + 'GB free on ' + dataDir);
       } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
     } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
 
     let tlsStatus = 'yellow', tlsDetail = 'TLS terminated at the edge (not on this relay)';
     try {
-      const certFile = process.env.TLS_CERT_FILE || path.join(process.cwd(), 'deploy/certs/cert.pem');
+      const certFile = process.env.TLS_CERT_FILE || nodePath.join(process.cwd(), 'deploy/certs/cert.pem');
       if (fs.existsSync(certFile) && typeof crypto.X509Certificate === 'function') {
         const cert = new crypto.X509Certificate(fs.readFileSync(certFile));
         const days = Math.floor((new Date(cert.validTo).getTime() - Date.now()) / 86400000);
@@ -2185,6 +4529,25 @@ const server = http.createServer(async (req, res) => {
     add('users', apiKeys.size > 0 ? 'green' : 'yellow', apiKeys.size + ' API key(s) loaded');
     add('audit', 'green', 'Merkle hash chain active');
 
+    // The store, said out loud. Until now nothing in either health route
+    // mentioned redis, so a relay whose TOTP secrets and replay guard were
+    // unreachable reported the same green as a healthy one. The probe is
+    // bounded like every other redis call (lib/redis-deadline), so a dead store
+    // makes this route slower by at most one deadline and never hangs it.
+    if (!redisClient) {
+      add('redis', 'yellow', 'not configured (REDIS_URL empty)');
+    } else {
+      try {
+        const pong = await redisClient.ping();
+        add('redis', pong === 'PONG' ? 'green' : 'red', pong === 'PONG' ? 'reachable' : 'unexpected ping reply');
+      } catch (e) {
+        // No detail from the error: it carries the configured deadline in its
+        // message, and in full mode this route is public.
+        log('warn', 'deep_health_redis_unreachable', { err: (e && e.message) || 'unknown' });
+        add('redis', 'red', 'unreachable');
+      }
+    }
+
     const rank = { green: 0, yellow: 1, red: 2 };
     const overall = checks.reduce((m, c) => (rank[c.status] > rank[m] ? c.status : m), 'green');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2196,12 +4559,93 @@ const server = http.createServer(async (req, res) => {
   // ═══════════════════════════════════════════════════════════════════════
 
   function _internalOk() {
-    const tok = process.env.INTERNAL_AUTH_TOKEN;
-    return tok && req.headers["x-internal-auth"] === tok;
+    return authGate.internalAuthOk(process.env.INTERNAL_AUTH_TOKEN, req.headers["x-internal-auth"]);
   }
   function _internalReject() {
     res.writeHead(401, { "Content-Type": "application/json" });
     res.end(J({ error: "unauthorized" }));
+  }
+
+  // ── POST /v2/session-token: mint a ParaSend session token ──────────────────
+  // Called by the admin panel on behalf of a logged-in user, never by a
+  // browser. Two credentials have to line up:
+  //
+  //   X-Internal-Auth   the admin plane speaking, same gate as every /v2/user/*
+  //                     route. Not configured means closed (auth-gate treats a
+  //                     missing token as closed), like every internal endpoint.
+  //   X-Api-Key         the account the token will speak for. The admin sends
+  //                     the session's own key through proxyApiKey(), so the
+  //                     browser never gets to name an account: it can only ever
+  //                     be handed a token for the account it is signed in as.
+  //
+  // A token may not mint another token. It cannot reach here anyway -- the
+  // scope allowlist refuses this path far above -- but the check is written out
+  // rather than inferred, because "an unreachable path" is a property of code
+  // somewhere else and this is the line that must not be wrong.
+  if (req.method === 'POST' && path === '/v2/session-token') {
+    if (!_internalOk()) return _internalReject();
+    if (viaSessionToken) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'session_token_out_of_scope', hint: 'a session token cannot mint another one' }));
+    }
+    const owner = apiKeys.get(apiKey);
+    if (!owner || !owner.active) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
+    if (!redisClient) {
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+      return res.end(J({ error: 'redis_unavailable', hint: 'session tokens need the relay store' }));
+    }
+    // The purpose picks the allowlist the minted token will be judged against.
+    // It is read from the admin plane's body, which is the only caller that can
+    // reach this route at all (X-Internal-Auth above), and an unknown word is
+    // refused rather than folded onto a default: handing back a token that
+    // opens the wrong three routes is worse than handing back nothing. An
+    // ABSENT purpose is the ParaSend one, so the admin route that predates
+    // purposes keeps working byte for byte.
+    let _purpose = sessionTokens.PURPOSE_PARASEND;
+    try {
+      const b = JSON.parse((await readBody(req, 1024)).toString() || '{}');
+      if (b && b.purpose !== undefined && b.purpose !== null) _purpose = String(b.purpose);
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'bad_json' }));
+    }
+    if (!sessionTokens.normalisePurpose(_purpose)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'unknown_purpose', hint: 'purpose must be one of: parasend, app' }));
+    }
+    try {
+      const minted = await sessionTokens.mint(redisClient, apiKey, Date.now(), _purpose);
+      // The per-account ceiling. Twenty live tokens is far above any honest
+      // use of a page that mints one per load, so this is a signed-in session
+      // being used as a credential factory. 429 rather than 403: the account is
+      // fine and the answer changes on its own as the tokens expire.
+      if (minted.capped) {
+        log('warn', 'session_token_capped', {
+          account: String(owner.account_id || apiKey).slice(0, 12), live: minted.live, cap: minted.cap,
+        });
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+        return res.end(J({ error: 'session_token_cap_reached', cap: minted.cap }));
+      }
+      log('info', 'session_token_minted', {
+        account: String(owner.account_id || apiKey).slice(0, 12),
+        ttl_s: minted.expires_in_s,
+        purpose: minted.purpose,
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        ok: true,
+        token: minted.token,
+        expires_ms: minted.expires_ms,
+        expires_in_s: minted.expires_in_s,
+        purpose: minted.purpose,
+      }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      throw err;
+    }
   }
 
   // POST /v2/user/setup-totp
@@ -2229,12 +4673,14 @@ const server = http.createServer(async (req, res) => {
       } else {
         await redisClient.set(activeKey, "true");
       }
-      const backupCodes = userTotp.generateBackupCodes();
-      await userTotp.storeBackupCodes(redisClient, user_id, backupCodes);
-      // Backup codes returned once in the response; not stored in plaintext
+      // Backup codes are NOT minted here. They are generated once, at the moment
+      // activation succeeds (/v2/user/activate-totp), so a reloaded setup page, a
+      // second tab, or a re-issued setup link can never strand the user on an
+      // empty backup-code set. The setup step only provisions the TOTP secret.
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(J({ secret, backup_codes: backupCodes }));
+      return res.end(J({ secret, backup_codes: [] }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/setup-totp]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2244,17 +4690,68 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && path === "/v2/user/verify-totp") {
     if (!_internalOk()) return _internalReject();
     try {
-      const { user_id, totp } = JSON.parse((await readBody(req, 4096)).toString());
+      const { user_id, totp, throttled_upstream } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
-      const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      // Throttle, never refuse: see userMfaDelayMs.
+      //
+      // WHY throttled_upstream EXISTS. This sleep is charged to an account, and
+      // only a request that names an EXISTING account ever reaches it: the admin
+      // returns two steps earlier for an address it cannot find. So the delay is
+      // an account-existence oracle at the admin's edge, worth up to two seconds,
+      // which is four orders of magnitude louder than the 4 ms difference the
+      // fixed floor was built to hide. Measured through the admin at twelve
+      // prior failures: 306 ms for an address that exists against 252 ms for one
+      // that does not, with no overlap; at the cap, 2006 against 252.
+      //
+      // The delay has to be applied somewhere that does not know whether the
+      // account exists, and that is the admin, which owns a failure counter
+      // keyed on the hashed ADDRESS. So a caller may declare that it has already
+      // paid, and this route then counts the failure and reports what it would
+      // have charged, without charging it twice. The route is X-Internal-Auth
+      // only, so the only callers who can set this are callers who could already
+      // pass any user_id they like; it moves the delay, it does not remove it.
+      // A caller that does not set it pays here exactly as before.
+      const ownDelayMs = userMfaDelayMs(user_id);
+      if (!throttled_upstream) await authThrottle.sleep(ownDelayMs);
+      // Bounded, so an unreachable redis answers 503 here instead of parking the
+      // request in front of the single-use guard that is supposed to fail closed.
+      let secret;
+      try {
+        secret = await redisDeadline(userTotp.getUserTotpSecret(redisClient, user_id));
+      } catch (e) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "login", stage: "secret_read" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
       if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
       const result = await verifyTotpGeneric(totp, secret, {
-        algorithm: "sha256", window: 1,
+        window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      // The single-use guard could not reach Redis. Fail closed: this is the
+      // endpoint that mints admin-panel sessions, and without the NX key an
+      // observed code can be replayed inside its own 30-second slot. 503, not
+      // 401, so the caller can tell "service down" from "wrong code", and not a
+      // counted failure either.
+      if (result && result.error === totpLib.REPLAY_STORE_UNAVAILABLE) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "login" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
+      if (!result || !result.valid) userMfaNoteFailure(user_id);
+      if (result && result.valid) {
+        userMfaAttemptReset(user_id);
+        // Dual-verify accepted this code. If it validated under SHA-1, record a
+        // structured, countable event (never the code or the secret) so SHA-1-app
+        // usage is measurable in the logs. This is the login/verify path.
+        if (result.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "login" });
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(J(result));
+      // throttle_ms is what this account owed before the attempt, so an upstream
+      // that took the delay on itself can be checked against it.
+      return res.end(J({ ...result, throttle_ms: ownDelayMs }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/verify-totp]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2263,42 +4760,80 @@ const server = http.createServer(async (req, res) => {
   // POST /v2/user/activate-totp
   if (req.method === "POST" && path === "/v2/user/activate-totp") {
     if (!_internalOk()) return _internalReject();
-    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    await redisClient.set(`paramant:user:totp_active:${user_id}`, "true");
-    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ success: true }));
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      await redisClient.set(`paramant:user:totp_active:${user_id}`, "true");
+      // Single source of truth for backup codes: mint them here, at the one moment
+      // activation succeeds, and return them exactly once. Generating them at
+      // activation (not at the QR/setup step) is what makes the whole flow robust
+      // against reloads, second tabs, and re-issued setup links.
+      await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+      const backupCodes = await userTotp.regenerateBackupCodes(redisClient, user_id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ success: true, backup_codes: backupCodes }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/activate-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
   // POST /v2/user/consume-backup
   if (req.method === "POST" && path === "/v2/user/consume-backup") {
     if (!_internalOk()) return _internalReject();
-    const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
-    const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J(result));
+    try {
+      const { user_id, code, throttled_upstream } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id || !code) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      // Same treatment as verify-totp. The delay is what bounds the argon2 work
+      // a wrong code triggers now that the refusal is gone; the per-IP caps on
+      // the admin side bound it from the other end.
+      // Same existence oracle, same opt-out: see /v2/user/verify-totp above.
+      if (!throttled_upstream) await authThrottle.sleep(userMfaDelayMs(user_id));
+      const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
+      if (result && (result.valid || result.success)) userMfaAttemptReset(user_id);
+      else userMfaNoteFailure(user_id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J(result));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/consume-backup]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
   // POST /v2/user/regenerate-backup
   if (req.method === "POST" && path === "/v2/user/regenerate-backup") {
     if (!_internalOk()) return _internalReject();
-    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    await redisClient.del(`paramant:user:backup_codes:${user_id}`);
-    const codes = userTotp.generateBackupCodes();
-    await userTotp.storeBackupCodes(redisClient, user_id, codes);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ backup_codes: codes }));
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const codes = await userTotp.regenerateBackupCodes(redisClient, user_id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ backup_codes: codes }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/regenerate-backup]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
   // POST /v2/user/delete-totp
   if (req.method === "POST" && path === "/v2/user/delete-totp") {
     if (!_internalOk()) return _internalReject();
-    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    await userTotp.deleteUserTotp(redisClient, user_id);
-    await redisClient.del(`paramant:user:totp_active:${user_id}`);
-    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ success: true }));
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      await userTotp.deleteUserTotp(redisClient, user_id);
+      await redisClient.del(`paramant:user:totp_active:${user_id}`);
+      await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ success: true }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/delete-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
 
@@ -2321,8 +4856,570 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ exists: true, secret, backup_codes: [] }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/get-totp-provisional]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/usage-purpose: store the one-time dashboard survey answer
+  // ("What do you use Paramant for?") on the account key record. Internal,
+  // X-Internal-Auth only: the admin server proxies the authenticated user
+  // session through this (same trust model as the TOTP endpoints above).
+  // A second call overwrites (last answer wins; see lib/usage-purpose.js).
+  if (req.method === "POST" && path === "/v2/user/usage-purpose") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, purpose } = JSON.parse((await readBody(req, 4096)).toString());
+      const out = usagePurpose.setUsagePurpose({ apiKeys, mutateUsersJson: _mutateUsersJson }, user_id, purpose);
+      if (out.status === 200) {
+        const _acct = (apiKeys.get(user_id) || {}).account_id || user_id;
+        log('info', 'usage_purpose_set', { account: String(_acct).slice(0, 12), purpose });
+      }
+      res.writeHead(out.status, { "Content-Type": "application/json" });
+      return res.end(J(out.body));
+    } catch (err) {
+      console.error("[user/usage-purpose]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/envelopes: account-scoped signing worklist for the normal
+  // dashboard. Internal only. The admin proxy supplies user_id from the
+  // authenticated session, never from browser-controlled account input. POST
+  // keeps today's key-shaped user_id out of access-log query strings.
+  if (req.method === "POST" && path === "/v2/user/envelopes") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || "").toString();
+      const limit = Math.max(1, Math.min(parseInt(input.limit || "100", 10) || 100, 250));
+      if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: "invalid_user_id" })); }
+      const store = _envStore();
+      if (!store) { res.writeHead(503); return res.end(J({ error: "envelope_store_unavailable" })); }
+      const documents = await store.listAccountEnvelopes(userId, { limit });
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(J({ ok: true, documents, count: documents.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/envelopes GET]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // ── POST /v2/sends/precheck: the recipient list, before any upload ────────
+  //
+  // The same check POST /v2/sends makes (tiers.checkRecipients on the ParaSend
+  // tier), without a single block. The page asks this first, so a Community
+  // sender with two addresses is told about the ceiling of one BEFORE the file
+  // is sealed and uploaded, instead of after: then a transfer was counted and
+  // the loose blocks sat in memory for a send that was refused. Nothing is
+  // counted, stored or mailed here, and the invitation budget is not touched.
+  if (req.method === 'POST' && path === '/v2/sends/precheck') {
+    const kd = apiKeys.get(apiKey);
+    if (!kd || !kd.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    let input;
+    try { input = JSON.parse((await readBody(req, 65536)).toString()); }
+    catch (e) {
+      const teGroot = /too large/i.test(String((e && e.message) || ''));
+      res.writeHead(teGroot ? 413 : 400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: teGroot ? 'body_too_large' : 'invalid_json' }));
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      res.writeHead(400); return res.end(J({ error: 'invalid_json' }));
+    }
+    const _tierP = parasendLimitsOf(kd).tier;
+    const chk = tiers.checkRecipients(_tierP, input.recipients);
+    if (!chk.ok) {
+      const status = chk.reason === 'over_limit' ? 403 : 400;
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ error: chk.reason, dimension: 'max_recipients', plan: chk.plan,
+                         limit: chk.limit, asked: chk.count || undefined,
+                         rejected: chk.rejected || undefined }));
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, plan: chk.plan, limit: chk.limit, count: chk.count }));
+  }
+
+  // ── POST /v2/sends: van geuploade blokken naar een verzending ─────────────
+  //
+  // WHY THIS IS A SECOND STEP. A file goes up in blocks of a fixed size: a
+  // 50 MB document arrives as twelve separate /v2/inbound calls. Reading a
+  // recipient list off one of those would have made twelve sends out of one
+  // file, each with its own links, which is worse than not supporting it.
+  //
+  // So the upload is untouched and this comes after it: the caller hands back
+  // the hashes it just wrote, in order, and they become one file in the durable
+  // store. The loose blocks are dropped the moment they are joined, so nothing
+  // sits in memory twice.
+  if (req.method === 'POST' && path === '/v2/sends') {
+    const kd = apiKeys.get(apiKey);
+    if (!kd || !kd.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    try {
+      // Eigen try: een kapotte body is de fout van de beller, geen interne
+      // storing. Zes vormen gaven 500 send_failed -- geen JSON, leeg, null, te
+      // groot -- terwijl dezelfde file elders netjes 400 "Invalid JSON body"
+      // geeft. Een 500 stuurt iemand de verkeerde kant op en telt mee in elke
+      // storingsmeting.
+      let input;
+      try {
+        input = JSON.parse((await readBody(req, 65536)).toString());
+      } catch (e) {
+        const teGroot = /too large/i.test(String((e && e.message) || ''));
+        res.writeHead(teGroot ? 413 : 400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: teGroot ? 'body_too_large' : 'invalid_json',
+                           limit_bytes: teGroot ? 65536 : undefined }));
+      }
+      if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        res.writeHead(400); return res.end(J({ error: 'invalid_json' }));
+      }
+      const hashes = Array.isArray(input.hashes) ? input.hashes : [];
+      if (!hashes.length || hashes.length > 512) {
+        res.writeHead(400); return res.end(J({ error: 'hashes_required' }));
+      }
+      // Every block has to exist AND belong to this key. Without the second
+      // half, knowing a hash would be enough to fold somebody else's upload
+      // into your own send.
+      // The same block twice would be joined twice: one 5 MiB upload repeated
+      // 512 times is a 2.5 GB buffer built from nothing.
+      if (new Set(hashes).size !== hashes.length) {
+        res.writeHead(400); return res.end(J({ error: 'duplicate_block' }));
+      }
+      // Off the ParaSend product axis, like every other ceiling in this file.
+      // Reading kd.plan was the fault parasendLimitsOf exists to end: the
+      // Mollie webhook writes plan_parasend and deliberately never touches the
+      // unified `plan`, so a paying Firm buyer was held to the community
+      // ceiling of one recipient while /pricing sold him ten.
+      const _psend = parasendLimitsOf(kd);
+      const _tier = _psend.tier;
+      const _fileMb = tiers.tierLimitNum(_tier, 'file_mb');
+      const _maxBytes = Number.isFinite(_fileMb) ? _fileMb * 1048576 : Infinity;
+      let _totaal = 0;
+      const delen = [];
+      for (const h of hashes) {
+        if (typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h)) {
+          res.writeHead(400); return res.end(J({ error: 'bad_hash' }));
+        }
+        const entry = blobStore.get(h);
+        if (!entry) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
+        if (entry.apiKey !== apiKey) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
+        _totaal += entry.blob.length;
+        if (_totaal > _maxBytes) {
+          res.writeHead(413);
+          return res.end(J({ error: 'too_large', dimension: 'file_mb', limit: _fileMb }));
+        }
+        delen.push(entry.blob);
+      }
+      const blob = Buffer.concat(delen);
+
+      // `sealed` is a map address -> { token, wrapped_key }, made in the
+      // sender's browser. The wrapping is the file key locked under that one
+      // recipient's token; we keep the wrapping and the hash of the token, and
+      // the token itself passes through once to be put in an email.
+      //
+      // So this relay holds a locked box and no key. Refusing a send without
+      // them is deliberate: a recipient who gets bytes they cannot open is
+      // worse off than one who never got them.
+      const sealed = (input.sealed && typeof input.sealed === 'object') ? input.sealed : null;
+
+      // Seats for the whole send, before anything is written. The count comes
+      // off `sealed`, which is the browser's own list and therefore the number
+      // of mails this is actually going to cause; the plan ceiling is checked
+      // again inside create, so a padded `sealed` buys nothing but a refusal.
+      const _wilMailen = sealed ? Object.keys(sealed).length
+                       : (Array.isArray(input.recipients) ? input.recipients.length : 0);
+      const _rem = inviteRateOk(acctOf(apiKey), kd, _wilMailen);
+      if (!_rem.ok) {
+        log('warn', 'invite_rate_limited', { limit: _rem.limit, used: _rem.used, asked: _rem.asked });
+        res.writeHead(429, { 'Content-Type': 'application/json',
+                             'Retry-After': String(_rem.retry_after_s) });
+        return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
+                           limit: _rem.limit, used: _rem.used, asked: _rem.asked,
+                           retry_after_s: _rem.retry_after_s,
+                           hint: 'this ceiling is per hour and covers everyone you invite' }));
+      }
+
+      const made = await _sendStore().create({
+        plan: _tier, blob, addresses: input.recipients, sealed,
+        ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
+        // From the key record, never from the request: a sender may not choose
+        // whose name appears above a mail thirty strangers receive.
+        sender: { naam: kd.label || '', email: kd.email || '', taal: mailTaal(input.lang) },
+      });
+      if (!made.ok) {
+        // No send, no mail, so the seats go back. Otherwise a sender who trips
+        // the recipient ceiling also loses an hour of their invitation budget,
+        // for a send that never left.
+        inviteRateGeef(acctOf(apiKey), _wilMailen);
+        // The dimension has to be the one that actually refused, not a
+        // constant. Every refusal from create used to come back as
+        // max_recipients, so a file over the size ceiling told the sender
+        // "your plan allows 25" while the 25 was megabytes and the number
+        // beside it was 27263003 bytes. A sender reading that would go and
+        // delete recipients from a list that was never the problem.
+        const _dim = made.dimension
+          || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
+        const status = made.reason === 'over_limit' ? 403
+                     : made.reason === 'too_large' ? 413 : 400;
+        log('info', 'send_refused', { reason: made.reason, dimension: _dim, limit: made.limit });
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: made.reason, dimension: _dim,
+                           limit: made.limit, asked: made.asked,
+                           rejected: made.rejected || undefined }));
+      }
+
+      // Joined, so the loose blocks are no longer needed. Dropping them here
+      // rather than leaving them to their TTL keeps one file from occupying
+      // memory twice for the rest of its window.
+      for (const h of hashes) blobDrop(h);
+
+      const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+      const taal = mailTaal(input.lang);
+      const _totOpt = { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' };
+      const tot = mailDatum(made.expires_at, 'nl', _totOpt);
+      const totEn = mailDatum(made.expires_at, 'en', _totOpt);
+      // Escaped: this name is chosen by the sender and lands in the HTML of up
+      // to thirty mails from paramant.app to people who are not our customers.
+      // An unescaped one could carry a link or a tracking pixel of its own.
+      // ONE LINE, and printable.
+      //
+      // The HTML half goes through escHtml, so markup was already dead. The
+      // TEXT half took the name raw, newlines included, and that is 120
+      // characters of free writing inside a mail from paramant.app to somebody
+      // who is not our customer. Measured: a filename carrying
+      // "PARAMANT SUPPORT: your account expires. Confirm here: <link>" arrived
+      // exactly like that, above our own link, thirty times over.
+      //
+      // Lone surrogates go too. encodeURIComponent throws URIError on one, and
+      // that throw happens in writeHead on the pickup route -- after the token
+      // is claimed. The recipient got a 500 and then already_collected on every
+      // retry: a file destroyed by its own name.
+      const naamRuw = (String((input.filename == null ? '' : input.filename))
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/[\uD800-\uDFFF]/g, '')
+        .replace(/\s+/g, ' ')
+        // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
+        // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
+        // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
+        // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
+        // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
+        // onze eigen link, dertig keer.
+        .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
+        .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
+        .trim()
+        .slice(0, 120)) || (taal === 'en' ? 'a file' : 'een bestand');
+      const naam = escHtml(naamRuw);
+      // The human above the mail. Thirty people who are not our customers get
+      // this, and a message with no sender in it reads as phishing no matter
+      // how carefully the rest is worded.
+      const wieRuw = mailer.veiligeNaam(kd.label || '');
+      const wie = escHtml(wieRuw);
+      let gemaild = 0;
+      // One invitation per person, never a visible list of the others: who else
+      // receives a confidential document is not for the group to know.
+      const sector = sectorOfKey(kd);
+      for (const [adres, token] of Object.entries(made.tokens)) {
+        // An English send lands on the English page. Every other link stays on
+        // the Dutch path, which is also where mails sent before 23-09 point.
+        const link = base + (taal === 'en' ? '/en' : '') + '/ontvang/' + encodeURIComponent(token)
+                   + '?r=' + encodeURIComponent(sector);
+        // await, so `invited` counts what a provider accepted instead of how
+        // often we tried. A 201 saying "invited: 30" while nothing arrived is
+        // worse than an honest lower number.
+        const bezorgd = await mailer.stuur({
+          to: adres,
+          from: mailer.afzenderNamens(undefined, wieRuw),
+          replyTo: kd.email || undefined,
+          subject: taal === 'en'
+            ? (wieRuw ? wieRuw + ' sent you a file' : 'A file is waiting for you')
+            : (wieRuw ? wieRuw + ' heeft u een bestand gestuurd' : 'Er staat een bestand voor u klaar'),
+          // The plain-text half takes the unescaped name: HTML entities in a
+          // text mail read as noise, and there is nothing to inject into.
+          text: tweetaligTekst(taal,
+                (wieRuw ? wieRuw + ' heeft u via Paramant een bestand gestuurd.' : 'Er staat een bestand voor u klaar.')
+              + '\n\n' + naamRuw + '\n\n' + link
+              + '\n\nDeze link is alleen voor u en werkt één keer. Als u hem opent, sturen we een '
+              + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
+              + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
+              + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
+              + ' uw adres heeft ingevuld. Paramant verstuurt het bestand, maar kan het niet openen.'
+              + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
+                (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
+              + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
+              + '\n\nThe link is yours alone and works once. Opening it sends a short code '
+              + 'to this address, so only somebody who can read this mailbox can collect the '
+              + 'file. Available until ' + totEn + '.'
+              + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
+              + ' entered your address. Paramant carries the file; we cannot open it.'
+              + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
+          html: tweetaligHtml(taal,
+                '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'
+                             : 'Er staat een bestand voor u klaar.') + '</p>'
+              + '<p style="font-weight:600">' + naam + '</p>'
+              + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
+              + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
+              + 'Bestand openen</a></p>'
+              + '<p style="color:#666;font-size:13px">Deze link is alleen voor u en werkt één keer. '
+              + 'Als u hem opent, sturen we een korte controlecode naar dit adres. Zo kan alleen '
+              + 'wie deze mailbox leest het bestand ophalen.<br>Beschikbaar tot ' + tot + '.</p>',
+                '<p>' + (wie ? '<strong>' + wie + '</strong> sent you a file through Paramant.'
+                             : 'A file is waiting for you.') + '</p>'
+              + (taal === 'en'
+                  ? '<p style="font-weight:600">' + naam + '</p>'
+                  + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
+                  + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
+                  + 'Open the file</a></p>'
+                  : '<p>Use the button above to open the file.</p>')
+              + '<p style="color:#666;font-size:13px">This link is yours alone and works once. '
+              + 'Opening it sends a short code to this address, so only somebody who can read '
+              + 'this mailbox can collect the file.<br>Available until ' + totEn + '.</p>')
+              + VOET(wieRuw, kd.email, taal),
+        });
+        if (bezorgd && bezorgd.ok) gemaild += 1;
+        else log('warn', 'invitation_failed', { reason: bezorgd && bezorgd.reason });
+      }
+      log('info', 'send_invitations', { id: made.id, mailed: gemaild, of: made.count });
+
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
+                         invited: gemaild, size: blob.length,
+                         expires_at: new Date(made.expires_at).toISOString() }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      log('warn', 'send_create_failed', { err: err && err.message });
+      res.writeHead(500); return res.end(J({ error: 'send_failed' }));
+    }
+  }
+
+  // ── POST /v2/user/sends: wat dit account naar een groep stuurde ───────────
+  // The sending side of the dashboard, and the thing a customer actually buys:
+  // seeing who collected and who did not. Internal only, same as the signing
+  // worklist above, and the user_id comes from the authenticated session and
+  // never from the browser.
+  if (req.method === 'POST' && path === '/v2/user/sends') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: 'invalid_user_id' })); }
+      const out = await _sendStore().list(userId, input.limit);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, sends: out.sends, count: out.sends.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      log('warn', 'user_sends_failed', { err: err && err.message });
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/detail: one send, with its recipients ─────────────
+  if (req.method === 'POST' && path === '/v2/user/sends/detail') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      const sendId = (input.send_id || '').toString();
+      // Ownership first, and the same answer for "not yours" as for "never
+      // existed": a sender must not be able to probe another account's ids.
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      const view = await _sendStore().overview(sendId);
+      if (!view.ok) { res.writeHead(404); return res.end(J({ error: 'unknown_send' })); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J(view));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/revoke ────────────────────────────────────────────
+  // Withdraw one person without touching the rest of the group.
+  if (req.method === 'POST' && path === '/v2/user/sends/revoke') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      const sendId = (input.send_id || '').toString();
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      const out = await _sendStore().revoke(sendId, (input.email || '').toString());
+      if (!out.ok) { res.writeHead(409); return res.end(J({ error: out.reason })); }
+      log('info', 'send_recipient_revoked', { id: sendId });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, settled: out.settled }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/reinvite ──────────────────────────────────────────
+  // A REMINDER, and it carries no new link.
+  //
+  // It used to mint a fresh token and kill the old one, and that destroyed the
+  // file for the person it was meant to help: the file key is wrapped under the
+  // recipient's own token, and this relay cannot make a new wrapping because it
+  // never holds the key. They spent their one-time link on bytes that opened
+  // into nothing. Keeping the token instead is not an option either -- not
+  // writing it down is the whole reason the relay cannot open what it stores.
+  //
+  // So this points at the invitation they already have, which still works.
+  if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      const sendId = (input.send_id || '').toString();
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      // Through the SAME hourly brake as an invitation. It was not, and that
+      // left ninety mails per send of thirty going out around the ceiling:
+      // three reminders per recipient, each a real mail to somebody who is not
+      // our customer. The brake exists to bound exactly that.
+      //
+      // The seat is taken before the send store is touched, and handed back
+      // below if the reminder turns out not to be allowed.
+      const _remH = inviteRateOk(accountVan(userId), apiKeys.get(userId) || null, 1);
+      if (!_remH.ok) {
+        log('warn', 'reminder_rate_limited', { limit: _remH.limit, used: _remH.used });
+        res.writeHead(429, { 'Content-Type': 'application/json',
+                             'Retry-After': String(_remH.retry_after_s) });
+        return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
+                           limit: _remH.limit, retry_after_s: _remH.retry_after_s }));
+      }
+      const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
+      if (!out.ok) {
+        inviteRateGeef(accountVan(userId), 1);
+        res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
+        return res.end(J({ error: out.reason, limit: out.limit }));
+      }
+      const taal3 = mailTaal(out.lang);
+      const _remOpt = { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit',
+                        minute: '2-digit', timeZone: 'Europe/Amsterdam', timeZoneName: 'short' };
+      const tot = mailDatum(out.expires_at || Date.now(), 'nl', _remOpt);
+      const totEn = mailDatum(out.expires_at || Date.now(), 'en', _remOpt);
+      // Awaited, so the dashboard's "reminder sent" is about what happened.
+      const wie3 = mailer.veiligeNaam(out.sender_name || '');
+      const bezorgd = await mailer.stuur({
+        to: out.email,
+        from: mailer.afzenderNamens(undefined, wie3),
+        replyTo: out.sender_email || undefined,
+        subject: taal3 === 'en'
+          ? (wie3 ? 'A reminder from ' + wie3 + ': your file is still waiting'
+                  : 'A reminder: a file is still waiting for you')
+          : (wie3 ? 'Herinnering van ' + wie3 + ': uw bestand staat nog klaar'
+                  : 'Herinnering: er staat nog een bestand voor u klaar'),
+        text: tweetaligTekst(taal3,
+              'Er staat nog een bestand voor u klaar.\n\nGebruik de link uit de eerdere mail '
+            + 'van Paramant. Die werkt nog en is nog steeds alleen voor u. '
+            + 'Beschikbaar tot ' + tot + '.',
+              'A file is still waiting for you.\n\nUse the link in the earlier mail '
+            + 'from Paramant; it still works and it is still yours alone. '
+            + 'Available until ' + totEn + '.'),
+        html: tweetaligHtml(taal3,
+              '<p>Er staat nog een bestand voor u klaar.</p>'
+            + '<p>Gebruik de link uit de eerdere mail van Paramant. Die werkt nog '
+            + 'en is nog steeds alleen voor u.</p>'
+            + '<p style="color:#666;font-size:13px">Beschikbaar tot ' + escHtml(tot) + '. '
+            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.</p>',
+              '<p>A file is still waiting for you.</p>'
+            + '<p>Use the link in the earlier mail from Paramant. It still works, '
+            + 'and it is still yours alone.</p>'
+            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(totEn) + '. '
+            + 'Cannot find that mail? Ask the sender to send the file again.</p>')
+            + VOET(wie3, out.sender_email, taal3),
+      });
+      if (!bezorgd || !bezorgd.ok) {
+        log('warn', 'reminder_not_mailed', { id: sendId, reason: bezorgd && bezorgd.reason });
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'reminder_not_sent' }));
+      }
+      log('info', 'send_recipient_reminded', { id: sendId, reminders: out.reminders });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, reminders: out.reminders }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/envelopes/lookup: heb ik dit document al aangeboden ─────
+  // Voor een client die afbrak tussen het aanmaken van de envelope en het
+  // opschrijven van het id. Je krijgt alleen antwoord over je eigen account en
+  // alleen op een hash die je zelf al kent, dus dit legt niets bloot dat de
+  // vrager niet had. De dashboardlijst blijft de documenthash weglaten.
+  if (req.method === "POST" && path === "/v2/user/envelopes/lookup") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || "").toString();
+      const docHash = (input.doc_hash || "").toString().trim().toLowerCase();
+      if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: "invalid_user_id" })); }
+      if (!/^[0-9a-f]{64}$/.test(docHash)) { res.writeHead(400); return res.end(J({ error: "invalid_doc_hash" })); }
+      const store = _envStore();
+      if (!store) { res.writeHead(503); return res.end(J({ error: "envelope_store_unavailable" })); }
+      const ids = await store.findAccountEnvelopeIdsByDocHash(userId, docHash);
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(J({ ok: true, envelope_ids: ids, count: ids.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/envelopes lookup]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // ── POST /v2/parasign/inbox/:id/resend: send me that invitation again ──────
+  // Internal auth plus an asserted verified email hash, the same pair the
+  // recipient-side document and participant-receipt reads take. It is NOT in
+  // any session-token scope: it reads the stored per-party invite token back so
+  // the admin can put it in a mail, and a route that can produce a capability
+  // must never be reachable from a browser.
+  //
+  // IT MINTS NOTHING. getPartyInvite() returns the token create() wrote. A fresh
+  // capability would keep an invite alive past its window and orphan the link
+  // already in the party's mailbox; the seven-day window runs from created_at
+  // and is untouched, so the resent link dies at the same moment as the first.
+  //
+  // The relay does not send mail and does not hold addresses, so it answers with
+  // the material and the admin does the sending, to the session address whose
+  // hash it just asserted. That address is the only one the mail can reach.
+  //
+  // It sits up here beside the other internal /v2/user routes rather than beside
+  // GET /v2/parasign/inbox further down, because the api-key gate stands between
+  // the two and this request carries no api-key: the admin authenticates as
+  // itself, not as the account.
+  const parasignResendMatch = path.match(/^\/v2\/parasign\/inbox\/([A-Za-z0-9_-]{20,64})\/resend$/);
+  if (parasignResendMatch && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope_store_unavailable' })); }
+    const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
+    try {
+      const invite = await store.getPartyInvite(parasignResendMatch[1], verifiedEmailHash);
+      // One answer for "no such envelope", "not your envelope" and "not waiting
+      // on you any more". A caller who is not the party learns nothing, not even
+      // that the id exists.
+      if (!invite) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
+      return res.end(J({
+        ok: true,
+        party_index: invite.party_index,
+        party_label: invite.party_label,
+        invite_token: invite.invite_token,
+        document: invite.document,
+        sender: senderLabelOf(invite.sender_account_id),
+        sent_at: invite.sent_at,
+        signing_closes_at: invite.signing_closes_at,
+      }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error('[parasign/inbox resend]', err.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
     }
   }
 
@@ -2346,9 +5443,14 @@ const server = http.createServer(async (req, res) => {
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
-        algorithm: "sha256", window: 1,
+        window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      if (totpResult.error === totpLib.REPLAY_STORE_UNAVAILABLE) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "signing-key" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
       if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
       // Store (server-side pk_hash computation — never trust client)
       let result;
@@ -2358,6 +5460,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { "Content-Type": "application/json" });
         return res.end(J({ error: e.message }));
       }
+      if (totpResult.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "sign" });
       const ctEntry = ctAppendSigningPkEvent("signing_pk_enrolled", user_id, result.entry.pk_hash_sha3);
       log("info", "signing_pk_enrolled", {
         user_id: String(user_id).slice(0, 12) + "…",
@@ -2373,8 +5476,10 @@ const server = http.createServer(async (req, res) => {
         enrolled_at: result.entry.enrolled_at,
         reenrolled: result.reenrolled,
         ct_index: ctEntry.index,
+        totp_algorithm: totpResult.algorithm,
       }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key POST]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2399,6 +5504,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, keys: projected, total: projected.length }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key GET]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2415,10 +5521,16 @@ const server = http.createServer(async (req, res) => {
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
-        algorithm: "sha256", window: 1,
+        window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      if (totpResult.error === totpLib.REPLAY_STORE_UNAVAILABLE) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "signing-key" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
       if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      if (totpResult.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "sign" });
       let result;
       try {
         result = await userSigning.revokeSigningPk(redisClient, user_id, pk_hash_sha3);
@@ -2440,7 +5552,151 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, revoked_at: result.entry.revoked_at, ct_index: ctEntry.index }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key DELETE]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/signing-key/tofu — enrol a signing pubkey gated by an EMAIL-
+  // BOUND invite token + the account's own email, INSTEAD of TOTP, for a
+  // first-time (TOFU) invitee who has no TOTP. The relay self-verifies as
+  // strictly as the TOTP gate it replaces — it does NOT merely trust the caller:
+  //   GATE 1  the invite token must match this envelope party (PR-0, email-bound);
+  //   GATE 2  the party's bound email MUST equal THIS account's own email
+  //           (so a pubkey can only land on the account the invite was for —
+  //           no path to set a key on someone else's account);
+  //   GATE 3  one-shot per party slot (a single TOFU enrol per invite);
+  //   + the cross-account-conflict check inside storeSigningPk still applies.
+  // No valid invite token -> no enrol. Internal-auth only (admin proxy).
+  if (req.method === "POST" && path === "/v2/user/signing-key/tofu") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, pk_b64, label, envelope_id, party_index, invite_token } = JSON.parse((await readBody(req, 16384)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      if (!pk_b64 || typeof pk_b64 !== "string") { res.writeHead(400); return res.end(J({ error: "missing_pk_b64" })); }
+      if (!envelope_id || !invite_token) { res.writeHead(400); return res.end(J({ error: "missing_invite_context" })); }
+      const pi = parseInt(party_index, 10);
+      if (!Number.isInteger(pi) || pi < 0) { res.writeHead(400); return res.end(J({ error: "invalid_party_index" })); }
+
+      const store = _envStore();
+      if (!store) { res.writeHead(503); return res.end(J({ error: "envelope_store_unavailable" })); }
+
+      // GATE 1 — invite token must match this envelope party (timing-safe, PR-0).
+      if (!(await store.checkInviteToken(envelope_id, pi, invite_token))) {
+        res.writeHead(403); return res.end(J({ error: "invalid_invite_token" }));
+      }
+      // GATE 2 — the party's bound email MUST equal THIS account's email.
+      const view = await store.getForParty(envelope_id, pi, invite_token);
+      const partyEmailHash = view && view.party ? (view.party.email_hash || "") : "";
+      let acctEmail = "";
+      try { acctEmail = (JSON.parse((await redisClient.get(`paramant:user:meta:${user_id}`)) || "{}").email) || ""; } catch {}
+      const acctEmailHash = envelopeMod.partyEmailHash(acctEmail);
+      // Timing-safe hex compare (the same helper envelope.js sign() uses) — for
+      // consistency, so the unsafe `!==` pattern is never copied to a spot where
+      // it would matter. safeHexEqual returns false for empty/length-mismatch too.
+      if (!envelopeMod.safeHexEqual(partyEmailHash, acctEmailHash)) {
+        res.writeHead(403); return res.end(J({ error: "account_email_mismatch" }));
+      }
+      // GATE 3 — one-shot per party slot (NX). Released on store failure below.
+      const enrolKey = `paramant:tofu_enrol:${envelope_id}:${pi}`;
+      const firstEnrol = await redisClient.set(enrolKey, String(user_id), { NX: true, EX: 30 * 86400 });
+      if (firstEnrol === null) { res.writeHead(409); return res.end(J({ error: "already_enrolled" })); }
+
+      // Store (server-side pk_hash; cross-account-conflict check inside).
+      let result;
+      try {
+        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label });
+      } catch (e) {
+        await redisClient.del(enrolKey).catch(() => {});
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));   // e.g. 'pubkey already enrolled to a different account'
+      }
+      const ctEntry = ctAppendSigningPkEvent("signing_pk_enrolled_tofu", user_id, result.entry.pk_hash_sha3);
+      log("info", "signing_pk_enrolled_tofu", {
+        user_id: String(user_id).slice(0, 12) + "…",
+        pk_hash: result.entry.pk_hash_sha3.slice(0, 16) + "…",
+        envelope: String(envelope_id).slice(0, 10) + "…", party: pi, ct_index: ctEntry.index,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, pk_hash_sha3: result.entry.pk_hash_sha3, enrolled_at: result.entry.enrolled_at, ct_index: ctEntry.index }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/signing-key/tofu]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/signing-key/attested — enrol a signing pubkey gated by a
+  // PASSKEY STEP-UP the admin already verified, INSTEAD of TOTP. This is the
+  // "your sign-in passkey IS your signing key" path: a logged-in user who has a
+  // passkey proves possession with a fresh WebAuthn assertion (verified in the
+  // admin server, which owns rpId/origin — the relay never verifies assertions,
+  // see the storage block below), and that step-up authorises the bind. It lets
+  // a passkey-only account (no TOTP) enrol a signing key at all, which the
+  // TOTP-gated route above cannot. The relay does NOT blindly trust the caller:
+  //   GATE 1  internal-auth only (admin proxy);
+  //   GATE 2  the account MUST already have >=1 active passkey credential — with
+  //           no passkey there is nothing the admin could have stepped up, so a
+  //           TOTP-less, passkey-less account can never reach a TOTP-free bind;
+  //   + the cross-account-conflict check inside storeSigningPk still applies, and
+  //   the server recomputes pk_hash (a client-supplied hash is never trusted).
+  // Mirrors /tofu's "as strict as the TOTP gate it replaces" property.
+  if (req.method === "POST" && path === "/v2/user/signing-key/attested") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, pk_b64, label, step_up_token } = JSON.parse((await readBody(req, 16384)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      if (!pk_b64 || typeof pk_b64 !== "string") { res.writeHead(400); return res.end(J({ error: "missing_pk_b64" })); }
+      // GATE 1 (Auth M1) — a FRESH, one-shot step-up proof. The admin mints this
+      // only after a live WebAuthn assertion and binds it to this user in Redis;
+      // the relay consumes it atomically (getDel) and checks the binding. Without
+      // it, "a passkey exists" (the old gate 2) — or any second admin code path
+      // that skips the step-up ceremony — could enroll an attacker's signing key
+      // on a hijacked session. The relay now enforces the step-up independently.
+      if (typeof step_up_token !== "string" || !/^[a-f0-9]{64}$/.test(step_up_token)) {
+        res.writeHead(403); return res.end(J({ error: "step_up_required" }));
+      }
+      if (!redisClient || !redisClient.isReady) { res.writeHead(503); return res.end(J({ error: "step_up_store_unavailable" })); }
+      const _suKey = `paramant:signing:stepup:${step_up_token}`;
+      const _suRaw = redisClient.getDel
+        ? await redisClient.getDel(_suKey)
+        : await (async () => { const v = await redisClient.get(_suKey); if (v !== null) await redisClient.del(_suKey); return v; })();
+      let _su = null; try { _su = _suRaw ? JSON.parse(_suRaw) : null; } catch { _su = null; }
+      // Freshness is enforced by the Redis EX on the token; a returned value means
+      // still-valid. Bind the token to this exact account.
+      if (!_su || _su.user_id !== user_id) { res.writeHead(403); return res.end(J({ error: "step_up_invalid" })); }
+      // GATE 2 — the account must actually have a passkey (the factor the admin
+      // stepped up). No passkey -> no attested bind (fall back to the TOTP route).
+      const credCount = await userWebauthn.countActiveCredentials(redisClient, user_id);
+      if (!credCount) { res.writeHead(403); return res.end(J({ error: "no_passkey_enrolled" })); }
+      // Store (server-side pk_hash computation; cross-account-conflict check inside).
+      let result;
+      try {
+        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label });
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));   // e.g. 'pubkey already enrolled to a different account'
+      }
+      const ctEntry = ctAppendSigningPkEvent("signing_pk_enrolled_attested", user_id, result.entry.pk_hash_sha3);
+      log("info", "signing_pk_enrolled_attested", {
+        user_id: String(user_id).slice(0, 12) + "…",
+        pk_hash: result.entry.pk_hash_sha3.slice(0, 16) + "…",
+        reenrolled: result.reenrolled,
+        ct_index: ctEntry.index,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({
+        ok: true,
+        pk_hash_sha3: result.entry.pk_hash_sha3,
+        label: result.entry.label,
+        enrolled_at: result.entry.enrolled_at,
+        reenrolled: result.reenrolled,
+        ct_index: ctEntry.index,
+      }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/signing-key/attested]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
   }
@@ -2463,6 +5719,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, handle }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/handle]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2493,6 +5750,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, reenrolled: result.reenrolled, credId: result.entry.credId }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/credential POST]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2514,6 +5772,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, credentials: creds, total: creds.length }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/credentials GET]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2534,6 +5793,7 @@ const server = http.createServer(async (req, res) => {
         counter: found.entry.counter, prfSupported: found.entry.prfSupported,
       }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/lookup]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2549,6 +5809,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ found: true, user_id: found.userId }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/by-handle]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2565,6 +5826,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, updated }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/counter]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2598,23 +5860,162 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, remaining_active: result.remaining_active }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/credential DELETE]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
+  }
+
+  // -- ParaSign /v1 self-serve API keys (user session via X-Internal-Auth) -------
+  // The admin server proxies the logged-in account's request here. GATED on the
+  // ParaSign entitlement: a paid plan (pro/enterprise/licensed) OR an explicit
+  // grant on the account. No entitlement -> 403. Runs the SAME mintParasignKey
+  // generator as the admin route. POST mints (full key ONCE), GET lists masked,
+  // DELETE revokes (after which the /v1 auth rejects the key).
+  if (path === "/v2/user/parasign-keys" && req.method === "POST") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      const user_id = (d.user_id || "").toString();
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const accountId = acctOf(user_id);
+      if (!parasignApiEntitled(accountId)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten." }));
+      }
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
+      log("info", "parasign_key_self_minted", { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode });
+      res.writeHead(201, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+        note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      if (keyCapReject(err, res)) return;
+      console.error("[user/parasign-keys POST]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  if (path === "/v2/user/parasign-keys" && req.method === "GET") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const user_id = (query.user_id || "").toString();
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || new Set();
+      const keys = [...members]
+        .map(k => [k, apiKeys.get(k)])
+        .filter(([k, v]) => v && (v.scope === "parasign" || v.product === "parasign" || /^psk_/.test(k)))
+        .map(([k, v]) => ({ kid: v.kid || keysTable.computeKid(k), key_masked: maskKey(k), mode: /^psk_test_/.test(k) ? "test" : "live", plan: v.plan, label: v.label || "", active: v.active !== false, created: v.created || null }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, account_id: accountId, count: keys.length, keys }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/parasign-keys GET]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  if (path === "/v2/user/parasign-keys" && req.method === "DELETE") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const user_id = (d.user_id || "").toString();
+      const target = (d.kid || d.key || "").toString();
+      if (!user_id || !target) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || new Set();
+      let hitKey = null;
+      for (const k of members) { const v = apiKeys.get(k); if (!v) continue; if (k === target || v.kid === target) { hitKey = k; break; } }
+      if (!hitKey) { res.writeHead(404); return res.end(J({ error: "key_not_found" })); }
+      const rec = apiKeys.get(hitKey);
+      if (!(rec.scope === "parasign" || rec.product === "parasign" || /^psk_/.test(hitKey))) { res.writeHead(400); return res.end(J({ error: "not_a_parasign_key" })); }
+      rec.active = false;
+      _mutateUsersJson(ud => {
+        const ue = ud.api_keys.find(k => k.key === hitKey);
+        if (ue) { ue.active = false; ue.revoked_at = new Date().toISOString(); }
+        ud.updated = new Date().toISOString();
+      }).then(() => log("info", "parasign_key_revoked", { account: String(accountId).slice(0, 12), kid: rec.kid || null, persisted: true }))
+        .catch(we => log("warn", "parasign_key_revoke_persist_failed", { err: we.message }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, revoked: rec.kid || maskKey(hitKey) }));
+    } catch (err) {
+      console.error("[user/parasign-keys DELETE]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // ── POST /v2/claim/reveal — burn-on-reveal for the welcome-email claim link ──
+  // Public: the bearer is the 256-bit claim token, not an API key. Returns the
+  // key exactly once, then deletes the token atomically (getDel) so a second
+  // reveal — or a mail-scanner prefetch — gets nothing.
+  if (path === '/v2/claim/reveal' && req.method === 'POST') {
+    if (!claimRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const token = String(d.token || '');
+      if (!/^[a-f0-9]{64}$/.test(token)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid_token' })); }
+      if (!redisClient || !redisClient.isReady) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'claim store unavailable' })); }
+      const k = `paramant:claim:${token}`;
+      const key = redisClient.getDel ? await redisClient.getDel(k) : await (async () => { const v = await redisClient.get(k); if (v !== null) await redisClient.del(k); return v; })();
+      if (key === null || key === undefined) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'claim_not_found_or_used' })); }
+      log('info', 'claim_revealed', {});
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, key }));
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_request' })); }
   }
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
   if (path === '/v2/check-key') {
     if (!checkKeyRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' })); }
     const kd = apiKeys.get(apiKey);
+    // How long a sealed file waits on the relay, in milliseconds, straight out
+    // of tiers.js. The "Send a link" chooser on /parashare has to name those
+    // times in its own first sentence, before a file is picked, and a sentence
+    // that carries hand-written hours is a sentence that goes stale the first
+    // time a tier changes. So the numbers are served, not written.
+    //
+    // Two fields because the page asks two different questions. `link_ttl_ms`
+    // is the ceiling THIS key is really held to, read through the ParaSend
+    // entitlement, so a ParaSend Pro buyer whose legacy `plan` still says
+    // community is told 24 hours and not 1 hour -- the same source POST
+    // /v2/inbound clamps against, so the page cannot promise what the upload
+    // will not give. `link_ttl_ms_by_plan` is the plain tiers.js table the
+    // chooser needs to say "1 hour on Community, 24 hours on Pro, 7 days on
+    // Enterprise" to a reader who is on none of them yet. Business stays in
+    // the payload because it is a real server-side ceiling; it is not a
+    // ParaSend plan, so the page does not name it.
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ valid: !!(kd?.active), plan: kd?.plan || null }));
+    return res.end(J({
+      valid: !!(kd?.active),
+      plan: kd?.plan || null,
+      link_ttl_ms: parasendLimitsOf(kd).limits.view_ttl_ms,
+      link_ttl_ms_by_plan: {
+        community:  tiers.tierLimit('community',  'view_ttl_ms'),
+        pro:        tiers.tierLimit('pro',        'view_ttl_ms'),
+        business:   tiers.tierLimit('business',   'view_ttl_ms'),
+        enterprise: tiers.tierLimit('enterprise', 'view_ttl_ms'),
+      },
+    }));
   }
 
-  // ── GET /v2/lookup-signer/:pk_hash — public reverse-lookup for verifiers ──
+  // ── GET /v2/lookup-signer/:pk_hash, reverse-lookup for verifiers ─────────
   // Exact 64-hex-char SHA3-256 match only — no prefix scan, no enumeration.
-  // The caller must already possess the envelope (= the pk) to ask; we return
-  // label + email (if enrolled). Rate-limited 30/min/IP to blunt scraping.
+  // Rate-limited 30/min/IP to blunt scraping.
+  //
+  // THE EMAIL ADDRESS NEEDS A KEY NOW. The comment here used to defend handing
+  // it to anyone, on the grounds that "the caller must already possess the
+  // envelope (= the pk) to ask". That stopped being true. GET /v2/envelopes/:id
+  // is public, and it used to put signer_pk_hash in its answer, so the pk hash
+  // was free: envelope id -> hash -> the real mailbox of everyone who signed,
+  // in two unauthenticated GETs. The 2026-09-05 review, finding 4.
+  //
+  // Both halves are closed. The public envelope projection no longer carries
+  // the hash (envelope.js getRedacted), and the address here is now only for a
+  // caller that presented a live API key. What stays public is what a verifier
+  // checking a .psign file actually needs and already has in the file itself:
+  // that this key is enrolled, under what label, since when, and whether it was
+  // revoked. Verification does not need to know the person's mailbox.
   if (req.method === 'GET' && path.startsWith('/v2/lookup-signer/')) {
     if (!lookupSignerRateOk(clientIp)) {
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
@@ -2631,11 +6032,15 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         return res.end(J({ found: false }));
       }
+      // The identity half. keyData is resolved once, above the route table, and
+      // an inactive or absent key leaves it falsy: no key, no address.
       let email = null;
-      try {
-        const metaRaw = await redisClient.get(`paramant:user:meta:${found.userId}`);
-        if (metaRaw) { const m = JSON.parse(metaRaw); email = m.email || null; }
-      } catch {}
+      if (keyData && keyData.active) {
+        try {
+          const metaRaw = await redisClient.get(`paramant:user:meta:${found.userId}`);
+          if (metaRaw) { const m = JSON.parse(metaRaw); email = m.email || null; }
+        } catch {}
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({
         found: true,
@@ -2646,128 +6051,10 @@ const server = http.createServer(async (req, res) => {
         revoked_at: found.entry.revoked_at,
       }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error('[lookup-signer]', err.message);
       res.writeHead(500); return res.end(J({ error: 'internal' }));
     }
-  }
-
-  // ── POST /v2/request-trial — Self-service trial key request (public, no auth) ──
-  if (path === '/v2/request-trial' && req.method === 'POST') {
-    try {
-      const d = JSON.parse((await readBody(req, 4096)).toString());
-
-      // Honeypot: bots fill hidden fields; legitimate browsers leave them empty
-      if (d._hp) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true })); }
-
-      const rawEmail = (d.email || '').toString().trim();
-      const name = (d.name || '').toString().trim().slice(0, 128);
-      const useCase = ((d.use_case || d.usecase) || '').toString().trim().slice(0, 512);
-      if (!name || !rawEmail || !useCase) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'name, email and use_case are required' }));
-      }
-      if (rawEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'Invalid email address' }));
-      }
-
-      const now = Date.now();
-      const DAY_MS = 86_400_000;
-
-      // IP rate limit: max 3 per IP per 24h
-      // Use CF-Connecting-IP (Cloudflare) or X-Real-IP (nginx $remote_addr) instead of
-      // socket address, which collapses to the proxy IP in reverse-proxy deployments.
-      const clientIp = getClientIp(req);
-      const ipTimes = (trialIpRequests.get(clientIp) || []).filter(t => now - t < DAY_MS);
-      if (ipTimes.length >= 3) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
-        return res.end(J({ error: 'Too many requests' }));
-      }
-
-      // Email rate limit: 1 per 7 days — generic 429 (no info disclosure about existing key)
-      const emailKey = rawEmail.toLowerCase();
-      if (trialRequests.has(emailKey) && now - trialRequests.get(emailKey) < 7 * DAY_MS) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '604800' });
-        return res.end(J({ error: 'Too many requests' }));
-      }
-
-      // Record rate limit entries
-      ipTimes.push(now);
-      trialIpRequests.set(clientIp, ipTimes);
-      trialRequests.set(emailKey, now);
-
-      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
-      const label = `trial:${name.replace(/\s+/g, '_').toLowerCase().slice(0, 40)}`;
-      const trialCreated = now;
-      apiKeys.set(newKey, {
-        plan: 'community', label, email: rawEmail, active: true, dsa_pub: '',
-        daily_uploads: 0, daily_reset_ts: now + DAY_MS,
-        is_trial: true, trial_created: trialCreated,
-        uploads_today: 0, last_upload_day: '',
-      });
-
-      // Persist to JSONL (append-only, survives restarts independently of users.json)
-      const trialRecord = JSON.stringify({ key: newKey, label, email: rawEmail, active: true, created: trialCreated, trial_metadata: { name, use_case: useCase } });
-      fs.promises.appendFile(TRIAL_KEYS_FILE, trialRecord + '\n').catch(e => log('warn', 'trial_key_jsonl_failed', { err: e.message }));
-
-      // Also persist to users.json (admin visibility) — full read-modify-write inside queue
-      _mutateUsersJson(d => {
-        d.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date(trialCreated).toISOString(), trial_metadata: { name, use_case: useCase } });
-        d.updated = new Date().toISOString();
-      });
-
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      function sendEmail(to, subject, html) {
-        if (!RESEND_KEY) return;
-        const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [to], subject, html });
-        const r = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-        }, res2 => { res2.on('data', () => {}); res2.on('end', () => {}); });
-        r.on('error', e => log('warn', 'trial_email_failed', { to, err: e.message }));
-        r.write(body); r.end();
-      }
-
-      // Welcome email to requester
-      const welcomeHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Hi ${escHtml(name)},</p>
-          <p style="color:#888;margin-bottom:24px">Your free trial API key is ready. It gives you access to the community relay — burn-on-read, ML-KEM-768 encryption, EU/DE jurisdiction.</p>
-          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
-            <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
-            <div style="font-size:14px;color:#ededed;word-break:break-all">${newKey}</div>
-          </div>
-          <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-            IMPORTANT: Save this key in your password manager immediately. It is generated once and cannot be recovered.
-          </div>
-          <p style="font-size:12px;color:#555">Limits: 10 uploads/day · 1h TTL · 5MB · 30-day trial</p>
-          <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install paramant-sdk
-
-from paramant import ParamantClient
-client = ParamantClient(api_key='${newKey}')
-session = client.create_session('recipient@example.com')</pre>
-          <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> &nbsp;&middot;&nbsp; <a href="https://paramant.app" style="color:#888">Dashboard</a></p>
-          <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 &nbsp;&middot;&nbsp; Burn-on-read &nbsp;&middot;&nbsp; EU/DE &nbsp;&middot;&nbsp; BUSL-1.1</p>
-        </div>`;
-      sendEmail(rawEmail, 'Your PARAMANT trial API key', welcomeHtml);
-
-      // Notification email to operator
-      const notifyHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:32px;max-width:480px">
-          <div style="font-size:14px;font-weight:600;margin-bottom:16px;letter-spacing:.08em">PARAMANT — new trial key</div>
-          <table style="font-size:12px;color:#888;border-collapse:collapse">
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Name</td><td>${escHtml(name)}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Email</td><td>${escHtml(rawEmail)}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Use case</td><td>${escHtml(useCase.slice(0, 120))}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Key prefix</td><td>${newKey.slice(0, 12)}…</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Time</td><td>${new Date(now).toISOString()}</td></tr>
-          </table>
-        </div>`;
-      sendEmail('privacy@paramant.app', `New trial key: ${name} <${rawEmail}>`, notifyHtml);
-
-      log('info', 'trial_key_requested', { name, email: rawEmail, use_case: useCase.slice(0, 80) });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, key: newKey, email: rawEmail,
-        message: 'Your API key is ready. Save it now — it cannot be recovered. A copy has also been sent to your email.' }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/sign-dpa — Electronic DPA signature (GDPR Art. 28) ──────────────
@@ -2811,12 +6098,14 @@ session = client.create_session('recipient@example.com')</pre>
 
       // Persist DPA signature record (append-only)
       const DPA_FILE = process.env.DPA_FILE || '/etc/paramant/dpa-signatures.jsonl';
-      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: getClientIp(req) });
+      // Keep the signing party's identity (name/org/email) for the legal Art. 28
+      // record, but store only a masked IP: the full address is not needed for
+      // the agreement and is unnecessary PII in a permanent append-only file.
+      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: maskIp(getClientIp(req)) });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
       // Send countersigned DPA email
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      if (RESEND_KEY) {
+      if (mailer.gereed()) {
         const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
           <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
           <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
@@ -2828,28 +6117,28 @@ session = client.create_session('recipient@example.com')</pre>
               <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${version}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner DE (FSN1)</td></tr>
+              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${escHtml(version)}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
             </table>
           </div>
-          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/verwerkersovereenkomst" style="color:#888">paramant.app/verwerkersovereenkomst</a>. Keep this email and the reference number for your records.</p>
+          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
           <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
         </div>`;
-        const emailBody = JSON.stringify({
+        // Through the one door, like every other message. A DPA confirmation
+        // that talks about EU jurisdiction should not be carried out of it.
+        mailer.stuur({
           from: 'PARAMANT <privacy@paramant.app>',
-          to: [email],
-          cc: ['privacy@paramant.app'],
+          to: email,
+          cc: 'privacy@paramant.app',
           subject: `DPA signed — ${org} (${ref})`,
           html,
-        });
-        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(emailBody) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'dpa_email_sent', { ref, email, id: p.id }); } catch(e) {} }); });
-        req2.on('error', e => log('warn', 'dpa_email_failed', { err: e.message }));
-        req2.write(emailBody); req2.end();
+        }).then(r => {
+          if (r.ok) log('info', 'dpa_email_sent', { ref, email: maskEmail(email), provider: r.provider });
+          else log('warn', 'dpa_email_failed', { reason: r.reason, detail: r.detail });
+        }).catch(e => log('warn', 'dpa_email_failed', { err: e && e.message }));
       }
 
-      log('info', 'dpa_signed', { ref, org, email, version });
+      log('info', 'dpa_signed', { ref, org, email: maskEmail(email), version });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, ref, signed_at }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -2858,12 +6147,39 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /metrics — Prometheus metrics (voor auth gate, ADMIN_TOKEN vereist) ──
   if (path === '/metrics') {
     const adminToken = process.env.ADMIN_TOKEN || '';
+    if (!adminToken) {
+      // Fail closed: without an ADMIN_TOKEN configured, metrics must not be public.
+      res.writeHead(503, { 'Content-Type': 'text/plain' }); return res.end('Metrics disabled: ADMIN_TOKEN not configured');
+    }
     const reqToken = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
-    if (adminToken && !safeEqual(reqToken, adminToken)) {
+    if (!safeEqual(reqToken, adminToken)) {
       res.writeHead(401, { 'Content-Type': 'text/plain' }); return res.end('Unauthorized');
     }
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
     return res.end(renderPrometheus());
+  }
+
+  // Publish a new code-transparency manifest (deploy-time step, CT-anchored).
+  if (path === '/v2/admin/code-manifest' && req.method === 'POST') {
+    const adminTok = (req.headers['x-admin-token'] || '').trim();
+    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 2 * 1024 * 1024)).toString()); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
+    if (!body || !body.files || !body.manifest_hash || typeof body.files !== 'object') {
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'manifest needs files + manifest_hash' }));
+    }
+    const ct = ctAppendEvent('code_manifest_published', body.manifest_hash, {
+      git_commit: body.git_commit || '', file_count: Object.keys(body.files).length,
+    });
+    codeManifest = { ...body, published: new Date().toISOString(), ct_index: ct.index };
+    try { require('fs').writeFileSync(CODE_MANIFEST_FILE, JSON.stringify(codeManifest)); }
+    catch (e) { log('warn', 'code_manifest_write_error', { err: e.message }); }
+    log('info', 'code_manifest_published', { hash: body.manifest_hash.slice(0, 16), files: Object.keys(body.files).length });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, manifest_hash: body.manifest_hash, ct_index: ct.index }));
   }
 
   // ── GET /ct, /ct/ — public CT log web UI (no auth) ─────────────────────────
@@ -2874,18 +6190,33 @@ session = client.create_session('recipient@example.com')</pre>
 
   // ── GET /ct/feed — public JSON feed for CT log UI (no auth, no keys) ─────────
   if (path === '/ct/feed' && req.method === 'GET') {
-    const last50 = ctLog.slice(-50);
-    const root   = ctLog.length ? ctLog[ctLog.length - 1].tree_hash : '0'.repeat(64);
+    // `i` comes from the window position (start_index + i), never from the
+    // entry's stored index field. See /v2/ct/log below.
+    //
+    // `t` is coarsened by ctCoarseTs, exactly like /v2/ct/log and /v2/ct/proof.
+    // It used to be the stored full-precision ts, and that turned the hour
+    // rounding on the other two routes into decoration. A leaf commits to the
+    // millisecond timestamp, so anyone holding a candidate document could take
+    // the exact `t` from this feed, join it to the full leaf_hash that
+    // /v2/ct/log publishes at the same index, and confirm the document in ONE
+    // hash - no search at all - for the fifty most recent entries, which is
+    // precisely the traffic worth hiding. Coarsening here does not fix the
+    // underlying unsalted leaf (that needs a salted tree), but it puts the
+    // free path back behind the same hour of brute force as the rest of the
+    // log. Every projection that leaves this process goes through ctCoarseTs;
+    // the full ts stays in the stored entry and in the receipt.
+    const last50 = ctWindow.recentPage(50);
+    const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({
       relay_id: relayIdentity ? relayIdentity.pk_hash : null,
       sector:   SECTOR,
       version:  VERSION,
-      tree_size: ctLog.length,
+      tree_size: ctWindow.size,
       root,
-      entries: last50.map(e => ({
-        i:    e.index,
-        t:    e.ts,
+      entries: last50.entries.map((e, i) => ({
+        i:    last50.start_index + i,
+        t:    ctCoarseTs(e.ts),
         h:    e.leaf_hash ? e.leaf_hash.slice(0, 16) + '...' : null,
         type: e.type || 'key_reg',
         s:    e.relay_sector || SECTOR,
@@ -2897,18 +6228,36 @@ session = client.create_session('recipient@example.com')</pre>
   if (path === '/v2/ct/log') {
     const limit = Math.min(parseInt(query.limit || '100'), 1000);
     const from  = parseInt(query.from || '0');
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
+    // Privacy: the public log projection deliberately omits device_hash and
+    // coarsens timestamps to the hour. device_hash is a stable, deterministic
+    // function of a participant public key, so publishing it unauthenticated
+    // let anyone holding a target's pubkey confirm presence, reconstruct a
+    // per-device activity timeline to the millisecond, and link a device
+    // across sector relays. The transparency guarantee does NOT depend on it:
+    // tamper-evidence comes from leaf_hash + tree_hash + the Merkle proof
+    // (/v2/ct/proof) + the signed tree head, none of which reveal identity.
+    // The published index is the entry's POSITION in the log (start_index + i),
+    // never the index field stored with the entry. Those two agreed until an
+    // April rebuild left five entries with a stale field, and the listing then
+    // reported indices 4..8 twice while the entries really sat at 42..46. The
+    // Merkle tree, /v2/ct/proof and the STH were all correct throughout,
+    // because they address the log by position; only this projection lied.
+    const pageR = ctWindow.page(from, limit);
+    const entries = pageR.entries.map((e, i) => ({ index: pageR.start_index + i, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
+    return res.end(J({ ok: true, size: ctWindow.size, root: ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64), entries }));
   }
   const ctpm0 = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
   const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
   if (ctpm0 || (ctpq0 !== null && ctpq0 !== undefined)) {
     const idx = parseInt(ctpm0 ? ctpm0[1] : ctpq0);
-    const entry = ctLog[idx];
+    // Positional by construction: get() resolves idx - base into the window, so
+    // this route never consulted the stored index field and was already right
+    // while the listing was wrong. The echoed `index` is the requested one.
+    const entry = ctWindow.get(idx);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: entry.ts }));
+    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: ctCoarseTs(entry.ts) }));
   }
 
   // ── GET /v2/sth, /v2/sth/history, /v2/sth/:timestamp — Signed Tree Head (public) ──
@@ -2916,7 +6265,11 @@ session = client.create_session('recipient@example.com')</pre>
     const latest = sthLog.length ? sthLog[sthLog.length - 1] : null;
     if (!latest) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'No STH yet — CT log is empty' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, sth: latest }));
+    // `forked` is present only when this relay has refused to sign a head that
+    // would contradict one it already signed. It is on the PUBLIC endpoint on
+    // purpose: an outside monitor watching heads would otherwise see nothing but
+    // a log that stopped advancing, and could not tell that from a quiet week.
+    return res.end(J({ ok: true, sth: latest, ...(ctLogForked ? { forked: ctLogForked } : {}) }));
   }
   if (path === '/v2/sth/history' && req.method === 'GET') {
     const limit = Math.min(parseInt(query.limit || '100'), 100);
@@ -2936,6 +6289,22 @@ session = client.create_session('recipient@example.com')</pre>
   // ── POST /v2/relays/register — relay self-registration, ML-DSA-65 verified ───
   // Public endpoint — no API key required. Requires valid ML-DSA-65 signature.
   if (path === '/v2/relays/register' && req.method === 'POST') {
+    // Before the body read and before the signature verify, exactly as the STH
+    // ingest route does it: an ML-DSA-65 verification is not something an
+    // unauthenticated caller gets to ask for at will.
+    {
+      const REGISTER_RPH = parseInt(process.env.RELAY_REGISTER_RATE_PER_HOUR || '10');
+      const HOUR_MS = 3_600_000;
+      const ip      = getClientIp(req);
+      const now     = Date.now();
+      const ipTimes = (relayRegisterIpRequests.get(ip) || []).filter(t => now - t < HOUR_MS);
+      if (ipTimes.length >= REGISTER_RPH) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' });
+        return res.end(J({ error: 'Rate limit: too many relay registrations from this address. Try again later.' }));
+      }
+      ipTimes.push(now);
+      relayRegisterIpRequests.set(ip, ipTimes);
+    }
     if (!mlDsa) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'ML-DSA-65 not available on this relay — relay registry disabled' }));
@@ -2979,24 +6348,53 @@ session = client.create_session('recipient@example.com')</pre>
     }
     const pkHash = crypto.createHash('sha3-256').update(pkBytes).digest('hex');
     const existing = relayRegistry.get(pkHash);
+    const edition = rEdition || 'community';
     const verified_since = existing?.verified_since || new Date().toISOString();
-    const ctEntry = ctAppendRelayReg(rUrl, rSector, rVersion, rEdition || 'community', pkHash);
-    // Fix 7: evict oldest entry when registry is at capacity
+
+    // Append to the transparency log only when the registration SAYS something
+    // new. A relay that re-registers on its heartbeat used to write a fresh leaf
+    // every time, each one carrying an attacker-choosable url and sector, each
+    // one producing a signed head that gossips to every peer. The log is on disk
+    // now, so "unbounded appends" is unbounded disk. A repeat that changes
+    // nothing moves last_seen and stops there.
+    const changed = !existing
+      || existing.url !== rUrl
+      || existing.sector !== rSector
+      || existing.version !== rVersion
+      || existing.edition !== edition;
+    const ctEntry = changed ? ctAppendRelayReg(rUrl, rSector, rVersion, edition, pkHash) : null;
+    const nowIso = new Date().toISOString();
+
+    // Evict the LEAST RECENTLY SEEN, not the first inserted. A Map keeps
+    // insertion order and `set` on an existing key does not move it, so the old
+    // "oldest key wins" rule threw out the relay that had been in the federation
+    // longest and was still checking in every hour. Anyone able to register
+    // MAX_RELAY_REGISTRY fresh keypairs could push every real relay out of the
+    // public list; now the entries that keep proving they are alive are the last
+    // to go, and a flood evicts itself.
     if (!existing && relayRegistry.size >= MAX_RELAY_REGISTRY) {
-      const oldestKey = relayRegistry.keys().next().value;
-      relayRegistry.delete(oldestKey);
-      log('warn', 'relay_registry_evict', { evicted: oldestKey?.slice(0,16), size: relayRegistry.size });
+      let stalestKey = null;
+      let stalestAt = Infinity;
+      for (const [k, v] of relayRegistry) {
+        const seen = Date.parse(v.last_seen || v.verified_since || '') || 0;
+        if (seen < stalestAt) { stalestAt = seen; stalestKey = k; }
+      }
+      if (stalestKey) {
+        relayRegistry.delete(stalestKey);
+        log('warn', 'relay_registry_evict', { evicted: stalestKey.slice(0, 16), last_seen: new Date(stalestAt).toISOString(), size: relayRegistry.size });
+      }
     }
+    const ctIndex = ctEntry ? ctEntry.index : (existing?.last_ct_index ?? existing?.ct_index ?? null);
     relayRegistry.set(pkHash, {
-      url: rUrl, sector: rSector, version: rVersion, edition: rEdition || 'community',
+      url: rUrl, sector: rSector, version: rVersion, edition,
       pk_hash: pkHash, verified_since,
-      last_seen: ctEntry.ts,
-      ct_index: existing?.ct_index ?? ctEntry.index,
-      last_ct_index: ctEntry.index
+      last_seen: ctEntry ? ctEntry.ts : nowIso,
+      ct_index: existing?.ct_index ?? ctIndex,
+      last_ct_index: ctIndex
     });
-    log('info', 'relay_registered', { url: rUrl, sector: rSector, pk_hash: pkHash.slice(0,16)+'…', ct_index: ctEntry.index });
+    log('info', 'relay_registered', { url: rUrl, sector: rSector, pk_hash: pkHash.slice(0,16)+'…', ct_index: ctIndex, logged: !!ctEntry });
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, pk_hash: pkHash, ct_index: ctEntry.index, verified_since }));
+    return res.end(J({ ok: true, pk_hash: pkHash, ct_index: ctIndex, verified_since }));
   }
 
   // ── GET /v2/relays — public registry of verified relay nodes ─────────────────
@@ -3019,6 +6417,22 @@ session = client.create_session('recipient@example.com')</pre>
     if (!mlDsa) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'ML-DSA-65 not available — STH ingestion disabled' }));
+    }
+    // This endpoint is unauthenticated (ownership-signature only), so a flood of
+    // attacker-minted relay keypairs is otherwise unbounded. Per-IP limiter caps
+    // the rate before any body read / signature verify (mirrors anon-inbound).
+    {
+      const STH_INGEST_RPH = parseInt(process.env.STH_INGEST_RATE_PER_HOUR || '120');
+      const HOUR_MS = 3_600_000;
+      const ip      = getClientIp(req);
+      const now     = Date.now();
+      const ipTimes = (sthIngestIpRequests.get(ip) || []).filter(t => now - t < HOUR_MS);
+      if (ipTimes.length >= STH_INGEST_RPH) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' });
+        return res.end(J({ error: 'Rate limit: too many STH ingest requests from this address. Try again later.' }));
+      }
+      ipTimes.push(now);
+      sthIngestIpRequests.set(ip, ipTimes);
     }
     let body;
     try { body = JSON.parse((await readBody(req, 65536)).toString()); } catch {
@@ -3050,9 +6464,19 @@ session = client.create_session('recipient@example.com')</pre>
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Signature verification failed' }));
     }
-    if (!peerSths.has(computedPkHash)) peerSths.set(computedPkHash, { sths: [], pk_b64: public_key });
+    if (!peerSths.has(computedPkHash)) {
+      peerSths.set(computedPkHash, { sths: [], pk_b64: public_key, last: Date.now() });
+      _evictPeerSthsIfNeeded(); // bound distinct peers (Map entries + fds + .jsonl files)
+    }
     const peer = peerSths.get(computedPkHash);
+    // If this peer was just evicted by the cap (e.g. immediately re-added under
+    // load), it is no longer in the Map — skip the write to avoid resurrecting it.
+    if (!peer) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      return res.end(J({ error: 'Peer relay table at capacity. Try again later.' }));
+    }
     peer.pk_b64 = public_key;
+    peer.last = Date.now();
     const record = { relay_id, relay_pk_hash: computedPkHash, sha3_root, timestamp, tree_size,
                      version: version || 1, signature, public_key, received_at: new Date().toISOString() };
     peer.sths.push(record);
@@ -3099,14 +6523,14 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /v2/sth/consistency — RFC 6962 consistency proof ──────────────────────
   if (path === '/v2/sth/consistency' && req.method === 'GET') {
     const fromSize = parseInt(query.from);
-    const toSize   = query.to !== undefined ? parseInt(query.to) : ctLog.length;
+    const toSize   = query.to !== undefined ? parseInt(query.to) : ctWindow.windowLength;
     if (isNaN(fromSize) || isNaN(toSize)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Query params required: from=<integer> (and optionally to=<integer>)' }));
     }
-    if (fromSize < 0 || toSize < fromSize || toSize > ctLog.length) {
+    if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ log size (${ctLog.length})` }));
+      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ window size (${ctWindow.windowLength})` }));
     }
     const proof = ctConsistencyProof(fromSize, toSize);
     if (proof === null) { res.writeHead(500); return res.end(J({ error: 'Could not compute proof' })); }
@@ -3225,7 +6649,7 @@ session = client.create_session('recipient@example.com')</pre>
     // Fix 4: only burn blob after response has fully flushed to the client
     res.on('finish', () => {
       td.used = true;
-      blobStore.delete(blobHash);
+      blobDrop(blobHash);
       try { blob.fill(0); } catch {}
     });
     // Fix 4: on socket error before finish, allow retry
@@ -3251,11 +6675,30 @@ session = client.create_session('recipient@example.com')</pre>
     return res.end(J({ ok: true, enc_meta: td.enc_meta || null, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
   }
 
+  // ── GET /v2/dl/<anything else>: a token that is not [a-f0-9]{48} ─────────
+  // The three routes above only match a well-formed token. Everything else
+  // under /v2/dl/ answers here, as a link problem, not as an auth problem.
+  if (path.startsWith('/v2/dl/') && req.method === 'GET') {
+    if (/\/(get|info)$/.test(path)) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J(DL_INVALID));
+    }
+    res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(_dlInvalidPage());
+  }
+
   // ── POST /v2/session/join — Receiver bewijst kennis van PSS + bindt pubkeys ─
   // Geen API key nodig — PSS is de authenticatie
-  // Relay verifieert: SHA-256(pss) == commitment  (relay kan dit NIET vervalsen)
+  // Relay verifieert: SHA3-256(pss) == commitment  (relay kan dit NIET vervalsen)
   // Na join: pubkeys gebonden aan sessie, niet overschrijfbaar
+  //
+  // Guessing is budgeted twice: per source address, and per session. See
+  // sessionJoinRateOk above for why both.
   if (path === '/v2/session/join' && req.method === 'POST') {
+    if (!sessionJoinRateOk(clientIp)) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' }));
+    }
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.session_id || !d.pss || !d.ecdh_pub) {
@@ -3270,11 +6713,21 @@ session = client.create_session('recipient@example.com')</pre>
       }
       if (sess.joined)              { res.writeHead(409); return res.end(J({ error: 'Session already joined — first join wins' })); }
 
-      // Verifieer PSS commitment: SHA-256(pss) moet overeenkomen
+      // Verifieer PSS commitment: SHA3-256(pss) moet overeenkomen.
+      // safeEqual and not !==: everything else in this codebase that compares a
+      // secret is constant-time (lib/auth-gate.js), and a comparison that leaks
+      // how far it got is an offline lever on a weak passphrase.
       const pssHash = crypto.createHash('sha3-256').update(d.pss).digest('hex');
-      if (pssHash !== sess.commitment) {
-        log('warn', 'session_join_bad_pss', { sid: d.session_id.slice(0, 12) });
-        res.writeHead(403); return res.end(J({ error: 'Pre-shared secret does not match commitment' }));
+      if (!authGate.safeEqual(pssHash, sess.commitment)) {
+        sess.bad_attempts = (sess.bad_attempts || 0) + 1;
+        const spent = sess.bad_attempts >= SESSION_JOIN_MAX_ATTEMPTS;
+        if (spent) sessions.delete(d.session_id);
+        log('warn', 'session_join_bad_pss', { sid: d.session_id.slice(0, 12), attempt: sess.bad_attempts, burned: spent });
+        res.writeHead(403);
+        return res.end(J({
+          error: 'Pre-shared secret does not match commitment',
+          attempts_left: Math.max(0, SESSION_JOIN_MAX_ATTEMPTS - sess.bad_attempts),
+        }));
       }
 
       // PSS verified — bind pubkeys (first-join-wins, onveranderbaar)
@@ -3299,6 +6752,15 @@ session = client.create_session('recipient@example.com')</pre>
       res.writeHead(400); return res.end(J({ error: 'USERS_JSON env in gebruik — bestand reload niet van toepassing' }));
     }
     const prevCount = apiKeys.size;
+
+    // Wait for this process's own writes first. A change (set-product-plan,
+    // a grant, a hydration) answers before its _mutateUsersJson has reached the
+    // disk, and the admin calls this route straight after the change. Read
+    // earlier, the old file comes back in and puts the old tier back in
+    // memory, while the new file lands a moment later: memory and disk then
+    // disagree, and the union merge of the next reseed writes the old tier back
+    // to disk as well (review of #515, round 2). The queue never rejects.
+    await _usersWriteQueue;
 
     // Read with retry — handle transient mid-write reads from concurrent _mutateUsersJson.
     let parsed = null;
@@ -3330,6 +6792,8 @@ session = client.create_session('recipient@example.com')</pre>
         is_trial: !!(k.plan === 'community' && k.trial_metadata),
         trial_created: k.created ? new Date(k.created).getTime() : null,
         uploads_today: 0, last_upload_day: '',
+        created: k.created || null,
+        ...keysTable.parseAccountFields(k),
       });
     }
 
@@ -3343,6 +6807,8 @@ session = client.create_session('recipient@example.com')</pre>
     // Atomic swap.
     apiKeys.clear();
     candidate.forEach((v, k) => apiKeys.set(k, v));
+    keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
+    rebuildApiKeyHashIndex();
 
     applyKeyLimitEnforcement();
     log('info', 'reload_users', { prev: prevCount, now: apiKeys.size, delta: apiKeys.size - prevCount });
@@ -3353,6 +6819,13 @@ session = client.create_session('recipient@example.com')</pre>
   // inv_ session tokens bypass API key auth for pubkey endpoints only.
   // Public keys are not sensitive; security comes from fingerprint verification.
   const INVITE_RE = /^inv_[a-zA-Z0-9]{32}(_ready)?$/;
+
+  // ── The `_ready` handshake slot holds no content ────────────────────────────
+  // The grammar, and why it is a refusal rather than a clean-up, is in
+  // relay/lib/handshake-record.js. Short version: /dpa promises customers that
+  // filenames are never stored in readable form, and this slot used to hold
+  // them in the clear for an hour, readable without an API key.
+  const { isCleanReadyRecord } = require('./lib/handshake-record');
 
   // ── GET /v2/pubkey — relay's ML-DSA-65 identity public key (for STH verification) ─
   if (path === '/v2/pubkey' && req.method === 'GET') {
@@ -3369,8 +6842,40 @@ session = client.create_session('recipient@example.com')</pre>
       // M3: reject oversized device_id to prevent memory exhaustion / map-key attacks
       if (typeof d.device_id !== 'string' || d.device_id.length > 256) { res.writeHead(400); return res.end(J({ error: 'device_id must be a string of at most 256 characters' })); }
       if (INVITE_RE.test(d.device_id)) {
+        // The handshake slot carries no content. See lib/handshake-record.js.
+        if (d.device_id.endsWith('_ready') && !isCleanReadyRecord(d.kyber_pub || '', d.ecdh_pub)) {
+          log('warn', 'ready_handshake_rejected', { device: d.device_id.slice(0, 12) });
+          res.writeHead(400);
+          return res.end(J({ error: 'handshake record must carry only kind, counts and download tokens' }));
+        }
         // Store without API key suffix — readable by any party who knows the session token
         const invFp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
+        // FIRST REGISTRATION WINS, the same rule the keyed branch below enforces
+        // and the same rule the session manifest cites as "a property worth
+        // keeping". This branch did not have it: it did an unconditional set, so
+        // anyone who saw the ?s= token in the share link (an access log, browser
+        // history, an extension, the chat the link travelled through) could
+        // overwrite BOTH key slots with their own ECDH and ML-KEM keys after the
+        // honest parties had registered. Sender and receiver would then encrypt
+        // to the attacker, with only a manual fingerprint comparison in the way.
+        // A slot is a one-time capability; once filled it is filled.
+        //
+        // The one thing that must keep working is a refresh: the receiver stores
+        // its keypair in sessionStorage and re-registers the identical keys after
+        // a reload. Byte-identical content is therefore a replay and answers 200
+        // with the same fingerprint. Anything else is a takeover attempt: 409.
+        const heldInvite = pubkeys.get(d.device_id);
+        if (heldInvite && (!heldInvite.expires || Date.now() < heldInvite.expires)) {
+          const same = safeEqual(heldInvite.ecdh_pub || '', String(d.ecdh_pub || ''))
+                    && safeEqual(heldInvite.kyber_pub || '', String(d.kyber_pub || ''));
+          if (!same) {
+            log('warn', 'pubkey_invite_overwrite_refused', { device: d.device_id.slice(0, 12) });
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(J({ ok: true, fingerprint: heldInvite.fingerprint }));
+        }
         pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', fingerprint: invFp, ts: new Date().toISOString(), registered_at: new Date().toISOString(), expires: Date.now() + INVITE_PUBKEY_TTL });
         log('info', 'pubkey_registered_invite', { device: d.device_id.slice(0, 12), fp: invFp });
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -3378,11 +6883,35 @@ session = client.create_session('recipient@example.com')</pre>
       }
       // Non-invite: require valid API key
       if (!keyData?.active) { res.writeHead(401); return res.end(J({ error: 'Invalid API key' })); }
-      const plan = keyData.plan || 'pro';
-      // Per-plan total device limit
-      const maxDevices = _pubkeyMax[plan] ?? _pubkeyMax.free;
-      if (maxDevices !== Infinity) {
-        const keyPrefix = `:${apiKey}`;
+      // Device cap on the PRODUCT axis (parasendLimitsOf), not on the unified
+      // `plan`. This read was `keyData.plan || 'pro'`: it could not see a
+      // webhook-written plan_parasend, and its default handed a key with no
+      // plan at all the Pro cap of 50 devices - the mirror image of the fault
+      // closed on the inbound ceilings. The strictest tier is the right
+      // default; _pubkeyMax stays as the tiers.js lookup for other callers.
+      const _psend = parasendLimitsOf(keyData);
+      const plan = _psend.tier;
+      const maxDevices = _psend.limits.devices;
+      // The cap governs how many devices an account may HAVE, so it applies to a
+      // registration that would ADD one. A device this account already holds is
+      // re-registered, not added: the map entry is replaced and the count does
+      // not grow. Checking the cap first turned every re-registration by an
+      // account over its cap into a 429, and re-registration is the normal path
+      // (a community device pubkey lives 7 days and the expiry sweep runs
+      // hourly), so an account over its cap could never refresh a device it
+      // already had and would lose them one by one. Being over the cap is a real
+      // state: every account that registered while the counter matched nothing
+      // (see below), and any account moved to a lower tier afterwards.
+      const _pkSlot = `${d.device_id}:${acctOf(apiKey)}`;
+      const _alreadyHeld = pubkeys.has(_pkSlot);
+      if (maxDevices !== Infinity && !_alreadyHeld) {
+        // Count what is actually STORED. Every write and every lookup on this
+        // map is keyed `<device_id>:<account_id>` (acctOf), but this counter
+        // matched on `:<api_key>`, which equals the account id only for a key
+        // that has none. So for every real account the tally stayed 0 and the
+        // cap never fired, whatever the tier said. Counting the same suffix
+        // the route writes makes the ceiling above enforceable.
+        const keyPrefix = `:${acctOf(apiKey)}`;
         let deviceCount = 0;
         for (const k of pubkeys.keys()) { if (k.endsWith(keyPrefix)) deviceCount++; }
         if (deviceCount >= maxDevices) {
@@ -3392,13 +6921,13 @@ session = client.create_session('recipient@example.com')</pre>
       const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
-      const existingPubkey = pubkeys.get(`${d.device_id}:${apiKey}`);
+      const existingPubkey = pubkeys.get(_pkSlot);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
-        res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session — first registration wins' }));
+        res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
       }
       const fp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
       const regAt = new Date().toISOString();
-      pubkeys.set(`${d.device_id}:${apiKey}`, {
+      pubkeys.set(_pkSlot, {
         ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '',
         dsa_pub:  d.dsa_pub  || '',
         fingerprint: fp, ct_index: ctEntry.index,
@@ -3417,8 +6946,22 @@ session = client.create_session('recipient@example.com')</pre>
     let deviceId;
     try { deviceId = decodeURIComponent(pkm[1]); }
     catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
+    // A named device slot belongs to an account, and reading one needs the key
+    // that owns it. These three routes sit before the auth gate so the keyless
+    // inv_ share-link flow can work, and until the 2026-09-05 review (finding
+    // 22l) they let that keylessness spill onto the named slots as well: acctOf
+    // returns the header value verbatim for a key it does not know, so
+    // `X-Api-Key: <account_id>` addressed any account's namespace. Today
+    // account_id and api_key are the same string, so that header is also the
+    // real key and little is lost; the moment accounts move to non-secret
+    // acct_ ids, it becomes a cross-account read oracle. The inv_ branch stays
+    // keyless, which is the whole reason these routes are here.
+    if (!INVITE_RE.test(deviceId) && !keyData?.active) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
     // Invite sessions: stored and retrieved without API key
-    const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
+    const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
     const entry = pubkeys.get(_pkKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device. Start receiver first.' })); }
     if (entry.expires && Date.now() > entry.expires) {
@@ -3437,7 +6980,12 @@ session = client.create_session('recipient@example.com')</pre>
     let deviceId;
     try { deviceId = decodeURIComponent(fpm[1]); }
     catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
-    const _fKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
+    // Same rule as GET /v2/pubkey/:device above.
+    if (!INVITE_RE.test(deviceId) && !keyData?.active) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
+    const _fKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
     const entry = pubkeys.get(_fKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
     if (entry.expires && Date.now() > entry.expires) {
@@ -3454,7 +7002,14 @@ session = client.create_session('recipient@example.com')</pre>
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.fingerprint) { res.writeHead(400); return res.end(J({ error: 'device_id and fingerprint required' })); }
-      const _vKey = INVITE_RE.test(d.device_id) ? d.device_id : `${d.device_id}:${apiKey}`;
+      // Same rule as GET /v2/pubkey/:device above. A fingerprint check is a
+      // yes/no oracle over a stored key, so it needs the same entitlement as
+      // reading the key it is checking.
+      if (!INVITE_RE.test(d.device_id) && !keyData?.active) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+      }
+      const _vKey = INVITE_RE.test(d.device_id) ? d.device_id : `${d.device_id}:${acctOf(apiKey)}`;
       const entry = pubkeys.get(_vKey);
       if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
       const storedFp = entry.fingerprint || computeFingerprint(entry.kyber_pub || '', entry.ecdh_pub);
@@ -3505,6 +7060,12 @@ session = client.create_session('recipient@example.com')</pre>
       if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
       if (blobStore.has(hash))           { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
       const blob = Buffer.from(payload, 'base64');
+      // Bind the committed hash to the actual bytes: the hash is written into the
+      // CT-log leaf and the signed delivery receipt, so an unverified claim would
+      // let a caller mint a relay-signed, CT-anchored proof for bytes the relay
+      // never held. The honest client sends hash = sha256(payload bytes), so this
+      // is non-breaking. Rejected before peek / ctAppendTransfer / blobStore.set.
+      if (crypto.createHash('sha256').update(blob).digest('hex') !== hash) { res.writeHead(400); return res.end(J({ error: 'hash_mismatch' })); }
       if (blob.length > ANON_MAX)        { res.writeHead(413); return res.end(J({ error: 'Max 5MB on anonymous uploads' })); }
       try { peekInboundBlob(blob); }
       catch(e) {
@@ -3524,13 +7085,14 @@ session = client.create_session('recipient@example.com')</pre>
       }
       const ttl     = Math.min(parseInt(ttl_ms || TTL_MS), 86_400_000); // max 24h for anon
       const ctEntry = ctAppendTransfer(hash, SECTOR);
-      blobStore.set(hash, {
+      blobPut(hash, {
         blob, ts: now, ttl, size: blob.length,
         apiKey: null, max_views: 1, views_remaining: 1, sector: SECTOR,
         ct_entry: { index: ctEntry.index, leaf_hash: ctEntry.leaf_hash, tree_hash: ctEntry.tree_hash,
-                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null },
+                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null,
+                    ts: ctEntry.ts },
       });
-      setTimeout(() => { const e = blobStore.get(hash); if (e) { zeroBuffer(e.blob); blobStore.delete(hash); } }, ttl);
+      setTimeout(() => { blobDrop(hash); }, ttl);
       ipTimes.push(now);
       anonInboundIpRequests.set(ip, ipTimes);
       const dlToken = require('crypto').randomBytes(24).toString('hex');
@@ -3555,6 +7117,236 @@ session = client.create_session('recipient@example.com')</pre>
     req.method === 'GET' ||
     (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
   );
+  // ── De ontvangerskant, en hij staat BOVEN de sleutelpoort ────────────────
+  //
+  // Hier afgehandeld en niet lager, want dat is het verschil tussen een route
+  // die publiek IS en een route met een gat in de poort. Een ontvanger draagt
+  // geen sleutel: hij heeft een link uit zijn eigen mail en verder niets. Door
+  // hem hier te beantwoorden raakt hij de poort niet eens.
+
+  // ── GET /v2/pickup/:token ───────────────────────────────────────────────────
+  // The receiving end of a send to named recipients. The token is the whole
+  // capability: it arrives in one person's mail, it names the send, and it works
+  // exactly once. There is no account here and there must not be one, because a
+  // recipient is somebody who was sent something, not somebody with a login.
+  //
+  // Every refusal gives the same shape of answer whether the token never
+  // existed, was already used or was withdrawn, so a caller cannot map which
+  // sends exist by trying tokens. The reason is in the body for the person who
+  // legitimately holds the link and needs to know why it stopped working.
+  // One shape of refusal for every way a link can be unusable, so trying tokens
+  // tells a caller nothing about which sends exist. The reason sits in the body
+  // for the person who legitimately holds the link and needs to know why it
+  // stopped working.
+  function _pickupRefused(res, reason, limit) {
+    const status = reason === 'already_collected' ? 410
+                 : reason === 'revoked' ? 403
+                 : reason === 'expired' ? 410
+                 : reason === 'too_many_codes' ? 429
+                 : reason === 'too_many_tries' ? 429 : 404;
+    log('info', 'pickup_refused', { reason });
+    const kop = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+    if (status === 429) kop['Retry-After'] = '3600';
+    res.writeHead(status, kop);
+    return res.end(J({ error: reason, limit: limit || undefined }));
+  }
+
+  const pickm = path.match(/^\/v2\/pickup\/([A-Za-z0-9_-]{16,128})$/);
+
+  // Both steps are POST, and that is not pedantry about verbs.
+  //
+  // Asking for a code SENDS A MAIL. As a GET, every Safe Links, Proofpoint or
+  // Barracuda scanner that opens the invitation fired it: the recipient got a
+  // code before they had clicked anything, and a second one when they did.
+  // A scanner does not POST, so this is the whole fix.
+  //
+  // Step one: prove the mailbox. It does not claim the link, so asking twice
+  // costs the recipient nothing but their own ceiling.
+  if (pickm && req.method === 'POST') {
+    let _body = {};
+    try { _body = JSON.parse((await readBody(req, 4096)).toString() || '{}') || {}; }
+    catch (_) { _body = {}; }
+
+    // De ontvanger meldt dat het bestand echt openging. Pas daarna is zijn
+    // link definitief op. Tot die tijd staat de claim "bezig" en valt hij na
+    // vijf minuten terug, want een server kan niet zien of bytes aankwamen.
+    if (_body.action === 'confirm') {
+      try {
+        const bev = await _sendStore().confirm(pickm[1]);
+        res.writeHead(bev.ok ? 200 : 409,
+                      { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J(bev.ok ? { ok: true } : { error: bev.reason }));
+      } catch (e) {
+        if (redisOutage503(e, res)) return;
+        res.writeHead(500); return res.end(J({ error: 'confirm_failed' }));
+      }
+    }
+
+    if (_body.action === 'code') {
+     try {
+      const vraag = await _sendStore().requestPickup(pickm[1]);
+      if (!vraag.ok) {
+        return _pickupRefused(res, vraag.reason, vraag.limit);
+      }
+      // The code leaves through the mailer, never through this response.
+      // Whoever holds the link must already be able to read that mailbox.
+      const minuten = Math.round(vraag.expires_in_s / 60);
+      // Awaited, so "we sent you a code" is a statement about what happened
+      // rather than about what was attempted. Fire-and-forget meant a recipient
+      // could sit waiting for a mail the provider had already refused, with
+      // their previous working code overwritten.
+      // Same address and same name as the invitation. It used to come from a
+      // DIFFERENT sender than the mail it belongs to, which is the single most
+      // reliable way to make a legitimate code look like a scam.
+      const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
+      const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
+      const taal2 = mailTaal(vraag.lang);
+      const bezorgd = await mailer.stuur({
+        to: vraag.email,
+        from: mailer.afzenderNamens(undefined, wie2),
+        replyTo: vraag.sender_email || undefined,
+        subject: taal2 === 'en' ? 'Your code to open the file'
+                                : 'Uw controlecode om het bestand te openen',
+        text: tweetaligTekst(taal2,
+              'Uw controlecode is ' + vraag.code + '. De code is ' + minuten + ' minuten geldig.'
+            + (vraag.filename ? '\n\nVoor het bestand: ' + vraag.filename : '')
+            + (wie2 ? '\nGestuurd door ' + wie2 + ' via Paramant.' : '')
+            + '\n\nHeeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders uw link. '
+            + 'Geef de code niet door en laat het de afzender weten.',
+              'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
+            + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
+            + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
+            + '\n\nIf you did not just ask for this code, somebody else has your link. '
+            + 'Do not pass the code on, and let the sender know.'),
+        html: tweetaligHtml(taal2,
+              '<p>Uw controlecode om het bestand te openen:</p>'
+            + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+            + (bestand2 ? '<p style="color:#666;font-size:13px">Voor het bestand: <strong>'
+                          + bestand2 + '</strong></p>' : '')
+            + '<p style="color:#666;font-size:13px">De code is ' + minuten
+            + ' minuten geldig.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
+            + 'uw link. Geef de code niet door en laat het de afzender weten.</p>',
+              '<p>Your code to open the file' + (taal2 === 'en' ? ':' : ' is the one above.') + '</p>'
+            + (taal2 === 'en'
+                ? '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+                : '')
+            + (bestand2 ? '<p style="color:#666;font-size:13px">It opens: <strong>'
+                          + bestand2 + '</strong></p>' : '')
+            + '<p style="color:#666;font-size:13px">It works for ' + minuten
+            + ' minutes.<br>If you did not just ask for this code, somebody else has your '
+            + 'link. Do not pass the code on, and let the sender know.</p>')
+            + VOET(wie2, vraag.sender_email, taal2),
+      });
+      if (!bezorgd || !bezorgd.ok) {
+        log('warn', 'pickup_code_not_mailed', { reason: bezorgd && bezorgd.reason });
+        res.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J({ error: 'code_not_sent' }));
+      }
+      log('info', 'pickup_code_mailed', {});
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, step: 'code_sent', sent_to: vraag.masked,
+                         expires_in_s: vraag.expires_in_s }));
+     } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_code_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+     }
+    }
+
+    // Step two: the code, and then the bytes.
+    try {
+      const code = String(_body.code || '');
+      const got = await _sendStore().collect(pickm[1], code);
+      if (!got.ok) {
+        // A wrong or stale code is a separate answer from a link that cannot be
+        // used at all: the holder needs to know whether to try again or stop.
+        if (got.reason === 'wrong_code' || got.reason === 'too_many_tries'
+            || got.reason === 'code_expired' || got.reason === 'no_code_requested') {
+          log('info', 'pickup_code_refused', { reason: got.reason });
+          res.writeHead(got.reason === 'too_many_tries' ? 429 : 401,
+                        { 'Content-Type': 'application/json' });
+          return res.end(J({ error: got.reason, tries_left: got.tries_left }));
+        }
+        return _pickupRefused(res, got.reason);
+      }
+      log('info', 'pickup_served', { bytes: got.blob.length, remaining: got.remaining,
+                                     settled: got.settled });
+      incMetric('bytes_out_total', got.blob.length);
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': got.blob.length,
+        'Cache-Control': 'no-store',
+        // What the receiver's client needs to show who it was for and how much
+        // of the group is still outstanding. Never an address of somebody else.
+        'X-Paramant-Recipient': veiligCodeer(got.email || ''),
+        'X-Paramant-Outstanding': String(got.remaining),
+        // The name the sender gave the file, so a browser saves something a
+        // person recognises instead of a string of random characters.
+        // veiligCodeer, never encodeURIComponent directly: a lone surrogate
+        // makes it throw, and a throw here lands after the claim. Older sends,
+        // filed before the name was cleaned on the way in, still pass through
+        // this route.
+        'X-Paramant-Filename': veiligCodeer(got.filename || 'file'),
+        // The file key, locked under this recipient's token. The page unwraps
+        // it with the token from its own URL; we never had the means to.
+        'X-Paramant-Key': got.wrapped_key || '',
+        'Access-Control-Expose-Headers':
+          'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key',
+      });
+
+      // THE CLAIM IS ONLY REAL WHEN THE BYTES ARRIVED.
+      //
+      // 'finish' fires when the last byte has been handed to the socket;
+      // 'close' without it means the connection died first. On a phone that is
+      // an ordinary Tuesday, and it used to cost the recipient their one
+      // collection: fragments received, the retry answered already_collected,
+      // the file dropped, and the sender's dashboard reporting a delivery that
+      // never happened.
+      //
+      // So the file is drained here, after the fact, and a dead connection
+      // hands the turn back instead.
+      let _afgerond = false;
+      res.on('finish', () => {
+        _afgerond = true;
+        if (!got.settled) return;
+        _sendStore().drained(got.send_id)
+          .catch((e) => log('warn', 'send_drain_failed', { err: e && e.message }));
+      });
+      res.on('close', () => {
+        if (_afgerond) return;
+        log('warn', 'pickup_aborted', { bytes: got.blob.length });
+        _sendStore().releaseClaim(pickm[1])
+          .catch((e) => log('warn', 'pickup_release_failed', { err: e && e.message }));
+      });
+      return res.end(got.blob);
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+    }
+  }
+
+
+  // The receiving end of a send to named recipients, and it carries no key on
+  // purpose: a recipient is somebody who was sent something, not somebody with
+  // a login. The capability is the token, which arrives in one person's mail.
+  //
+  // Opening the link only mails a code to that same mailbox; the bytes need
+  // both halves, and three wrong codes close the door. Without this line every
+  // recipient met a 401 and the whole feature reached nobody, which is what an
+  // audit on 22-09 found: the route was written, the gate was never opened.
+  const isPickupPublic = /^\/v2\/pickup\/[A-Za-z0-9_-]{16,128}$/.test(path)
+    && (req.method === 'GET' || req.method === 'POST');
+  const isBillingWebhook = path === '/v2/billing/webhook' && req.method === 'POST';
+  // The admin plane cancelling on behalf of a logged-in session. It carries
+  // X-Internal-Auth, which no public caller can set, and the route itself
+  // resolves the account from the user_id in the body. Without this line the
+  // pipeline answered "Invalid API key" before the route was ever reached, and
+  // the Cancel plan button on /account had no way to stop a collection at all.
+  const isInternalBillingCancel = path === '/v2/billing/cancel'
+    && req.method === 'POST' && _internalOk();
   if (isAdminPath) {
     const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
     const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && safeEqual(adminHeader, process.env.ADMIN_TOKEN);
@@ -3563,13 +7355,17 @@ session = client.create_session('recipient@example.com')</pre>
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
     }
     // Fall through to admin endpoint handlers below
-  } else if (!keyData?.active && !isEnvelopePublic) {
+  } else if (!keyData?.active && !isEnvelopePublic && !isPickupPublic && !isBillingWebhook && !isInternalBillingCancel) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
 
   // ── POST /v2/session/create — Sender maakt PSS-gebonden sessie ─────────────
-  // Vereist: geldige API key, commitment = SHA-256(pss) als hex
+  // Vereist: geldige API key, commitment = SHA3-256(pss) als hex.
+  // SHA3, niet SHA-256: /join rekent sha3-256 en deze kant zei jarenlang iets
+  // anders. Beide geven 64 hex, dus een SDK die de foutmelding volgde bouwde een
+  // sessie die nooit te joinen was en kreeg pas bij join een 403 die "verkeerde
+  // PSS" zei. docs/security.md had het als enige goed.
   // Geeft: session_id (pss_<32hex>), expires_ms
   // Relay ziet alleen de hash — kan PSS niet reconstrueren
   if (path === '/v2/session/create' && req.method === 'POST') {
@@ -3578,7 +7374,7 @@ session = client.create_session('recipient@example.com')</pre>
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.commitment || !/^[a-f0-9]{64}$/.test(d.commitment)) {
         res.writeHead(400);
-        return res.end(J({ error: 'commitment must be SHA-256 hex (64 chars) of your pre-shared secret' }));
+        return res.end(J({ error: 'commitment must be SHA3-256 hex (64 chars) of your pre-shared secret' }));
       }
       const ttl  = Math.min(Math.max(parseInt(d.ttl_ms) || 600000, 60000), 3600000); // 1min–1h, default 10min
       const sid  = 'pss_' + crypto.randomBytes(24).toString('hex');
@@ -3616,6 +7412,67 @@ session = client.create_session('recipient@example.com')</pre>
       joined_at: sess.joined_at,
       expires_ms: sess.expires_ms,
     }));
+  }
+
+  // ── The streaming manifest ───────────────────────────────────────────────────
+  //
+  // WHY THIS EXISTS. The sender used to upload every block of a file and only
+  // then tell the receiver, by registering `<session>_ready` with the full token
+  // list. For a 500 MB file that is 112 blocks sitting in the relay's memory at
+  // once, for as long as the whole upload takes, and blobs live in RAM: that is
+  // 560 MB held for one transfer, and it is also 560 MB that a restart throws
+  // away. The fleet restarted hourly for twenty-one days in July and August and
+  // nobody lost a transfer, but only because there was almost no traffic.
+  //
+  // With a manifest the receiver learns each token as it is minted and takes the
+  // block straight away, so the sender can keep a small sliding window instead of
+  // the whole file. The same change cuts the memory a transfer costs and the
+  // window in which a restart can lose something.
+  //
+  // WHY NOT REUSE `_ready`. POST /v2/pubkey answers 409 on a second write to the
+  // same slot: first registration wins, and that is a property worth keeping.
+  // A manifest is append-only by nature and needed its own door.
+  //
+  // The manifest hangs off the session, so it expires with it and needs no sweep
+  // of its own. Writing needs the session's API key, exactly like the pubkey
+  // route above. Reading needs only the session id, exactly like
+  // GET /v2/pubkey/:device, which is how the receiver already reads `_ready`:
+  // knowing the pss_ token IS the capability, and the tokens it hands back are
+  // useless without the private key that decrypts what they point at.
+  const sessMfm = path.match(/^\/v2\/session\/(pss_[a-f0-9]{48})\/manifest$/);
+  if (sessMfm && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401); return res.end(J({ error: 'Valid API key required' })); }
+    const sess = sessions.get(sessMfm[1]);
+    if (!sess)                   { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (sess.api_key !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Session belongs to a different API key' })); }
+    let d;
+    try { d = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch (e) { res.writeHead(400); return res.end(J({ error: 'bad_request' })); }
+    const idx   = Number(d.index);
+    const total = Number(d.total_chunks);
+    const token = typeof d.token === 'string' ? d.token : '';
+    if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
+    if (!sess.manifest) sess.manifest = { total, tokens: new Map(), meta: null };
+    if (sess.manifest.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
+    // First write wins per index, for the same reason the pubkey slot does: a
+    // second token for a block the receiver may already have taken would point
+    // it at a blob that is gone.
+    if (!sess.manifest.tokens.has(idx)) sess.manifest.tokens.set(idx, token);
+    if (typeof d.meta === 'string' && d.meta.length <= 2048 && !sess.manifest.meta) sess.manifest.meta = d.meta;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, have: sess.manifest.tokens.size, total }));
+  }
+  if (sessMfm && req.method === 'GET') {
+    const sess = sessions.get(sessMfm[1]);
+    if (!sess)          { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (!sess.manifest) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, total: 0, chunks: [], complete: false })); }
+    const m = sess.manifest;
+    const chunks = [...m.tokens.entries()].sort((a, b) => a[0] - b[0]).map(([index, token]) => ({ index, token }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, total: m.total, meta: m.meta, chunks, complete: chunks.length === m.total }));
   }
 
   // ── GET /v2/session/:id/status — Poll of receiver al gejoind is ─────────────
@@ -3707,8 +7564,65 @@ session = client.create_session('recipient@example.com')</pre>
       }
 
       const blob = Buffer.from(payload, 'base64');
-      const planMaxSize = MAX_BLOB;
-      if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
+      // Bind the committed hash to the actual bytes: the hash is written into the
+      // CT-log leaf and the signed delivery receipt, so an unverified claim would
+      // let a caller mint a relay-signed, CT-anchored proof for bytes the relay
+      // never held. The honest client sends hash = sha256(payload bytes), so this
+      // is non-breaking. Rejected before peek / ctAppendTransfer / blobStore.set.
+      if (crypto.createHash('sha256').update(blob).digest('hex') !== hash) { res.writeHead(400); return res.end(J({ error: 'hash_mismatch' })); }
+      const _psend = parasendLimitsOf(keyData);
+
+      // ── Two ceilings, and they are not the same ceiling ──────────────────
+      //
+      // 1. THE BLOB CEILING. MAX_BLOB is the wire-format roof: every blob is
+      //    padded to exactly this, so anything larger is malformed rather than
+      //    merely big. It is the operator's number and no tier may exceed it.
+      //    This is not a product limit and does not vary by plan.
+      if (blob.length > MAX_BLOB) {
+        res.writeHead(413);
+        return res.end(J({ error: 'blob_too_large', max_bytes: MAX_BLOB,
+          hint: 'one blob is one padded block; split the file into chunks' }));
+      }
+
+      // 2. THE FILE CEILING. The tier's file_mb, enforced across the blocks
+      //    that make up one file. This is the number the site sells. Comparing
+      //    a single blob against it, which is what this code used to do, held
+      //    every file to the size of one block and made file_mb unsellable.
+      //
+      //    A sender without a file_id is sending one standalone block, which is
+      //    by definition inside any file ceiling, so there is nothing to count.
+      const _fileMb = _psend.limits.file_mb;
+      const _fileId = meta && meta.file_id ? String(meta.file_id).slice(0, 128) : null;
+      if (_fileId && Number.isFinite(_fileMb)) {
+        const _fk   = `${acctOf(apiKey)}:${_fileId}`;
+        const _seen = fileBlocks.get(_fk);
+        const _n    = (_seen ? _seen.blocks : 0) + 1;
+        if (_n > fileMaxBlocks(_fileMb)) {
+          log('info', 'file_ceiling_reached', { account: String(keyData?.account_id || '').slice(0, 12), plan: _psend.tier, file_mb: _fileMb });
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'file_too_large', dimension: 'file_mb',
+            plan: _psend.tier, limit_mb: _fileMb,
+            message: `Max ${_fileMb}MB per file on ${_psend.tier}` }));
+        }
+        fileBlocks.set(_fk, { blocks: _n, ts: Date.now() });
+      }
+
+      // 3. THE CONCURRENCY CEILING. Blobs live in RAM, so what one account may
+      //    hold at once is a real resource and not a paperwork limit. The
+      //    relay-wide budget (ramOk, above) is the harder floor underneath;
+      //    this one stops a single account from taking the whole pool while
+      //    everyone else gets the 503.
+      const _maxConc = _psend.limits.concurrent_blobs;
+      if (Number.isFinite(_maxConc) && keyData && keyData.account_id) {
+        const _held = accountBlobs.get(acctOf(apiKey)) || 0;
+        if (_held >= _maxConc) {
+          log('info', 'concurrency_ceiling_reached', { account: String(keyData.account_id).slice(0, 12), plan: _psend.tier, held: _held, limit: _maxConc });
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+          return res.end(J({ error: 'too_many_blocks_in_flight', dimension: 'concurrent_blobs',
+            plan: _psend.tier, limit: _maxConc, held: _held, retry_after_s: 5,
+            hint: 'blocks free up as the receiver takes them' }));
+        }
+      }
 
       try { peekInboundBlob(blob); }
       catch(e) {
@@ -3727,22 +7641,50 @@ session = client.create_session('recipient@example.com')</pre>
         sigResult = verifyDsaSignature(hash, dsa_signature, keyData.dsa_pub);
       }
 
-      // Per-tier view TTL ceiling -- single source of truth in lib/tiers.js.
-      // Falls back to community ceiling when the plan is missing or unrecognised.
-      const _plan = keyData?.plan || 'community';
-      const _maxTtl = tiers.tierLimitNum(_plan, 'view_ttl_ms');
+      // Per-tier ceilings, off the SAME ParaSend entitlement as the size gate
+      // above and the quota gate below. ONE default for both, and it is the
+      // strictest one. The two used to disagree a line apart: the TTL fell back
+      // to 'community' and max_views to 'pro', so a key with no plan was held
+      // to the community link lifetime and handed the Pro read count at the
+      // same time. That default was fixed; the SOURCE was not, and reading the
+      // unified `plan` here meant a ParaSend Pro buyer still got 1 hour and 1
+      // read, because the webhook only ever writes plan_parasend.
+      const _maxTtl = _psend.limits.view_ttl_ms;
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
       // Access policies: max_views (default 1 = burn-on-read) + Argon2id password.
-      // Per-tier max_views ceiling also lives in lib/tiers.js now.
-      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, tiers.tierLimitNum(keyData?.plan || 'pro', 'max_views') || 1));
+      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, _psend.limits.max_views || 1));
       let pw_hash = null;
       if (password) {
         if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
         pw_hash = await argon2Lib.hash(password, { type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
       }
+      // Phase 4 quota enforcement: decline a NEW transfer once the monthly tier
+      // cap is reached. Access to existing blobs (download/view) is never gated.
+      // A continuing multi-chunk upload (dedup hit) and Redis outages both pass
+      // (fail-open) — this only declines fresh active use over the cap.
+      if (keyData && keyData.account_id) {
+        const _dedupKey = (meta && meta.file_id)
+          ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
+          : quota.firstChunkHash(blob);
+        // ParaSend entitlement: transfers_month for this account's plan_parasend
+        // (falls back to the legacy plan when not yet migrated). Independent of
+        // the ParaSign signs quota below.
+        const _tLimit = _psend.quotas.transfers_month;
+        const _tGate  = await quota.gateTransfer(redisClient, keyData.account_id, _dedupKey, _tLimit, log);
+        if (!_tGate.allowed) {
+          // Report the tier that DECIDED, not the unified plan. A ParaSend Pro
+          // buyer whose `plan` still reads community would otherwise be told
+          // he is on community while being held to the Pro ceiling.
+          log('info', 'quota_transfer_declined', { account: String(keyData.account_id).slice(0, 12), plan: _psend.tier, limit: _tLimit });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: _psend.tier, limit: _tLimit }));
+        }
+      }
+
       // Append transfer to CT log before storing — so proof is available at outbound time
       const ctEntry = ctAppendTransfer(hash, SECTOR);
-      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+      blobPut(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+        account_id: acctOf(apiKey),
         sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
         sector: SECTOR,
         ct_entry: {
@@ -3752,35 +7694,29 @@ session = client.create_session('recipient@example.com')</pre>
           tree_size: ctEntry.index + 1,
           audit_path: ctEntry.proof,
           sth:       ctEntry.sth || null,
+          ts:        ctEntry.ts,
         }
       });
       setTimeout(() => {
-        const e = blobStore.get(hash);
-        if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
+        blobDrop(hash);
       }, ttl);
 
       const deviceId = meta?.device_id;
       incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
       stats.inbound++; stats.bytes_in += blob.length;
-      auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
+      // `via` marks the credential, not a second identity. The chain is the
+      // owner's, keyed on the owner's api-key exactly as it is for a request
+      // that carried the key, and only the field says the fifteen-minute token
+      // was what presented it. Without it an account owner reading their own
+      // audit log cannot tell a transfer made from a browser session apart from
+      // one made with the key itself, which is the difference that matters when
+      // they are trying to work out what happened.
+      auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned', ...(viaSessionToken ? { via: 'pst' } : {}) });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
+      // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
+      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
 
-      // Phase 3 quota counter: tally one transfer per account_id per month.
-      // ParaShare sends chunks of the same file with a shared meta.file_id, so
-      // we dedup on file_id (preferred) or on the encrypted-blob hash (single-
-      // blob SDK path). A 111-chunk upload counts as one transfer; a brand-new
-      // upload tomorrow with the same file_id counts as a new transfer (24 h
-      // dedup window).
-      //
-      // COUNT ONLY -- no gate, no 402. If Redis is unavailable the counter is
-      // skipped silently; the upload completes either way.
-      if (keyData && keyData.account_id) {
-        const dedupKey = (meta && meta.file_id)
-          ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
-          : quota.firstChunkHash(blob);
-        quota.recordTransfer(redisClient, keyData.account_id, dedupKey, log)
-          .catch(() => { /* never throws but be defensive */ });
-      }
+      // (Transfer already counted by the quota gate above, before storage.)
 
       if (deviceId) {
         pushWebhooks(apiKey, deviceId, 'blob_ready', { hash, size: blob.length, ttl_ms: ttl, sig_valid: sigResult.valid });
@@ -3811,7 +7747,7 @@ session = client.create_session('recipient@example.com')</pre>
       };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, sig_verified: sigResult.valid, download_token: dlToken, merkle_proof: merkleProof }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
     finally { inFlightInbound--; }
   }
 
@@ -3820,9 +7756,18 @@ session = client.create_session('recipient@example.com')</pre>
   if (delm && req.method === 'DELETE') {
     const entry = blobStore.get(delm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found' })); }
-    if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
-    zeroBuffer(entry.blob);
-    blobStore.delete(delm[1]);
+    // An anonymous blob is stored with apiKey: null, and `entry.apiKey && ...`
+    // skipped the owner check entirely for it. On the READ side that is the
+    // design and it is written down: the 64-hex hash is the capability, the
+    // payload is encrypted with a key in the URL fragment that the relay never
+    // sees, and it burns after one read. Destroying is not reading. Whoever
+    // glimpsed the hash in an access log, a browser history or a mail gateway's
+    // link scanner could end the transfer without ever being able to open it,
+    // and the sender would never learn why. So a blob with no owner has no
+    // owner who can abort it either: it goes when it burns or when its TTL
+    // runs out. The 2026-09-05 review, finding 22d.
+    if (!entry.apiKey || entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
+    blobDrop(delm[1]);
     // Remove associated download token if present
     for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { downloadTokens.delete(t); break; } }
     auditAppend(apiKey, 'inbound_aborted', { hash: delm[1].slice(0,16)+'...' });
@@ -3838,7 +7783,7 @@ session = client.create_session('recipient@example.com')</pre>
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     // Per-key outbound rate limit (finding #12)
-    if (!outboundRateOk(apiKey, keyData?.plan)) {
+    if (!outboundRateOk(apiKey, keyData)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Outbound rate limit exceeded. Retry after the hourly window resets.' }));
     }
@@ -3869,7 +7814,12 @@ session = client.create_session('recipient@example.com')</pre>
     const blob = entry.blob;
     if (entry.pw_hash) entry._verifying = false; // release lock now that decision is finalized
     if (burned) {
-      blobStore.delete(outm[1]);
+      // Unlisted immediately so a concurrent reader cannot find it, but NOT
+      // wiped: `blob` below is the buffer being served. Wiping here handed the
+      // downloader five megabytes of zeroes.
+      blobDrop(outm[1], false);
+      res.on('finish', () => zeroBuffer(blob));
+      res.on('close',  () => zeroBuffer(blob));
       incMetric('blobs_burned'); stats.burned++;
     }
     incMetric('bytes_out_total', blob.length);
@@ -3878,9 +7828,16 @@ session = client.create_session('recipient@example.com')</pre>
       { hash: outm[1].slice(0,16)+'...', bytes: blob.length, views_left: entry.views_remaining });
     log('info', burned ? 'blob_burned' : 'blob_served',
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
+    // ParaSend Pro download notification. Notify the transfer OWNER (the uploader),
+    // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
+    {
+      const _ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
+      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: mailLater });
+    }
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
+    let receiptJson = null;
     const ctData = entry.ct_entry || null;
     if (ctData) {
       const inclusionProof = {
@@ -3894,10 +7851,11 @@ session = client.create_session('recipient@example.com')</pre>
       };
       const receiptPayload = {
         blob_hash:              outm[1],
+        ts:                     ctData.ts,
         retrieved_at:           Date.now(),
         sector:                 entry.sector || SECTOR,
         relay_id:               RELAY_SELF_URL || (SECTOR + '.paramant.app'),
-        tree_size_at_retrieval: ctLog.length,
+        tree_size_at_retrieval: ctWindow.size,
         inclusion_proof:        inclusionProof,
         burn_confirmed:         burned,
       };
@@ -3909,7 +7867,8 @@ session = client.create_session('recipient@example.com')</pre>
         } catch(e) { log('warn', 'receipt_sign_failed', { err: e.message }); }
       }
       const receipt = { ...receiptPayload, signature };
-      receiptHeader = Buffer.from(JSON.stringify(receipt)).toString('base64url');
+      receiptJson = JSON.stringify(receipt);
+      receiptHeader = Buffer.from(receiptJson).toString('base64url');
     }
 
     const outHeaders = {
@@ -3918,10 +7877,50 @@ session = client.create_session('recipient@example.com')</pre>
       'X-Paramant-Burned':  burned ? 'true' : 'false',
       'X-Paramant-Hash':    outm[1],
     };
-    if (receiptHeader) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+    // The receipt travels by reference, not by value: an id to fetch it with and
+    // the hash of the exact bytes that will come back, so the handover itself is
+    // verifiable. The payload is ~18 KB and does not fit in a response header
+    // that Node clients or a default nginx will accept (see the store above).
+    if (receiptHeader) {
+      const receiptHash = crypto.createHash('sha3-256').update(receiptHeader).digest('hex');
+      const _receiptKey = entry.apiKey || apiKey || null;
+      const _receiptRec = (_receiptKey && apiKeys.get(_receiptKey)) || keyData || null;
+      const receiptId = await storeDeliveryReceipt(receiptJson, receiptHash, _receiptKey,
+        _receiptKey ? acctOf(_receiptKey) : null, _receiptRec);
+      outHeaders['X-Paramant-Receipt-Id'] = receiptId;
+      outHeaders['X-Paramant-Receipt-Hash'] = 'sha3-256:' + receiptHash;
+      outHeaders['X-Paramant-Receipt-Url'] = `/v2/transfers/${receiptId}/receipt`;
+      // DEPRECATED, off by default, removed after 2026-12-01. When it is off,
+      // say so ON THE RESPONSE. A client that reads X-Paramant-Receipt and finds
+      // nothing there has no way to tell "this transfer had no receipt" from
+      // "the receipt moved", and the Python SDK's own handling of an absent
+      // header is a silent receipt=None (sdk-py/paramant_sdk.py:681). A silent
+      // downgrade of a delivery proof is the one failure mode this route must
+      // not have, so the removal announces itself and says where to go.
+      if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+      else outHeaders['X-Paramant-Receipt-Deprecated'] = `removed 2026-12-01; GET /v2/transfers/${receiptId}/receipt`;
+    }
     res.writeHead(200, outHeaders);
     if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
     return res.end(blob);
+  }
+
+  // ── GET /v2/transfers/:receipt_id/receipt ─ the delivery receipt, by reference ─
+  // Answers with the exact base64url payload GET /v2/outbound/:hash used to put
+  // in its X-Paramant-Receipt header, so a client that already decodes that
+  // string, or posts it to /v2/verify-receipt, needs no other change.
+  // The id is 16 random bytes handed only to the caller that did the download,
+  // and the receipt is additionally bound to that caller's API key. An unknown,
+  // expired, or foreign id answers with ONE 404, so the route can never be used
+  // to probe whether a transfer existed.
+  const rcptm = path.match(/^\/v2\/transfers\/([a-f0-9]{32})\/receipt$/);
+  if (rcptm && req.method === 'GET') {
+    const rec = await fetchDeliveryReceipt(rcptm[1]);
+    const gone = { error: 'Not found. Expired, or never issued.' };
+    if (!rec) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
+    if (rec.apiKey && rec.apiKey !== apiKey) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, receipt: Buffer.from(rec.json).toString('base64url'), receipt_hash: 'sha3-256:' + rec.hash }));
   }
 
   // ── GET /v2/status/:hash ─────────────────────────────────────────────────────
@@ -3937,13 +7936,34 @@ session = client.create_session('recipient@example.com')</pre>
 
   // ── POST /v2/webhook ─────────────────────────────────────────────────────────
   if (path === '/v2/webhook' && req.method === 'POST') {
+    // Webhook registration is an advertised ParaSend Pro capability. Before this
+    // gate ANY tier (incl. Free/community) could register a ghostpipe webhook.
+    // Require a live key and ParaSend Pro+ (community/free -> 403). The ParaSign
+    // /v1 completion webhooks are unaffected: they live behind the /v1 parasign
+    // scope, not this route.
+    if (!keyData || keyData.active === false) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'API key required' }));
+    }
+    if (!tierGate.isParasendProPlus(keyData)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'tier_upgrade_required', feature: 'webhooks', message: 'Webhook registration requires a Pro plan or higher.' }));
+    }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
-      const k = `${d.device_id}:${apiKey}`;
+      const k = `${d.device_id}:${acctOf(apiKey)}`;
       if (!webhooks.has(k)) webhooks.set(k, []);
-      webhooks.get(k).push({ url: d.url, secret: d.secret || '' });
+      // String(), want `|| ''` vangt alleen falsy. Een number, object of array
+      // overleefde en kwam later in crypto.createHmac terecht, dat op een
+      // niet-string gooit. Die throw stond een regel BUITEN de try in
+      // pushWebhooks, in een async functie zonder await: een onafhankelijke
+      // rejected promise, en dit proces beantwoordt een onafgehandelde
+      // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
+      // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
+      // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
+      webhooks.get(k).push({ url: d.url, secret: String(d.secret == null ? '' : d.secret) });
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
@@ -3964,7 +7984,7 @@ session = client.create_session('recipient@example.com')</pre>
   if (path === '/v2/stream-next') {
     const device = query.device || '';
     // Fix B: return next real blob hash from per-device delivery queue
-    const qKey = `${apiKey}:${device}`;
+    const qKey = `${acctOf(apiKey)}:${device}`;
     const queue = deviceQueues.get(qKey) || [];
     // Pop only hashes whose blob is still in store (TTL may have expired)
     let hash = null;
@@ -3995,6 +8015,91 @@ session = client.create_session('recipient@example.com')</pre>
     return res.end(J({ ok: true, count: entries.length, chain_valid: valid, entries }));
   }
 
+  // ── GET /v2/user/history — per-account send/link history (ParaSend/ParaSign Pro) ─
+  // Pure read-view over the per-key Merkle audit chain (no new storage). Pro+ only.
+  if (path === '/v2/user/history' && req.method === 'GET') {
+    const acct = acctOf(apiKey);
+    const memberKeys = [...(accountKeys.get(acct) || new Set([apiKey]))];
+    return userHistory.handle({
+      res, J, keyData, memberKeys,
+      auditFor: (k) => auditChain.get(k) || [],
+      query,
+    });
+  }
+
+  // ── GET /v2/parasign/audit-export — ParaSign Business signing-audit export ────
+  // Tier-gated on the audit_export entitlement (Business+). CSV or JSON export of
+  // the account's tamper-evident audit chain + the CT signed tree head.
+  if (path === '/v2/parasign/audit-export' && req.method === 'GET') {
+    const acct = acctOf(apiKey);
+    const memberKeys = [...(accountKeys.get(acct) || new Set([apiKey]))];
+    return parasignAuditExport.handle({
+      res, J, keyData, memberKeys,
+      auditFor: (k) => auditChain.get(k) || [],
+      ctHead: () => (sthLog.length ? sthLog[sthLog.length - 1] : null),
+      verifyChain,
+      query,
+      // Full per-envelope .psign export: enumerate the account's envelopes via
+      // the index and rebuild each completed one's notary-signed .psign, reusing
+      // the exact recipe GET /v1/receipt uses (parasignOpenApi.buildEnvelopePsign).
+      account: acct,
+      envStore: _envStore(),
+      metaStore: _parasignStore(),
+      buildPsign: parasignOpenApi.buildEnvelopePsign,
+      sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
+      relayIdentity,
+      canonicalJSON: parasign.canonicalJSON,
+      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app',
+    });
+  }
+
+  // ── GET /v2/parasign/inbox: what is waiting for THIS account's signature ─────
+  // The mirror of the worklist behind POST /v2/user/envelopes. That one lists
+  // what the account SENT, off the per-account index; this one lists what was
+  // sent TO it, off the per-party index in envelope.js. Until it existed a
+  // signed-in recipient could not learn a signing request existed at all: the
+  // only handle on an envelope was the per-party invite token in the mail, and
+  // losing the mail meant losing the document.
+  //
+  // THE ADDRESS IS DERIVED HERE, NEVER SUPPLIED. The account is already
+  // authenticated (api-key, or an app-purpose session token resolved to the
+  // same key, above), and its registered address is on the key record. Hashing
+  // that with the canonical partyEmailHash is the whole authorisation: an
+  // account can only ever be handed the worklist of the address it signed in
+  // with. Accepting a hash from a header instead would have made this route a
+  // way to read anybody's worklist, which is why the trusted-header pattern the
+  // /v2/envelopes/:id/document route uses is deliberately NOT copied here.
+  //
+  // WHAT IT WILL NOT SAY. No invite token, no document hash, no capsule, no
+  // envelope-wide party list. The answer is knowing-THAT a document waits, from
+  // whom, since when and until when. Opening it still takes the link in the
+  // mail, so this route cannot become a second way in.
+  if (path === '/v2/parasign/inbox' && req.method === 'GET') {
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope_store_unavailable' })); }
+    const acct = acctOf(apiKey);
+    // The address on the key, falling back to the account summary. Same
+    // precedence _indexAccountExpiry() uses for the address it mails.
+    const selfEmail = (keyData && keyData.email) || (accounts.get(acct) || {}).email || '';
+    const selfHash = envelopeMod.partyEmailHash(selfEmail);
+    // An account with no address on record is a party to nothing: the hash of
+    // an empty string is not a party hash, so answering empty is the truth.
+    if (!selfHash) {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, documents: [], count: 0 }));
+    }
+    const limit = Math.max(1, Math.min(parseInt((Array.isArray(query.limit) ? query.limit[0] : query.limit) || '50', 10) || 50, 200));
+    try {
+      const documents = await store.listPartyEnvelopes(selfHash, { limit, resolveSender: senderLabelOf });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, documents, count: documents.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error('[parasign/inbox]', err.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
+    }
+  }
+
   // ── POST /v2/did/register ────────────────────────────────────────────────────
   if (path === '/v2/did/register' && req.method === 'POST') {
     try {
@@ -4006,20 +8111,82 @@ session = client.create_session('recipient@example.com')</pre>
       if (!keyData && !isReceiverSession) {
         res.writeHead(401); return res.end(J({ error: 'Valid API key required for pubkey registration' }));
       }
-      // Rate limit: max 500 DIDs per API key to prevent RAM DoS
+      // Keyless inv_ registrations need no API key, so the per-key cap below does
+      // not bound them — an anonymous flood would append forever to didRegistry +
+      // ctLog. Throttle per IP (max 20/hour) to cap anonymous growth.
+      if (!keyData && isReceiverSession) {
+        const now = Date.now(), HOUR_MS = 3_600_000, MAX_INV_PER_IP = 20;
+        const ipKey = getClientIp(req);
+        const times = (invDidIpRequests.get(ipKey) || []).filter(t => now - t < HOUR_MS);
+        if (times.length >= MAX_INV_PER_IP) {
+          res.writeHead(429); return res.end(J({ error: 'Too many receiver-session registrations from this address. Try again later.' }));
+        }
+        times.push(now); invDidIpRequests.set(ipKey, times);
+      }
+      // The key a new enrollment binds to: the presented API key, or for a
+      // DID-authenticated register the key the AUTHENTICATING DID was enrolled
+      // under (keyData.account_id). Binding to '' here would mint a keyless
+      // enrollment from an authenticated session AND skip the per-key cap.
+      const ownerKey = apiKey || (keyData && keyData.account_id) || '';
+      // Rate limit: max 500 DIDs per API key to prevent RAM DoS. Counter is O(1)
+      // (didKeyCounts) instead of an O(n) scan of the whole registry per request.
       const MAX_DID_PER_KEY = 500;
-      if (apiKey) {
-        let keyDidCount = 0;
-        for (const e of didRegistry.values()) { if (e.key === apiKey) keyDidCount++; }
+      if (ownerKey) {
+        const keyDidCount = didKeyCounts.get(ownerKey) || 0;
         if (keyDidCount >= MAX_DID_PER_KEY) {
           res.writeHead(429); return res.end(J({ error: `DID limit reached. Max ${MAX_DID_PER_KEY} DIDs per API key.` }));
         }
       }
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
-      didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
-      const _didPlan = keyData?.plan || 'pro';
-      pubkeys.set(`${d.device_id}:${apiKey}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
+      // FIRST REGISTRATION WINS, the same rule POST /v2/pubkey has had on its
+      // slot. Finding 22b of the 2026-09-05 review: the set was unconditional
+      // and a DID is sha3-256(device_id + ecdh_pub), both of which GET
+      // /v2/did/:did hands out to anyone who asks -- a DID is a public
+      // identifier by design, so the holder's own counterparties know both
+      // halves of its preimage.
+      //
+      // What the rebind actually did is sharper than "the device moves". The
+      // signing material cannot be swapped (the ecdh key is inside the hash, so
+      // a different key is a different DID), but authByDid resolves the
+      // principal through didRegistry.key. Rebinding pointed the VICTIM'S OWN
+      // DID-authenticated traffic at the attacker's account: his plan, his
+      // account_id, his quota buckets, his device queues.
+      //
+      // A same-owner re-register stays 200 and keeps the stored document rather
+      // than rebuilding it, so `created` does not move under a verifier that
+      // pinned it. The counter is only touched for a genuinely new DID, and a
+      // rebind can no longer leave the previous owner's slot spent forever
+      // while the attacker's count never rises.
+      const held = didRegistry.get(did);
+      if (held && held.key !== ownerKey) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'DID already registered: first registration wins' }));
+      }
+      const _didIsNew = !held;
+      didRegistry.set(did, { device_id: d.device_id, key: ownerKey, doc: held ? held.doc : doc, ts: new Date().toISOString() });
+      if (_didIsNew && ownerKey) didKeyCounts.set(ownerKey, (didKeyCounts.get(ownerKey) || 0) + 1);
+      // Pubkey TTL follows the authenticated ParaSend tier; an ANONYMOUS
+      // (keyless inv_) registration gets the free-tier TTL, never the pro
+      // default. Same fix as POST /v2/pubkey: the tier comes off the product
+      // axis, and a key with no plan on file lands on community (7 days) rather
+      // than being handed the pro 30 by the `|| 'pro'` default.
+      const _didPlan = keyData ? parasendLimitsOf(keyData).tier : 'free';
+      // The SAME slot POST /v2/pubkey guards with its 409, written here without
+      // one. Two things came with that. Under DID-auth apiKey is '' and acctOf('')
+      // returns '', so the slot collapses to `${device_id}:` -- one namespace
+      // shared by every DID-authenticated caller, readable through
+      // GET /v2/pubkey/:device. And a live slot could be overwritten from this
+      // route even though the front door refuses. Anonymous inv_ registrations
+      // keep their own slot as before; what is refused is writing over a slot
+      // that is still alive and does not belong to this account.
+      const _didSlot = `${d.device_id}:${acctOf(apiKey)}`;
+      const _heldPk = pubkeys.get(_didSlot);
+      if (_heldPk && (!_heldPk.expires || Date.now() < _heldPk.expires) && _heldPk.ecdh_pub !== d.ecdh_pub) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Pubkey already registered for this device: first registration wins' }));
+      }
+      pubkeys.set(_didSlot, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
       auditAppend(apiKey, 'did_registered', { did, device: d.device_id });
@@ -4030,7 +8197,10 @@ session = client.create_session('recipient@example.com')</pre>
 
   // ── GET /v2/did ──────────────────────────────────────────────────────────────
   if (path === '/v2/did' && req.method === 'GET') {
-    const dids = [...didRegistry.values()].filter(e => e.key === apiKey).map(e => ({ did: e.doc.id, device: e.device_id, ts: e.ts }));
+    // Same owner resolution as everywhere: the API key, or for DID-auth the key
+    // the DID enrolled under. Never '' (which would match keyless inv_ entries).
+    const _didListKey = apiKey || (keyData && keyData.account_id) || null;
+    const dids = [...didRegistry.values()].filter(e => _didListKey && e.key === _didListKey).map(e => ({ did: e.doc.id, device: e.device_id, ts: e.ts }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, count: dids.length, dids }));
   }
@@ -4040,7 +8210,7 @@ session = client.create_session('recipient@example.com')</pre>
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.attestation) { res.writeHead(400); return res.end(J({ error: 'device_id and attestation required' })); }
-      const pk = pubkeys.get(`${d.device_id}:${apiKey}`);
+      const pk = pubkeys.get(`${d.device_id}:${acctOf(apiKey)}`);
       if (!pk) { res.writeHead(404); return res.end(J({ error: 'Device not registered' })); }
       const result = verifyAttestation(pk.ecdh_pub, d.device_id, d.attestation);
       auditAppend(apiKey, 'attestation', { device: d.device_id, method: d.attestation.method, valid: result.valid });
@@ -4079,14 +8249,14 @@ session = client.create_session('recipient@example.com')</pre>
     // M2: rate limit — max 5 attempts per IP per minute
     const clientIp = getClientIp(req);
     if (!checkMfaRateLimit(clientIp)) {
-      log('warn', 'mfa_rate_limited', { ip: clientIp });
+      log('warn', 'mfa_rate_limited', { ip: maskIp(clientIp) });
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
       return res.end(J({ error: 'Too many MFA attempts — try again in 60 seconds' }));
     }
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const valid = verifyTotp(d.totp_code || '');
-      log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: clientIp });
+      log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: maskIp(clientIp) });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: valid, error: valid ? null : 'Invalid TOTP code' }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -4094,22 +8264,10 @@ session = client.create_session('recipient@example.com')</pre>
 
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
-    // Enforce key limit (community = 5 hard cap; licensed = LICENSE_MAX_KEYS or Infinity)
-    if (LICENSE_MAX_KEYS !== Infinity) {
-      const activeCount = [...apiKeys.values()].filter(v => v.active !== false).length;
-      if (activeCount >= LICENSE_MAX_KEYS) {
-        res.writeHead(402, { 'Content-Type': 'application/json' });
-        return res.end(J({
-          error: EDITION === 'community'
-            ? `Community Edition limit reached (${COMMUNITY_KEY_LIMIT} keys). Add a plk_ license key to unlock unlimited users.`
-            : `License limit reached (${LICENSE_MAX_KEYS} keys). Contact Paramant to upgrade your license.`,
-          current_keys: activeCount,
-          max_keys: LICENSE_MAX_KEYS,
-          upgrade_url: 'https://paramant.app/pricing'
-        }));
-      }
-    }
     try {
+      // Parse FIRST, then do the cap check + insert in one synchronous tick (no
+      // await between the count and the set) so two concurrent creates cannot
+      // both pass a stale count — closes the prior check-before-await TOCTOU.
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
       // Fix 13: validate plan against allowlist
@@ -4123,25 +8281,126 @@ session = client.create_session('recipient@example.com')</pre>
         return res.end(J({ error: 'Invalid email address' }));
       }
       const email = rawEmail;
-      apiKeys.set(newKey, { plan, label, email, active: true });
-      _mutateUsersJson(d => {
-        d.api_keys.push({ key: newKey, plan, label, email, active: true, created: new Date().toISOString() });
-        d.updated = new Date().toISOString();
-      }).then(() => log('info', 'key_created_via_admin', { label, plan, persisted: true }))
+      // Account binding: explicit account_id adds a key to an existing account
+      // (non-primary); otherwise this key opens its own account (1:1, the stap-1
+      // default) as its primary.
+      const account_id = (d.account_id && String(d.account_id)) || newKey;
+      const is_primary = !d.account_id;
+      const scope = keysTable.VALID_SCOPES.has(d.scope) ? d.scope : 'full';
+
+      // Per-account cap (and the self-host relay-total cap) — checked atomically
+      // with the insert below.
+      const acctPlan = tiers.normalisePlan((accounts.get(account_id) && accounts.get(account_id).plan) || plan);
+      const acctCap = ACCOUNT_KEY_LIMIT[acctPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const acctActive = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+      if (acctActive >= acctCap) {
+        res.writeHead(402, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: `Account key limit reached (${acctCap} keys on the ${acctPlan} plan).`, current_keys: acctActive, max_keys: acctCap, upgrade_url: 'https://paramant.app/pricing' }));
+      }
+      if (EDITION !== 'licensed' && LICENSE_MAX_KEYS !== Infinity) {
+        const relayActive = [...apiKeys.values()].filter((v) => v.active !== false).length;
+        if (relayActive >= LICENSE_MAX_KEYS) {
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({
+            error: EDITION === 'community'
+              ? `Community Edition limit reached (${COMMUNITY_KEY_LIMIT} keys). Add a plk_ license key to unlock unlimited users.`
+              : `License limit reached (${LICENSE_MAX_KEYS} keys). Contact Paramant to upgrade your license.`,
+            current_keys: relayActive, max_keys: LICENSE_MAX_KEYS, upgrade_url: 'https://paramant.app/pricing'
+          }));
+        }
+      }
+
+      const created = new Date().toISOString();
+      apiKeys.set(newKey, { plan, label, email, active: true, account_id, is_primary, scope, created });
+      if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan, email, primary_api_key: null, label });
+      if (is_primary || !accounts.get(account_id).primary_api_key) accounts.get(account_id).primary_api_key = newKey;
+      if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
+      accountKeys.get(account_id).add(newKey);
+      const kid = keysTable.assignKid(kidIndex, newKey, log);
+      apiKeys.get(newKey).kid = kid;
+      kidIndex.set(kid, newKey);
+
+      _mutateUsersJson(ud => {
+        ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true }))
         .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      applyKeyLimitEnforcement();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, key: newKey, plan, label }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+      return res.end(J({ ok: true, key: newKey, kid, account_id, plan, label }));
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
-    const keys = [...apiKeys.entries()].map(([k, v]) => ({
-      key: k, plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false
+    // Account fields (kid/account_id/is_primary/scope/created) are ADDITIVE —
+    // existing consumers read key/plan/label/email/active; stap-4 self-service
+    // and the account-aware admin view use the account grouping.
+    //
+    // Blast-radius hygiene: the bulk list MASKS the secret key by default so a
+    // full pgp_ value is never returned for every account at once. Server-to-
+    // server callers that genuinely need the raw key (revoke/plan-change/reset)
+    // opt in with ?reveal=1; per-row reveal is also available at
+    // GET /v2/admin/keys/reveal/:account_id. key_masked is always present so
+    // browser-facing list views can render rows without ever holding a secret.
+    const reveal = query.reveal === '1' || query.reveal === 'true';
+    const keys = [...apiKeys.entries()].map(([k, v]) => ({ v, sign: _termView(v, 'parasign'), send: _termView(v, 'parasend'), k })).map(({ k, v, sign, send }) => ({
+      key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
+      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
+      // Per-product truth for the admin panel: the term that runs now (see
+      // _termView), or a no-downgrade derivation from the legacy plan for
+      // un-migrated records (mirrors getEntitlements' fallback) so an operator
+      // never sees a blank.
+      plan_parasign: sign.tier,
+      plan_parasend: send.tier,
+      // The period the tier was paid for. WITHOUT this the tier above is the
+      // whole story a reader gets, and "no period" is read everywhere as "never
+      // expires" (entitlements.effectiveProductTier, and the same rule mirrored
+      // client-side in dashboard.js/account.inline1.js). Every account surface
+      // in admin/ is built on this projection, so leaving it out made a lapsed
+      // account render as "Pro, active" long after the relay's own gates had
+      // floored it to free. The date is on the record; it just never left.
+      paid_until_parasign: sign.paidUntil,
+      paid_until_parasend: send.paidUntil,
+      // Is there a collection standing behind this account. The account page
+      // told every customer auto_renews:false because nothing on this
+      // projection could say otherwise, and with BILLING_MODE set that is the
+      // opposite of the truth: checkout opens a mandate and a subscription, and
+      // Mollie collects again on its own. A page that says a plan does not
+      // renew, next to a plan that does, is the one thing the buyer cannot
+      // check for himself.
+      auto_renews: Object.values(billingRecurring.PRODUCT_SUBSCRIPTION_FIELD).some((f) => !!v[f]),
+      usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null /*MARK:parasign_list*/
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, count: keys.length, keys, license: licenseInfo }));
+    return res.end(J({ ok: true, count: keys.length, masked: !reveal, keys, license: licenseInfo }));
+  }
+
+  // ── GET /v2/admin/keys/reveal/:account_id — reveal ONE full secret key ──────
+  // Single-key counterpart to the masked list: returns the full pgp_ value for
+  // exactly one account/key so an operator never has to pull the whole table in
+  // the clear. Path-param (mirrors /v2/admin/usage/:account_id) so no query
+  // parse. ADMIN_TOKEN-gated by the admin-path guard above. Matches by
+  // account_id, then by the raw key, then by kid.
+  const revealGet = path.match(/^\/v2\/admin\/keys\/reveal\/(.+)$/);
+  if (revealGet && req.method === 'GET') {
+    const id = decodeURIComponent(revealGet[1]);
+    const entry = [...apiKeys.entries()].find(([k, v]) => (v.account_id || k) === id || k === id || v.kid === id);
+    if (!entry) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'key_not_found' })); }
+    const [k, v] = entry;
+    log('info', 'admin_key_revealed', { account: String(v.account_id || k).slice(0, 12), kid: v.kid || null });
+    const sign = _termView(v, 'parasign');
+    const send = _termView(v, 'parasend');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
+      account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
+      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
+      plan_parasign: sign.tier,
+      plan_parasend: send.tier,
+      paid_until_parasign: sign.paidUntil,
+      paid_until_parasend: send.paidUntil,
+      usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null }));/*MARK:parasign_reveal*/
   }
 
   // ── GET /v2/admin/usage[/:account_id] — Phase 4 read-only observation ────
@@ -4155,19 +8414,26 @@ session = client.create_session('recipient@example.com')</pre>
       const accountId = v.account_id || k;
       const usage = await quota.readUsage(redisClient, accountId, month);
       const plan = v.plan || 'community';
+      // The limits an operator reads here are the limits the relay enforces, so
+      // they come off the same product axis the gates read and NOT off the
+      // unified `plan`, which a webhook upgrade never moves. Both product tiers
+      // ride along, because `plan` alone no longer explains the numbers.
+      const ent = entitlements.getEntitlements(v);
       out.push({
         account_id: accountId,
         api_key_prefix: k.slice(0, 12),
         plan,
+        parasend_tier: ent.parasend.tier,
+        parasign_tier: ent.parasign.tier,
         label: v.label || '',
         email: v.email || null,
         active: !!v.active,
         usage,
         limits: {
-          transfers_month: tiers.tierLimit(plan, 'transfers_month'),
-          signs_month:     tiers.tierLimit(plan, 'signs_month'),
-          file_mb:         tiers.tierLimit(plan, 'file_mb'),
-          devices:         tiers.tierLimit(plan, 'devices'),
+          transfers_month: _reportLimit(ent.parasend.quotas.transfers_month),
+          signs_month:     _reportLimit(ent.parasign.quotas.signs_month),
+          file_mb:         _effectiveFileMb(ent),
+          devices:         _reportLimit(ent.parasend.limits.devices),
         },
       });
     }
@@ -4179,6 +8445,8 @@ session = client.create_session('recipient@example.com')</pre>
     const accountId = decodeURIComponent(usageMatch[1]);
     const entry = [...apiKeys.entries()].find(([k, v]) => (v.account_id || k) === accountId || k === accountId);
     const plan = entry ? (entry[1].plan || 'community') : 'community';
+    // Same product axis as the list above and as the gates themselves.
+    const ent = entitlements.getEntitlements(entry ? entry[1] : null);
     const month = quota.ymKey();
     const usage = await quota.readUsage(redisClient, accountId, month);
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4190,13 +8458,146 @@ session = client.create_session('recipient@example.com')</pre>
       month,
       redis_available: !!(redisClient && redisClient.isReady),
       usage,
+      parasend_tier: ent.parasend.tier,
+      parasign_tier: ent.parasign.tier,
       limits: {
-        transfers_month: tiers.tierLimit(plan, 'transfers_month'),
-        signs_month:     tiers.tierLimit(plan, 'signs_month'),
-        file_mb:         tiers.tierLimit(plan, 'file_mb'),
-        devices:         tiers.tierLimit(plan, 'devices'),
+        transfers_month: _reportLimit(ent.parasend.quotas.transfers_month),
+        signs_month:     _reportLimit(ent.parasign.quotas.signs_month),
+        file_mb:         _effectiveFileMb(ent),
+        devices:         _reportLimit(ent.parasend.limits.devices),
       },
     }));
+  }
+
+  // ── GET /v2/admin/billing/export: the books for one period ────────────────
+  // Every document issued between `from` and `to`, both ends inclusive, both
+  // series (PS invoices and receipts, CN credit notes), in the shape the person
+  // doing the VAT return actually opens. Auth: ADMIN_TOKEN, handled above with
+  // every other /v2/admin path; this is the whole customer base's billing in one
+  // response and it may never hang off a customer key.
+  //
+  //   ?from=2026-09-01&to=2026-09-30   the period, on the date the DOCUMENT
+  //                                    states, not on when it was written
+  //   ?format=csv                      default. Semicolon, UTF-8 BOM, comma
+  //                                    decimals: a Dutch Excel opens it as a
+  //                                    table of numbers, not one column of text
+  //   ?format=json                     the same rows with dots and no BOM
+  //   ?pdfs=1                          a zip: one PDF per document plus the
+  //                                    ledger file, so the archive stands alone
+  //
+  // Read-only from end to end. It draws no number, writes no record and cannot
+  // change what a document says; see lib/billing-export.js.
+  if (path === '/v2/admin/billing/export' && req.method === 'GET') {
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'export_unavailable', hint: 'the documents live in redis' }));
+    }
+    const from = String(query.from || '').trim();
+    const to = String(query.to || '').trim();
+    const format = String(query.format || 'csv').trim().toLowerCase();
+    if (format !== 'csv' && format !== 'json') {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'bad_format', hint: 'format=csv or format=json' }));
+    }
+    const exported = await billingExport.build({ from, to, redis: redisClient });
+    if (exported.error) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: exported.error, hint: 'from and to are YYYY-MM-DD, from <= to' }));
+    }
+    // A number in the global list with no document behind it is the one gap
+    // lib/invoice.js cannot close (a crash between INCR and the write-back). It
+    // rides along in the JSON body and is logged either way, because a hole in
+    // a numbered series is exactly what an auditor comes looking for.
+    if (exported.missing.length) {
+      log('warn', 'billing_export_missing_documents', {
+        from, to, count: exported.missing.length, numbers: exported.missing.slice(0, 20),
+      });
+    }
+    log('info', 'billing_export', {
+      from, to, format, pdfs: query.pdfs === '1', documents: exported.count, scanned: exported.scanned,
+    });
+
+    const base = billingExport.fileBase(from, to);
+    if (query.pdfs === '1') {
+      const built = billingExport.buildZipEntries(exported, { render: invoicePdf.render, format });
+      if (built.failures.length) {
+        log('warn', 'billing_export_pdf_failed', { from, to, count: built.failures.length });
+      }
+      let zip;
+      try { zip = zipStore.buildZip(built.entries); }
+      catch (e) {
+        log('error', 'billing_export_zip_failed', { from, to, err: e.message });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'zip_failed' }));
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Length': zip.length,
+        'Content-Disposition': `attachment; filename="${base}.zip"`,
+        'Cache-Control': 'private, no-store',
+      });
+      return res.end(zip);
+    }
+
+    if (format === 'json') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
+      return res.end(J(billingExport.asJson(exported)));
+    }
+    const csv = Buffer.from(billingExport.toCsv(exported.rows), 'utf8');
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Length': csv.length,
+      'Content-Disposition': `attachment; filename="${base}.csv"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return res.end(csv);
+  }
+
+  // ── POST /v2/admin/keys/erase ─────────────────────────────────────────────
+  // Revoke stops a key working; this removes the person. Article 17 GDPR asks for
+  // erasure, and until now "delete account" left the email address in users.json
+  // on every sector while only Redis was cleared. Audit finding 5 of 2026-07-21.
+  //
+  // Takes an account_id or a key and erases the identifying fields from both
+  // places the account lives, keeping what a payment must stay traceable by.
+  // Idempotent: a retry after a sector was briefly unreachable finds nothing left
+  // and reports zero, which is a success and not an error.
+  //
+  // Two gates since 2026-09-06: ADMIN_TOKEN by the admin-path fence, plus
+  // X-Internal-Auth here. Erasure is irreversible by design, so it belongs on
+  // the same footing as the routes that move an entitlement. Both admin call
+  // sites pass the header (admin/server.js, relayFetch withInternal).
+  if (path === '/v2/admin/keys/erase' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const target = d.account_id || d.key;
+      if (!target) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
+      let result = { accounts: 0, keys: 0, fields: 0 };
+      await _mutateUsersJson(ud => {
+        result = keysTable.erasePersonalData(ud, target);
+        ud.updated = new Date().toISOString();
+      });
+      // Drop the in-memory copies too, otherwise the erased address stays
+      // readable until the next restart.
+      for (const [k, v] of apiKeys) {
+        if (k === target || (v && v.account_id === target)) {
+          for (const f of keysTable.PERSONAL_DATA_FIELDS) delete v[f];
+          v.active = false;
+        }
+      }
+      const acct = accounts.get(target);
+      if (acct) { for (const f of keysTable.PERSONAL_DATA_FIELDS) delete acct[f]; }
+      // The expiry index carries a copy of the address so any container can
+      // mail from it. An erasure that left that copy behind would be an
+      // erasure in name only, and the next sweep would write to it.
+      if (redisClient && redisClient.isReady) {
+        planExpiry.forgetAccount(redisClient, target)
+          .catch(e => log('warn', 'plan_expiry_forget_failed', { err: e.message }));
+      }
+      log('info', 'account_erased', { target: String(target).slice(0, 16), ...result });
+      res.writeHead(200); return res.end(J({ ok: true, erased: result }));
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
@@ -4212,6 +8613,18 @@ session = client.create_session('recipient@example.com')</pre>
         ud.updated = new Date().toISOString();
       }).then(() => log('info', 'key_revoked_via_admin', { key: revokedKey.slice(0,16), persisted: true }))
         .catch(we => log('warn', 'key_revoke_persist_failed', { err: we.message }));
+      // Every live ParaSend session token for this key, gone from the shared
+      // store, so the other four sectors stop honouring them too. Not awaited:
+      // the revocation itself is already done above (the key is inactive in
+      // this process and being persisted), and a slow redis must not hold up
+      // the answer. It is also not the only thing standing between a revoked
+      // key and a live token -- a resolved token is looked up in apiKeys like
+      // any other credential, so this sweep is the fast path, not the guarantee.
+      if (redisClient) {
+        sessionTokens.revokeForKey(redisClient, revokedKey)
+          .then(n => { if (n) log('info', 'session_tokens_revoked', { key: revokedKey.slice(0, 16), count: n }); })
+          .catch(e => log('warn', 'session_token_revoke_failed', { err: e.message }));
+      }
       // Fix 12: close active WebSocket connections for the revoked key
       const revokedWsClients = wsClients.get(revokedKey);
       if (revokedWsClients) {
@@ -4224,22 +8637,976 @@ session = client.create_session('recipient@example.com')</pre>
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── /v2/admin/coupons: create, list, withdraw ──────────────────────────
+  // On the ordinary admin gate above (ADMIN_TOKEN, checked once for every
+  // /v2/admin path), and on nothing else: a coupon raises a tier without a
+  // payment, so the ability to mint one is exactly the ability to give the
+  // product away. No session token of either purpose can reach these paths.
+  //
+  // The three verbs are deliberately not four. There is no edit: raising the
+  // cap on a code people are already redeeming against, or changing what it
+  // grants under them, is how two customers end up with different answers for
+  // the same code. Withdraw it and make another.
+  //
+  // The withdraw carries the code IN THE PATH and takes no body. A DELETE with
+  // a body that the auth gate above refuses before reading is a request whose
+  // bytes are still on the wire when the 401 goes out, and the next request on
+  // that kept-alive connection is answered by a socket that has lost its place.
+  // Nothing needs a body here, so nothing sends one.
+  if (path === '/v2/admin/coupons') {
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'coupons_unavailable', hint: 'the coupon store lives in redis' }));
+    }
+    try {
+      if (req.method === 'GET') {
+        const list = await coupon.listCoupons(redisClient);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupons: list }));
+      }
+      if (req.method === 'POST') {
+        const body = JSON.parse((await readBody(req, 2048)).toString() || '{}');
+        const out = await coupon.createCoupon(redisClient, {
+          code: body.code,
+          // Omitting `grants` means the campaign default: both products on Pro
+          // for ninety days. One number, in lib/coupon.js, not in a curl line.
+          grants: body.grants || undefined,
+          max_redemptions: body.max_redemptions,
+          valid_until: body.valid_until,
+          created_by: body.created_by || 'admin',
+          note: body.note,
+        });
+        if (!out.ok) {
+          res.writeHead(out.error === 'code_exists' ? 409 : 400, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: out.error }));
+        }
+        log('info', 'coupon_created', {
+          code: out.coupon.code, max: out.coupon.max_redemptions,
+          grants: out.coupon.grants.map((g) => `${g.product}:${g.tier}:${g.days}d`).join(','),
+          valid_until: out.coupon.valid_until,
+        });
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupon: out.coupon }));
+      }
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'method_not_allowed' }));
+  }
+
+  // ── /v2/admin/coupons/:code ────────────────────────────────────────────────
+  // GET .../redemptions: the counter on the list says how many, this says which
+  // accounts and when. It is the trail behind a term that was given rather than
+  // sold, so it is the one thing a coupon leaves that an auditor can follow.
+  //
+  // DELETE .../:code: withdraw. A stamp, not a delete: the redemptions that
+  // already happened are the record of terms that were given away, and they
+  // stay readable. No term already granted is taken back.
+  if (path.startsWith('/v2/admin/coupons/')) {
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'coupons_unavailable' }));
+    }
+    const rest = path.slice('/v2/admin/coupons/'.length);
+    const wantsRedemptions = rest.endsWith('/redemptions');
+    const c = coupon.normaliseCode(decodeURIComponent(
+      wantsRedemptions ? rest.slice(0, -'/redemptions'.length) : rest));
+    if (!c.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_code' })); }
+    try {
+      if (wantsRedemptions && req.method === 'GET') {
+        const doc = await coupon.getCoupon(redisClient, c.code);
+        if (!doc) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_code' })); }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupon: doc, redemptions: await coupon.redemptionsOf(redisClient, c.code) }));
+      }
+      if (!wantsRedemptions && req.method === 'DELETE') {
+        const out = await coupon.revokeCoupon(redisClient, c.code);
+        if (!out.ok) {
+          res.writeHead(out.error === 'unknown_code' ? 404 : 400, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: out.error }));
+        }
+        log('info', 'coupon_revoked', { code: out.coupon.code, used: out.coupon.used });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupon: out.coupon }));
+      }
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'method_not_allowed' }));
+  }
+
+  // ── POST /v2/billing/checkout — start a Mollie payment (authenticated) ───────
+  // The amount comes from the server-side catalog, NEVER from the request body.
+  // The caller only names product+plan+interval; it can never set a price.
+  if (path === '/v2/billing/checkout' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    let body;
+    try { body = JSON.parse((await readBody(req, 2048)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    // resolveSale, not resolveOrder: the checkout sells what the site sells
+    // (billing-catalog ON_SALE) and nothing else. The legacy Pro rows still
+    // resolve for the webhook, where the money has already moved (R8).
+    const order = billingCatalog.resolveSale({ product: body.product, plan: body.plan, interval: body.interval });
+    if (order.error) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: order.error })); }
+    // No second plan NEXT TO a running other plan. Nothing would be lost any
+    // more: a product holds a term per tier, the highest running one is what
+    // the customer gets, and the one under it takes over when it ends (the
+    // webhook and entitlements.applyProductTier). But the weeks the two
+    // overlap would be paid twice, and nobody sets out to do that. Renewing a
+    // tier that already holds a running term is fine, also when a higher tier
+    // runs above it, and so is a first purchase. Changing plans goes by mail.
+    // Two tabs, or a payment link, can still get past this; that money is
+    // granted in full and loses nothing (tests/rang-en-kassa.test.mjs).
+    {
+      const rec = entitlementRecordOf(accountId);
+      for (const g of order.grants) {
+        if (entitlements.hasRunningTerm(rec, g.product, g.tier)) continue;
+        const running = entitlements.effectiveProductTier(rec, g.product);
+        if (running.tier === entitlements.floorTierOf(g.product)) continue;
+        const until = running.paidUntil ? planExpiry.formatDate(running.paidUntil) : null;
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({
+          error: 'other_plan_running',
+          product: g.product,
+          running: running.tier,
+          paid_until: running.paidUntil ? new Date(running.paidUntil).toISOString() : null,
+          message: `You already have ${planExpiry.planLabel(g.product, running.tier)}${until ? ` until ${until}` : ''}. `
+            + `${billingCatalog.orderLabel(order)} would run alongside it and you would pay twice for the same weeks, so no payment was started. `
+            + 'To change plans, mail privacy@paramant.app.',
+        }));
+      }
+    }
+    const stance = mollie.billingStance();
+    const mode = stance.mode;
+    const origin = process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app';
+    // The VAT: 21% as every catalog price includes, unless reverse charged.
+    // Decided once, here, and carried on the payment (lib/vat.js), so the
+    // webhook's amount check, the invoice and every renewal agree with it.
+    const vatTerms = await _vatTermsForCheckout(accountId);
+    try {
+      // A Mollie customer, and a payment marked as the FIRST of a series. Both
+      // are required before Mollie will create a mandate, and without a mandate
+      // there is no authority to collect a second time: the payment succeeds,
+      // the tier is granted, and the money never comes in again. That is what
+      // made every sale a one-off.
+      //
+      // Only when BILLING_MODE was set by hand (stance.recurring). With it
+      // empty, as production has run since billing exists, the customer step is
+      // skipped and the payload below is byte for byte the one-off payment of
+      // 2026-08-08. See mollie.billingStance for why an inferred mode is not
+      // enough to open mandates against a real account.
+      const cust = await billingRecurring.ensureCustomer(accountId, {
+        recurring: stance.recurring, mode,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveCustomer: (aid, id) => _setMolliePointer(aid, billingRecurring.CUSTOMER_FIELD, id),
+        mollie,
+      });
+      if (cust.result === 'failed') {
+        log('error', 'billing_customer_failed', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
+      } else if (cust.result === 'reused_unverified') {
+        // Mollie could not confirm the stored customer for a reason other than
+        // "gone". It is kept rather than replaced: a new customer here is what
+        // left a running subscription under a customer nobody asked for any more.
+        log('warn', 'billing_customer_unverified', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
+      }
+      const customerId = cust.customerId;
+      const payment = await mollie.createPayment(mode, Object.assign({
+        amount: { currency: order.currency, value: vatMod.chargeAmount(order, vatTerms) },
+        description: `Paramant ${billingCatalog.orderLabel(order)} (${order.interval})`,
+        redirectUrl: `${origin}/dashboard?billing=return`,
+        webhookUrl: `${origin}/v2/billing/webhook`,
+        // A reverse-charged sale adds its terms (lib/vat.metadataOf); a 21%
+        // sale adds nothing, so its payload is what it always was.
+        metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval, ...vatMod.metadataOf(vatTerms) },
+      }, customerId ? { customerId, sequenceType: 'first' } : {}));
+      const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
+      log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode, recurring: !!customerId, vat: vatTerms.treatment });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, payment_id: payment && payment.id, checkout_url: checkoutUrl, mode }));
+    } catch (e) {
+      log('error', 'billing_checkout_failed', { account: String(accountId).slice(0, 12), err: e.message, status: e.status });
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'checkout_failed' }));
+    }
+  }
+
+  // ── POST /v2/billing/webhook — Mollie payment status callback ────────────────
+  // Mollie POSTs only { id } (form-encoded). The four hard rules live in
+  // lib/billing.processPayment; here we (1) re-fetch the payment from Mollie and
+  // trust ONLY that, then pass idempotency + entitlement effects as deps. Always
+  // 200 on a handled event so Mollie stops retrying; 503 only for a transient
+  // fetch failure we want retried.
+  if (path === '/v2/billing/webhook' && req.method === 'POST') {
+    let paymentId = '';
+    try {
+      const raw = (await readBody(req, 4096)).toString();
+      paymentId = (new URLSearchParams(raw).get('id') || '').trim();
+      if (!paymentId) { try { paymentId = (JSON.parse(raw).id || '').trim(); } catch { /* not json */ } }
+    } catch { /* empty body */ }
+    if (!/^tr_[A-Za-z0-9]+$/.test(paymentId)) {
+      log('warn', 'billing_webhook_bad_id', { raw_id: String(paymentId).slice(0, 24) });
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_payment_id' }));
+    }
+    const stance = mollie.billingStance();
+    const mode = stance.mode;
+    let payment;
+    try { payment = await mollie.getPayment(mode, paymentId); }
+    catch (e) {
+      const f = billing.classifyFetchError(e);
+      log(f.level, 'billing_webhook_fetch_failed', {
+        payment_id: paymentId, err: e.message, status: e.status, reason: f.reason, retry: f.retry });
+      if (!f.retry) {
+        // Permanent: acknowledge so Mollie stops retrying an event we can never
+        // resolve. Nothing was granted; the warn log above is the trail.
+        res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, ignored: 'unknown_payment' }));
+      }
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'fetch_failed' }));
+    }
+    // One webhook at a time per account (see _claimBillingLock). Per account and
+    // not per payment: two different purchases handled at once would each find
+    // no subscription on file and each create one.
+    const _lockOf = (payment && payment.metadata && payment.metadata.accountId)
+      ? `acct:${String(payment.metadata.accountId).slice(0, 128)}` : `pay:${paymentId}`;
+    const _lock = await _claimBillingLock(_lockOf);
+    if (!_lock) {
+      log('warn', 'billing_webhook_busy', { payment_id: paymentId });
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+      return res.end(J({ error: 'busy' }));
+    }
+    // Everything from here to the billing_webhook log line runs under the lock,
+    // and the finally after it gives the lock back whatever happens in between:
+    // an exception in the paperwork used to hold the account on 503 for the
+    // whole TTL. The block is deliberately not indented one step further, so
+    // this route's diff stays readable next to the other changes to it.
+    try {
+    const _rok = () => !!(redisClient && redisClient.isReady);
+    const _idemKey = (id) => `paramant:billing:done:${id}`;
+    // The payment id that bought the period currently on file, per product.
+    // Stored on the account record (and so in users.json) alongside the Mollie
+    // pointers, which is what makes the idempotency guard durable.
+    const _paidByField = (product) => `paid_by_${product}`;
+    // The entitlement products one line item covers: one for a product plan,
+    // two for the Firm bundle. Unknown metadata yields none, and nothing is
+    // written for a payment we could not attribute.
+    const catalogGrantsOf = (product, plan) => (billingCatalog.grantsOf(product, plan) || [])
+      .filter((g) => entitlements.PRODUCTS.includes(g.product));
+    const outcome = await billing.processPayment(payment, {
+      setProductPlan,
+      // Lets a renewal extend from where the paid period ends instead of from
+      // the day the money landed, so paying early never costs the buyer days.
+      // Per TIER: a renewal of Pro extends the Pro term from its own end, also
+      // when a Business month runs above it, and a Business month starts from
+      // the end of an earlier Business term or from now, never from the end of
+      // a Pro year (R2).
+      currentTermEnd: async (accountId, product, tier) => entitlements.termEndOf(entitlementRecordOf(accountId), product, tier),
+      // Redis holds the marker, but redis is a cache here and users.json is the
+      // record. When redis is down or has been flushed, isProcessed used to
+      // answer 'no' and the grant ran a second time -- and since a grant extends
+      // from the paid_until already on file, one payment bought two months. So
+      // the account record carries the payment id that bought its current
+      // period, and that answer survives anything redis does.
+      isProcessed: async (id) => {
+        if (_rok()) {
+          try { const v = await redisClient.get(_idemKey(id)); if (v) return v; } catch { /* fall through to disk */ }
+        }
+        const rec = _billingRecordOf((payment.metadata || {}).accountId);
+        if (!rec) return false;
+        for (const p of entitlements.PRODUCTS) if (rec[_paidByField(p)] === id) return 'granted';
+        return false;
+      },
+      markProcessed: async (id, val) => {
+        const md = payment.metadata || {};
+        // Persist first: this is the half that has to outlive a restart.
+        // Every product this payment granted, so a Firm payment is remembered on
+        // both halves. Reading only md.product would leave the parasend side
+        // with no id on file, and a redis flush would then let the same bundle
+        // payment grant a second month.
+        const bought = catalogGrantsOf(md.product, md.plan);
+        if (md.accountId && bought.length) {
+          for (const g of bought) {
+            // A revoke takes the money back, so the id that bought the period goes
+            // with it; leaving it would make the reversal look like a live grant.
+            _setMolliePointer(md.accountId, _paidByField(g.product), val === 'granted' ? id : null);
+          }
+        }
+        if (!_rok()) return;
+        try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ }
+      },
+    });
+    // The collecting half. A grant only says what this payment bought; without
+    // a subscription nothing asks for the next period. Deliberately AFTER the
+    // grant and never able to undo it: a buyer who paid keeps what he paid for
+    // even if Mollie refuses the subscription, and the error level is the
+    // signal that this account will not renew by itself. With BILLING_MODE
+    // empty (stance.recurring false) this is a silent skip: the 08-08 webhook
+    // granted and stopped there, and so does this one.
+    if (outcome.result === 'granted') {
+      const sub = await billingRecurring.ensureSubscription(payment, outcome, {
+        recurring: stance.recurring,
+        mode,
+        webhookUrl: `${process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app'}/v2/billing/webhook`,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveSubscription: _saveSubscriptionPointer,
+        mollie,
+      });
+      if (sub.result !== 'skipped') {
+        log(sub.level || 'info', 'billing_subscription', {
+          payment_id: paymentId, account: String(outcome.account).slice(0, 12),
+          product: outcome.product, result: sub.result, reason: sub.reason,
+          subscription_id: sub.subscriptionId, start_date: sub.startDate, replaced: sub.replaced,
+        });
+      }
+      // A new purchase after a cancellation. The account page hides its cancel
+      // button while paramant:user:plan_cancel_at:<key> is set (admin writes it
+      // on cancel and nothing ever cleared it), so after buying again there was
+      // a subscription running and no button to stop it, while the renewal mail
+      // points the customer at that very button. A collection by the running
+      // subscription is not a new purchase and leaves the marker alone.
+      if (!billingRecurring.isRecurringPayment(payment)) await _clearScheduledCancel(outcome.account);
+    }
+    // Money taken back stops the collecting too. The revoke above floored the
+    // plan, but the subscription kept running: the next collection charged the
+    // customer who had just asked for his money back, and gave him the plan
+    // again. Only the subscription that belongs to this payment (its purchase
+    // or one of its collections): a refund of an old purchase must not stop the
+    // subscription a later purchase made. Not gated on stance.recurring, since
+    // stopping a collection is always safe; with BILLING_MODE empty no account
+    // holds a subscription and this calls nobody.
+    if (outcome.result === 'revoked') {
+      const stopped = await billingRecurring.cancelOnRevoke(payment, outcome, {
+        mode,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveSubscription: _saveSubscriptionPointer,
+        mollie,
+      });
+      for (const s of stopped) {
+        if (s.result === 'noop') continue;
+        log(s.level || 'info', 'billing_subscription_revoked', {
+          payment_id: paymentId, account: String(outcome.account).slice(0, 12),
+          line: s.line, result: s.result, reason: s.reason,
+        });
+      }
+    }
+    // A collection that did not go through: tell the customer, once.
+    if (billingRecurring.isFailedCollection(payment)) await _noticeFailedCollection(payment);
+    // The paperwork. A grant is money received, and money received without a
+    // document is what this whole branch is about: no number, no VAT split, no
+    // record to hand a bookkeeper. Runs AFTER the grant and can never undo it.
+    //
+    // 'already_processed' is included on purpose. A repeat webhook for a paid
+    // payment means the entitlement half is settled, but the document half may
+    // have failed the first time (redis down at exactly that moment), and
+    // issueDocument is idempotent per payment id, so a retry can only ever
+    // repair, never duplicate.
+    if (payment && payment.status === 'paid' &&
+        (outcome.result === 'granted' ||
+         (outcome.result === 'ignored' && outcome.reason === 'already_processed'))) {
+      await _issueInvoiceForPayment(payment, outcome);
+    }
+    // Money going back. An issued invoice may not be withdrawn, so the document
+    // for it is a CREDIT NOTE with its own number in its own series, referring
+    // to the invoice it credits (lib/credit-note.js).
+    //
+    // Not gated on outcome.result. A chargeback revokes the entitlement and a
+    // refund does not, but both are money the customer no longer paid, and both
+    // need the document. A partial refund arrives as a still-'paid' payment
+    // with amountRefunded set, which no outcome would ever have caught.
+    if (creditNote.isReversal(payment) && redisClient && redisClient.isReady) {
+      const credit = await _creditNoteForPayment(payment);
+      // The marker on the invoice, and only when the WHOLE invoice went back: a
+      // partly refunded invoice is still partly true, and stamping it reversed
+      // would say the opposite. The credit note is the record either way.
+      if (credit && credit.fully_credited) {
+        const rev = await invoiceMod.recordReversal({ payment }, redisClient);
+        if (rev.result === 'reversed') log('warn', 'billing_invoice_reversed', { payment_id: paymentId, number: rev.number });
+      }
+    } else if (outcome.result === 'revoked' && redisClient && redisClient.isReady) {
+      // A revoke we could not read an amount for. The marker is still the
+      // honest minimum: the record must not keep claiming money that went back.
+      const rev = await invoiceMod.recordReversal({ payment }, redisClient);
+      if (rev.result === 'reversed') log('warn', 'billing_invoice_reversed', { payment_id: paymentId, number: rev.number });
+    }
+    // Monitoring: log every webhook with payment-id, status and outcome. The
+    // 'error' level marks the alert cases (paid but no entitlement: amount
+    // mismatch, missing metadata, or a grant that failed).
+    log(outcome.level || 'info', 'billing_webhook', {
+      payment_id: paymentId, status: payment && payment.status,
+      result: outcome.result, account: outcome.account ? String(outcome.account).slice(0, 12) : undefined,
+      product: outcome.product, reason: outcome.reason,
+    });
+    } finally {
+      await _lock.release();
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true }));
+  }
+
+  // ── GET /v2/billing/invoices: this account's documents (authenticated) ────
+  // Every document ever issued to this account, newest first, read from the
+  // append-only per-account list. Never another account's: listFor re-checks
+  // account_id on each record it loads, so a shared or leaked number still
+  // yields nothing here.
+  if (path === '/v2/billing/invoices' && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invoices_unavailable' }));
+    }
+    const accountId = acctOf(apiKey);
+    const records = await invoiceMod.listFor(accountId, redisClient);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      ok: true,
+      // The listing carries no seller/buyer blocks: the account page shows a
+      // row per document and the PDF is the document. Less to leak, less to
+      // keep in step.
+      invoices: records.map(r => ({
+        number: r.number, kind: r.kind, date: r.invoice_date, description: r.description,
+        currency: r.currency, amount_net: r.amount_net, amount_vat: r.amount_vat,
+        amount_gross: r.amount_gross, vat_rate: r.vat_rate,
+        reversed_at: r.reversed_at || null,
+        // Credit notes ride in the same list, in the same order the customer's
+        // documents happened. These four fields are what tells the page a row
+        // is money going back and which invoice it belongs to.
+        credit_for: r.credit_for || null,
+        reason: r.kind === 'credit_note' ? (r.reason || null) : null,
+        partial: r.kind === 'credit_note' ? !!r.partial : false,
+        credit_notes: r.credit_notes || null,
+        pdf_url: `/v2/billing/invoices/${r.number}.pdf`,
+      })),
+    }));
+  }
+
+  // ── GET /v2/billing/history: one chronological list (authenticated) ──────
+  // Derived, never stored: the invoice and credit-note records for the money,
+  // and the paid periods on those same records (cross-read against the
+  // plan-expiry index) for the terms that ended. See lib/billing-history.js for
+  // why a period end is not simply a date in the past.
+  if (path === '/v2/billing/history' && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'history_unavailable' }));
+    }
+    const history = await billingHistory.build({ accountId: acctOf(apiKey), redis: redisClient, now: new Date() });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, history }));
+  }
+
+  // -- POST /v2/billing/redeem: spend a gift code (authenticated) -------------
+  // The one path to a paid tier that involves no money. It is deliberately NOT
+  // a checkout with a 100% discount: nothing reaches Mollie, no invoice number
+  // is drawn, and nothing lands in the books as revenue, because nothing was
+  // sold. What it shares with a payment is the half the customer cares about,
+  // and it shares it by calling the SAME setProductPlan the webhook calls, so
+  // the entitlement layer, the expiry index and the reminder mails see an
+  // ordinary paid term and need no special case for a gift.
+  //
+  // Reachable on a pst_ session token with purpose `app` (lib/session-token.js
+  // APP_SCOPE), because the two pages carrying the field hold no api-key. The
+  // ACCOUNT IS THE ONE THE RELAY RESOLVED, never one the body names: a code is
+  // spent on the caller's own account or not at all.
+  if (path === '/v2/billing/redeem' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 512)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    const accountId = acctOf(apiKey);
+
+    // The seat is taken FIRST, atomically, and given back below if the grant
+    // that should follow it does not happen. The other order lets the hundred
+    // and first request be granted while the cap is being read.
+    let claim;
+    try { claim = await coupon.claim(redisClient, { code: body && body.code, accountId, now: new Date() }); }
+    catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'coupon_claim_failed', { account: String(accountId).slice(0, 12), err: e.message });
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+    }
+    if (!claim.ok) {
+      // 409 for a code that exists and cannot be spent (run out, already used,
+      // expired, withdrawn), 404 for one we have never heard of. Both carry the
+      // plain sentence the page prints; the machine-readable error is for logs
+      // and tests, never for the reader.
+      const status = claim.error === 'unknown' || claim.error === 'bad_code' ? 404 : 409;
+      log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: claim.error });
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error) }));
+    }
+
+    // Rule 3 (lib/coupon.js): the gift is ADDED to a term that is still
+    // running, never substituted for it. grantEnd is billing.extendFrom plus
+    // the days, so paying customers keep every day they bought.
+    const rec = entitlementRecordOf(accountId) || {};
+    // ONE instant for the whole redemption. Reading the clock per product gives
+    // the two halves of a single gift dates a millisecond apart, which is a lie
+    // on /account and a needless second entry in the expiry index.
+    const at = new Date();
+    const granted = [];
+    const kept = [];
+    let failure = null;
+    for (const g of claim.grants) {
+      // A gift adds a term of its own tier, like a payment does, with one
+      // exception: nothing under a HIGHER tier that is running. Until
+      // 2026-09-25 a Business customer who typed in a Pro code landed on Pro,
+      // on relay-main only, while every screen went on showing Business
+      // (betaaltest R3). A Pro term under the Business one would lower nothing
+      // any more, but it would be a gift that starts ticking while it can not
+      // be used, and the answer would have to explain that. So the product
+      // keeps what it has, and the answer says so. A higher gift over a lower
+      // paid term is fine now: the lower term stays under it and takes over
+      // when the gift ends. A term with no end has nothing to add to.
+      const running = entitlements.effectiveProductTier(rec, g.product, at.getTime());
+      const rel = entitlements.termRelation(g.product, g.tier, running.tier);
+      if (rel === 'higher_running' || (rel === 'same' && running.paidUntil === null)) {
+        kept.push({ product: g.product, tier: running.tier, ends: running.paidUntil ? new Date(running.paidUntil).toISOString() : null });
+        continue;
+      }
+      // Added to the end of this tier's own term, never to another tier's.
+      const current = entitlements.termEndOf(rec, g.product, g.tier);
+      const ends = coupon.grantEnd(current, at, g.days);
+      let out;
+      // null, not undefined: a gift is not a Firm purchase, so any bundle
+      // marker from an earlier Firm term goes with the term it belonged to.
+      // Leaving it would make the expiry mail call a gifted month a Firm plan.
+      try { out = setProductPlan(accountId, g.product, g.tier, ends, null); }
+      catch (e) { out = { ok: false, reason: e.message }; }
+      if (!out || !out.ok) { failure = (out && out.reason) || 'not_applied'; break; }
+      granted.push({ product: g.product, tier: out.tier, days: g.days, ends: ends.toISOString() });
+    }
+    if (failure) {
+      // Nothing half-given: the seat goes back so the code is not silently one
+      // shorter than the cap says, and the reader is told to try again.
+      await coupon.release(redisClient, claim.code, accountId);
+      log('error', 'coupon_grant_failed', { account: String(accountId).slice(0, 12), code: claim.code, reason: failure });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed }));
+    }
+    if (granted.length === 0) {
+      // Nothing to add anywhere. The seat goes back, so the code is not spent
+      // on an account it did nothing for.
+      await coupon.release(redisClient, claim.code, accountId);
+      log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: 'nothing_to_add',
+        kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') });
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept) }));
+    }
+
+    // The line on /account. Written after the term is really on the account, so
+    // a row here always has a term behind it, and written to its own store
+    // because no invoice series may hold a document for a thing that was given.
+    // It names what was given, not everything the code could have given.
+    const redeemedAt = at.toISOString();
+    await billingHistory.recordGift(redisClient, accountId, {
+      code: claim.code,
+      label: coupon.historyLabel(claim.code, granted),
+      grants: granted,
+      redeemed_at: redeemedAt,
+    });
+
+    // One mail, on the existing route. Not an invoice and not a receipt: there
+    // is nothing to put a number on.
+    const to = (rec && rec.email) || (accounts.get(accountId) || {}).email || '';
+    if (to) {
+      const msg = coupon.redeemMail({
+        code: claim.code,
+        grants: granted.map((g) => ({ ...g, ends: g.ends })),
+        siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
+      });
+      if (msg) {
+        Promise.resolve(mailLater({ to, subject: msg.subject, text: msg.text, html: msg.html }))
+          .catch((e) => log('warn', 'coupon_mail_failed', { err: e.message }));
+      }
+    }
+
+    log('info', 'coupon_redeemed', {
+      account: String(accountId).slice(0, 12), code: claim.code, used: claim.used,
+      products: granted.map((g) => `${g.product}:${g.tier}`).join(','),
+      ...(kept.length ? { kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') } : {}),
+    });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      ok: true,
+      code: claim.code,
+      granted,
+      ...(kept.length ? { kept } : {}),
+      // The sentence the page prints. Built here so the mail, the history line
+      // and the page all name the same plans and the same dates.
+      message: coupon.successMessage(granted, kept),
+    }));
+  }
+
+  // ── GET /v2/billing/invoices/:number.pdf: one document (authenticated) ────
+  // Rendered on demand from the stored record rather than kept as a blob: the
+  // record is the thing that must survive seven years, and a layout change then
+  // reprints every old document unchanged in content.
+  if (path.startsWith('/v2/billing/invoices/') && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const number = decodeURIComponent(path.slice('/v2/billing/invoices/'.length)).replace(/\.pdf$/i, '');
+    // Both series: PS for what was charged, CN for what was credited back. They
+    // share one document keyspace and one per-account list, so a credit note is
+    // downloaded by the same route that serves the invoice it credits.
+    if (!invoiceMod.parseDocumentNumber(number)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_invoice_number' }));
+    }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invoices_unavailable' }));
+    }
+    const record = await invoiceMod.getFor(acctOf(apiKey), number, redisClient);
+    if (!record) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+    let pdf;
+    try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
+    catch (e) {
+      log('error', 'billing_invoice_pdf_failed', { number, err: e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'render_failed' }));
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Length': pdf.length,
+      'Content-Disposition': `attachment; filename="${number}.pdf"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return res.end(pdf);
+  }
+
+  // ── GET/POST /v2/billing/profile: the customer half of an invoice ─────────
+  // Company name, address and VAT id, all optional. Without them a document is
+  // still valid as a receipt to the email address on the account, and says on
+  // its face how to get the company details onto the next one.
+  if (path === '/v2/billing/profile' && (req.method === 'GET' || req.method === 'POST')) {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    if (req.method === 'POST') {
+      let body;
+      try { body = JSON.parse((await readBody(req, 4096)).toString() || '{}'); }
+      catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+      // Trimmed and length-capped, and nothing else: these strings are printed
+      // on a PDF and mailed, never interpolated into markup or a query.
+      const clean = (v, max) => String(v == null ? '' : v).replace(/\r/g, '').trim().slice(0, max);
+      const profile = {
+        company: clean(body.company, 120),
+        address: clean(body.address, 300),
+        vat: clean(body.vat, 40),
+      };
+      if (profile.address.split('\n').length > 6) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'address_too_many_lines' }));
+      }
+      const saved = await _setBillingProfile(accountId, profile);
+      if (!saved.ok) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'profile_unavailable' })); }
+      log('info', 'billing_profile_saved', { account: String(accountId).slice(0, 12), has_company: !!profile.company, has_vat: !!profile.vat });
+    }
+    const buyer = await _billingBuyerOf(accountId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, email: buyer.email, company: buyer.company, address: buyer.address, vat: buyer.vat }));
+  }
+
+  // ── POST /v2/billing/cancel — stop the next collection (authenticated) ──────
+  // Selling a subscription without a way to end it is not allowed in the EU, and
+  // it is the first thing a buyer looks for before he buys. Cancelling stops the
+  // NEXT collection only: paid_until is untouched, so the period already paid
+  // for runs to its end and the tier goes with it. Anything else would be taking
+  // back time that was bought.
+  if (path === '/v2/billing/cancel' && req.method === 'POST') {
+    let body;
+    try { body = JSON.parse((await readBody(req, 1024)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    // TWO CALLERS. An api-key caller cancels its own account, as before. The
+    // ADMIN PLANE calls with X-Internal-Auth and the session's user_id, because
+    // the Cancel plan button on /account is the only cancel a customer will ever
+    // use and it had no way to reach this route at all: there was no proxy, and
+    // an app-scoped session token is denied this path (session-token.js). So the
+    // button wrote a redis marker, mailed "cancellation scheduled", and left the
+    // Mollie subscription collecting.
+    const internal = _internalOk();
+    const _who = internal ? (body && body.user_id) : apiKey;
+    if (!internal && !keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (internal && (!_who || !apiKeys.has(_who))) {
+      res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_account' }));
+    }
+    const accountId = acctOf(_who);
+    // No product named means every collection this account has: the buyer who
+    // presses Cancel is cancelling his plan, not one line of it, and he cannot
+    // be expected to know that a Firm subscription is a different row from a
+    // ParaSign one.
+    const product = body && body.product;
+    if (product && !billingRecurring.subscriptionFieldOf(product)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_product' }));
+    }
+    const mode = mollie.billingMode();
+    const _rec0 = _billingRecordOf(accountId) || {};
+    const products = product
+      ? [product]
+      : Object.keys(billingRecurring.PRODUCT_SUBSCRIPTION_FIELD)
+        .filter((p) => !!_rec0[billingRecurring.subscriptionFieldOf(p)]);
+    const results = [];
+    let out = { result: 'noop', reason: 'no_subscription' };
+    for (const p of (products.length ? products : [product || 'firm'])) {
+      out = await billingRecurring.cancelForProduct(accountId, p, {
+        mode,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveSubscription: _saveSubscriptionPointer,
+        mollie,
+      });
+      results.push({ product: p, result: out.result, reason: out.reason });
+      log(out.level || 'info', 'billing_cancel', {
+        account: String(accountId).slice(0, 12), product: p, result: out.result, reason: out.reason, mode,
+      });
+      if (out.result === 'failed' || out.result === 'refused') break;
+    }
+    if (out.result === 'failed' || out.result === 'refused') {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'cancel_failed', reason: out.reason, results }));
+    }
+    // What the buyer needs to see: nothing more will be collected, and until
+    // when he still has what he paid for.
+    const _rec = _billingRecordOf(accountId);
+    // A bundle is not an entitlement product and holds no paid_until of its own,
+    // so the date the buyer keeps is the EARLIEST of the products it covers:
+    // that is the day the plan he cancelled stops being whole. Reading
+    // PRODUCT_PAID_UNTIL_FIELD['firm'] answered null and told a Firm customer
+    // who had just cancelled that he had nothing left.
+    // Per product the day it falls to its floor, the last of its terms: with a
+    // Pro year under a Business month, what the buyer keeps runs to the end of
+    // the year, not to the end of the month on top.
+    const _untilOf = (p) => {
+      const last = entitlements.finalTermOf(_rec, p);
+      return last ? last.paidUntil : ((_rec && _rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[p]]) || null);
+    };
+    const _forDate = product || (results.find((r) => r.result === 'cancelled') || {}).product || 'firm';
+    const _covered = (billingCatalog.BUNDLES[_forDate] || { grants: [{ product: _forDate }] }).grants
+      .map((g) => _untilOf(g.product)).filter(Boolean).sort();
+    const until = _covered[0] || entitlements.PRODUCTS.map((p) => _untilOf(p)).filter(Boolean).sort()[0] || null;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, cancelled: results.some((r) => r.result === 'cancelled'), results, product: _forDate, access_until: until }));
+  }
+
   // ── POST /v2/admin/keys/update-plan ─────────────────────────────────────────
   if (path === '/v2/admin/keys/update-plan' && req.method === 'POST') {
     if (!_internalOk()) return _internalReject();
     try {
       const { key, plan } = JSON.parse((await readBody(req, 1024)).toString());
-      const VALID_PLANS = new Set(['community','dev','pro','licensed','enterprise']);
+      // 'business' is a first-class tier in tiers.js/entitlements; without it a
+      // Business plan-change (incl. a Mollie ParaSign Business purchase) failed here.
+      const VALID_PLANS = new Set(['community','dev','pro','business','licensed','enterprise']);
       if (!key || !VALID_PLANS.has(plan)) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
       if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
-      apiKeys.get(key).plan = plan;
+      const _rec = apiKeys.get(key);
+      _rec.plan = plan;
+      // Re-derive the per-product plans from the new unified plan (there is no
+      // per-product admin endpoint yet). An explicit admin plan change may raise
+      // or lower a product tier; that is intentional, not a silent migration.
+      _rec.plan_parasend = entitlements.derivePlanParasend(plan);
+      _rec.plan_parasign = entitlements.derivePlanParasign(plan, _rec.parasign);
+      // The per-tier terms go with it: this route sets one tier per product
+      // and has always meant exactly that, down included. A Business month
+      // left in terms_parasign would outrank the Pro it just wrote.
+      for (const f of Object.values(entitlements.PRODUCT_TERMS_FIELD)) delete _rec[f];
+      // Keep the account's plan in step so the per-account cap re-evaluates.
+      const _aid = _rec.account_id;
+      if (_aid && accounts.has(_aid)) accounts.get(_aid).plan = plan;
+      // Billing auto-grant: a paid Pro plan entitles the account to ParaSign /v1.
+      if (PARASIGN_PAID_PLANS.has(plan)) grantParasignOnPaidPlan(_aid || key); /*MARK:parasign_billing_autograt*/
       _mutateUsersJson(ud => {
         const entry = ud.api_keys.find(k => k.key === key);
-        if (entry) { entry.plan = plan; entry.plan_updated = new Date().toISOString(); }
+        if (entry) {
+          entry.plan = plan; entry.plan_parasend = _rec.plan_parasend; entry.plan_parasign = _rec.plan_parasign; entry.plan_updated = new Date().toISOString();
+          for (const f of Object.values(entitlements.PRODUCT_TERMS_FIELD)) delete entry[f];
+        }
         ud.updated = new Date().toISOString();
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
+      applyKeyLimitEnforcement();
       res.writeHead(200); return res.end(J({ ok: true, key, plan }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/set-product-plan ────────────────────────────────────
+  // Fine-grained sibling of /v2/admin/keys/update-plan: moves ONE product's tier
+  // (plan_parasign OR plan_parasend) on the target key's account and leaves the
+  // unified `plan` AND the other product untouched. Same internal-auth gate as
+  // update-plan. Body { key, product, tier, downgrade? }. An unknown product, or
+  // a tier that is not on that product's ladder, is rejected 400 (never
+  // silently floored to the base tier). Delegates the account fan-out +
+  // users.json persistence to setProductPlan - the exact block the Mollie
+  // webhook uses - so there is one per-product entitlement path, not a second
+  // copy.
+  if (path === '/v2/admin/keys/set-product-plan' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { key, product, tier, downgrade } = JSON.parse((await readBody(req, 1024)).toString());
+      if (!key) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
+      const v = entitlements.validateProductPlan(product, tier);
+      if (!v.ok) { res.writeHead(400); return res.end(J({ error: v.error })); }
+      if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
+      const accountId = acctOf(key);
+      // EXPLICITLY does not set the unified `plan` and does not touch the other
+      // product; setProductPlan writes only plan_<product> (+ the parasign access
+      // flag on a paid parasign tier).
+      //
+      // A grant never lowers a running higher tier by accident: a Pro grant on
+      // a customer who paid for Business would take away what he bought. 409,
+      // with what is running and the two ways on. `downgrade: true` moves the
+      // running term to the lower tier WITH ITS END DATE (a customer who asked
+      // for Pro instead of Business keeps the time he paid for). The floor
+      // tier is a revoke, not a grant, and still lands. Until 2026-09-25 this
+      // answer said "set free first", and whoever did that and then granted
+      // Pro handed out ParaSign Pro without an end date (review of #515).
+      const out = setProductPlan(accountId, v.product, v.tier, undefined, undefined, { downgrade: downgrade === true });
+      if (!out.ok && out.reason === 'lower_than_running') {
+        const until = out.running && out.running.paidUntil ? planExpiry.formatDate(out.running.paidUntil) : null;
+        res.writeHead(409);
+        return res.end(J({
+          error: 'lower_than_running', product: v.product, tier: v.tier, running: out.running,
+          message: `This account has ${planExpiry.planLabel(v.product, out.running.tier)}${until ? ` until ${until}` : ''}. `
+            + 'A grant never lowers a running plan by accident. '
+            + `To move this term to ${planExpiry.planLabel(v.product, v.tier)} and keep its end date, send the same request with downgrade: true. `
+            + `To take the plan away, set ${entitlements.floorTierOf(v.product)}.`,
+        }));
+      }
+      if (!out.ok) { res.writeHead(422); return res.end(J({ error: out.reason || 'not_applied' })); }
+      try { auditAppend(key, 'admin_product_plan_changed', { product: v.product, tier: out.tier, keys: out.keys, ...(downgrade === true ? { downgrade: true } : {}) }); } catch {}
+      log('info', 'admin_product_plan_changed', { account: String(accountId).slice(0, 12), product: v.product, tier: out.tier, keys: out.keys, changed: out.changed, downgrade: downgrade === true });
+      res.writeHead(200); return res.end(J({ ok: true, key, product: v.product, tier: out.tier }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  const entitlementRead = path.match(/^\/v2\/admin\/entitlements\/([^/]+)$/);
+  if (entitlementRead && req.method === 'GET') {
+    if (!_internalOk()) return _internalReject();
+    let requested;
+    try { requested = decodeURIComponent(entitlementRead[1]); }
+    catch { res.writeHead(400); return res.end(J({ error: 'invalid_account_id' })); }
+    const accountId = apiKeys.has(requested) ? acctOf(requested) : requested;
+    if (!accounts.has(accountId) && !accountKeys.has(accountId)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'account_not_found' }));
+    }
+    const record = entitlementRecordOf(accountId);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, account_id: accountId, entitlements: entitlements.getEntitlements(record) }));
+  }
+
+  // ── POST /v2/admin/keys/set-parasign - grant/revoke the ParaSign /v1 API ────
+  // Admin override for the `parasign` entitlement, alongside the automatic grant
+  // on payment. Sets the flag on the target key AND every sibling key of its
+  // account (account-level grant), then persists to users.json. The admin server
+  // fans this out to every sector so the grant is fleet-consistent.
+  //
+  // TWO gates, not one. ADMIN_TOKEN by the admin-path guard above, and
+  // X-Internal-Auth here, the same pair update-plan and set-product-plan carry.
+  // Until 2026-09-06 this route had only the first, which made one leaked secret
+  // enough to hand out the /v1 API to any account. The neighbouring routes that
+  // move the same entitlement had two, and that asymmetry is what the 2026-09-05
+  // review found. admin/server.js sends the second header on this call.
+  if (path === '/v2/admin/keys/set-parasign' && req.method === 'POST') {/*MARK:parasign_endpoint*/
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const key = (d.key || '').toString();
+      const enabled = d.enabled === true || d.parasign === true;
+      if (!key) { res.writeHead(400); return res.end(J({ error: 'key required' })); }
+      const kv = apiKeys.get(key);
+      if (!kv) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
+      const accountId = kv.account_id || key;
+      const members = accountKeys.get(accountId) || new Set([key]);
+      for (const m of members) { const mv = apiKeys.get(m); if (mv) mv.parasign = enabled; }
+      _mutateUsersJson(ud => {
+        for (const entry of ud.api_keys) {
+          if ((entry.account_id || entry.key) === accountId) entry.parasign = enabled;
+        }
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'parasign_grant_via_admin', { account: String(accountId).slice(0, 12), enabled, keys: members.size, persisted: true }))
+        .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, key, account_id: accountId, parasign: enabled, keys_updated: members.size }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/mint-parasign - mint a psk_ ParaSign /v1 key ─────────
+  // Manual admin-setup path. Runs the SAME mintParasignKey generator as the
+  // self-serve route, so both paths share one key format + one storage shape.
+  // Binds the key to {account_id} (or the account of {key}); returns the FULL key
+  // ONCE (never re-retrievable in full).
+  //
+  // TWO gates: ADMIN_TOKEN by the admin-path guard above, plus X-Internal-Auth,
+  // matching the self-serve route at /v2/user/parasign-keys, which has required
+  // the internal header since it was written. A route that MINTS a credential
+  // standing behind fewer gates than the route that merely moves a tier was the
+  // asymmetry in the 2026-09-05 review.
+  //
+  // `plan` is NOT read from the body any more. It reached buildParasignKeyRecord
+  // as a bare string, and on an account with no per-product plan on record
+  // {"plan":"enterprise"} minted an enterprise key with no paid_until, which
+  // entitlements reads as never expiring. The account's own plan is already the
+  // fallback inside mintParasignKey, and there is no legitimate reason to mint a
+  // key at a tier the account does not hold. set-product-plan is the route for
+  // changing what an account holds, and it validates against the ladder.
+  if (path === '/v2/admin/keys/mint-parasign' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      let accountId = (d.account_id && String(d.account_id)) || '';
+      if (!accountId && d.key) accountId = acctOf(String(d.key));
+      if (!accountId) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
+      try { auditAppend(out.key, 'admin_parasign_key_minted', { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode, plan: out.plan }); } catch {}
+      res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+        note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
+    } catch(e) { if (keyCapReject(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── GET /v2/admin/keys/primary/:account_id — read an account's primary + members ──
+  // Read-only; path-param (mirrors /v2/admin/usage/:account_id) so no query parse.
+  const primaryGet = path.match(/^\/v2\/admin\/keys\/primary\/(.+)$/);
+  if (primaryGet && req.method === 'GET') {
+    const accountId = decodeURIComponent(primaryGet[1]);
+    const acct = accounts.get(accountId);
+    const members = [...(accountKeys.get(accountId) || [])].map((k) => {
+      const v = apiKeys.get(k) || {};
+      return { kid: v.kid || null, is_primary: !!v.is_primary, scope: v.scope || 'full', active: v.active !== false, label: v.label || '' };
+    });
+    const primaryKey = acct && acct.primary_api_key;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, account_id: accountId, known: !!acct,
+      primary_kid: primaryKey ? ((apiKeys.get(primaryKey) || {}).kid || null) : null, keys: members }));
+  }
+
+  // ── POST /v2/admin/keys/primary — designate {key} as {account_id}'s primary ──
+  // Promotes the chosen key, demotes the previous primary within the account
+  // (keysTable.designatePrimary), then persists. Mismatched account_id => 400, so
+  // a key can never be moved into an account it does not belong to.
+  // Two gates since 2026-09-06: it rewrites which key an account is billed and
+  // metered through, which is the same class of change as set-product-plan. No
+  // caller in the admin panel reaches it, so nothing had to move with it.
+  if (path === '/v2/admin/keys/primary' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const accountId = (d.account_id || '').toString();
+      const key = (d.key || '').toString();
+      if (!accountId || !key) { res.writeHead(400); return res.end(J({ error: 'account_id and key required' })); }
+      let result;
+      try { result = keysTable.designatePrimary(apiKeys, accounts, accountKeys, accountId, key); }
+      catch (ke) { res.writeHead(ke.code === 'key_not_found' ? 404 : 400); return res.end(J({ error: ke.code || 'invalid_request' })); }
+      _mutateUsersJson(ud => {
+        for (const entry of ud.api_keys) {
+          if ((entry.account_id || entry.key) === accountId) entry.is_primary = (entry.key === key);
+        }
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'primary_designated_via_admin', { account: accountId.slice(0, 12), persisted: true }))
+        .catch(we => log('warn', 'primary_persist_failed', { err: we.message }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, account_id: accountId, primary_key: key, previous_primary: result.previous }));
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
@@ -4247,44 +9614,43 @@ session = client.create_session('recipient@example.com')</pre>
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      if (!RESEND_KEY) { res.writeHead(503); return res.end(J({ error: 'RESEND_API_KEY not configured' })); }
+      if (!mailer.gereed()) { res.writeHead(503); return res.end(J({ error: 'mail not configured' })); }
+      // H1: never put the raw API key in the email body (it would sit in the
+      // mailbox and pass through Resend in plaintext). Mint a one-time claim
+      // token and email a link instead. The token travels in the URL fragment
+      // (#...), so it is never sent to the server on page load, never logged,
+      // and never leaks via Referer; the claim page POSTs it to burn-on-reveal.
+      if (!redisClient || !redisClient.isReady) { res.writeHead(503); return res.end(J({ error: 'claim store unavailable' })); }
+      const claimToken = crypto.randomBytes(32).toString('hex');
+      await redisClient.set(`paramant:claim:${claimToken}`, d.key, { EX: CLAIM_TTL_SECONDS });
+      const claimUrl = `https://paramant.app/claim.html#${claimToken}`;
       const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
         <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
         <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-          IMPORTANT: Save this API key in your password manager immediately. It is generated once and cannot be recovered. If you lose it, you need to purchase a new subscription.
+          Your API key is ready to claim. The link below reveals it once and expires in 7 days. Save the key in your password manager the moment you see it — it is generated once and cannot be recovered.
         </div>
-        <p style="color:#888;margin-bottom:24px">Your API key is ready.</p>
-        <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
-          <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — ${(d.plan||'').toUpperCase()}</div>
-          <div style="font-size:14px;color:#ededed;word-break:break-all">${d.key}</div>
-        </div>
-        <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install cryptography
-
-python3 paramant-receiver.py \\
-  --key ${d.key} \\
-  --device my-device \\
-  --output /tmp/received/</pre>
+        <p style="color:#888;margin-bottom:24px">Plan: <strong style="color:#ededed">${escHtml((d.plan||'').toUpperCase())}</strong></p>
+        <div style="margin-bottom:24px"><a href="${claimUrl}" style="display:inline-block;background:#ededed;color:#0c0c0c;text-decoration:none;padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600">Reveal my API key</a></div>
+        <p style="color:#555;font-size:12px;margin-bottom:24px">Or paste this link into your browser:<br><span style="color:#888;word-break:break-all">${claimUrl}</span></p>
         <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> · <a href="https://paramant.app/ct-log" style="color:#555">CT log</a></p>
         <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 · Burn-on-read · EU/DE · BUSL-1.1</p>
       </div>`;
-      const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [d.email], subject: 'Your PARAMANT API key', html });
-      const resp = await new Promise((resolve, reject) => {
-        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({raw:data}); } }); });
-        req2.on('error', reject);
-        req2.write(body); req2.end();
+      // Through the one door. This caller waits for the answer, because the
+      // person on the other end is standing in front of a page that has to say
+      // whether their key is on its way.
+      const resp = await mailer.stuur({
+        from: 'PARAMANT <privacy@paramant.app>', to: d.email,
+        subject: 'Claim your PARAMANT API key', html,
       });
-      if (resp.id) {
-        log('info', 'welcome_mail_sent', { email: d.email, id: resp.id, label: d.label });
+      if (resp.ok) {
+        log('info', 'welcome_mail_sent', { email: maskEmail(d.email), provider: resp.provider, label: d.label });
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true, id: resp.id }));
+        return res.end(J({ ok: true }));
       } else {
-        log('warn', 'welcome_mail_failed', { email: d.email, resp });
-        res.writeHead(502); return res.end(J({ error: 'Resend error', detail: resp }));
+        log('warn', 'welcome_mail_failed', { email: maskEmail(d.email), reason: resp.reason, detail: resp.detail });
+        res.writeHead(502); return res.end(J({ error: 'mail_failed', detail: resp.reason }));
       }
-    } catch(e) { res.writeHead(500); return res.end(J({ error: e.message })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(500); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /v2/team/devices ───────────────────────────────────────────────────
@@ -4292,7 +9658,7 @@ python3 paramant-receiver.py \\
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     const teamId = kd.team_id;
-    if (!teamId) { res.writeHead(200); return res.end(J({ team_id: null, devices: [], message: 'Individuele key — geen team' })); }
+    if (!teamId) { res.writeHead(200); return res.end(J({ team_id: null, devices: [], message: 'Losse sleutel, geen team' })); }
     const devices = [];
     apiKeys.forEach((v, k) => {
       if (v.team_id === teamId) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
@@ -4301,18 +9667,63 @@ python3 paramant-receiver.py \\
   }
 
   // ── POST /v2/team/add-device ──────────────────────────────────────────────
+  // Finding 9 of the 2026-09-05 review lived here, and both the mechanism it
+  // named and the reach it assumed turned out to be wrong. Written down because
+  // the code reads as a working feature and is not one.
+  //
+  // What the review said: the minted key gets no account_id, so all three quota
+  // gates skip it. False. A backfill above all routing sets
+  // keyData.account_id = apiKey for any record that lacks one, so the gates
+  // never skip. The damage was real and different: the device became its OWN
+  // account, with its own fresh monthly bucket, uncorrelated with the seat that
+  // was paid for. Buy one Pro seat, mint devices, each one gets the whole plan.
+  //
+  // What the review did not check: `team_id` never reaches a runtime record.
+  // keysTable.parseAccountFields returns a fixed field set and drops it, and no
+  // other apiKeys.set site writes it. You need a record with team_id to mint one
+  // with team_id, so this route answers 403 to everyone and always has.
+  // deploy/paramant-admin.py team-create writes it to users.json, where it is
+  // dropped on load. The feature does not work end to end.
+  //
+  // So it is left unreachable, and the mint is fixed anyway: the day somebody
+  // teaches the loader about team_id, this must not be the shape that lands.
+  // Bound to the PARENT account, scope inherited, capped, persisted, and 32
+  // bytes like every other key in the file. key-mint-gate.test.js holds it here.
   if (path === '/v2/team/add-device' && req.method === 'POST') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    if (!kd.team_id) { res.writeHead(403); return res.end(J({ error: 'Geen team — upgrade naar Pro' })); }
+    if (!kd.team_id) { res.writeHead(403); return res.end(J({ error: 'Geen team. Daarvoor is Pro nodig.' })); }
     if (kd.plan === 'dev') { res.writeHead(403); return res.end(J({ error: 'Team keys vereisen Pro of Enterprise' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.label) { res.writeHead(400); return res.end(J({ error: 'label verplicht' })); }
-      const newKey = 'pgp_' + require('crypto').randomBytes(16).toString('hex');
-      apiKeys.set(newKey, { label: d.label, plan: kd.plan, team_id: kd.team_id, active: true, created: new Date().toISOString() });
-      log('info', 'team_device_added', { label: d.label, team: kd.team_id });
-      res.writeHead(201); return res.end(J({ ok: true, key: newKey, label: d.label, team_id: kd.team_id }));
+      const label = String(d.label).slice(0, 128);
+      const account_id = kd.account_id || apiKey;
+      const scope = keysTable.VALID_SCOPES.has(kd.scope) ? kd.scope : 'full';
+      const email = kd.email || '';
+      const capPlan = tiers.normalisePlan(kd.plan);
+      const cap = ACCOUNT_KEY_LIMIT[capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const active = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+      if (active >= cap) {
+        res.writeHead(402, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: `Account key limit reached (${cap} keys on the ${capPlan} plan).`, current_keys: active, max_keys: cap === Infinity ? null : cap, upgrade_url: 'https://paramant.app/pricing' }));
+      }
+      const created = new Date().toISOString();
+      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
+      apiKeys.set(newKey, { plan: kd.plan, label, email, active: true, account_id, is_primary: false, scope, team_id: kd.team_id, created });
+      if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan: kd.plan, email, primary_api_key: null, label });
+      if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
+      accountKeys.get(account_id).add(newKey);
+      const kid = keysTable.assignKid(kidIndex, newKey, log);
+      apiKeys.get(newKey).kid = kid;
+      kidIndex.set(kid, newKey);
+      _mutateUsersJson(ud => {
+        ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true }))
+        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      applyKeyLimitEnforcement();
+      res.writeHead(201); return res.end(J({ ok: true, key: newKey, kid, account_id, label, team_id: kd.team_id }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -4341,7 +9752,13 @@ python3 paramant-receiver.py \\
     const successRate = total > 0 ? Math.round((acked / total) * 1000) / 1000 : 1;
     return res.end(J({
       ok:              true,
-      plan:            kd.plan || 'pro',
+      // Display only, no limit hangs off it. The unified plan stays the value
+      // of this long-standing field so nothing reading it breaks, but the
+      // default was the generous one (a key with no plan on file reported
+      // itself as pro), and the tier the stats beside it are actually measured
+      // against now travels alongside.
+      plan:            kd.plan || 'community',
+      parasend_tier:   parasendLimitsOf(kd).tier,
       blobs_in_flight: pending,
       stats: {
         inbound:       stats.inbound,
@@ -4358,159 +9775,26 @@ python3 paramant-receiver.py \\
     }));
   }
 
-  // ── POST /v2/drop/create — Anonieme burn-on-read drop met BIP39 + Argon2id ────
-  if (path === '/v2/drop/create' && req.method === 'POST') {
-    if (!ramOk()) {
-      const r = ramStatus();
-      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '10' });
-      return res.end(J({ ok: false, error: 'Relay at capacity', retry_after_s: 10, slots_available: r.available_slots }));
-    }
-    inFlightInbound++;
-    try {
-      const d = JSON.parse((await readBody(req)).toString());
-      const { hash, payload, ttl_ms, password, private: isPrivate } = d;
-      if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash en payload verplicht' })); }
-      // Private drops require an authenticated creator so pickup/status can
-      // tenant-check. Drops without an apiKey cannot be private (no owner).
-      if (isPrivate && !apiKey) { res.writeHead(400); return res.end(J({ error: 'private drop requires X-Api-Key' })); }
-      if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash moet SHA-256 hex zijn' })); }
-      if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash al in gebruik' })); }
-      const blob = Buffer.from(payload, 'base64');
-      if (blob.length > MAX_BLOB) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(MAX_BLOB/1048576)}MB` })); }
-      try { peekInboundBlob(blob); }
-      catch(e) {
-        const mapped = mapCryptoErrorToHttp(e);
-        if (mapped) {
-          log('warn', 'drop_create_wire_v1_reject', { status: mapped.status, err: e.code || e.name });
-          res.writeHead(mapped.status, { 'Content-Type': 'application/json' });
-          return res.end(J(mapped.body));
-        }
-        throw e;
-      }
-      const _planDropTtl = { free: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
-      const ttl = Math.min(parseInt(ttl_ms || 3_600_000) || 3_600_000, _planDropTtl[keyData?.plan || 'pro']);
-      // Argon2id password protection
-      let pw_hash = null;
-      if (password) {
-        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
-        pw_hash = await argon2Lib.hash(password, {
-          type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1,
-        });
-      }
-      // Drops zijn altijd burn-on-read. `private` binds the drop to its
-      // creator: pickup/status from a different key are refused.
-      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
-        sig_valid: false, apiKey, max_views: 1, views_remaining: 1, pw_hash,
-        is_drop: true, is_private: !!isPrivate });
-      setTimeout(() => {
-        const e = blobStore.get(hash);
-        if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
-      }, ttl);
-      incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
-      stats.inbound++; stats.bytes_in += blob.length;
-      auditAppend(apiKey, 'drop_created', { hash: hash.slice(0,16)+'...', bytes: blob.length, pw_protected: !!pw_hash, private: !!isPrivate });
-      log('info', 'drop_created', { hash: hash.slice(0,16), size: blob.length, pw: !!pw_hash, ttl, private: !!isPrivate });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, pw_protected: !!pw_hash, private: !!isPrivate }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-    finally { inFlightInbound--; }
-  }
-
-  // ── POST /v2/drop/pickup — Haal drop op via BIP39 mnemonic + optioneel wachtwoord ──
-  if (path === '/v2/drop/pickup' && req.method === 'POST') {
-    // Rate-limit by api key when present, by IP otherwise. Pentest H1.
-    const rlToken = apiKey || clientIp;
-    if (!dropPickupRateOk(rlToken)) {
-      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
-      return res.end(J({ error: 'Too many drop pickups. Retry after 60 seconds.' }));
-    }
-    try {
-      const d = JSON.parse((await readBody(req, 8192)).toString());
-      const { mnemonic, password } = d;
-      if (!mnemonic) { res.writeHead(400); return res.end(J({ error: 'mnemonic verplicht' })); }
-      let lookupHash;
-      try { lookupHash = mnemonicToLookupHash(mnemonic.trim()); }
-      catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-      const entry = blobStore.get(lookupHash);
-      if (!entry) {
-        res.writeHead(404); return res.end(J({ error: 'Drop not found. Expired, already retrieved, or invalid mnemonic.' }));
-      }
-      // Tenant-scope on private drops: only the creator may pickup. Returns
-      // 404 (not 403) so a non-owner cannot distinguish private-existing
-      // from absent.
-      if (entry.is_private && entry.apiKey && entry.apiKey !== apiKey) {
-        res.writeHead(404); return res.end(J({ error: 'Drop not found. Expired, already retrieved, or invalid mnemonic.' }));
-      }
-      // Argon2id password verification with per-hash backoff.
-      if (entry.pw_hash) {
-        const backoff = dropPwBackoffMs(lookupHash);
-        if (backoff > 0) {
-          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(backoff/1000)) });
-          return res.end(J({ error: 'Too many failed password attempts. Retry later.', retry_after_s: Math.ceil(backoff/1000) }));
-        }
-        if (!password) { res.writeHead(401); return res.end(J({ error: 'Password required (password field)' })); }
-        if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id not available' })); }
-        const pwOk = await argon2Lib.verify(entry.pw_hash, password);
-        if (!pwOk) {
-          dropPwRecordFail(lookupHash);
-          res.writeHead(403); return res.end(J({ error: 'Incorrect password' }));
-        }
-        dropPwClear(lookupHash);
-      }
-      // Burn-on-read
-      const blob = entry.blob;
-      blobStore.delete(lookupHash);
-      incMetric('blobs_burned'); incMetric('bytes_out_total', blob.length);
-      stats.outbound++; stats.burned++; stats.bytes_out += blob.length;
-      auditAppend(apiKey, 'drop_pickup', { hash: lookupHash.slice(0,16)+'...', bytes: blob.length });
-      log('info', 'drop_pickup', { hash: lookupHash.slice(0,16), size: blob.length });
-      res.writeHead(200, {
-        'Content-Type':     'application/octet-stream',
-        'Content-Length':   blob.length,
-        'X-Paramant-Burned': 'true',
-        'X-Paramant-Hash':   lookupHash,
-      });
-      return res.end(blob, () => { try { blob.fill(0); } catch {} });
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-  }
-
-  // ── POST /v2/drop/status — Controleer drop beschikbaarheid zonder te branden ─
-  if (path === '/v2/drop/status' && req.method === 'POST') {
-    // Rate-limit by api key when present, by IP otherwise. Pentest H1.
-    const rlToken = apiKey || clientIp;
-    if (!dropStatusRateOk(rlToken)) {
-      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
-      return res.end(J({ error: 'Too many drop status checks. Retry after 60 seconds.' }));
-    }
-    try {
-      const d = JSON.parse((await readBody(req, 4096)).toString());
-      if (!d.mnemonic) { res.writeHead(400); return res.end(J({ error: 'mnemonic verplicht' })); }
-      let lookupHash;
-      try { lookupHash = mnemonicToLookupHash(d.mnemonic.trim()); }
-      catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-      const entry = blobStore.get(lookupHash);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      if (!entry) return res.end(J({ available: false }));
-      // Tenant-scope on private drops: leak nothing to a non-owner. Same
-      // response shape as "not found" so existence is undetectable.
-      if (entry.is_private && entry.apiKey && entry.apiKey !== apiKey) {
-        return res.end(J({ available: false }));
-      }
-      return res.end(J({
-        available:        true,
-        size:             entry.size,
-        ttl_remaining_ms: Math.max(0, entry.ttl - (Date.now() - entry.ts)),
-        pw_protected:     !!entry.pw_hash,
-      }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-  }
-
   // ── POST /v2/sign — ParaSign notary (R017) ───────────────────────────────────
   // The signature is made client-side; this relay NEVER receives a private key
   // and never receives document content -- only the SHA3-256 hash, the signer's
   // ML-DSA-65 signature, and the signer's public key. The relay verifies the
   // signature, logs it to the CT tree, and counter-signs the .psign envelope.
   if (path === '/v2/sign' && req.method === 'POST') {
+    // RETIRED (H4): the legacy R017 notary verifies a bare, non-domain-separated
+    // doc hash (no envelope/relay/recipe binding), unlike the R018 multi-party
+    // recipe. It has no first-party callers — production signing uses the in-browser
+    // R018 path (/sign -> /v2/user/sign/*). Return 410 rather than mint new weak
+    // signatures. Existing .psign artifacts still verify via /v2/verify.
+    res.writeHead(410, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'gone', message: 'POST /v2/sign (legacy R017 notary) is retired; sign in your browser at /sign (R018).' }));
+  }
+  // DEAD CODE (retained for reference only; guarded by `&& false`). This is the
+  // legacy R017 notary body. It held the ONLY gateSign/recordSign call in the
+  // relay, which is why signatures went uncounted for so long: the live signing
+  // path is POST /v2/envelopes/:id/sign (R018), which now meters signs itself.
+  // Do NOT re-enable without moving the metering; kept only to document history.
+  if (path === '/v2/sign' && req.method === 'POST' && false) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
     if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
     try {
@@ -4524,35 +9808,58 @@ python3 paramant-receiver.py \\
       if (!/^[0-9a-f]{64}$/.test(documentHash)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'document_hash must be a 64-char SHA3-256 hex string' })); }
       if (!signatureB64 || !signerPubB64)       { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signature and signer_public_key are required' })); }
 
-      // Refuse to notarise a signature that does not verify against the supplied key.
-      let signerOk = false;
-      try {
-        signerOk = registry.getSig(0x0002).verify(
-          Buffer.from(signatureB64, 'base64'),
-          Buffer.from(documentHash, 'hex'),
-          Buffer.from(signerPubB64, 'base64'));
-      } catch (e) { signerOk = false; }
-      if (!signerOk) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer signature does not verify against signer_public_key' })); }
+      // Refuse to notarise a signature that does not verify against the supplied
+      // key. The signer MUST sign the domain-separated v2 message (pentest
+      // #3/#4) so a signature minted for another purpose cannot be replayed as a
+      // document notarisation. Legacy bare-hash (v1) signers are only accepted
+      // when PARASIGN_ACCEPT_LEGACY_V1=true (transition escape hatch); by
+      // default v1 is rejected, closing the cross-protocol replay.
+      const _sigBuf = Buffer.from(signatureB64, 'base64');
+      const _pubBuf = Buffer.from(signerPubB64, 'base64');
+      const _sigEng = registry.getSig(0x0002);
+      const _tryVerify = (bytes) => { try { return _sigEng.verify(_sigBuf, bytes, _pubBuf); } catch (e) { return false; } };
+      let sigVersion = '2';
+      let signerOk = _tryVerify(parasign.singleSignerMessage(documentHash));
+      if (!signerOk && process.env.PARASIGN_ACCEPT_LEGACY_V1 === 'true') {
+        signerOk = _tryVerify(Buffer.from(documentHash, 'hex'));
+        if (signerOk) { sigVersion = '1'; log('warn', 'parasign_legacy_v1_signature', { doc: documentHash.slice(0, 16) + '…' }); }
+      }
+      if (!signerOk) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer signature does not verify against signer_public_key (expected a v2 domain-separated signature: ML-DSA over sha3_256("paramant/parasign/notary/v1" || 0x00 || document_hash))' })); }
+
+      // Phase 4 quota enforcement: decline a NEW counter-signature once the
+      // monthly tier cap is reached. Verifying/reading existing envelopes is not
+      // gated. Redis outages pass (fail-open).
+      if (keyData && keyData.account_id) {
+        // ParaSign entitlement: signs_month for this account's plan_parasign
+        // (independent of the ParaSend transfers quota). Separate counter key.
+        const _psign  = entitlements.getEntitlements(keyData).parasign;
+        const _sLimit = _psign.quotas.signs_month;
+        const _sGate  = await quota.gateSign(redisClient, keyData.account_id, _sLimit, log);
+        if (!_sGate.allowed) {
+          // The tier that DECIDED, as on the transfer gate: the unified plan
+          // does not move on a ParaSign purchase either, so reporting it here
+          // tells a paying customer he is on a tier he is not being held to.
+          log('info', 'quota_sign_declined', { account: String(keyData.account_id).slice(0, 12), plan: _psign.tier, limit: _sLimit });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month', plan: _psign.tier, limit: _sLimit }));
+        }
+      }
 
       const signerPkHash = crypto.createHash('sha3-256').update(Buffer.from(signerPubB64, 'base64')).digest('hex');
       const ctEntry = ctAppendParasign(documentHash, signerPkHash);
 
       const envelope = parasign.buildEnvelope(
-        { documentHashHex: documentHash, signatureB64, signerPubB64, signerLabel, ttlDays, ctLogIndex: ctEntry.index },
+        { documentHashHex: documentHash, signatureB64, signerPubB64, signerLabel, ttlDays, ctLogIndex: ctEntry.index, version: sigVersion },
         { relaySign: (msg) => registry.getSig(0x0002).sign(msg, relayIdentity.sk), relayPkHash: relayIdentity.pk_hash });
 
       log('info', 'parasign_signed', { ct_index: ctEntry.index, signer_pk_hash: signerPkHash.slice(0, 16) + '…' });
 
-      // Phase 3 quota counter: tally one sign per account_id per month.
-      // No dedup -- every counter-signature is a billable event.
-      // COUNT ONLY -- no gate, no 402. Redis failure does not block the response.
-      if (keyData && keyData.account_id) {
-        quota.recordSign(redisClient, keyData.account_id, log).catch(() => {});
-      }
+      // (Sign already counted by the quota gate above, before the envelope was built.)
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
     }
@@ -4614,7 +9921,7 @@ python3 paramant-receiver.py \\
   // POST /v2/envelopes -- create a new envelope.
   if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
-    if (!envCreateRateOk(apiKey)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
+    if (!(await envCreateRateOkShared(apiKey))) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable (redis or crypto not ready)' })); }
     try {
@@ -4627,13 +9934,189 @@ python3 paramant-receiver.py \\
         ? crypto.createHash('sha3-256').update(Buffer.from(d.creator_public_key, 'base64')).digest('hex')
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
-      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode });
+      // The plan travels with the request now: it decides how many names may go
+      // on one document. Read here rather than passed down from the quota block
+      // above, whose const lives in its own scope.
+      const _planForParties = (apiKeys.get(apiKey) || {}).plan;
+      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance, plan: _planForParties });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: out }));
     } catch (e) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
+    }
+  }
+
+  // POST /v2/envelopes/:id/document -- creator uploads the browser-encrypted
+  // document capsule. The relay stores ciphertext only. Authorization is the
+  // envelope creator's account, resolved from its API key.
+  const envDocumentMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/document$/);
+  if (envDocumentMatch && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    const maxCapsule = MAX_BLOB + 8192;
+    const declared = parseInt(req.headers['content-length'] || '0', 10);
+    if (declared > maxCapsule) { res.writeHead(413, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'document_too_large', max_bytes: MAX_BLOB })); }
+    try {
+      const capsule = await readBody(req, maxCapsule);
+      const capsuleSha256 = (req.headers['x-capsule-sha256'] || '').toString().trim().toLowerCase();
+      const out = await store.putDocumentCapsule(envDocumentMatch[1], acctOf(apiKey), capsule, capsuleSha256);
+      if (!out.ok) {
+        const status = out.code === 'not_owner' ? 403 : out.code === 'hash_mismatch' ? 400 : out.code === 'expired' ? 410 : 404;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: out.code }));
+      }
+      log('info', 'envelope_document_stored', { id: envDocumentMatch[1], bytes: out.size });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, sha256: out.sha256, size: out.size, expires_in: out.expires_in }));
+    } catch (e) {
+      const tooLarge = /too large/i.test(e.message || '');
+      res.writeHead(tooLarge ? 413 : 400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: tooLarge ? 'document_too_large' : e.message, max_bytes: MAX_BLOB }));
+    }
+  }
+
+  // GET /v2/envelopes/:id/document -- ciphertext read requires both the invite
+  // capability and an internal assertion of the authenticated recipient email.
+  // A copied or intercepted link alone is therefore insufficient.
+  if (envDocumentMatch && req.method === 'GET') {
+    if (!_internalOk()) return _internalReject();
+    if (!envViewRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
+    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
+    try {
+      const out = await store.getDocumentCapsule(envDocumentMatch[1], pi, token, verifiedEmailHash);
+      if (!out.ok) {
+        const status = out.code === 'not_authorized' ? 403 : out.code === 'invite_expired' || out.code === 'voided' ? 410 : 404;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: out.code }));
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': out.capsule.length,
+        'Cache-Control': 'private, no-store',
+        'X-Capsule-Sha256': out.sha256,
+      });
+      return res.end(out.capsule);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // GET /v2/envelopes/:id/owner-check -- narrow account-ownership proof for
+  // authenticated services that send invitations. It reveals no envelope data.
+  const envOwnerMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/owner-check$/);
+  if (envOwnerMatch && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    try {
+      if (!(await store.isOwner(envOwnerMatch[1], acctOf(apiKey)))) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'not_found' }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true }));
+    } catch {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'store_unavailable' }));
+    }
+  }
+
+  // Account-owner actions for envelopes created from the signed-in web app.
+  // These v2 envelopes use the account's pgp_ key, so the psk_-only /v1
+  // receipt and void routes cannot serve the dashboard. Ownership is checked
+  // against the durable account_id before state or evidence is returned.
+  const envCancelMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/cancel$/);
+  if (envCancelMatch && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      if (!(await store.isOwner(envCancelMatch[1], acctOf(apiKey)))) {
+        res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' }));
+      }
+      const out = await store.voidEnvelope(envCancelMatch[1], 'Cancelled by the account owner');
+      if (!out.ok) {
+        const status = out.code === 'already_complete' ? 409 : out.code === 'not_found' ? 404 : 409;
+        res.writeHead(status, { 'Content-Type': 'application/json' }); return res.end(J({ error: out.code }));
+      }
+      try { await store.deleteDocumentCapsule(envCancelMatch[1]); } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, id: envCancelMatch[1], status: 'void', voided_at: out.voided_at || null }));
+    } catch {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' }));
+    }
+  }
+
+  const envReceiptMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/receipt$/);
+  if (envReceiptMatch && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      if (!(await store.isOwner(envReceiptMatch[1], acctOf(apiKey)))) {
+        res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' }));
+      }
+      const env = await store.getForReceipt(envReceiptMatch[1]);
+      if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      if (env.status !== 'complete') { res.writeHead(409, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_ready' })); }
+      if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'notary_unavailable' })); }
+      const psign = parasignOpenApi.buildEnvelopePsign({
+        env, meta: null, canonicalJSON: parasign.canonicalJSON,
+        sigEngine: registry.getSig(0x0002), relayIdentity,
+        publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+      });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="Paramant-${envReceiptMatch[1]}.psign"`,
+        'Cache-Control': 'private, no-store',
+      });
+      return res.end(J(psign));
+    } catch {
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'receipt_failed' }));
+    }
+  }
+
+  // Participant receipt for the signed-in web flow. Internal-auth plus the
+  // invite capability and verified email hash are all required. This lets a
+  // recipient save the final proof without exposing the owner-only endpoint.
+  const envParticipantReceiptMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/participant-receipt$/);
+  if (envParticipantReceiptMatch && req.method === 'GET') {
+    if (!_internalOk()) return _internalReject();
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    const partyIndex = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
+    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString();
+    try {
+      const party = await store.getForParty(envParticipantReceiptMatch[1], partyIndex, token);
+      if (!party || !envelopeMod.safeHexEqual(party.party.email_hash, verifiedEmailHash)) {
+        res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' }));
+      }
+      const env = await store.getForReceipt(envParticipantReceiptMatch[1]);
+      if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      if (env.status !== 'complete') { res.writeHead(409, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_ready' })); }
+      if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'notary_unavailable' })); }
+      const psign = parasignOpenApi.buildEnvelopePsign({
+        env, meta: null, canonicalJSON: parasign.canonicalJSON,
+        sigEngine: registry.getSig(0x0002), relayIdentity,
+        publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+      });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="Paramant-${envParticipantReceiptMatch[1]}.psign"`,
+        'Cache-Control': 'private, no-store',
+      });
+      return res.end(J(psign));
+    } catch {
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'receipt_failed' }));
     }
   }
 
@@ -4644,26 +10127,35 @@ python3 paramant-receiver.py \\
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     const id = path.slice('/v2/envelopes/'.length).split('/')[0];
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
-    const recipeFor = (v) => v >= 2
-      ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
-      : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)';
+    // Recipe the co-signer must reproduce. Open-mode slots are signer-bound
+    // (recipe v4): the signer's public key is appended so the signature commits
+    // to the exact key. Email/PRF slots stay email/document-hash bound (v2/v3).
+    const recipeFor = (v, mode) => (mode || 'open') === 'open'
+      ? 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes || signer_public_key_bytes)'
+      : (v >= 5
+        ? 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes || signer_public_key_bytes || appearance_hash_bytes)'
+        : v >= 3
+          ? 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
+          : v >= 2
+            ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
+            : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)');
     try {
-      // ?p=<i>&t=<invite_token> -> party-scoped view. For email-bound envelopes
-      // the token must match (getForParty returns null otherwise); for open
-      // envelopes the token is not required. This gives the co-signer exactly
-      // what it needs to recompute the (possibly v2) sign-message locally.
+      // ?p=<i>&t=<invite_token> -> party-scoped view. The token must match in
+      // every binding mode (getForParty returns null otherwise, as a plain 404).
+      // This gives the co-signer exactly what it needs to recompute the
+      // (possibly v2) sign-message locally, and gives a passer-by nothing.
       if (query.p !== undefined) {
         const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
         const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
         const view = await store.getForParty(id, pi, token);
         if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true, envelope: view, sign_message_recipe: recipeFor(view.recipe_version) }));
+        return res.end(J({ ok: true, envelope: view, sign_message_recipe: recipeFor(view.recipe_version, view.binding_mode) }));
       }
       const env = await store.getRedacted(id);
       if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version) }));
+      return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version, env.binding_mode) }));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'internal' }));
@@ -4681,9 +10173,11 @@ python3 paramant-receiver.py \\
       const d = JSON.parse((await readBody(req, 4096)).toString() || '{}');
       const pi = parseInt(d.party_index, 10);
       if (!Number.isInteger(pi) || pi < 0) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
-      // For email-bound envelopes the per-party invite token must match before
-      // we record a view; getForParty returns null on a bad/absent token (and
-      // does not require one for open envelopes).
+      // The per-party invite token must match before we record a view, in every
+      // binding mode; getForParty returns null on a bad or absent token. A view
+      // is written into the CT log as evidence of when a party opened the
+      // document, so an unauthenticated stamp on someone else's slot is a
+      // falsified record, not a cosmetic one.
       const gate = await store.getForParty(id, pi, (d.token || '').toString());
       if (!gate) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       const ok = await store.markViewed(id, pi);
@@ -4708,30 +10202,213 @@ python3 paramant-receiver.py \\
       const pi = parseInt(d.party_index, 10);
       const signerPub = (d.signer_public_key || '').toString();
       const sig = (d.signature || '').toString();
-      if (!Number.isInteger(pi) || pi < 0 || !signerPub || !sig) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'party_index, signer_public_key, signature required' }));
-      }
+      // The per-party invite capability. Open-mode slots have no mailbox to bind
+      // to, so this token is what proves the submitter is the party whose slot
+      // this is; the store refuses an open slot without it.
+      const inviteToken = (d.token || d.invite_token || '').toString();
       // Email-bound envelopes (R018): the store accepts the signature only when
       // a trusted internal caller (the admin proxy, which verified the signer's
       // authenticated session email) asserts a matching verified_email_hash.
       // _internalOk() gates that trust on the X-Internal-Auth header; a public
-      // caller cannot set it, so it can never satisfy an email-bound slot.
+      // caller cannot set it, so it can never satisfy an email-bound slot. Read
+      // here rather than at the call, because it also decides whether the
+      // account_id in the body may be believed at all (see below).
       const internalTrusted = _internalOk();
       const verifiedEmailHash = (d.verified_email_hash || '').toString();
-      const out = await store.sign(id, pi, signerPub, sig, { internalTrusted, verifiedEmailHash });
+      if (!Number.isInteger(pi) || pi < 0 || !signerPub || !sig) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'party_index, signer_public_key, signature required' }));
+      }
+
+      // ── WHOSE METER RUNS, and where that answer comes from ──────────────────
+      // It used to come straight out of the body (`d.account_id`), and every
+      // quota decision below sat inside `if (accountId)`. Leaving the field out
+      // therefore skipped the pre-gate AND the increment, while the signature was
+      // accepted all the same: unlimited signing on a plan that sells two a
+      // month. Absence was read as permission.
+      //
+      // The account is now resolved server-side, and absence is a refusal:
+      //   1. an internal-auth caller (the admin proxy) may name the SIGNER's
+      //      account -- that is the claim the enrolled-key pin below verifies;
+      //   2. otherwise the envelope's OWN stored account_id, written at create()
+      //      from the creating API key and not writable from any request;
+      //   3. neither -> 403. A signature that no account answers for is refused
+      //      rather than waved through.
+      // A public caller naming account_id is ignored outright, so the body can no
+      // longer steer whose meter runs, nor drain a stranger's quota.
+      const claimedAccountId = internalTrusted ? (d.account_id || '').toString() : '';
+      let ownerAccountId;
+      try { ownerAccountId = await store.ownerAccountId(id); }
+      catch (e) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+      // No record at all stays a plain 404, exactly as before: the account rule
+      // must not turn into an oracle for which envelope ids exist.
+      if (ownerAccountId === null) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      const accountId = claimedAccountId || ownerAccountId;
+      if (!accountId) {
+        log('warn', 'sign_no_account', { envelope: String(id).slice(0, 10) });
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'account_required' }));
+      }
+
+      // Crypto M1: when the trusted admin proxy names the signer's account_id,
+      // pin the submitted key to that account's ENROLLED active signing keys.
+      // The email-binding check proves *which mailbox*; this proves the signature
+      // was made by a key the account actually enrolled — so a leaked internal
+      // token can't fill an email-bound slot with an attacker-substituted key.
+      // Fail-closed (Redis is already a hard dependency of the envelope store).
+      // Only the CLAIMED account is pinned: the envelope owner is the party being
+      // billed, not the party holding the pen, and open-mode signers enrol no
+      // keys with us at all.
+      if (claimedAccountId) {
+        try {
+          const active = await userSigning.getActiveSigningPks(redisClient, claimedAccountId);
+          const subj = Buffer.from(signerPub, 'base64');
+          const enrolled = active.some(e => {
+            try { return Buffer.from(e.pk_b64, 'base64').equals(subj); } catch { return false; }
+          });
+          if (!enrolled) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer_not_enrolled' })); }
+        } catch (e) {
+          res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer_not_enrolled' }));
+        }
+      }
+      // ── Signs-quota enforcement (was NEVER counted) ─────────────────────────
+      // This R018 route is the ONE active signing path (POST /v2/sign is retired,
+      // and the only gateSign/recordSign lived in a dead `&& false` block below).
+      // So no signature was ever metered: the dashboard signs-counter never moved
+      // and a plan's monthly signs_month cap was unenforceable. We meter the
+      // SIGNER's account (the account the enrolled key belongs to, named by the
+      // admin proxy as account_id). Pre-gate is READ-ONLY (a bare usage read) so
+      // an invalid signature that store.sign() will reject is never counted; the
+      // increment happens AFTER, and ONLY for a genuinely NEW signature, so an
+      // idempotent retry ('idem') never double-counts. Fail-open on redis trouble
+      // or an unknown account: a signer is never blocked by infra.
+      const _signerPlan = (accounts.get(accountId) && accounts.get(accountId).plan)
+        || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
+      // Signs limit from ENTITLEMENTS (plan_parasign, legacy-plan fallback), the
+      // per-product ParaSign tier -- never the product-blind tiers.js helpers.
+      // Tier behaviour: every tier blocks AT its included quota.
+      //   free      2 included, blocks at 2
+      //   pro       100 included, blocks at 100
+      //   business  1000 included, blocks at 1000
+      //   enterprise config ceiling, unchanged
+      // Pro used to meter past 100 at EUR 0.40 a signature up to 1000. No
+      // billing line ever collected that money, so the meter was a promise the
+      // kassa could not keep; it is gone, here and on the site.
+      // The block decision itself is quota.signGateDecision, shared with the
+      // /v1 create gate so both paths can never diverge.
+      // entitlementRecordOf merges the accounts summary with the per-product
+      // plans on the account's keys; reading `accounts` alone hid paid upgrades.
+      const _signerRec = entitlementRecordOf(accountId) || { plan: _signerPlan };
+      const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
+      const _signIncluded = _signEnt.quotas.signs_month;
+      let _signUsed = null;      // count this month, feeds the 200 quota field
+      let _signReserved = false; // this request took a slot and owes a release if the signature does not land
+      // No `accountId &&` here on purpose: the account is resolved above and an
+      // absent one already returned 403, so this gate can no longer be skipped by
+      // leaving a field out of the request.
+      //
+      // The gate DECIDES AND COUNTS in one redis round trip (quota.gateSign, one
+      // Lua script). It used to read the count here, decide here, and increment
+      // 38 lines below, past a whole ML-DSA verification: ten requests that
+      // arrived together all read the same number, all found room, and all
+      // signed. See the 2026-09-05 review, finding 8.
+      //
+      // Counting first costs one thing, and it is paid back below: a signature
+      // the store then rejects, or an idempotent retry, has taken a slot it did
+      // not use, so both release it. That is the same reservation shape
+      // lib/coupon.js uses for a seat.
+      //
+      // The rule itself is still quota.signGateDecision's `used >= included`; the
+      // Lua enforces the same comparison, and quota-gate.test.js holds the two to
+      // each other at the boundary so the /v1 create gate cannot drift from this
+      // one.
+      if (Number.isFinite(_signIncluded)) {
+        const _g = await quota.gateSign(redisClient, accountId, _signIncluded, log);
+        if (!_g.allowed) {
+          log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month',
+            plan: _signEnt.tier, limit: _signIncluded, used: _g.used,
+            reset_date: quota.nextResetDate() }));
+        }
+        _signReserved = _g.counted;
+        if (Number.isFinite(_g.used)) _signUsed = _g.used;
+      }
+
+      const out = await store.sign(id, pi, signerPub, sig, {
+        internalTrusted,
+        verifiedEmailHash,
+        inviteToken,
+        appearance: d.appearance,
+      });
       if (!out.ok) {
+        // The slot was taken before the store had its say. The signature did not
+        // land, so the month does not owe it.
+        if (_signReserved) await quota.releaseSign(redisClient, accountId, log);
         const code = out.code === 'not_found' ? 404
-          : out.code === 'bad_signature' ? 400
-          : out.code === 'closed' ? 410
-          : (out.code === 'email_binding_required' || out.code === 'email_mismatch') ? 403
+          : (out.code === 'bad_signature' || out.code === 'invalid_appearance') ? 400
+          : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
+          : (out.code === 'email_binding_required' || out.code === 'email_mismatch'
+             || out.code === 'invite_token_required') ? 403
           : 409;
         res.writeHead(code, { 'Content-Type': 'application/json' });
         return res.end(J({ error: out.code }));
       }
+
+      // Exactly one signature is counted per NEW accepted party-signature
+      // (signs_month is a signature counter, so multi-party envelopes count per
+      // party). The count was already taken by the gate above, so all that is
+      // left here is the retry case: an 'idem' answer means this signature was
+      // already counted the first time round, and the slot this request reserved
+      // has to go back or a client that retries pays twice for one signature.
+      if (out.code !== 'new' && _signReserved) {
+        const _rel = await quota.releaseSign(redisClient, accountId, log);
+        if (Number.isFinite(_rel.used)) _signUsed = _rel.used;
+        _signReserved = false;
+      }
+      // A path that reserved a slot and neither released it nor signed would
+      // leak a unit a month. There is no such path: every return between the
+      // gate and here releases first, and the only remaining exits are this
+      // 200 and the throw that the outer handler turns into a 500 (where a lost
+      // unit is the safe direction and the month self-heals on the 1st).
+
+      // ── Completion webhooks (were never fired from the sign path) ───────────
+      // envelope.sent/.voided already fire from the /v1 router; the sign path (in
+      // relay.js) is where a signature actually lands, so signer.completed and
+      // envelope.completed must originate HERE. emitEvent reads the per-envelope
+      // webhook target from the same durable store; it no-ops for non-/v1
+      // envelopes (no meta record) and is HMAC-SHA256 signed like the others.
+      // Fire-and-forget so a slow/broken webhook never delays the signer's 200.
+      if (out.code === 'new') {
+        const _pdeps = { store: _parasignStore(), safeHttpsRequest, J, log };
+        parasignOpenApi.emitEvent(_pdeps, id, 'signer.completed', {
+          party_index: pi, signed_count: out.signed_count, party_count: out.party_count,
+        });
+        if (out.status === 'complete') {
+          parasignOpenApi.emitEvent(_pdeps, id, 'envelope.completed', {
+            status: 'completed', signed_count: out.signed_count, party_count: out.party_count,
+          });
+        }
+      }
+
+      // API contract with the dashboard: every successful sign response carries
+      // a `quota` field so the frontend can render usage without a second call.
+      // Two numbers, because there are only two: what this account has signed
+      // this month and what its tier includes. Omitted entirely when redis could
+      // not be read (fail-open, the field is best-effort). There is always an
+      // account by this point; a request without one never got here.
+      const _quotaField = (_signUsed != null && Number.isFinite(_signIncluded)) ? {
+        used: _signUsed,
+        included: _signIncluded,
+        reset_date: quota.nextResetDate(),
+      } : null;
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status }));
+      return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status,
+        signed_at: out.signed_at, appearance: out.appearance, appearance_hash: out.appearance_hash,
+        ...(_quotaField ? { quota: _quotaField } : {}) }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
     }
@@ -4739,7 +10416,8 @@ python3 paramant-receiver.py \\
 
   // ── POST /v2/verify-receipt — Verify a signed delivery receipt ───────────────
   // Verifies the ML-DSA-65 signature and re-walks the inclusion proof.
-  // Receipt must be base64url-encoded JSON (as returned in X-Paramant-Receipt header).
+  // Receipt must be base64url-encoded JSON, as returned by
+  // GET /v2/transfers/:receipt_id/receipt (before 2026-09, the X-Paramant-Receipt header).
   if (path === '/v2/verify-receipt' && req.method === 'POST') {
     try {
       const body = await readBody(req, 65536);
@@ -4782,6 +10460,16 @@ python3 paramant-receiver.py \\
       if (!proof.leaf_hash) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(J({ valid: false, reason: 'inclusion_proof_missing_leaf_hash' }));
+      }
+      // Bind the proof's leaf to the asserted blob_hash: recompute the leaf the
+      // same way the relay produced it. Without this the proof only proves "some
+      // leaf is in the tree", not that it is the leaf for THIS blob_hash. (The
+      // signature already covers both, so this is defense-in-depth against a
+      // relay self-inconsistency.)
+      const expectedLeaf = blobLeafHash(receiptObj.blob_hash, receiptObj.sector, receiptObj.ts);
+      if (proof.leaf_hash !== expectedLeaf) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ valid: false, reason: 'leaf_hash_mismatch' }));
       }
       let computedRoot = proof.leaf_hash;
       for (const step of (proof.audit_path || [])) {
@@ -4836,7 +10524,7 @@ python3 paramant-receiver.py \\
                 'GET /v2/outbound/:hash','GET /v2/status/:hash','POST /v2/webhook',
                 'GET /v2/stream-next','GET /v2/audit','GET /health','GET /metrics',
                 'POST /v2/verify-receipt'] }));
-});
+}
 
 // ── WebSocket streaming — push blob_ready events zonder polling ───────────────
 const wsClients = new Map(); // apiKey → Set van ws connections
@@ -4854,7 +10542,7 @@ try {
       else { log('warn', 'ws_ticket_invalid', { ticket: parsed.query.ticket?.slice(0, 12) }); }
     }
     if (!wsApiKey && parsed.query.k) {
-      log('warn', 'ws_key_in_querystring_rejected', { ip: (socket.remoteAddress||'').slice(0,15) });
+      log('warn', 'ws_key_in_querystring_rejected', { ip: maskIp(socket.remoteAddress) });
       return socket.destroy();
     }
     const apiKey = wsApiKey;
@@ -4890,12 +10578,56 @@ const _ED25519_DER_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 
 let EDITION          = 'community';
 let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by checkLicense()
+// Per-account key cap (SaaS product dimension). Orthogonal to the BUSL-fixed
+// per-relay COMMUNITY_KEY_LIMIT: a key is over_limit if it busts EITHER (F).
+// Community is env-tunable within 3..5.
+//
+// pro and enterprise were Infinity until 2026-09-06, which read as "no product
+// limit" and worked out as "no limit at all": with a self-serve mint route and
+// no cap, a Pro account grew users.json by one entry per HTTP request, and on a
+// licensed relay the relay-total dimension is skipped so nothing ever noticed.
+// These two numbers are NOT a product limit and no page sells them. They are an
+// abuse ceiling, set far above what any real account holds, and env-tunable for
+// the one customer who ever argues with them. over_limit only flags, it never
+// deactivates, so a ceiling that turns out too low is a log line and not an
+// outage.
+const ACCOUNT_KEY_LIMIT = Object.freeze({
+  community: Math.min(5, Math.max(3, parseInt(process.env.ACCOUNT_KEY_LIMIT_COMMUNITY || '5', 10) || 5)),
+  pro: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
+  enterprise: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_ENTERPRISE || '1000', 10) || 1000),
+});
 let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
 
 // ── Ed25519 base64url decoder ─────────────────────────────────────────────────
 function _b64urlDecode(s) {
   const p = s.replace(/-/g, '+').replace(/_/g, '/');
   return Buffer.from(p + '='.repeat((4 - p.length % 4) % 4), 'base64');
+}
+
+// Say at boot who carries the mail, and say it loudly when nobody does.
+//
+// The failure this exists for is silent by construction: a typo in
+// MAIL_PROVIDER falls back to dryrun, dryrun answers ok, the send route counts
+// thirty invitations, and the first anybody hears about it is a customer
+// asking why nothing arrived. One line at boot turns a week of quiet into a
+// question somebody can answer before the first send.
+function meldMailstand() {
+  const d = mailer.diagnose();
+  if (d.waarschuwing) {
+    log('error', 'mail_misconfigured', {
+      requested: d.gevraagd, using: d.provider, delivering: !d.stil,
+      hint: d.waarschuwing,
+    });
+    return;
+  }
+  log('info', 'mail_carrier', { provider: d.provider, from: d.from, delivering: !d.stil,
+                                fallback: d.reserve || 'none', fallback_ready: d.reserve_gereed });
+  if (!d.reserve) {
+    // Not an error: one carrier is a choice. But it is a choice worth seeing in
+    // the log, because the day it matters is the day nobody remembers making it.
+    log('info', 'mail_no_fallback', { hint: 'MAIL_FALLBACK_PROVIDER is unset, so a '
+      + 'suspended account stops every pickup code and signing link' });
+  }
 }
 
 function checkLicense() {
@@ -4906,6 +10638,7 @@ function checkLicense() {
   } catch(e) {
     log('warn', 'relay_integrity_failed', { err: e.message });
   }
+  meldMailstand();
 
   // PLK_KEY is the canonical env var; PARAMANT_LICENSE accepted for backward compat
   const rawKey = process.env.PLK_KEY || process.env.PARAMANT_LICENSE || '';
@@ -4962,38 +10695,26 @@ function checkLicense() {
 // Licensed (plk_*): no limit. Set PARAMANT_LICENSE=plk_... in .env to unlock.
 // ─────────────────────────────────────────────────────────────────────────────
 function applyKeyLimitEnforcement() {
-  if (EDITION === 'licensed') {
-    for (const v of apiKeys.values()) v.over_limit = false;
-    log('info', 'edition', { edition: 'licensed', active_keys: [...apiKeys.values()].filter(k => k.active !== false).length, max_keys: LICENSE_MAX_KEYS === Infinity ? 'unlimited' : LICENSE_MAX_KEYS });
-    return;
-  }
-
-  const entries = [...apiKeys.entries()];
-  const active  = entries.filter(([, v]) => v.active !== false);
-
-  if (active.length <= LICENSE_MAX_KEYS) {
-    for (const [, v] of entries) v.over_limit = false;
-    log('info', 'edition', { edition: EDITION, active_keys: active.length, limit: LICENSE_MAX_KEYS });
-    return;
-  }
-
-  // Keys beyond LICENSE_MAX_KEYS are flagged over_limit
-  let n = 0;
-  for (const [, v] of entries) {
-    if (v.active === false) continue;
-    n++;
-    v.over_limit = n > LICENSE_MAX_KEYS;
-    if (v.over_limit) log('warn', 'key_over_limit', {
-      label: v.label,
-      hint: 'Add PLK_KEY=plk_... to .env to unlock unlimited users — https://paramant.app/pricing'
-    });
-  }
-  log('warn', 'community_limit_exceeded', {
-    active_keys: active.length,
-    limit: LICENSE_MAX_KEYS,
-    blocked: active.length - LICENSE_MAX_KEYS,
-    operator_upgrade: 'https://paramant.app/pricing'
+  // Per-account cap (ACCOUNT_KEY_LIMIT) OR'd with the self-host relay-total cap
+  // (LICENSE_MAX_KEYS, only when edition !== 'licensed'); see lib/keys-table
+  // computeOverLimit. Flags v.over_limit but never deactivates a key — reversible
+  // on upgrade, mirroring the prior community-edition behaviour.
+  const over = keysTable.computeOverLimit(apiKeys, accounts, accountKeys, {
+    capForPlan: (p) => ACCOUNT_KEY_LIMIT[tiers.normalisePlan(p)] ?? ACCOUNT_KEY_LIMIT.community,
+    licenseMaxKeys: LICENSE_MAX_KEYS,
+    edition: EDITION,
   });
+  let flagged = 0;
+  for (const [key, v] of apiKeys) {
+    const was = v.over_limit;
+    v.over_limit = over.has(key);
+    if (v.over_limit) {
+      flagged += 1;
+      if (!was) log('warn', 'key_over_limit', { label: v.label, account: String(v.account_id || key).slice(0, 12) });
+    }
+  }
+  const active = [...apiKeys.values()].filter((v) => v.active !== false).length;
+  log('info', 'edition', { edition: EDITION, active_keys: active, relay_limit: LICENSE_MAX_KEYS === Infinity ? 'unlimited' : LICENSE_MAX_KEYS, account_cap_community: ACCOUNT_KEY_LIMIT.community, over_limit: flagged });
 }
 
 
@@ -5058,28 +10779,264 @@ loadPeerSths();
 // Generate a startup STH if the CT log has entries but no STH was persisted.
 // Covers the case where the STH file was missing or the relay restarted after
 // new CT entries were written without a corresponding STH flush.
-if (ctLog.length > 0 && sthLog.length === 0) {
-  const last = ctLog[ctLog.length - 1];
-  produceSth(ctLog.length, last.tree_hash);
+if (ctWindow.windowLength > 0 && sthLog.length === 0) {
+  const last = ctWindow.last();
+  produceSth(ctWindow.windowLength, last.tree_hash);
 }
 // Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
 setInterval(() => {
   if (sthLog.length === 0 || !relayIdentity) return;
   broadcastSTH(sthLog[sthLog.length - 1]).catch(() => {});
 }, 10 * 60_000);
+
+// ── Paid-term reminders ──────────────────────────────────────────────────────
+// The one thing standing between a customer and a plan that stops without a
+// word. There is no cron on the server, so the schedule lives here: one sweep a
+// short random delay after boot, then every six hours. Five relay containers
+// run this same line against one redis, and a SET NX lock in lib/plan-expiry
+// means exactly one of them does the work each window. Nothing about "already
+// warned him" is held in this process: the markers are redis keys carrying the
+// paid_until they belong to, so a restart, a redeploy and a second container
+// all send zero extra mail.
+//
+// The seed is what makes the index complete. Accounts live in users.json, per
+// container; every container puts what it knows into the shared index once at
+// boot, so an account that paid before this existed is still warned.
+//
+// PLAN_EXPIRY_BOOT_DELAY_MS shortens the boot delay. It exists so a test can
+// watch the one thing this planner promises the customer -- the mail seven days
+// before his term ends -- inside a test run instead of waiting the production
+// 30 to 60 seconds. Unset (production) the delay is unchanged.
+const _expiryBootDelay = parseInt(process.env.PLAN_EXPIRY_BOOT_DELAY_MS || '', 10);
+planExpiry.startPlanExpiryPlanner({
+  redis: redisClient,
+  sendEmail: ({ to, subject, text, html }) => mailLater({ to, subject, text, html }),
+  log,
+  siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
+  // What the reminder may promise: a term that a subscription will collect for
+  // gets "renews on <date> for <amount>", never "nothing is charged".
+  renewalOf: (aid, product, bundle) => billingRecurring.renewalFor(redisClient, aid, product, bundle),
+  // With BILLING_MODE set a plan is a subscription, so a term that ends
+  // without one (the customer cancelled) must not be explained as "every plan
+  // here is a one-off payment". Empty, as in production, it still is.
+  recurring: mollie.billingStance().recurring,
+  seed: async () => {
+    const s = await planExpiry.seedIndex(redisClient, accountsWithTerms());
+    const r = await billingRecurring.seedRenewals(redisClient, _subscriptionPointers());
+    return Object.assign({}, s, r.seeded ? { renewals_seeded: r.seeded } : {});
+  },
+  ...(Number.isFinite(_expiryBootDelay) ? { bootDelayMs: _expiryBootDelay } : {}),
+});
+
+// ── Paid terms granted on another container ──────────────────────────────────
+// The half of a grant that is not this container's own (lib/shared-grants). A
+// term bought or redeemed on relay-main has to be true on relay-health too,
+// because that is the relay the account page, the homepage figure and the
+// ParaSign signature gate are all served from.
+//
+// Two mechanisms, on purpose. The CHANNEL is what makes it immediate: the
+// customer redeems a code and reloads the page a second later, and a mechanism
+// that took a minute to catch up would show him the same "Community, free for
+// good" that this whole change exists to end. The RESEED is what makes it
+// reliable: a container that was down for the deploy, or a subscriber whose
+// socket dropped, heals on the next pass instead of staying wrong until
+// somebody notices.
+//
+// The subscriber is its own connection because a subscribed node-redis client
+// can run nothing else, and a raw one because the deadline guard on the shared
+// client bounds single commands and has no business wrapping a subscription
+// that is meant to stay open.
+const SHARED_GRANT_RESEED_MS = 60_000;
+if (redisClient && RELAY_REDIS_URL) {
+  // One pass at a time. The pass reads redis once per granted account, so on a
+  // large estate a slow store could otherwise start a second pass on top of the
+  // first and have the two publish over each other.
+  let reseeding = false;
+  const seedOnce = () => {
+    if (reseeding) return Promise.resolve();
+    reseeding = true;
+    return _reseedSharedGrants()
+      .then((n) => { if (n) log('info', 'shared_grants_reseeded', { hydrated: n }); })
+      .catch(e => log('warn', 'shared_grant_reseed_failed', { err: e.message }))
+      .finally(() => { reseeding = false; });
+  };
+  // A short delay so the first pass runs after loadUsers and after the client
+  // has had a chance to connect; a container with nothing to hydrate pays one
+  // SMEMBERS for it.
+  setTimeout(seedOnce, 2000).unref?.();
+  setInterval(seedOnce, SHARED_GRANT_RESEED_MS).unref?.();
+
+  const subscriber = createClient({ url: RELAY_REDIS_URL, ...redisDeadlines.redisClientBounds() });
+  subscriber.on('error', (err) => log('warn', 'shared_grant_subscriber_error', { err: err.message }));
+  subscriber.connect()
+    .then(() => subscriber.subscribe(sharedGrants.CHANNEL, (message) => {
+      const accountId = String(message || '').trim();
+      if (!accountId) return;
+      _pullSharedGrant(accountId)
+        .catch(e => log('warn', 'shared_grant_pull_failed', { account: accountId.slice(0, 12), err: e.message }));
+    }))
+    .then(() => log('info', 'shared_grant_subscriber_ready', { channel: sharedGrants.CHANNEL }))
+    .catch(e => log('warn', 'shared_grant_subscriber_failed', { err: e.message }));
+}
+
+// ── The party worklist migration ─────────────────────────────────────────────
+// One run, ever, across the estate: fill the per-party envelope index for the
+// envelopes created before that index existed. Same shape as the two planners
+// around it (nothing in process memory, a SET NX lock so one of five containers
+// does the scan), with one difference: it is a migration and not a sweep, so a
+// finished run writes a redis marker and no later boot scans anything.
+// PARTY_INDEX_BOOT_DELAY_MS moves the one run, the same way
+// PLAN_EXPIRY_BOOT_DELAY_MS moves the sweep above. It exists for the same two
+// reasons: a test that wants to watch the migration should not wait 15 to 35
+// seconds for it, and a test that does NOT want it should not get an
+// estate-wide SCAN over the keyspace it is asserting on. Unset (production) the
+// delay and its jitter are unchanged.
+const _partyBackfillDelay = parseInt(process.env.PARTY_INDEX_BOOT_DELAY_MS || '', 10);
+partyBackfill.startPartyIndexBackfill({
+  redis: redisClient,
+  ...(Number.isFinite(_partyBackfillDelay) ? { bootDelayMs: _partyBackfillDelay } : {}),
+  // Its own store, not the request-scoped one. The migration reads envelope
+  // hashes and writes index members: no signature is verified and no CT entry
+  // is appended, so it needs neither engine, and a boot job that reached into a
+  // request closure for a dependency would be a boot job that only runs once a
+  // request has already happened.
+  store: redisClient ? new envelopeMod.EnvelopeStore(redisClient) : null,
+  log,
+});
+
+// ── Moneybird retries ────────────────────────────────────────────────────────
+// The push after an invoice or a credit note is aftercare and is allowed to
+// fail: Moneybird can be down, a token can expire, and neither may cost a
+// customer his plan. What may NOT happen is that the document then quietly
+// stays out of the books, so a failed push queues the document number and this
+// sweep works through the queue every six hours. Same shape as the paid-term
+// planner above and for the same reasons: nothing in process memory, a SET NX
+// lock so exactly one of five containers pushes, and no timer at all when
+// MONEYBIRD_TOKEN and MONEYBIRD_ADMINISTRATION_ID are unset (the default).
+moneybird.startMoneybirdPlanner({
+  redis: redisClient,
+  env: process.env,
+  renderPdf: (r) => invoicePdf.render(r, { buyerHint: invoiceMod.BUYER_HINT }),
+  log,
+});
+
+// One entry per ACCOUNT, not per key: an account with three keys is one
+// customer with one address. A fresh generator per call, so a seed that failed
+// on an unreachable redis can be retried against a full list instead of an
+// exhausted one.
+function* accountsWithTerms() {
+  const seenAccounts = new Set();
+  for (const [key, rec] of apiKeys) {
+    const accountId = (rec && rec.account_id) || key;
+    if (seenAccounts.has(accountId)) continue;
+    seenAccounts.add(accountId);
+    const merged = entitlementRecordOf(accountId);
+    if (!merged) continue;
+    yield { accountId, record: { ...merged, email: rec.email || (accounts.get(accountId) || {}).email || '' } };
+  }
+}
 server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2',
       relay_identity: relayIdentity ? relayIdentity.pk_hash.slice(0,16)+'…' : 'none' });
+  // Say it once, loudly, at boot: without a key for the active billing mode
+  // every checkout and every webhook fails, and the only earlier symptom was a
+  // 503 on a public endpoint that nobody watches. Never log the key itself.
+  //
+  // The stance is the second half of that line. BILLING_MODE empty means
+  // one-off payments only, as on 2026-08-08; 'live' or 'test' by hand turns on
+  // customers, mandates and subscriptions. warn, not info, when it is inferred:
+  // it is a legitimate stance, but one nobody has decided on yet, and the
+  // decision belongs in .env at deploy time, not in a key prefix.
+  //
+  // And what is wrong on top of that: a BILLING_MODE nobody recognises, or a key
+  // whose prefix belongs to the other mode. The key is refused (apiKeyFor gives
+  // '' for it), the unknown mode falls back to the inferred one-off stance, and
+  // both are errors here with a line each, so neither can pass for normal.
+  {
+    const _bs = mollie.billingStance();
+    const _bk = mollie.apiKeyFor(_bs.mode);
+    const _bp = mollie.configProblems();
+    const _odd = _bp.find((p) => p.code === 'billing_mode_unknown');
+    log(!_bk || _bp.length ? 'error' : (_bs.recurring ? 'info' : 'warn'), 'billing_config', {
+      mode: _bs.mode, mode_source: _bs.source, recurring: _bs.recurring,
+      key_present: !!_bk, key_prefix: _bk ? _bk.slice(0, 5) : null,
+      stance: _bs.recurring
+        ? `${_bs.mode}: one-off payments plus customers, mandates and subscriptions (BILLING_MODE=${_bs.mode})`
+        : `${_bs.mode}: one-off payments only, no customers or subscriptions (${_odd
+          ? `BILLING_MODE=${_odd.detail} not recognised, treated as not set`
+          : 'BILLING_MODE not set'})`,
+      ...(_bp.length ? { problems: _bp.map((p) => p.code) } : {}),
+    });
+    const _effect = {
+      billing_mode_unknown: 'treated as not set: one-off payments only, no customers, mandates or subscriptions',
+      live_key_wrong_prefix: 'MOLLIE_API_KEY is not used: live mode takes only a live_ key',
+      test_key_wrong_prefix: 'MOLLIE_TEST_API_KEY is not used: test mode takes only a test_ key',
+    };
+    for (const p of _bp) log('error', 'billing_config_refused', { problem: p.code, detail: p.detail, effect: _effect[p.code] });
+  }
   // Register to the relay registry after a short delay to let the server fully bind
   if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);
 });
-function emergencyZeroAndExit(reason, code = 0) {
-  // Fix 8: flush CT write queue before exit
-  _flushCtOnExit();
+// How long the exit may wait for the append logs to reach the disk. A BACKSTOP
+// for a wedged volume, not the mechanism: the mechanism is the 'finish' event
+// below, and on a healthy disk this timer is never reached.
+const EXIT_FLUSH_MAX_MS = parseInt(process.env.EXIT_FLUSH_MAX_MS || '5000');
+
+// Resolves when this stream's queued writes have all reached the fd.
+function _endAppendStream(stream) {
+  return new Promise((resolve) => {
+    if (!stream || stream.destroyed || stream.writableEnded) return resolve();
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    stream.once('error', finish);
+    try { stream.end(finish); } catch (_) { finish(); }
+  });
+}
+
+// THE LAST APPEND IS NOT WRITTEN UNTIL THE BYTES ARE AT THE FD.
+//
+// fs.WriteStream.write() hands the buffer to libuv and returns; process.exit()
+// does not wait for it. The exit path used to write the queue and exit in the
+// same tick, so a head the relay had already SERVED could be missing from
+// sth-log.jsonl a millisecond later. Not a theory: route-ct-persistence uploads
+// four blobs, reads tree_size 4 off the live relay, restarts, and reads the
+// heads back. On an idle machine that passes 100 times out of 100. Under the
+// load of the other route suites on four cores it failed 3 times in 60, always
+// the same way - /v2/sth/history said [1,2,3,4] before the stop and
+// sth-log.jsonl held [1,2,3] after it. The relay then came back believing 3 was
+// the largest size it had ever signed, which is the exact state the fork guard
+// exists to refuse, so the suite read a lost write as a forked log.
+//
+// A relay stopped by systemctl lost the same head in production, silently.
+//
+// So the shutdown waits on the streams' own 'finish' events, which fire when
+// every queued write has completed. Waiting on an event, not on a duration.
+async function _flushAppendLogsOnExit() {
+  _shuttingDown = true;                 // the drains stop; this is now the only writer
+  _flushCtOnExit();                     // queue -> stream
   _flushSthOnExit();
-  _flushPeerSthsOnExit();
-  // Zeroize all in-memory blobs before exit
+  const streams = [_ctStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
+  if (streams.length === 0) return;
+  let timer = null;
+  const guard = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      log('error', 'append_log_flush_timeout', {
+        ms: EXIT_FLUSH_MAX_MS, streams: streams.length,
+        hint: 'The transparency log did not reach the disk before the relay exited. '
+            + 'The last entries may be missing; check the volume behind CT_FILE and STH_FILE.',
+      });
+      resolve();
+    }, EXIT_FLUSH_MAX_MS);
+    if (timer.unref) timer.unref();
+  });
+  await Promise.race([Promise.all(streams.map(_endAppendStream)), guard]);
+  if (timer) clearTimeout(timer);
+}
+
+async function emergencyZeroAndExit(reason, code = 0) {
+  // Zeroize first: it is the part that must happen even if the disk is wedged,
+  // and the flush below may wait.
   try {
     for (const [, e] of blobStore.entries()) {
       if (e.blob) zeroBuffer(e.blob);
@@ -5088,14 +11045,21 @@ function emergencyZeroAndExit(reason, code = 0) {
     pubkeys.clear();
     // Clear download tokens (contain hashes, not plaintext, but scrub anyway)
     downloadTokens.clear();
-    log('info', 'shutdown_clean', { reason, burned: stats.burned });
   } catch (_) {}
+  try { await _flushAppendLogsOnExit(); } catch (_) {}
+  try { log('info', 'shutdown_clean', { reason, burned: stats.burned }); } catch (_) {}
   process.exit(code);
 }
 
-// Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C)
-process.on('SIGTERM', () => emergencyZeroAndExit('SIGTERM'));
-process.on('SIGINT',  () => emergencyZeroAndExit('SIGINT'));
+// Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C). A second
+// signal arriving while the first is still flushing means the caller wants out
+// now, so it exits without waiting rather than starting the flush over.
+function _onExitSignal(reason) {
+  if (_shuttingDown) { process.exit(0); return; }
+  emergencyZeroAndExit(reason);
+}
+process.on('SIGTERM', () => _onExitSignal('SIGTERM'));
+process.on('SIGINT',  () => _onExitSignal('SIGINT'));
 
 // Catch unhandled promise rejections — log and exit cleanly so blobs are zeroized
 process.on('unhandledRejection', (reason) => {

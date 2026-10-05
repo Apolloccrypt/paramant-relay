@@ -19,19 +19,22 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Keyless cosign signing + attestation via Sigstore Fulcio/Rekor needs an
+      # OIDC token from the workflow. Read of this token is the only new grant.
+      id-token: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up QEMU (for ARM64 cross-build)
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -46,12 +49,18 @@ jobs:
             VERSION="$(git rev-parse --short HEAD)"
             IS_RELEASE=false
           fi
+          # The OCI image.version label. On a tag it is the tag; on main it is
+          # whatever relay/package.json says, which the version-consistency
+          # suite holds equal to the root package.json. Never the short sha:
+          # a label reading "c45d1c6" is not a version anyone can compare.
+          echo "label_version=$(node -p "require('./relay/package.json').version")" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
           echo "push_latest=$([[ "$GITHUB_REF" == refs/heads/main || "$IS_RELEASE" == true ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./relay
           file: ./relay/Dockerfile
@@ -60,11 +69,55 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.push_latest == 'true' && 'mtty001/relay:latest' || '' }}
             ${{ steps.meta.outputs.is_release == 'true' && format('mtty001/relay:{0}', steps.meta.outputs.version) || format('mtty001/relay:sha-{0}', steps.meta.outputs.version) }}
+          build-args: |
+            IMAGE_VERSION=${{ steps.meta.outputs.is_release == 'true' && steps.meta.outputs.version || steps.meta.outputs.label_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # In-registry SLSA build provenance attestation, attached to the image
+          # index by BuildKit. mode=max records the full build definition.
+          provenance: mode=max
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.head_commit.timestamp || github.run_id }}
 
       - name: Image digest
-        run: echo "Pushed ${{ steps.meta.outputs.version }} — digest available in job summary"
+        run: echo "Pushed ${{ steps.meta.outputs.version }} — digest ${{ steps.build.outputs.digest }}"
+
+      # ── Supply-chain: SBOM + cosign signature + SBOM attestation ─────────────
+      # Everything below binds to the immutable digest, never a mutable tag, so
+      # the signature and SBOM describe exactly the bytes that were pushed.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign image (keyless, Sigstore OIDC)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "mtty001/relay@${DIGEST}"
+
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: mtty001/relay@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: relay-sbom.cdx.json
+          # Do not let a missing SBOM tool silently pass; fail the job instead.
+          upload-artifact: false
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relay-sbom-${{ steps.meta.outputs.version }}
+          path: relay-sbom.cdx.json
+          if-no-files-found: error
+
+      - name: Attest SBOM to image (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign attest --yes \
+            --type cyclonedx \
+            --predicate relay-sbom.cdx.json \
+            "mtty001/relay@${DIGEST}"

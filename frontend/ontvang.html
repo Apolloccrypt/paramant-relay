@@ -1,21 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
+     before every module and deferred script that signals or awaits. -->
+<script src="/js/ready.js?v=1"></script>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Receive file - PARAMANT</title>
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
-<meta property="og:title" content="Receive file - PARAMANT">
-<meta property="og:description" content="Receive file - PARAMANT">
+<title>Bestand ontvangen · Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/done-state.css?v=1">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="live">
+<meta name="description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download.">
+<meta property="og:title" content="Er staat een beveiligd bestand klaar · Paramant">
+<meta property="og:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
 <meta property="og:url" content="https://paramant.app/ontvang">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Receive file - PARAMANT">
-<meta name="twitter:description" content="Receive file - PARAMANT">
+<meta name="twitter:title" content="Er staat een beveiligd bestand klaar · Paramant">
+<meta name="twitter:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/ontvang">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/ontvang">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/ontvang">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/ontvang">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--mono);min-height:100vh}
@@ -33,10 +51,10 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .card-body{padding:20px 18px}
 .status-line{font-size:11px;color:var(--ink-dim);padding:4px 0;display:flex;align-items:center;gap:8px;line-height:1.7}
 .status-line.ok{color:var(--cobalt)}
-.status-line.err{color:rgba(255,80,80,1)}
+.status-line.err{color:rgba(196, 96, 79, 1)}
 .fingerprint{font-size:28px;font-weight:700;letter-spacing:.18em;color:var(--ink);text-align:center;padding:24px;background:var(--bone);border:1px solid var(--ink-hair);margin:16px 0}
 .fingerprint-label{font-size:11px;color:var(--ink-dim);text-align:center;margin-bottom:8px}
-.btn{width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
+.btn{width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
 .btn:hover{opacity:.85}
 .btn:disabled{background:var(--ink-ghost);cursor:not-allowed}
 .progress-bar-wrap{background:var(--bone);border:1px solid var(--ink-hair);height:4px;overflow:hidden;margin:12px 0}
@@ -58,9 +76,9 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -71,26 +89,26 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -99,193 +117,77 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
 </style>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ontvang" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ontvang" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ontvang" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ontvang" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content">
 
+<!-- No session in the address: nobody sent this visitor a link. A calm page,
+     not an error. -->
+<div class="step" id="step-empty">
+  <h1>Er staat nog niets klaar</h1>
+  <p class="sub">Deze pagina opent vanzelf via de link die u kreeg.</p>
+  <a href="/parasend" class="btn">Zelf iets versturen</a>
+</div>
+
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
-  <h1>Secure receive</h1>
-  <p class="sub">Your browser is generating a post-quantum keypair. The private key never leaves your device. Share your fingerprint with the sender to verify the connection.</p>
+  <h1>Veilig ontvangen</h1>
+  <p class="sub">Uw browser maakt nu uw eigen sleutels. De geheime sleutel verlaat uw apparaat nooit. Daarna leest u de controlecode voor aan de afzender. Zo weet u allebei dat de verbinding klopt.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Generating keypair...</div></div>
+    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Sleutels worden gemaakt...</div></div>
     <div class="card-body">
-      <div class="status-line" id="keygen-status">Generating ML-KEM-768 + ECDH P-256 keypair in your browser...</div>
+      <div class="status-line" id="keygen-status">Uw browser maakt de sleutels (ML-KEM-768 en ECDH P-256)...</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="keygen-progress" style="width:30%"></div></div>
     </div>
   </div>
@@ -293,487 +195,113 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <!-- STEP 2: Show fingerprint, wait for sender -->
 <div class="step" id="step-fingerprint">
-  <h1>Your fingerprint</h1>
-  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This prevents the relay from intercepting.</p>
+  <h1>Uw controlecode</h1>
+  <p class="sub">Lees deze code voor aan de afzender. Die controleert of het dezelfde code is als op zijn scherm. Pas daarna wordt het bestand verzegeld. Zo kan niemand ertussen komen.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for sender to verify...</div></div>
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Wacht op bevestiging van de afzender...</div></div>
     <div class="card-body">
-      <p class="fingerprint-label">Read this to the sender:</p>
+      <p class="fingerprint-label">Lees dit voor aan de afzender:</p>
       <div class="fingerprint" id="fp-display">-</div>
-      <div class="status-line" id="fp-status">Connected - sender is verifying your fingerprint</div>
+      <div class="status-line" id="fp-status">Verbonden. De afzender controleert uw controlecode.</div>
     </div>
   </div>
 </div>
 
 <!-- STEP 3: Receiving & decrypting -->
 <div class="step" id="step-receiving">
-  <h1>Receiving file...</h1>
-  <p class="sub">Downloading and decrypting with your private key. The relay never had access to the decryption key.</p>
+  <h1>Bestand komt binnen...</h1>
+  <p class="sub">Het bestand wordt gedownload en met uw eigen sleutel geopend. Paramant heeft die sleutel nooit gehad.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Decrypting</div></div>
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Ontsleutelen</div></div>
     <div class="card-body">
-      <div class="status-line" id="recv-status">Downloading...</div>
+      <div class="status-line" id="recv-status">Downloaden...</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="recv-progress"></div></div>
       <div class="status-line" id="recv-detail" style="color:var(--ink-dim)"></div>
     </div>
   </div>
 </div>
 
-<!-- STEP 4: Done -->
+<!-- STEP 4: Done. The one end screen, shared with /get and /parashare: see
+     done-state.css. Small mark, one heading, one sentence, one button, and the
+     technical account folded away rather than deleted. -->
 <div class="step" id="step-done">
-  <h1>File received.</h1>
-  <p class="sub">The file has been decrypted and downloaded. The relay copy has been permanently destroyed.</p>
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h1 class="done-title">U hebt het bestand.</h1>
+    <p class="done-line" id="done-status">Het staat op uw apparaat. Onze kopie is voorgoed vernietigd.</p>
 
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Transfer complete</div></div>
-    <div class="card-body">
-      <div class="status-line ok" id="done-status">-</div>
-      <div id="ttl-note" style="display:none;font-size:10px;color:var(--ink-dim);margin-top:6px;padding:4px 0"></div>
-      <pre id="burn-receipt" style="display:none;font-size:10px;color:var(--ink-dim);margin-top:10px;padding:10px;background:var(--bone);border:1px solid var(--ink-hair);overflow-x:auto;line-height:1.8"></pre>
-      <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
-        <span class="tag green">ML-KEM-768</span>
-        <span class="tag green">Burn-on-read</span>
-        <span class="tag green">Fingerprint verified</span>
-        <span class="tag green">Private key never left browser</span>
-        <span class="tag green" id="vault-badge" style="display:none">Vault</span>
-      </div>
+    <div class="done-payload"></div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain" hidden>Nog een keer opslaan</button>
+      <a class="done-quiet" id="done-dashboard" href="/dashboard">Naar uw overzicht</a>
     </div>
+
+    <details class="done-details">
+      <summary>Waarom dit veilig was</summary>
+      <div class="done-details-body">
+        <p>Uw browser maakte bij het openen van deze pagina een eigen sleutelpaar. De geheime helft bleef op dit apparaat en staat er nog steeds. De afzender verzegelde het bestand met de openbare helft voordat het zijn apparaat verliet. Wat onderweg was, kon dus alleen u openen (<code>ML-KEM-768</code> met <code>ECDH P-256</code> voor de sleuteluitwisseling, <code>AES-256-GCM</code> voor het bestand).</p>
+        <p>De controlecode die u samen voorlas, is ook aan deze kant berekend uit uw eigen sleutels. Staat op beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld.</p>
+        <p>Een verzending via deze webapp wordt één keer gelezen. Elk deel is bij ons gewist zodra uw browser het ophaalde. Haalt niemand het op, dan wordt onze kopie vernietigd als de termijn voorbij is. Wat onze server onderweg meldde, staat hieronder.</p>
+        <pre id="burn-receipt" hidden></pre>
+      </div>
+    </details>
   </div>
 </div>
 
-<!-- STEP: Error -->
 <div class="step" id="step-error">
-  <h1>Transfer failed</h1>
+  <h1>Ontvangen is mislukt</h1>
   <div class="card">
-    <div class="card-head"><div class="dot" style="background:rgba(255,80,80,1)"></div><div class="card-head-title">Error</div></div>
+    <div class="card-head"><div class="dot" style="background:rgba(196, 96, 79, 1)"></div><div class="card-head-title">Fout</div></div>
     <div class="card-body">
-      <div class="status-line err" id="error-msg">Unknown error</div>
+      <div class="status-line err" id="error-msg">Onbekende fout</div>
     </div>
   </div>
-  <button class="btn" style="margin-top:8px" onclick="location.reload()">Try again</button>
+  <button class="btn" style="margin-top:8px" data-click="reload">Opnieuw proberen</button>
 </div>
 
 </main>
+<p class="lang-switch" style="max-width:580px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/en/ontvang" hreflang="en" lang="en" style="color:var(--ink)">This page in English</a></p>
 
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/trust">Trust</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/compliance/nis2">Compliance overview</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
+          <a href="/license">Licentie</a>
           <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script type="module" src="/noble-mlkem-loader.js?v=4"></script>
-<script type="module">
-import { initCrypto, encryptBlob, decryptBlob } from '/crypto-bridge.js?v=4';
-window._cryptoBridge = { initCrypto, encryptBlob, decryptBlob };
-// Pre-warm WASM (integrity check + init) so it's ready when a transfer arrives
-initCrypto().catch(e => console.error('WASM init failed:', e));
-</script>
-<script>
-const RELAY_WS  = 'wss://relay.paramant.app';
-const RELAY_SECTORS = {
-  health:  'https://health.paramant.app',
-  legal:   'https://legal.paramant.app',
-  finance: 'https://finance.paramant.app',
-  iot:     'https://iot.paramant.app',
-};
-
-function $(id) { return document.getElementById(id); }
-function showStep(id) {
-  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-  $(id).classList.add('active');
-}
-function showError(msg) {
-  $('error-msg').textContent = msg;
-  showStep('step-error');
-}
-
-function u8toHex(u8) {
-  return [...u8].map(b => b.toString(16).padStart(2,'0')).join('');
-}
-function hexToU8(hex) {
-  const arr = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i*2, i*2+2), 16);
-  return arr;
-}
-function concat(...arrays) {
-  const total = arrays.reduce((s,a) => s + a.length, 0);
-  const out = new Uint8Array(total); let off = 0;
-  for (const a of arrays) { out.set(a, off); off += a.length; }
-  return out;
-}
-function b64urlToU8(b64url) {
-  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(b64url.length / 4) * 4, '=');
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-}
-
-// Must match parashare.html: SHA-256(kyber_pub || ecdh_pub) → first 10 bytes → 5×4 hex
-async function genFingerprint(kyberPubHex, ecdhPubHex) {
-  const buf = hexToU8(kyberPubHex + (ecdhPubHex || ''));
-  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
-  const h = [...hash.slice(0, 10)].map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
-  return `${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}`;
-}
-
-// ── Get session token + relay sector from URL ──
-const params = new URLSearchParams(location.search);
-const sessionToken = params.get('s');
-const RELAY_API = RELAY_SECTORS[params.get('r')] || RELAY_SECTORS.health;
-if (!sessionToken || !/^inv_[a-zA-Z0-9]{32}$/.test(sessionToken)) {
-  window.addEventListener('mlkem-ready', () => showError('Invalid or missing session token'));
-}
-
-// ── State ──
-let myPrivateKey_ECDH = null;      // CryptoKey (for ECDH deriveBits — kept for legacy)
-let myPrivateKey_ECDH_RAW = null;  // Uint8Array 32-byte scalar (for WASM decryptBlob)
-let myPrivateKey_MLKEM = null;
-let ws = null;
-
-// ── Main flow ──
-async function init() {
-  // Guard: if ML-KEM library failed to load, refuse to proceed
-  if (typeof ml_kem768 === 'undefined' || !ml_kem768?.keygen) {
-    showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
-    return;
-  }
-  try {
-    // Restore keypair from sessionStorage (survives refresh, not tab-close)
-    const storageKey = 'paramant_kp_' + sessionToken;
-    const cached = sessionStorage.getItem(storageKey);
-    let kyberPubHex, ecdhPubHex;
-
-    if (cached) {
-      $('keygen-status').textContent = 'Restoring keypair...';
-      $('keygen-progress').style.width = '60%';
-      const kp = JSON.parse(cached);
-      kyberPubHex = kp.kyberPubHex;
-      ecdhPubHex  = kp.ecdhPubHex;
-      myPrivateKey_MLKEM = new Uint8Array(kp.kyberSec);
-      myPrivateKey_ECDH = await crypto.subtle.importKey(
-        'jwk', kp.ecdhSecJwk,
-        { name: 'ECDH', namedCurve: 'P-256' },
-        false, ['deriveBits']
-      );
-      // Extract raw 32-byte scalar from JWK d field (base64url → Uint8Array)
-      myPrivateKey_ECDH_RAW = b64urlToU8(kp.ecdhSecJwk.d);
-    } else {
-      // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
-      $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
-      $('keygen-progress').style.width = '40%';
-          const { publicKey: kyberPub, secretKey: kyberSec } = await new Promise(resolve => setTimeout(() => resolve(ml_kem768.keygen()), 50));
-      myPrivateKey_MLKEM = kyberSec;
-
-      // Generate ECDH P-256 keypair
-      $('keygen-status').textContent = 'Generating ECDH P-256 keypair...';
-      $('keygen-progress').style.width = '70%';
-      const ecdhPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-      myPrivateKey_ECDH = ecdhPair.privateKey;
-      const ecdhPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', ecdhPair.publicKey));
-
-      kyberPubHex = u8toHex(kyberPub);
-      ecdhPubHex  = u8toHex(ecdhPubRaw);
-
-      // Save to sessionStorage so refresh restores the same keypair
-      const ecdhSecJwk = await crypto.subtle.exportKey('jwk', ecdhPair.privateKey);
-      // Extract raw 32-byte scalar from JWK d field (base64url → Uint8Array)
-      myPrivateKey_ECDH_RAW = b64urlToU8(ecdhSecJwk.d);
-      sessionStorage.setItem(storageKey, JSON.stringify({
-        kyberPubHex, ecdhPubHex,
-        kyberSec: Array.from(kyberSec),
-        ecdhSecJwk
-      }));
-    }
-
-    $('keygen-progress').style.width = '100%';
-    $('keygen-status').textContent = 'Keypair ready - connecting to relay...';
-
-    const fp = await genFingerprint(kyberPubHex, ecdhPubHex);
-
-    // Show fingerprint
-    $('fp-display').textContent = fp;
-    showStep('step-fingerprint');
-
-    // Registreer pubkey via HTTP — onafhankelijk van WS (ontvanger heeft geen API key)
-    try {
-      await fetch(`${RELAY_API}/v2/pubkey`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          device_id: sessionToken,
-          ecdh_pub: ecdhPubHex,
-          kyber_pub: kyberPubHex
-        }),
-        signal: AbortSignal.timeout(8000)
-      });
-      $('fp-status').textContent = 'Ready - waiting for sender to verify fingerprint';
-    } catch(e) { console.warn('pubkey register failed', e); }
-
-    // Connect WebSocket (best-effort — ontvanger heeft geen API key, kan falen)
-    try {
-      ws = new WebSocket(RELAY_WS + '/v2/stream');
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'receiver' }));
-      };
-    } catch(e) { ws = { send: () => {}, close: () => {} }; }
-
-    ws.onmessage = async (e) => {
-      let msg;
-      try { msg = JSON.parse(e.data); } catch { return; }
-      console.log('WS msg:', msg.type, msg.payload ? msg.payload.slice?.(0,50) : '');
-
-      try {
-        let payload = null;
-        if (msg.type === 'packet' && msg.payload) {
-          try { payload = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch {}
-        }
-
-        if (payload?.type === 'fingerprint_ok') {
-          $('fp-title').textContent = 'Fingerprint confirmed - receiving file...';
-          $('fp-status').textContent = 'Sender confirmed fingerprint - file is being encrypted for you';
-        }
-
-        // ook via HTTP polling afgehandeld hieronder
-
-        if (msg.type === 'peer_left') {
-          if (!$('step-done').classList.contains('active')) {
-            showError('Sender disconnected');
-          }
-        }
-      } catch(err) {
-        console.error('ws.onmessage handler error:', err);
-      }
-    };
-
-    ws.onerror = (e) => console.warn('WS optional for receiver — file transfer via HTTP polling', e);
-    ws.onclose = () => {};
-
-    // Poll voor transfer_ready via HTTP
-    let _transferClaimed = false;
-    const pollTransfer = setInterval(async () => {
-      if (_transferClaimed) return;
-      try {
-        const r = await fetch(RELAY_API + '/v2/pubkey/' + encodeURIComponent(sessionToken + '_ready'), {
-          signal: AbortSignal.timeout(3000)
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.ecdh_pub && d.kyber_pub) {
-            if (_transferClaimed) return;
-            _transferClaimed = true;
-            clearInterval(pollTransfer);
-            const parts = d.kyber_pub.split('|');
-            if (parts[0] === 'vault') {
-              // Vault mode: meerdere bestanden
-              const ttl_ms = parseInt(parts[2]) || 3600000;
-              const vaultFiles = JSON.parse(d.ecdh_pub);
-              await receiveVault(vaultFiles, ttl_ms, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
-            } else {
-              // Enkelvoudig bestand — formaat: total_chunks|ttl_ms (bestandsnaam zit alleen in encrypted payload)
-              const ttl_ms = parseInt(parts[1]) || 3600000;
-              await receiveFile({ tokens: d.ecdh_pub, file_name: 'download', total_chunks: parseInt(parts[0]) || 1, ttl_ms }, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
-            }
-          }
-        }
-      } catch(e) {}
-    }, 2000);
-
-  } catch(e) {
-    showError('Keypair generation failed: ' + e.message);
-  }
-}
-
-async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
-  showStep('step-receiving');
-  const tokens = msg.tokens.split(',');
-  const totalChunks = parseInt(msg.total_chunks) || 1;
-  const fileName = msg.file_name || 'download';
-  const chunks = [];
-  const burnedHashes = [];
-  let fileWriter = null;  // File System Access API streaming writer
-
-  try {
-    // Probeer File System Access API (Chrome/Edge) — true streaming, geen RAM limiet
-    if (window.showSaveFilePicker) {
-      try {
-        const handle = await window.showSaveFilePicker({ suggestedName: fileName, _startIn: 'downloads' });
-        fileWriter = await handle.createWritable();
-      } catch(e) {
-        // Gebruiker annuleerde of API niet beschikbaar — val terug op Blob
-        fileWriter = null;
-      }
-    }
-    for (let i = 0; i < tokens.length; i++) {
-      const pct = Math.round(10 + (i / tokens.length) * 75);
-      $('recv-progress').style.width = pct + '%';
-      $('recv-status').textContent = `Downloading chunk ${i+1}/${tokens.length}...`;
-
-      const r = await fetch(`${RELAY_API}/v2/dl/${tokens[i]}/get`, {
-        signal: AbortSignal.timeout(60000)
-      });
-      if (!r.ok) throw new Error('Download failed for chunk ' + (i+1) + ': ' + r.status + ' - blob expired or already burned');
-      const burnHash = r.headers.get('X-Hash') || r.headers.get('X-Paramant-Hash') || '';
-      burnedHashes.push({ chunk: i+1, hash: burnHash.slice(0,16), ts: new Date().toISOString() });
-      const raw = new Uint8Array(await r.arrayBuffer());
-
-      $('recv-status').textContent = `Decrypting chunk ${i+1}/${tokens.length} with ML-KEM-768...`;
-
-      if (!window._cryptoBridge) throw new Error('WASM crypto bridge not ready');
-      const plainPadded = await window._cryptoBridge.decryptBlob(raw, kyberSec, ecdhPrivRaw);
-
-      // Strip metadata header: META_MAGIC(4) | metaLen(4) | meta | chunkData
-      const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
-      let doff = 0;
-      if (plainPadded[0] === META_MAGIC[0] && plainPadded[1] === META_MAGIC[1]) {
-        doff = 4;
-        const metaLen = new DataView(plainPadded.buffer).getUint32(doff, false);
-        if (i === 0) {
-          try {
-            const metaObj = JSON.parse(new TextDecoder().decode(plainPadded.slice(doff + 4, doff + 4 + metaLen)));
-            if (metaObj.file_name) fileName = metaObj.file_name;
-          } catch(_) {}
-        }
-        doff += 4 + metaLen;
-      }
-      const decryptedChunk = plainPadded.slice(doff);
-      if (fileWriter) {
-        await fileWriter.write(decryptedChunk);
-      } else {
-        chunks.push(decryptedChunk);
-      }
-    }
-
-    $('recv-progress').style.width = '100%';
-    $('recv-status').textContent = 'Saving file...';
-
-    let totalSize = 0;
-    if (fileWriter) {
-      // Streaming: sluit schrijfstream — bestand al opgeslagen op disk
-      await fileWriter.close();
-      fileWriter = null;
-      totalSize = chunks.length; // niet beschikbaar, gebruik 0
-    } else {
-      // Blob assembly: geef chunks direct aan Blob (efficienter dan concat)
-      const blob = new Blob(chunks);
-      totalSize = blob.size;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-    }
-
-    if (!opts.silent) {
-      const sizeStr = totalSize > 0 ? ' (' + (totalSize/1024/1024).toFixed(2) + ' MB)' : '';
-      $('done-status').textContent = '✓ ' + fileName + sizeStr + ' — decrypted and saved';
-      const receiptEl = $('burn-receipt');
-      if (receiptEl && burnedHashes.length) {
-        receiptEl.textContent = burnedHashes.map(b => 'chunk ' + b.chunk + '  hash:' + b.hash + '...  burned: ' + b.ts).join('\n');
-        receiptEl.style.display = 'block';
-      }
-      if (msg.ttl_ms) {
-        const exp = new Date(Date.now() + msg.ttl_ms);
-        $('ttl-note').textContent = 'Relay copy auto-expired at: ' + exp.toLocaleTimeString();
-        $('ttl-note').style.display = 'block';
-      }
-      showStep('step-done');
-      if (ws) ws.close();
-    }
-
-    // Burn-on-tab-switch: wis decrypted data als tab verborgen wordt
-    const _burnOnHide = () => {
-      if (document.hidden) {
-        chunks.length = 0;  // leeg de chunk array
-        $('done-status').textContent += ' — memory cleared (tab hidden)';
-        document.removeEventListener('visibilitychange', _burnOnHide);
-      }
-    };
-    document.addEventListener('visibilitychange', _burnOnHide);
-
-  } catch(e) {
-    if (fileWriter) { try { await fileWriter.abort(); } catch(_) {} fileWriter = null; }
-    showError('Decryption failed: ' + e.message);
-  }
-}
-
-
-async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
-  showStep('step-receiving');
-  $('recv-status').textContent = 'Receiving vault — ' + vaultFiles.length + ' files...';
-
-  const burnedHashes = [];
-
-  for (let fi = 0; fi < vaultFiles.length; fi++) {
-    const vf = vaultFiles[fi];
-    await receiveFile(
-      { tokens: vf.tokens.join(','), file_name: 'download', total_chunks: vf.tokens.length, ttl_ms, _vaultIdx: fi, _vaultTotal: vaultFiles.length },
-      kyberSec, ecdhPriv, { silent: fi < vaultFiles.length - 1 }
-    );
-    $('recv-status').textContent = 'Vault: ' + (fi+1) + '/' + vaultFiles.length + ' downloaded';
-  }
-
-  $('done-status').textContent = '✓ Vault opened — ' + vaultFiles.length + ' files decrypted and saved';
-  const ttlNote = $('ttl-note');
-  if (ttlNote) {
-    ttlNote.textContent = 'All vault blobs burned. TTL: ' + (ttl_ms/1000) + 's';
-    ttlNote.style.display = 'block';
-  }
-  showStep('step-done');
-  if (ws) ws.close();
-}
-window.addEventListener('mlkem-ready', () => {
-  if (sessionToken) init();
-});
-</script>
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script type="module" src="/noble-mlkem-loader.js?v=5"></script>
+<script type="module" src="/js/ontvang.inline1.js?v=3"></script>
+<script src="/js/delegate.js?v=1" defer></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/handshake-meta.js?v=1" defer></script>
+<script src="/js/ontvang.page.js?v=7" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

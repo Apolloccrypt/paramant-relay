@@ -1,0 +1,45 @@
+:root {
+  --bone: #F8FAFC; --navy: #0B3A6A; --cobalt: #1D4ED8; --lime: #B2FF3F;
+  --ink: #0F172A; --ink-mid: #475569; --ink-dim: #94A3B8; --ink-hair: #E2E8F0;
+  --sans: system-ui, -apple-system, 'Inter', sans-serif;
+  --mono: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); color: var(--ink); background: var(--bone); padding: 40px 20px; }
+main { max-width: 620px; margin: 0 auto; }
+
+header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; padding-bottom: 16px; border-bottom: 1px solid var(--ink-hair); }
+header h1 { font-size: 20px; font-weight: 700; color: var(--navy); letter-spacing: -0.01em; }
+header h1 span { color: var(--ink-mid); font-weight: 600; }
+
+.card { background: #fff; border: 1px solid var(--ink-hair); padding: 20px 22px; margin-bottom: 18px; }
+.card h2 { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+.hint { font-size: 13px; color: var(--ink-mid); line-height: 1.55; margin-bottom: 16px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field span { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--navy); font-weight: 700; }
+
+select, input[type="url"] {
+  width: 100%; padding: 10px 12px; font-family: var(--sans); font-size: 14px;
+  border: 1.5px solid var(--ink-hair); background: var(--bone); color: var(--ink);
+}
+select:focus, input[type="url"]:focus { outline: none; border-color: var(--cobalt); }
+
+.radio { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--ink-mid); line-height: 1.5; margin-bottom: 12px; cursor: pointer; }
+.radio:last-child { margin-bottom: 0; }
+.radio input { margin-top: 3px; flex-shrink: 0; }
+.radio strong { color: var(--navy); }
+
+.btn-danger {
+  padding: 9px 16px; background: transparent; color: #b91c1c; border: 1.5px solid #b91c1c;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  font-weight: 700; cursor: pointer; transition: background 0.12s, color 0.12s;
+}
+.btn-danger:hover { background: #b91c1c; color: #fff; }
+
+.saved {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #064E3B; color: #fff; padding: 10px 20px; font-family: var(--mono);
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.saved[hidden] { display: none; }
