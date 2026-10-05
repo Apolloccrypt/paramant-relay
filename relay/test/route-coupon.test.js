@@ -153,11 +153,16 @@ const entitlementsOf = (name) =>
 // answered can be a moment early; this waits for the field rather than sleeping
 // a fixed amount and hoping.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A gift of both products is two setProductPlan calls and so two queued
+// writes: between them the file holds the first product only. Name every
+// field the test is about to read (an array), or it compares a landed field
+// with one still on its way (flaky watch, 2026-10-05, 1 in 3 under load).
 async function recordOf(name, waitFor) {
   const read = () => (srv.readUsersFile().api_keys || []).find((k) => k.key === `pgp_${name}`) || {};
+  const fields = waitFor ? [].concat(waitFor) : [];
   for (let i = 0; i < 60; i++) {
     const rec = read();
-    if (!waitFor || rec[waitFor]) return rec;
+    if (fields.every((f) => rec[f])) return rec;
     await sleep(50);
   }
   return read();
@@ -390,7 +395,7 @@ test('a redeemed code puts the account on the Pro entitlements, both products', 
 
   // And the term is bounded, ON DISK. An unbounded grant is the bug #315 was
   // about, and a gift must not be the way it comes back.
-  const rec = await recordOf('a', 'paid_until_parasign');
+  const rec = await recordOf('a', ['paid_until_parasign', 'paid_until_parasend']);
   assert.strictEqual(rec.parasign, true, 'a paid parasign tier flips the access flag, as a payment does');
   const days = Math.round((Date.parse(rec.paid_until_parasign) - Date.now()) / 86_400_000);
   assert.strictEqual(days, 90, `the gift runs ${days} days, and the code promises 90`);
