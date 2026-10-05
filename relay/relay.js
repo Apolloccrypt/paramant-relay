@@ -713,8 +713,23 @@ if (CT_FILE) {
   try { leafBuf = fs.readFileSync(CT_LEAVES_FILE); }
   catch (e) { if (e.code !== 'ENOENT') log('warn', 'ct_leaves_load_failed', { err: e.message }); }
   const leafCount = Math.floor(leafBuf.length / 32);
+  let leafFileAligned = true;
   for (let i = 0; i < leafCount; i++) ctTree.append(leafBuf.toString('hex', i * 32, (i + 1) * 32));
-  if (leafBuf.length % 32) log('warn', 'ct_leaves_partial_tail', { bytes: leafBuf.length % 32 });
+  if (leafBuf.length % 32) {
+    // A crash or a full disk in the middle of a 32-byte write leaves a partial
+    // last leaf. Cut it off BEFORE anything is appended: recovered leaves and
+    // new ones written after it would otherwise sit 1..31 bytes out of step,
+    // and the next boot would read a different tree (review #555, M1). The
+    // leaf it belonged to is recovered from CT_FILE below like any other.
+    log('warn', 'ct_leaves_partial_tail', { bytes: leafBuf.length % 32 });
+    try {
+      fs.truncateSync(CT_LEAVES_FILE, leafCount * 32);
+      log('info', 'ct_leaves_partial_tail_cut', { leaves: leafCount });
+    } catch (e) {
+      log('error', 'ct_leaves_truncate_failed', { err: e.message, file: CT_LEAVES_FILE });
+      leafFileAligned = false;
+    }
+  }
 
   const firstIdx = loaded.length ? loaded[0].index : 0;
   const wantSize = loaded.length ? firstIdx + loaded.length : 0;
@@ -742,7 +757,7 @@ if (CT_FILE) {
       }
     }
   }
-  if (recovered.length) {
+  if (recovered.length && leafFileAligned) {
     try { fs.appendFileSync(CT_LEAVES_FILE, Buffer.concat(recovered.map(h => Buffer.from(h, 'hex'))), { flag: 'a' }); }
     catch (e) { log('warn', 'ct_leaves_recover_write_failed', { err: e.message }); }
     log('info', 'ct_leaves_recovered', { leaves: recovered.length, tree_size: ctTree.size });
