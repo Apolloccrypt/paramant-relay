@@ -542,8 +542,8 @@ function _b64urlFromBuffer(buf) {
 }
 
 // ── Same-origin admin calls for the per-document signing chain (R018) ────────
-async function _postJSON(url, body) {
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), credentials: 'include' });
+async function _postJSON(url, body, extraHeaders) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) }, body: JSON.stringify(body || {}), credentials: 'include' });
   let data = null; try { data = await r.json(); } catch { /* non-JSON */ }
   if (!r.ok) { const e = new Error((data && data.error) || ('http_' + r.status)); e.status = r.status; e.data = data; throw e; }
   return data;
@@ -569,7 +569,14 @@ export function createSigningEnvelope({ docHash, recipients, originalFilename, s
   // used (submitSignature's `appearance`), never this one, so it is sent on
   // envelope creation and never near the signing message.
   if (requestedAppearance) body.requested_appearance = normaliseSigningAppearance(requestedAppearance);
-  return _postJSON('/api/user/envelopes', body);
+  // One key per send. Without it the admin keyed on the body, so the same
+  // document to the same people within two minutes got the PREVIOUS request
+  // back, also when that one was withdrawn or declined, and its document was
+  // overwritten (fase-1 herrun P02). A double click cannot slip through: the
+  // send button is disabled before this call.
+  let idem = '';
+  try { idem = 'env-' + (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')); } catch { idem = ''; }
+  return _postJSON('/api/user/envelopes', body, idem ? { 'Idempotency-Key': idem } : undefined);
 }
 // Authorize + issue the per-document activation (pre-unlock gate). Returns
 // { activation_id, email_hash, recipe_version }.

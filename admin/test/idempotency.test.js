@@ -54,3 +54,22 @@ test('a different body runs again; a failed first try can be retried', async () 
   await go({ x: 3 }, 200);
   assert.strictEqual(runs, 4, 'a 502 is not stored, so the retry runs');
 });
+
+test('a partial failure (207 or partial_failure) is not replayed: the retry runs again', async () => {
+  // "Mislukte e-mails opnieuw sturen" posts the same body; it got the stored
+  // failure back for two minutes and sent nothing (fase-1 herrun COSIGN-11-A).
+  const redis = fakeRedis();
+  const mw = middleware({ redis: () => redis, scope: 't' });
+  let runs = 0;
+  const go = (body, status, out) => new Promise((done) => {
+    const rs = res(); rs.done = () => done(rs);
+    mw(req(body), rs, () => { runs++; rs.status(status).json(out); });
+  });
+  await go({ inv: 1 }, 207, { partial_failure: true });
+  const second = await go({ inv: 1 }, 200, { ok: true });
+  assert.strictEqual(runs, 2);
+  assert.deepStrictEqual(second.body, { ok: true });
+  await go({ inv: 2 }, 200, { ok: false, partial_failure: true });
+  await go({ inv: 2 }, 200, { ok: true });
+  assert.strictEqual(runs, 4, 'partial_failure in a 200 body is not stored either');
+});

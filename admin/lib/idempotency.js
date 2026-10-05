@@ -6,8 +6,9 @@
 // when it sends one, else a hash of the request body: the same body from the
 // same account within the window IS the same request. The first request runs;
 // a second one that arrives while it is running waits for its answer, and one
-// that arrives later gets the stored answer. Only 2xx answers are stored, so a
-// failed first try can be retried at once.
+// that arrives later gets the stored answer. Only whole 2xx answers are stored
+// (no 207 / partial_failure), so a failed or half-failed first try can be
+// retried at once.
 const crypto = require('crypto');
 
 function middleware({ redis, scope, windowSec = 120, waitMs = 10000 }) {
@@ -29,7 +30,12 @@ function middleware({ redis, scope, windowSec = 120, waitMs = 10000 }) {
       const json = res.json.bind(res);
       res.json = (body) => {
         const status = res.statusCode || 200;
-        const store = status >= 200 && status < 300
+        // A partial failure (207, or partial_failure in the body) is not an
+        // answer to replay: "send the failed mails again" posts the same body
+        // and got the stored failure back for two minutes, sending nothing
+        // (fase-1 herrun COSIGN-11-A).
+        const whole = status >= 200 && status < 300 && status !== 207 && !(body && body.partial_failure);
+        const store = whole
           ? r.set(key, JSON.stringify({ state: 'done', status, body }), { EX: windowSec })
           : r.del(key);
         Promise.resolve(store).catch(() => {});
