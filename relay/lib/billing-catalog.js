@@ -110,6 +110,40 @@ function orderLabel(order) {
   return planLabel(order.product, order.tier || order.plan);
 }
 
+// The Dutch name for what was bought, on the Mollie statement and the invoice
+// of a buyer who bought in Dutch: "Firm (versturen en ondertekenen)". The
+// English orderLabel above stays the name of the record (acceptatie 3.1.1,
+// betalen punt 5; taal #4: no "ParaSign Pro and ParaSend Pro" for a Dutch
+// buyer). A single-product term names the product by what it does.
+const PRODUCT_LABEL_NL = Object.freeze({ parasend: 'versturen', parasign: 'ondertekenen' });
+const TIER_LABEL_NL = Object.freeze({ pro: 'Firm', business: 'Business', enterprise: 'Enterprise' });
+function orderLabelNl(order) {
+  if (!order) return '';
+  const bundle = BUNDLES[order.bundle || order.product];
+  if (bundle) {
+    const what = [...new Set(bundle.grants.map((g) => PRODUCT_LABEL_NL[g.product]))];
+    const list = what.length > 1 ? 'versturen en ondertekenen' : what[0];
+    return `${bundle.label} (${list})`;
+  }
+  const tier = order.tier || order.plan;
+  return `${TIER_LABEL_NL[tier] || tier} voor ${PRODUCT_LABEL_NL[order.product] || order.product}`;
+}
+
+// The English name on the Mollie statement of a buyer who bought in English:
+// the bundle and what it is for, "Firm (sending and signing)", the words the
+// site uses.
+const PRODUCT_LABEL_MAIL = Object.freeze({ parasend: 'sending', parasign: 'signing' });
+function orderLabelEn(order) {
+  if (!order) return '';
+  const bundle = BUNDLES[order.bundle || order.product];
+  if (bundle) {
+    const what = [...new Set(bundle.grants.map((g) => PRODUCT_LABEL_MAIL[g.product]))];
+    return `${bundle.label} (${what.length > 1 ? 'sending and signing' : what[0]})`;
+  }
+  const tier = order.tier || order.plan;
+  return `${TIER_LABEL_NL[tier] || tier} for ${PRODUCT_LABEL_MAIL[order.product] || order.product}`;
+}
+
 // What the site sells today (the buttons on /pricing and /en/pricing, pinned
 // to this list by relay/test/pricing-page.test.js), and therefore the only
 // thing the checkout sells (resolveSale). The two `pro` rows are NOT here and
@@ -211,6 +245,6 @@ function amountsEqual(a, b) {
 
 module.exports = {
   CATALOG, PRODUCTS, SELLABLE, INTERVALS, BUNDLES, ON_SALE, isOnSale, resolveSale,
-  PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel,
+  PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel, orderLabelNl, orderLabelEn,
   isBundle, bundleKeyOf, grantedTier, grantsOf, floorTier, priceOf, resolveOrder, amountsEqual,
 };

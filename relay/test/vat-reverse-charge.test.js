@@ -501,13 +501,18 @@ test('the PDF says Btw verlegd and VAT reverse charged, next to both VAT numbers
   const rc = (await issue(redis, paymentOf('tr_pdf_rc', '29.00', vat.metadataOf(RC_TERMS)))).record;
   const text = invoicePdf.render(rc, { buyerHint: invoice.BUYER_HINT }).toString('latin1');
   assert.ok(text.includes('Btw verlegd / VAT reverse charged'));
-  assert.ok(text.includes(`Customer VAT ${EU_VAT} - Supplier VAT ${SELLER_VAT}`));
-  assert.ok(text.includes('Article 196, Directive 2006/112/EC'));
-  assert.ok(!text.includes('VAT 0%'), 'no rate line pretending a 0% Dutch rate');
+  // A buyer without a language on file gets the Dutch document (acceptatie
+  // 3.1.1, betalen punt 5); the mention itself is in both languages.
+  assert.ok(text.includes(`Btw afnemer ${EU_VAT} - Btw leverancier ${SELLER_VAT}`));
+  assert.ok(text.includes('artikel 196, Richtlijn 2006/112/EG'));
+  const en = invoicePdf.render({ ...rc, lang: 'en' }, { buyerHint: invoice.BUYER_HINT }).toString('latin1');
+  assert.ok(en.includes(`Customer VAT ${EU_VAT} - Supplier VAT ${SELLER_VAT}`));
+  assert.ok(en.includes('Article 196, Directive 2006/112/EC'));
+  assert.ok(!text.includes('Btw 0%') && !en.includes('VAT 0%'), 'no rate line pretending a 0% Dutch rate');
 
   const std = (await issue(redis, paymentOf('tr_pdf_std', '35.09'), { email: 'private@example.test' })).record;
   const stdText = invoicePdf.render(std, { buyerHint: invoice.BUYER_HINT }).toString('latin1');
-  assert.ok(stdText.includes('VAT 21%'));
+  assert.ok(stdText.includes('Btw 21%'));
   assert.ok(!/verlegd|reverse charged/i.test(stdText), 'a 21% invoice says nothing about reverse charge');
   did();
 });
@@ -516,12 +521,12 @@ test('the mail says it in both languages, and a 21% mail is unchanged', async ()
   const redis = fakeRedis();
   const rc = (await issue(redis, paymentOf('tr_mail_rc', '29.00', vat.metadataOf(RC_TERMS)))).record;
   const { text } = billingMail.invoiceMail(rc);
-  assert.ok(text.includes(`Totaal: EUR 29.00 (btw verlegd, btw-nummer afnemer ${EU_VAT})`), text);
+  assert.ok(text.includes(`Totaal: EUR 29,00 (btw verlegd, btw-nummer afnemer ${EU_VAT})`), text);
   assert.ok(text.includes(`Total: EUR 29.00 (VAT reverse charged, customer VAT number ${EU_VAT})`), text);
 
   const std = (await issue(redis, paymentOf('tr_mail_std', '35.09'), { email: 'private@example.test' })).record;
   const stdText = billingMail.invoiceMail(std).text;
-  assert.ok(stdText.includes('Totaal: EUR 35.09 (incl. 21% btw, EUR 6.09)'));
+  assert.ok(stdText.includes('Totaal: EUR 35,09 (incl. 21% btw, EUR 6,09)'));
   assert.ok(stdText.includes('Total: EUR 35.09 (incl. 21% VAT, EUR 6.09)'));
   did();
 });

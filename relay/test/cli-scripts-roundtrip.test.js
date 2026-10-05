@@ -41,13 +41,15 @@ test('the /docs example: send a file, receive it by hash with the transfer secre
   const data = crypto.randomBytes(3000);
   fs.writeFileSync(file, data);
   const secret = crypto.randomBytes(32).toString('base64url');
-  const sent = py('paramant-sender.py', ['--key', KEY, '--relay', srv.base, '--file', file, '--secret', secret]);
+  // '--secret=<value>', not '--secret <value>': one secret in 64 starts with
+  // '-', and argparse then reads it as an option ("expected one argument").
+  const sent = py('paramant-sender.py', ['--key', KEY, '--relay', srv.base, '--file', file, '--secret=' + secret]);
   assert.equal(sent.status, 0, sent.stdout + sent.stderr);
   const m = (sent.stdout + sent.stderr).match(/--hash ([a-f0-9]{64})/);
   assert.ok(m, 'the sender prints the receive command with the hash: ' + sent.stdout + sent.stderr);
   const out = path.join(dir, 'out');
   fs.mkdirSync(out);
-  const got = py('paramant-receiver.py', ['--key', KEY, '--relay', srv.base, '--hash', m[1], '--secret', secret, '--output', out]);
+  const got = py('paramant-receiver.py', ['--key', KEY, '--relay', srv.base, '--hash', m[1], '--secret=' + secret, '--output', out]);
   assert.equal(got.status, 0, got.stdout + got.stderr);
   const files = fs.readdirSync(out);
   assert.equal(files.length, 1, 'one file received: ' + got.stdout + got.stderr);

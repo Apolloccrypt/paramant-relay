@@ -173,6 +173,10 @@ function buildRecord({ number, original, amounts, reason, payment, now, partial 
   // says so in the same words (lib/invoice.js). Other records keep their shape.
   if (original.vat_treatment) record.vat_treatment = original.vat_treatment;
   if (original.vat_check) record.vat_check = Object.assign({}, original.vat_check);
+  // The language and the Dutch line of the invoice it credits, so the credit
+  // note reads in the language the buyer bought in (acceptatie 3.1.1).
+  if (original.lang) record.lang = original.lang;
+  if (original.description_nl) record.description_nl = `Creditering van ${original.description_nl} (factuur ${original.number})`;
   return record;
 }
 

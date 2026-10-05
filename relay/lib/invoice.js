@@ -195,7 +195,26 @@ function describe(order) {
   return `Paramant ${label}, ${interval} plan`;
 }
 
-function buildRecord({ number, kind, seller, buyer, order, payment, split, now, periodEnd, vat }) {
+// The same line in Dutch, for the Dutch half of the mail and for the PDF of a
+// buyer who bought in Dutch (acceptatie 3.1.1, betalen punt 5 and #12 of
+// 3.1.0: a Dutch buyer read "monthly plan"). The English line above stays the
+// record's description: the billing history, the exports and Moneybird read it.
+function describeNl(order) {
+  const interval = order.interval === 'yearly' ? 'per jaar' : 'per maand';
+  return `Paramant ${catalog.orderLabelNl(order)}, ${interval}`;
+}
+
+// The language the buyer bought in. relay.js keeps it per account when the
+// checkout starts (it never travels to Mollie) and passes it as `lang`; a
+// payment that names one in its metadata is honoured too. Only 'en' is
+// English; anything else is the Dutch default, the same rule the checkout
+// uses for the redirect.
+function buyerLang(payment, lang) {
+  if (lang === 'en' || lang === 'nl') return lang;
+  return payment && payment.metadata && payment.metadata.lang === 'en' ? 'en' : 'nl';
+}
+
+function buildRecord({ number, kind, seller, buyer, order, payment, split, now, periodEnd, vat, lang }) {
   const issued = now instanceof Date ? now : new Date();
   const record = {
     number,
@@ -215,6 +234,8 @@ function buildRecord({ number, kind, seller, buyer, order, payment, split, now, 
     grants: Array.isArray(order.grants) ? order.grants.map((g) => ({ product: g.product, tier: g.tier })) : null,
     interval: order.interval,
     description: describe(order),
+    description_nl: describeNl(order),
+    lang: buyerLang(payment, lang),
     service_period_end: periodEnd || null,
     currency: order.currency || 'EUR',
     vat_rate: split.rate,
@@ -267,7 +288,7 @@ function buyerIsComplete(buyer) {
 //   'existing'    this payment already has one; record is that one
 //   'deferred'    another attempt holds the claim right now; try again later
 //   'unavailable' no redis; nothing was written
-async function issueDocument({ payment, order, seller, buyer, now, periodEnd, vat }, redis) {
+async function issueDocument({ payment, order, seller, buyer, now, periodEnd, vat, lang }, redis) {
   if (!redis) return { result: 'unavailable', reason: 'no_redis' };
   if (!payment || !payment.id) return { result: 'unavailable', reason: 'no_payment' };
 
@@ -317,7 +338,7 @@ async function issueDocument({ payment, order, seller, buyer, now, periodEnd, va
   if (!split) return { result: 'unavailable', reason: 'bad_amount' };
 
   const kind = documentKind(seller);
-  const record = buildRecord({ number, kind, seller, buyer, order, payment, split, now: issued, periodEnd, vat });
+  const record = buildRecord({ number, kind, seller, buyer, order, payment, split, now: issued, periodEnd, vat, lang });
 
   // Step 3: the record first, then the claim, then the lists. In that order a
   // crash leaves at worst a document nobody has indexed yet, never a claim
@@ -404,6 +425,7 @@ async function recordForPayment(paymentId, redis) {
 }
 
 module.exports = {
+  describeNl, buyerLang,
   CATALOG_VAT_RATE, K, BUYER_HINT, RECEIPT_NOTE, PENDING_TAKEOVER_MS,
   REVERSE_CHARGE_NL, REVERSE_CHARGE_EN, isReverseCharged,
   sellerFromEnv, documentKind, documentTitle, buyerIsComplete,

@@ -476,7 +476,7 @@ function moneyOf(amount) {
 // what he can check.
 function failedCollectionMail({ order, paidUntil, now, siteUrl, amount }) {
   if (!order || order.error) return null;
-  const plan = planExpiry.bundleLabel(order.bundle) || planExpiry.planLabel(order.product, order.tier);
+  const plan = planExpiry.bundleLabel(order.bundle) || planExpiry.planLabelMail(order.product, order.tier);
   const planNl = planExpiry.bundleLabelNl(order.bundle) || planExpiry.planLabelNl(order.product, order.tier);
   const account = `${String(siteUrl || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '')}/account`;
   const at = paidUntil ? Date.parse(paidUntil) : NaN;

@@ -283,17 +283,20 @@ function modeAllows(p) {
 // from a phishing attempt, and a corporate spam filter will treat it as one.
 // Answering both costs three lines and is the difference between a document
 // that arrives and a ticket at somebody's IT desk.
+// "Paramant bewaart het bestand" read as storage, while /pricing says the
+// file lives in memory and is wiped (acceptatie 3.1.1, taal #37): the footer
+// says how long it waits and that it is gone after.
 function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'een klant van Paramant')
-       + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld. De link '
-       + 'in deze mail opent het. Die link bewaren wij niet.'
+       + ' uw adres heeft ingevuld. Het bestand staat versleuteld klaar tot het is opgehaald '
+       + 'of de link verloopt. Daarna is het weg. De link in deze mail opent het. Die link bewaren wij niet.'
        + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
   const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'a Paramant customer')
-       + ' entered your address. Paramant keeps the file encrypted. The link in this '
-       + 'mail opens it, and we do not keep that link.'
+       + ' entered your address. The file waits, encrypted, until it is picked up or the '
+       + 'link expires. Then it is gone. The link in this mail opens it, and we do not keep that link.'
        + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
   const tekst = taal === 'en' ? en
               : taal === 'nl' ? nl
@@ -2279,19 +2282,24 @@ async function notifySenderQuota(envelopeId, accountId) {
   const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
   const r = await mailer.stuur({
     to,
-    subject: 'Een ondertekenaar kan niet tekenen: uw tegoed is op',
+    // Both languages in the subject and a link in both halves; "handtekeningen
+    // op" instead of "tegoed", which reads as prepaid credit (acceptatie
+    // 3.1.1, taal #44).
+    subject: 'Een ondertekenaar kan nog niet tekenen: uw handtekeningen voor deze maand zijn op / A signer cannot sign yet: your signatures for this month are used up',
     text: tweetaligTekst('nl',
       'Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.'
       + '\n\nKies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.'
       + '\n\n' + base + '/pricing',
       'Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.'
-      + '\n\nUpgrade your plan or wait until next month. Then the signer can sign with the same link.'),
+      + '\n\nChoose a larger plan or wait until next month. Then the signer can sign with the same link.'
+      + '\n\n' + base + '/en/pricing'),
     html: tweetaligHtml('nl',
       '<p>Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.</p>'
       + '<p>Kies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.</p>'
       + '<p><a href="' + base + '/pricing">Plannen bekijken</a></p>',
       '<p>Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.</p>'
-      + '<p>Upgrade your plan or wait until next month. Then the signer can sign with the same link.</p>'),
+      + '<p>Choose a larger plan or wait until next month. Then the signer can sign with the same link.</p>'
+      + '<p><a href="' + base + '/en/pricing">See the plans</a></p>'),
   });
   log('info', 'sender_quota_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);
@@ -2327,22 +2335,24 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel, part
     r = await mailer.stuur({
       to,
       subject: 'Een ondertekenaar vraagt de uitnodiging opnieuw',
+      // Plain words, no "key" and no explanation of where it lives
+      // (acceptatie 3.1.1, taal #12): what to press, where, and the way out.
       text: tweetaligTekst('nl',
-        `${who} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.`
+        `${who} vraagt de uitnodiging om te tekenen opnieuw. Alleen uw eigen browser kan die uitnodiging maken, zodat niemand anders het document kan openen.`
         + '\n\nOpen deze link in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen:\n' + knop
-        + '\n\nDe ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.',
-        `${whoEn} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.`
+        + '\n\nDe ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer. Lukt het niet in die browser? Trek het verzoek dan in en stuur het opnieuw.',
+        `${whoEn} asks for the signing invitation again. Only your own browser can make that invitation, so nobody else can open the document.`
         + '\n\nOpen this link in the browser you sent the request from and click Send the invitation again:\n' + knop
-        + '\n\nThe signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.'),
+        + '\n\nThe signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.'),
       html: tweetaligHtml('nl',
-        `<p>${escHtml(who)} vraagt de uitnodiging om te ondertekenen opnieuw. De sleutel van het document staat alleen in uw browser, niet bij ons. Daarom stuurt u de uitnodiging zelf opnieuw, met één klik.</p>`
+        `<p>${escHtml(who)} vraagt de uitnodiging om te tekenen opnieuw. Alleen uw eigen browser kan die uitnodiging maken, zodat niemand anders het document kan openen.</p>`
         + '<p>Open deze knop in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen.</p>'
         + knopHtml('Uitnodiging opnieuw sturen')
-        + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer, met een link die het document ook op een ander apparaat opent. Staat de uitnodiging niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
-        `<p>${escHtml(whoEn)} asks for the signing invitation again. The document key is only in your browser, not with us. So you send the invitation again yourself, with one click.</p>`
+        + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer. Lukt het niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
+        `<p>${escHtml(whoEn)} asks for the signing invitation again. Only your own browser can make that invitation, so nobody else can open the document.</p>`
         + '<p>Open this button in the browser you sent the request from and click Send the invitation again.</p>'
         + knopHtml('Send the invitation again')
-        + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time, with a link that opens the document on another device too. Is the invitation not in that browser? Then withdraw the request and send it again.</p>'),
+        + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.</p>'),
     });
   } catch (_) { r = null; }
   const delivered = !!(r && r.ok);
@@ -3969,6 +3979,12 @@ let _sellerVatWarned = false;
 // produce a second invoice, and a first attempt that lost redis gets a second
 // chance instead of leaving the customer with nothing. Never throws: an
 // entitlement that was granted must not be undone by paperwork.
+// The language an account last bought in, 'nl' or 'en' (acceptatie 3.1.1,
+// betalen punt 5). Set when a checkout starts, read when the invoice for that
+// payment, or a later renewal of it, is issued. Not personal data and not part
+// of the Mollie payload, so the /dpa row for Mollie stays what it is.
+function _buyerLangKey(accountId) { return 'paramant:billing:buyer-lang:' + String(accountId); }
+
 async function _issueInvoiceForPayment(payment, outcome) {
   try {
     const md = (payment && payment.metadata) || {};
@@ -3992,6 +4008,10 @@ async function _issueInvoiceForPayment(payment, outcome) {
       });
     }
     const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+    // The language the buyer bought in (kept at checkout, never sent to
+    // Mollie): the document, its line and its mail follow it.
+    let lang = null;
+    try { lang = redis && md.accountId ? await redis.get(_buyerLangKey(md.accountId)) : null; } catch { lang = null; }
     const out = await invoiceMod.issueDocument({
       payment,
       order: Object.assign({ accountId: md.accountId }, order),
@@ -3999,6 +4019,7 @@ async function _issueInvoiceForPayment(payment, outcome) {
       buyer: await _billingBuyerOf(md.accountId),
       periodEnd: outcome && outcome.paidUntil,
       vat: vatTerms,
+      lang,
     }, redis);
 
     // The invoice exists, so the VIES proof it rests on is kept as long as the
@@ -10304,7 +10325,11 @@ async function handleRelayRequest(req, res) {
       const _en = body.lang === 'en';
       const payment = await mollie.createPayment(mode, Object.assign({
         amount: { currency: order.currency, value: vatMod.chargeAmount(order, vatTerms) },
-        description: `Paramant ${billingCatalog.orderLabel(order)} (${order.interval})`,
+        // In the buyer's language (acceptatie 3.1.1, betalen punt 5): a Dutch
+        // buyer read "Paramant Firm (ParaSign Pro and ParaSend Pro) (monthly)".
+        description: _en
+          ? `Paramant ${billingCatalog.orderLabelEn(order)} (${order.interval === 'yearly' ? 'yearly' : 'monthly'})`
+          : `Paramant ${billingCatalog.orderLabelNl(order)} (${order.interval === 'yearly' ? 'per jaar' : 'per maand'})`,
         redirectUrl: `${origin}${_en ? '/en' : ''}/dashboard?billing=return`,
         webhookUrl: `${origin}/v2/billing/webhook`,
         // A reverse-charged sale adds its terms (lib/vat.metadataOf); a 21%
@@ -10318,6 +10343,9 @@ async function handleRelayRequest(req, res) {
       // and without this the dashboard said "being confirmed" and "you get
       // the plan by itself" after a cancelled or failed payment too
       // (betaaltest 05-10, row 4). Best effort: a checkout never fails on it.
+      if (redisClient && redisClient.isReady) {
+        redisClient.set(_buyerLangKey(accountId), _en ? 'en' : 'nl').catch(() => { /* the invoice then falls back to Dutch */ });
+      }
       if (payment && payment.id && redisClient && redisClient.isReady) {
         redisClient.set(_lastCheckoutKey(accountId), J({
           id: payment.id, product: order.product, plan: order.plan, interval: order.interval,

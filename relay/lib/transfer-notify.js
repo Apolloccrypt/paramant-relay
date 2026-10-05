@@ -21,14 +21,29 @@ const SUBJECTS_NL = {
   download: 'Uw Paramant-verzending is opgehaald',
 };
 
+// What a reader can use: what happened and how big the file was, in KB or MB
+// the way each language writes it. A content hash as "Kenmerk" and a size in
+// bytes told a customer nothing (acceptatie 3.1.1, taal #38). The file name
+// stays out on purpose: the mail goes through a provider, and the name is
+// often the content. hashPrefix is still accepted from the caller and unused.
+function humanSize(bytes, lang) {
+  const b = Math.max(0, Number(bytes) || 0);
+  const mb = b / (1024 * 1024);
+  const v = mb >= 1 ? mb.toFixed(1) : Math.max(1, Math.round(b / 1024)).toString();
+  const unit = mb >= 1 ? 'MB' : 'KB';
+  return `${lang === 'nl' ? v.replace('.', ',') : v} ${unit}`;
+}
+
 function bodies(event, hashPrefix, bytes) {
-  const ref = String(hashPrefix || '').slice(0, 16);
-  const nl = `Een verzending van uw Paramant-account is ${event === 'download' ? 'opgehaald' : 'opgeslagen'}.\n\n`
-    + `Kenmerk: ${ref}\nGrootte: ${bytes || 0} bytes\n\n`
-    + 'U krijgt deze melding omdat die bij uw plan hoort.';
-  const en = `A transfer on your Paramant account was ${event === 'download' ? 'downloaded' : 'stored'}.\n\n`
-    + `Reference: ${ref}\nSize: ${bytes || 0} bytes\n\n`
-    + 'You get this notice because it is part of your plan.';
+  const down = event === 'download';
+  const nl = (down
+    ? `Een bestand dat u met Paramant verstuurde, is opgehaald (${humanSize(bytes, 'nl')}).`
+    : `Een bestand dat u met Paramant verstuurt, staat klaar voor de ontvanger (${humanSize(bytes, 'nl')}).`)
+    + '\n\nDe details staan op uw dashboard. U krijgt deze melding omdat die bij uw plan hoort.';
+  const en = (down
+    ? `A file you sent with Paramant has been picked up (${humanSize(bytes, 'en')}).`
+    : `A file you are sending with Paramant is ready for the recipient (${humanSize(bytes, 'en')}).`)
+    + '\n\nThe details are on your dashboard. You get this notice because it is part of your plan.';
   return { nl, en };
 }
 
@@ -57,4 +72,4 @@ function maybeNotify({ keyData, event, hashPrefix, bytes, sendEmail, lang }) {
   }
 }
 
-module.exports = { maybeNotify, SUBJECTS, SUBJECTS_NL };
+module.exports = { maybeNotify, SUBJECTS, SUBJECTS_NL, humanSize };

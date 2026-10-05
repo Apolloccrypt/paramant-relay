@@ -28,6 +28,25 @@ const NOTE_NL = Object.freeze({
 
 const BUYER_HINT_NL = 'Vul uw bedrijfsgegevens in op uw accountpagina, dan staan ze op de factuur';
 
+// Money the way each language writes it: "EUR 35,09" in the Dutch half,
+// "EUR 35.09" in the English half (acceptatie 3.1.1, taal #50).
+const moneyNl = (v) => String(v == null ? '' : v).replace(/^(-?\d+)\.(\d{2})$/, '$1,$2');
+const dateEn = (d) => planExpiry.formatDate(d) || String(d || '');
+// The Dutch line of the document, when the record carries one; older records
+// have only the English line, which is then quoted as it stands.
+const descNl = (record) => record.description_nl || record.description;
+
+// The buyer's language comes first, in the subject and in the text; the other
+// language follows below the line. A buyer from /en/pricing got "Factuur ..."
+// and a Dutch block first (acceptatie 3.1.1, betalen punt 5). A record without
+// a language is from before the field existed and keeps the Dutch-first order.
+function arrange(record, subjectNl, subjectEn, nl, en) {
+  const english = record.lang === 'en';
+  return english
+    ? { subject: planExpiry.bilingualSubject(subjectEn, subjectNl), text: planExpiry.bilingualText(en.join('\n'), nl.join('\n')) }
+    : { subject: planExpiry.bilingualSubject(subjectNl, subjectEn), text: planExpiry.bilingualText(nl.join('\n'), en.join('\n')) };
+}
+
 const titleNl = (t) => TITLE_NL[t] || t;
 const noteNl = (n) => (n ? (NOTE_NL[n] || n) : '');
 const dateNl = (d) => planExpiry.formatDateNl(d) || String(d || '');
@@ -41,7 +60,7 @@ function vatNl(record) {
   if (record.vat_treatment === 'reverse_charge') {
     return `${invoiceMod.REVERSE_CHARGE_NL.toLowerCase()}, btw-nummer afnemer ${record.buyer.vat}`;
   }
-  return `incl. ${record.vat_rate}% btw, ${record.currency} ${record.amount_vat}`;
+  return `incl. ${record.vat_rate}% btw, ${record.currency} ${moneyNl(record.amount_vat)}`;
 }
 function vatEn(record) {
   if (record.vat_treatment === 'reverse_charge') {
@@ -62,8 +81,8 @@ function invoiceMail(record) {
     ``,
     `${titleNl(record.title)} ${record.number}`,
     `Datum: ${dateNl(record.invoice_date)}`,
-    `${record.description}`,
-    `Totaal: ${record.currency} ${record.amount_gross} (${vatNl(record)})`,
+    `${descNl(record)}`,
+    `Totaal: ${record.currency} ${moneyNl(record.amount_gross)} (${vatNl(record)})`,
     ``,
     isInvoice ? '' : noteNl(invoiceMod.RECEIPT_NOTE),
     complete ? '' : `${BUYER_HINT_NL}.`,
@@ -76,7 +95,7 @@ function invoiceMail(record) {
     `Thank you for your payment.`,
     ``,
     `${record.title} ${record.number}`,
-    `Date: ${record.invoice_date}`,
+    `Date: ${dateEn(record.invoice_date)}`,
     `${record.description}`,
     `Total: ${record.currency} ${record.amount_gross} (${vatEn(record)})`,
     ``,
@@ -87,10 +106,7 @@ function invoiceMail(record) {
     ``,
     record.seller.name,
   ]);
-  return {
-    subject: planExpiry.bilingualSubject(subjectNl, subjectEn),
-    text: planExpiry.bilingualText(nl.join('\n'), en.join('\n')),
-  };
+  return arrange(record, subjectNl, subjectEn, nl, en);
 }
 
 function creditNoteMail(record) {
@@ -105,8 +121,8 @@ function creditNoteMail(record) {
     `${titleNl(record.title)} ${record.number}`,
     `Datum: ${dateNl(record.invoice_date)}`,
     `Creditering van factuur ${record.credit_for} van ${dateNl(record.credit_for_date)}`,
-    `${record.description}`,
-    `Totaal gecrediteerd: ${record.currency} ${record.amount_gross} (${vatNl(record)})`,
+    `${descNl(record)}`,
+    `Totaal gecrediteerd: ${record.currency} ${moneyNl(record.amount_gross)} (${vatNl(record)})`,
     ``,
     record.partial ? 'Dit is een gedeeltelijke creditering. De rest van die factuur blijft staan.' : '',
     noteNl(record.note),
@@ -121,8 +137,8 @@ function creditNoteMail(record) {
       : `Your payment has been refunded, so the invoice below has been credited.`,
     ``,
     `${record.title} ${record.number}`,
-    `Date: ${record.invoice_date}`,
-    `Credit for invoice ${record.credit_for} of ${record.credit_for_date}`,
+    `Date: ${dateEn(record.invoice_date)}`,
+    `Credit for invoice ${record.credit_for} of ${dateEn(record.credit_for_date)}`,
     `${record.description}`,
     `Total credited: ${record.currency} ${record.amount_gross} (${vatEn(record)})`,
     ``,
@@ -133,10 +149,7 @@ function creditNoteMail(record) {
     ``,
     record.seller.name,
   ]);
-  return {
-    subject: planExpiry.bilingualSubject(subjectNl, subjectEn),
-    text: planExpiry.bilingualText(nl.join('\n'), en.join('\n')),
-  };
+  return arrange(record, subjectNl, subjectEn, nl, en);
 }
 
 module.exports = { TITLE_NL, NOTE_NL, BUYER_HINT_NL, invoiceMail, creditNoteMail };

@@ -147,9 +147,10 @@ for (const s of ['&euro;29<', 'Annual &euro;290 excl.']) {
 ok('Firm excl-btw amounts visible in the ParaSend grid');
 
 // Excl-btw framing plus the incl-21% checkout notice.
-assert(/excl\. btw/.test(html), 'missing "excl. btw" mention');
-assert(/incl\. 21% btw/.test(html), 'missing "incl. 21% btw" checkout notice');
-ok('page states excl. btw and that checkout charges incl. 21% btw');
+assert(/excl\. VAT/.test(html), 'missing "excl. VAT" mention (English page, acceptatie 3.1.1 taal 53)');
+assert(/incl\. 21% VAT/.test(html), 'missing "incl. 21% VAT" checkout notice');
+assert(!/\bbtw\b/.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'the English pricing page says btw; it says VAT');
+ok('page states excl. VAT and that checkout charges incl. 21% VAT');
 
 // The Community limits on the page are the ones the relay actually enforces.
 //
@@ -996,7 +997,11 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert(body.includes(`&euro;${nl(yearlyIncl)} incl. btw (&euro;${yearlyExcl} excl.)`), 'the yearly line must be the catalog yearly amount');
   // Since 05-10-2026 the line says who it is for: a larger organisation, and
   // the one address to write to. Still no Business button on this page.
-  assert(/Grotere organisatie\? Neem contact op: <a href="mailto:privacy@paramant\.app/.test(body), 'Business and Enterprise are reached through "Grotere organisatie? Neem contact op", with the contact address');
+  // Since acceptatie 3.1.1 (taal 5) the line names Business, on request, with
+  // what it adds and its price, and the table has a Business column: the same
+  // plans as the English page, but still no Business button or card.
+  assert(/Grotere organisatie\? Dan is er Business, op aanvraag: [^<]*Neem contact op: <a href="mailto:privacy@paramant\.app/.test(body), 'Business is reached through "Grotere organisatie? Dan is er Business, op aanvraag", with the contact address');
+  assert(body.includes('<th scope="col">Business (op aanvraag)</th>'), 'the Dutch table names Business as on request');
   assert(!/class="tier-card|data-billing-plan="business"|>Business<|>Enterprise</.test(body), 'no Business or Enterprise card on the Dutch /pricing');
 
   const lim = (tier, dim) => tiers.tierLimit(tier, dim);

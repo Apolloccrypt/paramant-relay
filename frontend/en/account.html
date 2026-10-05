@@ -158,7 +158,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=3"></script>
+<script src="/js/format-date.js?v=4"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -167,11 +167,11 @@ main.acct input::placeholder { color: var(--ink-3); }
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -188,11 +188,11 @@ main.acct input::placeholder { color: var(--ink-3); }
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -271,11 +271,11 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section class="acct-card" id="passkey-section">
-  <div class="acct-kicker">Passkey sign-in &middot; WebAuthn, device-bound</div>
+  <div class="acct-kicker">Passkey sign-in</div>
   <h2>Passkey sign-in.</h2>
   <p class="acct-lead">
     Sign in with Face ID, Touch ID, Windows Hello or a security key, without typing a code.
-    A passkey changes your security. So we first ask for your current 6-digit code.
+    For your safety we first ask for your 6-digit code.
   </p>
   <div class="acct-block">
     <h3>Your passkeys</h3>
@@ -312,7 +312,7 @@ main.acct input::placeholder { color: var(--ink-3); }
       </div>
     </div>
     <div class="acct-block">
-      <h3>Browser vault</h3>
+      <h3>Key in this browser</h3>
       <p style="margin:0 0 12px" id="vault-status" class="small">Checking this browser...</p>
       <p class="small"><strong>Your signing key is encrypted in this browser and opened only with your passkey (Face ID / Touch ID / security key). We never see it. If you lose this device, set up signing again on a new one. Your account keeps every public key, so old signatures stay verifiable.</strong></p>
     </div>
@@ -324,8 +324,8 @@ main.acct input::placeholder { color: var(--ink-3); }
       We create your signing key here, in this browser.
       Only you hold it. You set it up, and open it each time you sign, with the same
       passkey you sign in with (Face ID, Touch ID, or a security key). So you need no passphrase and no extra
-      code. No passkey in this browser? You can still
-      sign at <a href="/en/sign">/sign</a> with your authenticator code instead.
+      code. No passkey in this browser? Then you sign on the
+      <a href="/en/sign">Sign</a> page with your authenticator code.
     </p>
     <div class="acct-field">
       <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optional, e.g. iPhone)" autocomplete="off">
@@ -509,7 +509,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-kicker">Deactivate account &middot; no access after this</div>
   <h2>Deactivate account.</h2>
   <p class="acct-lead">
-    This deactivates your account and its API key stops working. We remove your sessions and your authenticator setup. The account record is retained.
+    This deactivates your account and its API key stops working. Your sessions, your authenticator setup and any open signing requests go. We erase your email address and other personal data. Invoices are kept for as long as tax law requires.
   </p>
   <button type="button" class="btn btn-danger" id="delete-account">Deactivate account</button>
 </section>
@@ -519,16 +519,16 @@ main.acct input::placeholder { color: var(--ink-3); }
 </main>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=20" defer></script>
+<script src="/js/nav-auth.js?v=21" defer></script>
 <script src="/js/account-api-keys.js?v=4" defer></script>
-<script src="/js/plan-terms.js?v=1"></script>
-<script src="/js/account.inline1.js?v=17"></script>
+<script src="/js/plan-terms.js?v=2"></script>
+<script src="/js/account.inline1.js?v=18"></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
 <script src="/js/redeem-code.js?v=5" defer></script>
 
-<script type="module" src="/js/account.inline2.js?v=9"></script>
+<script type="module" src="/js/account.inline2.js?v=10"></script>
 <script type="module" src="/js/passkey.js?v=10"></script>
-<script type="module" src="/js/signing-enrol.js?v=20"></script>
+<script type="module" src="/js/signing-enrol.js?v=21"></script>
 <script src="/js/account-theme.js?v=4" defer></script>
 <footer class="legal-strip">
   <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a><span class="legal-sep">&middot;</span><a href="/en/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/account" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></span>
