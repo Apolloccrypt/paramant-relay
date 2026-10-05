@@ -281,7 +281,8 @@ jobs:
                 test/counter-atomicity-gate.test.js test/public-projection-gate.test.js \
                 test/guess-budget-gate.test.js test/parasign-cosign-parties.test.js \
                 test/parasign-envelope-index.test.js \
-                test/quota-sign-hold-race.test.js test/backup-code-race.test.js
+                test/quota-sign-hold-race.test.js test/backup-code-race.test.js \
+                test/rate-limit-sliding.test.js
             } | sort -u)
           echo "$suites" | sed 's/^/  /'
           node --test --test-reporter=tap $suites 2>&1 | tee /tmp/relay-routes.log

@@ -186,6 +186,8 @@ test('without PARASIGN_PUBLIC_ORIGIN a self-host links to its own RELAY_SELF_URL
   const r = await srv.get(`/v1/envelopes/${c.json.id}/receipt`, { headers: bearer(k.json.key) });
   assert.strictEqual(r.status, 200, r.text);
   assert.strictEqual(r.json.notary.relay_pubkey_url, SELF + '/v2/pubkey');
+  // matrix API-16-N: the proof itself names the relay that notarised it.
+  assert.strictEqual(r.json.notary.relay_id, SELF, 'the .psign names the self-host, inside the notary signature');
   assert.match(srv.log(), /parasign_public_origin_unset[^\n]*relay\.selfhost\.example/, 'the boot log says which origin it uses');
   await srv.stop();
   did();

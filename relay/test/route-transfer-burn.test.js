@@ -571,7 +571,7 @@ test('the /v2/dl link needs no API key, burns once, and is 410 afterwards', asyn
   const got = await srv.get(`/v2/dl/${token}/get`);
   assert.strictEqual(got.status, 200);
   assert.ok(got.buf.equals(b.payload));
-  assert.strictEqual(got.headers['x-burned'], 'true');
+  assert.strictEqual(got.headers['x-burned'], 'on-delivery');
 
   const again = await srv.get(`/v2/dl/${token}/get`);
   assert.strictEqual(again.status, 410, 'a used link is gone for good');
