@@ -199,14 +199,14 @@ footer a{color:var(--ink);text-decoration:none}
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -220,14 +220,14 @@ footer a{color:var(--ink);text-decoration:none}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/privacy" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/privacy" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
@@ -244,7 +244,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>How sending works (the ParaSend web app)</h2>
 <p>Files sent through the web app are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext on that path. The one place it does is the hosted signing ceremony on the <code>/v1</code> API, where the document is sent to us so that we can run the ceremony; we hold it, sealed at rest under our own key, until that envelope ends.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link through the API before that same destruction, up to 10 on Firm and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
+<p>Files travel encrypted in blocks of at most 5 MB: in the live hand-over in blocks padded to exactly 5 MB, for a one-time link or a send to a person without padding, at the encrypted size. Each block exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link through the API before that same destruction, up to 10 on Firm and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
 <p>Community plan blobs expire after 1 hour maximum. Firm blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier once the last read of the link is spent.</p>
 
 <h2>How ParaSign document delivery works</h2>
@@ -256,7 +256,7 @@ footer a{color:var(--ink);text-decoration:none}
 <table>
 <thead><tr><th>Data</th><th>Purpose</th><th>Storage</th><th>Shared</th></tr></thead>
 <tbody>
-<tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
+<tr><td>Encrypted blob (blocks up to 5 MB; padded only in the live hand-over)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
 <tr><td>ParaSign encrypted document capsule</td><td>Deliver the document with a signing request</td><td>Redis &middot; expires with the envelope</td><td>Hosting provider stores ciphertext only</td></tr>
 <tr><td>Personal ParaSign invitation link</td><td>Bind one recipient to one encrypted document and signing slot</td><td>Processed during delivery; not written to application logs</td><td>Resend (United States) only when you choose email delivery</td></tr>
 <tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted after its last read</td><td>Never</td></tr>
@@ -393,6 +393,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=14" defer></script>
+<script src="/js/nav-auth.js?v=15" defer></script>
 </body>
 </html>

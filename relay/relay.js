@@ -39,6 +39,7 @@ const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
 const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
+const dpaMail       = require('./lib/dpa-mail');        // DPA confirmation, NL or EN
 const rateLimit     = require('./lib/rate-limit');
 const mailer        = require('./lib/mail');            // one way out, carrier is a setting
 const authThrottle  = require('./lib/auth-throttle');
@@ -5154,7 +5155,12 @@ async function handleRelayRequest(req, res) {
       } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
     } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
 
-    let tlsStatus = 'yellow', tlsDetail = 'TLS terminated at the edge (not on this relay)';
+    // A relay behind a proxy that holds the certificate is the normal setup
+    // (install.sh, docker-compose), and a new install has no API keys yet.
+    // Neither is a warning about this relay, so both report 'info': shown,
+    // never counted in the verdict. A fresh install used to read "Actief, met
+    // waarschuwingen" forever and never "Alles werkt" (fase 2 SITE-13-A).
+    let tlsStatus = 'info', tlsDetail = 'TLS terminated at the edge (not checked on this relay)';
     try {
       const certFile = process.env.TLS_CERT_FILE || nodePath.join(process.cwd(), 'deploy/certs/cert.pem');
       if (fs.existsSync(certFile) && typeof crypto.X509Certificate === 'function') {
@@ -5166,7 +5172,8 @@ async function handleRelayRequest(req, res) {
     } catch (e) { tlsDetail = 'cert unreadable: ' + (e.code || e.message); }
     add('tls', tlsStatus, tlsDetail);
 
-    add('users', apiKeys.size > 0 ? 'green' : 'yellow', apiKeys.size + ' API key(s) loaded');
+    add('users', apiKeys.size > 0 ? 'green' : 'info',
+      apiKeys.size > 0 ? apiKeys.size + ' API key(s) loaded' : 'no API keys yet (normal on a new install)');
     add('audit', 'green', 'Merkle hash chain active');
 
     // The store, said out loud. Until now nothing in either health route
@@ -5188,7 +5195,7 @@ async function handleRelayRequest(req, res) {
       }
     }
 
-    const rank = { green: 0, yellow: 1, red: 2 };
+    const rank = { info: 0, green: 0, yellow: 1, red: 2 };
     const overall = checks.reduce((m, c) => (rank[c.status] > rank[m] ? c.status : m), 'green');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ overall, version: VERSION, sector: SECTOR, checks }));
@@ -6788,33 +6795,17 @@ async function handleRelayRequest(req, res) {
       const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: maskIp(getClientIp(req)) });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
-      // Send countersigned DPA email
+      // Send countersigned DPA email, in the language the page was signed in.
       if (mailer.gereed()) {
-        const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
-          <p style="color:#888;margin-bottom:24px">This email confirms that a Data Processing Agreement (GDPR Art. 28) has been signed on behalf of <strong style="color:#ededed">${escHtml(org)}</strong>.</p>
-          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px;font-size:13px">
-            <div style="color:#555;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Agreement details</div>
-            <table style="width:100%;border-collapse:collapse">
-              <tr><td style="color:#555;padding:4px 0;width:40%">Reference</td><td style="color:#ededed">${ref}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${escHtml(version)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
-            </table>
-          </div>
-          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
-          <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
-        </div>`;
+        const { subject: dpaSubject, html } = dpaMail.dpaConfirmation({
+          name, title, org, ref, signed_at, version, lang: d.lang === 'nl' ? 'nl' : 'en' });
         // Through the one door, like every other message. A DPA confirmation
         // that talks about EU jurisdiction should not be carried out of it.
         mailer.stuur({
           from: 'PARAMANT <privacy@paramant.app>',
           to: email,
           cc: 'privacy@paramant.app',
-          subject: `DPA signed — ${org} (${ref})`,
+          subject: dpaSubject,
           html,
         }).then(r => {
           if (r.ok) log('info', 'dpa_email_sent', { ref, email: maskEmail(email), provider: r.provider });

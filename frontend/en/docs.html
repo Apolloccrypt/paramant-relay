@@ -244,14 +244,14 @@ tr:last-child td{border-bottom:none}
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -265,14 +265,14 @@ tr:last-child td{border-bottom:none}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/docs" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/docs" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
@@ -1010,7 +1010,7 @@ python3 deploy/paramant-admin.py sync</pre>
       <tr><th>Date</th><th>Auditor</th><th>Findings</th><th>Status</th></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (verification)</td><td>14 total (1H · 8M · 5L)</td><td>All resolved: e6f216d</td></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (independent)</td><td>6 total (3H · 3M)</td><td>All resolved: 0db3ef0</td></tr>
-      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>Fixed in 0db3ef0, except two: #4 (critical, filename readable in relay RAM) and #14 (CT tree not RFC 6962) are still open, see <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a></td></tr>
+      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>Fixed in 0db3ef0, except three: #4 (critical, filename readable in relay RAM), #6 (high, key zeroization in the Python scripts only works on CPython and does not warn yet) and #14 (CT tree not RFC 6962) are still open, see <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a></td></tr>
     </table>
     <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)" rel="noopener">SECURITY.md</a>. To report a vulnerability, email <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
 
@@ -1115,7 +1115,7 @@ python3 deploy/paramant-admin.py sync</pre>
 
 <script src="/js/docs.inline1.js?v=1"></script>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=14" defer></script>
+<script src="/js/nav-auth.js?v=15" defer></script>
 </main>
 <footer>
   <div class="container-lg">
