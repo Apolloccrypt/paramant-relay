@@ -24,6 +24,13 @@
     verify: [500, 1500, 2900]
   };
 
+  // The stages sit in the hero's markup, inside .home-state, which is its own
+  // stacking context (z-index 2). Moved to <body> they cover the nav as a
+  // dialog should, instead of opening underneath it.
+  Array.prototype.forEach.call(document.querySelectorAll('[data-wp-stage]'), function (stage) {
+    document.body.appendChild(stage);
+  });
+
   var reduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   var timers = [];
   var open = null;      // the stage that is showing
