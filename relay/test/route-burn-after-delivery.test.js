@@ -37,32 +37,44 @@ const upload = (b) => srv.post('/v2/inbound', {
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Reads the first chunk of the body and breaks the connection, like a receiver
-// on a train going into a tunnel.
-async function readFirstChunkAndAbort(path, headers = {}) {
-  const ac = new AbortController();
-  let got = 0;
-  try {
-    const r = await fetch(srv.base + path, { headers, signal: ac.signal });
-    const rd = r.body.getReader();
-    const c = await rd.read();
-    got = c.value ? c.value.length : 0;
-    ac.abort();
-  } catch (_) { /* the abort itself */ }
-  return got;
+// Reads the first chunk of the body, stops reading and breaks the connection,
+// like a receiver on a train going into a tunnel. A raw socket that stops
+// reading, so the relay's last write waits for it: fetch() keeps pulling
+// from the socket after the first chunk, and on loopback the kernel buffers
+// hold several MB, so 'finish' could fire before the abort (and once the
+// last byte was written the read counts, review #565 B1).
+function readFirstChunkAndAbort(path, headers = {}) {
+  const port = Number(new URL(srv.base).port);
+  return new Promise((resolve) => {
+    const s = net.connect(port, '127.0.0.1');
+    let got = 0; let hdr = false; let done = false;
+    const end = () => { if (done) return; done = true; resolve(got); };
+    s.on('connect', () => s.write(`GET ${path} HTTP/1.1\r\nHost: x\r\n${Object.entries(headers).map(([k, v]) => `${k}: ${v}\r\n`).join('')}\r\n`));
+    s.once('data', (d) => {
+      const i = d.indexOf('\r\n\r\n');
+      hdr = i >= 0; got = hdr ? d.length - i - 4 : 0;
+      s.pause();
+      setTimeout(() => { s.destroy(); end(); }, 200);
+    });
+    s.on('error', end);
+    s.on('close', end);
+  });
 }
 
 before(async () => {
   srv = await boot({
     tag: 'burn-after-delivery',
-    env: { DELIVERY_SETTLE_MS: '500' },
+    // Blobs bigger than the 5 MB default, so a reader that stops after the
+    // first chunk is still waiting while the relay's last write is pending:
+    // loopback socket buffers take several MB before 'finish'.
+    env: { DELIVERY_SETTLE_MS: '500', MAX_BLOB: String(32 * 1024 * 1024) },
     users: { api_keys: [{ key: KEY, plan: 'pro', active: true, email: 'pro@example.test', account_id: 'acct_bad' }] },
   });
 });
 after(async () => { await killAll(); summary('route-burn-after-delivery', checks); });
 
 test('GET /v2/outbound broken off after the first chunk keeps the blob', async () => {
-  const b = bigBlob(4);
+  const b = bigBlob(16);
   assert.equal((await upload(b)).status, 200);
   const got = await readFirstChunkAndAbort(`/v2/outbound/${b.hash}`, { 'X-Api-Key': KEY });
   assert.ok(got > 0 && got < b.payload.length, `read ${got} of ${b.payload.length} bytes`);
@@ -90,7 +102,7 @@ test('a complete GET /v2/outbound still burns, and the next one is 404 at once',
 });
 
 test('the claimless /v2/dl link says nothing is burned yet, and a broken download keeps the link', async () => {
-  const b = bigBlob(4);
+  const b = bigBlob(16);
   const up = await upload(b);
   const token = up.json.download_token;
   const got = await readFirstChunkAndAbort(`/v2/dl/${token}/get`, { 'User-Agent': 'curl/8.9.1' });
@@ -165,5 +177,95 @@ test('a complete download on a connection that closes is gone after the window, 
   await sleep(1200);
   const gone = await srv.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': KEY } });
   assert.equal(gone.status, 404);
+  did();
+});
+
+// Review #565, B1: a reader that takes every byte and then resets the
+// connection on purpose (SO_LINGER 0) looks like a broken line. Putting the
+// blob back on that reset let one link be downloaded without end (6 of 6 on
+// both routes). Once the last byte was written the read counts.
+function readAllThenReset(path, headers) {
+  const port = Number(new URL(srv.base).port);
+  return new Promise((resolve) => {
+    const s = net.connect(port, '127.0.0.1');
+    let buf = Buffer.alloc(0); let hdrEnd = -1; let status = 0; let len = 0; let done = false;
+    const end = (full) => { if (done) return; done = true; resolve({ status, full }); };
+    s.on('connect', () => s.write(`GET ${path} HTTP/1.1\r\nHost: x\r\n${Object.entries(headers).map(([k, v]) => `${k}: ${v}\r\n`).join('')}\r\n`));
+    s.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      if (hdrEnd < 0) {
+        const i = buf.indexOf('\r\n\r\n'); if (i < 0) return;
+        hdrEnd = i + 4;
+        const h = buf.subarray(0, i).toString();
+        status = Number(h.split(' ')[1]);
+        const m = h.match(/content-length:\s*(\d+)/i); len = m ? Number(m[1]) : 0;
+        if (status !== 200) { s.destroy(); return end(false); }
+      }
+      if (buf.length - hdrEnd >= len) { s.resetAndDestroy(); end(true); }
+    });
+    s.on('error', () => end(false));
+    s.on('close', () => end(false));
+  });
+}
+
+for (const route of ['dl', 'outbound']) {
+  test(`read every byte, then reset: /v2/${route} delivers exactly once`, async () => {
+    const b = bigBlob(1);
+    const up = await upload(b);
+    assert.equal(up.status, 200);
+    const path = route === 'dl' ? `/v2/dl/${up.json.download_token}/get` : `/v2/outbound/${b.hash}`;
+    const headers = route === 'dl' ? { 'User-Agent': 'curl/8.9.1' } : { 'X-Api-Key': KEY };
+    let full = 0;
+    for (let i = 0; i < 4; i++) {
+      const r = await readAllThenReset(path, headers);
+      if (r.full) full++;
+      else break;
+      await sleep(800); // past DELIVERY_SETTLE_MS (500 ms in this suite)
+    }
+    assert.equal(full, 1, `${full} complete downloads of one burn-after-read blob`);
+    did();
+  });
+}
+
+// Review #565, H1: a download out of the retry hold closed cleanly inside the
+// window again and set a new hold, so the same key could chain it (8 of 8).
+// The hold is there once per blob.
+test('the retry hold on /v2/outbound cannot be chained', async () => {
+  const b = bigBlob(1);
+  assert.equal((await upload(b)).status, 200);
+  const port = Number(new URL(srv.base).port);
+  let full = 0;
+  for (let i = 0; i < 6; i++) {
+    const r = await new Promise((resolve) => {
+      http.get({ host: '127.0.0.1', port, path: `/v2/outbound/${b.hash}`, headers: { 'X-Api-Key': KEY, Connection: 'close' }, agent: false }, (res) => {
+        const parts = []; res.on('data', (d) => parts.push(d));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(parts) }));
+      }).on('error', () => resolve({ status: 0 }));
+    });
+    if (r.status !== 200) break;
+    if (r.body.equals(b.payload)) full++;
+    await sleep(100); // inside the window
+  }
+  assert.ok(full <= 2, `${full} complete downloads through the retry hold`);
+  did();
+});
+
+// Broken off before the last byte costs nothing, but not without end: after
+// DL_MAX_FETCHES broken attempts the link is spent.
+test('broken-off downloads are bounded on both routes', async () => {
+  const b = bigBlob(16);
+  const up = await upload(b);
+  const token = up.json.download_token;
+  for (let i = 0; i < 5; i++) await readFirstChunkAndAbort(`/v2/dl/${token}/get`, { 'User-Agent': 'curl/8.9.1' });
+  await sleep(300);
+  const dl = await srv.get(`/v2/dl/${token}/get`, { headers: { 'User-Agent': 'curl/8.9.1' } });
+  assert.equal(dl.status, 410, 'the sixth claimless GET after five broken ones');
+
+  const c = bigBlob(16);
+  assert.equal((await upload(c)).status, 200);
+  for (let i = 0; i < 6; i++) await readFirstChunkAndAbort(`/v2/outbound/${c.hash}`, { 'X-Api-Key': KEY });
+  await sleep(300);
+  const out = await srv.get(`/v2/outbound/${c.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.equal(out.status, 404, 'the seventh GET after six broken ones');
   did();
 });

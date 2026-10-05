@@ -201,12 +201,15 @@ burns anything:
   with `POST /v2/dl/:token/ack`. A transfer that dies mid-flight leaves the token
   spendable, so a dropped connection is a retry and not a lost file.
 - Without a claim (old SDKs and scripts) nothing burns until the whole body is
-  delivered. When the last byte leaves the relay the link is hidden (a second
-  `GET` answers `410` at once), and the bytes are destroyed only after the
-  connection stayed clean: the receiver closed it normally or kept it open
-  without a reset for three seconds. A receiver that breaks off mid-download
-  (its side closes or resets the connection with bytes unread) gets the link
-  back and can simply try again. The response says `X-Burned: on-delivery`.
+  delivered, meaning the relay has written the last byte to the connection.
+  From then on the read counts, whatever the connection does next: a reset
+  after the last byte cannot be told apart from a reader that took every byte
+  and reset on purpose. A receiver that breaks off before that point gets the
+  link back and can simply try again, at most five times per link. Bear in
+  mind that the operating system buffers a few MB, so on a fast line the last
+  byte leaves the relay well before it arrives. The link is hidden from the
+  last byte on (a second `GET` answers `410` at once). The response says
+  `X-Burned: on-delivery`.
   The claim mode stays the exact one: there the burn waits for the receiver's
   own confirmation that it decrypted the file.
 
@@ -229,15 +232,17 @@ record of what happened to the token, not a signed statement.
 ### GET /v2/outbound/:hash: Download (burn-on-read)
 
 The read counts, and a burning read destroys the blob, only once the whole
-response was delivered. While it is being sent and right after, the blob is
-hidden: a second `GET` answers `404`. If your client breaks off mid-download
-(it closes or resets the connection with bytes unread), the relay puts the blob
-back and the next `GET` serves it again in full. A proxy in front of the relay
-(nginx, docker's port proxy) can hide that break: it has read every byte and
-closes towards the relay normally. So a connection that closes within three
-seconds of the last byte keeps the blob for three more seconds, for a retry by
-the same API key only. Any other key gets `404`. After that, or after three
-seconds on an open connection without a reset, a complete download is gone for
+response was delivered, meaning the relay has written the last byte to the
+connection. While it is being sent and right after, the blob is hidden: a
+second `GET` answers `404`. If your client breaks off before the last byte
+(it closes or resets the connection), the relay puts the blob back and the
+next `GET` serves it again in full, at most five times per blob. A reset after
+the last byte counts as a delivery. A proxy in front of the relay (nginx,
+docker's port proxy) can hide a break: it has read every byte and closes
+towards the relay normally. So a connection that closes within three seconds
+of the last byte keeps the blob for three more seconds, for one retry by the
+same API key only, once per blob. Any other key gets `404`. After that, or
+after three seconds on an open connection, a complete download is gone for
 good. For a delivery confirmed by your own client after
 decryption, use the share link with `?claim=` (above).
 

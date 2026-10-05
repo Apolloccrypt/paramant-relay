@@ -542,7 +542,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
     <p>TTL and <code>max_views</code> are both clamped to the plan maximum: Community gets 1 hour and 1 read, Firm 24 hours and up to 10 reads, Enterprise 7 days and 100 reads. Leave <code>max_views</code> out and the link burns on the first read on every plan, which is what the ParaSend web app does. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>Uses one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Firm. A read only counts once the whole blob was delivered: if your connection breaks off halfway, it is still there and you fetch it again. After the last delivered read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery then.</p>
+    <p><strong>Uses one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Firm. A read only counts once the whole blob was delivered, meaning the relay has sent the last byte: if your connection breaks off before that, it is still there and you fetch it again, at most five times. After the last delivered read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery then.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 

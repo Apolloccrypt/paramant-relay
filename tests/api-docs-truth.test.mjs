@@ -57,12 +57,15 @@ test('API-30-C / API-30-N: /v2/dl answers as documented (403 for preview bots, a
 
 test('API-24-K / API-30-K / API-35-K: nothing burns before the whole body is delivered, and the docs say so', () => {
   assert.match(RELAY, /function afterDelivery\(req, res, \{ onFinish, onDelivered, onAborted, onCleanCloseEarly \}\)/);
-  assert.match(API, /for a retry by\s+the same API key only/);
   assert.match(RELAY, /'X-Burned': 'on-delivery'/);
   assert.doesNotMatch(RELAY, /'X-Burned': 'true'/, 'no response says burned before a byte has left');
-  assert.match(API, /Without a claim \(old SDKs and scripts\) nothing burns until the whole body is\s+delivered\./);
+  assert.match(API, /Without a claim \(old SDKs and scripts\) nothing burns until the whole body is\s+delivered, meaning the relay has written the last byte/);
   assert.doesNotMatch(API, /A connection that breaks after that point costs the file\./);
-  assert.match(API, /If your client breaks off mid-download\s+\(it closes or resets the connection with bytes unread\), the relay puts the blob\s+back/);
+  assert.match(API, /If your client breaks off before the last byte\s+\(it closes or resets the connection\), the relay puts the blob back/);
+  // Review #565 B1/H1: a reset after the last byte counts, the hold is once per blob.
+  assert.match(API, /A reset after\s+the last byte counts as a delivery\./);
+  assert.match(API, /for one retry by the\s+same API key only, once per blob/);
+  assert.match(RELAY, /if \(!burned \|\| !apiKey \|\| entry\.retryHeld\) return delivered\(\);/);
   assert.match(section(NL, 'outbound'), /Een lezing telt pas als de hele blob is afgeleverd/);
   assert.match(section(EN, 'outbound'), /A read only counts once the whole blob was delivered/);
 });

@@ -2863,9 +2863,17 @@ function zeroBuffer(buf) {
 // every byte closes cleanly (FIN) or keeps the connection for its next
 // request; a client that stopped early closes with unread bytes in its
 // buffer, and its kernel answers with a reset (ECONNRESET / EPIPE here).
-// So the bytes are hidden on 'finish' (a second reader gets 404 at once) and
-// only destroyed once the socket has stayed clean for DELIVERY_SETTLE_MS or
-// closed without an error. A reset before that puts the blob back.
+// But a reset after 'finish' cannot be told apart from a reader that took
+// every byte and then reset on purpose (SO_LINGER 0): putting the blob back
+// on that reset made burn-after-delivery repeatable without end (review #565,
+// B1). And a reader that stops 16 bytes short already has all the plaintext
+// (one AES-GCM stream, tag at the end). So once the last byte was written the
+// read counts, whatever the socket does next; only a download broken off
+// before 'finish' costs nothing, and those are bounded too (DL_MAX_FETCHES).
+// The bytes are hidden on 'finish' and destroyed after DELIVERY_SETTLE_MS or
+// on close. The one exception is a clean close inside that window on
+// /v2/outbound, which is what a proxy in front of us does when its client gave
+// up: the same key may fetch once more (onCleanCloseEarly), once per blob.
 // The claim mode (?claim= + ack on /v2/dl) stays the exact path.
 // hash -> { entry, key, until, timer }: see onCleanCloseEarly on GET /v2/outbound.
 const outboundRetryHold = new Map();
@@ -2889,9 +2897,11 @@ function afterDelivery(req, res, { onFinish, onDelivered, onAborted, onCleanClos
     state = 'delivered'; cleanup();
     try { onDelivered(); } catch (e) { log('warn', 'delivery_handler_failed', { err: e.message }); }
   };
-  function onSockError(e) { abort((e && e.code) || 'socket_error'); }
+  // After 'finish' a reset is a delivery, never an abort (see above).
+  function onSockError(e) { if (state === 'settling') return deliver(); abort((e && e.code) || 'socket_error'); }
   function onSockClose(hadError) {
-    if (hadError || state === 'sending') return abort(hadError ? 'reset' : 'closed_before_finish');
+    if (state === 'sending') return abort(hadError ? 'reset' : 'closed_before_finish');
+    if (hadError) return deliver();
     // A clean close inside the window is what a complete download looks like,
     // and also what a proxy in front of us does when ITS client gave up: the
     // proxy had already read every byte, so no reset reaches us. A caller
@@ -2909,7 +2919,7 @@ function afterDelivery(req, res, { onFinish, onDelivered, onAborted, onCleanClos
     if (state !== 'sending') return;
     state = 'settling';
     try { if (onFinish) onFinish(); } catch (e) { log('warn', 'delivery_finish_handler_failed', { err: e.message }); }
-    if (!sock || sock.destroyed) { if (sock && sock.errored) return abort('reset'); return deliver(); }
+    if (!sock || sock.destroyed) return deliver();
     timer = setTimeout(deliver, DELIVERY_SETTLE_MS);
     if (timer.unref) timer.unref();
   });
@@ -7681,6 +7691,9 @@ async function handleRelayRequest(req, res) {
       blobDrop(blobHash);
       return gone('exhausted');
     }
+    // Counted like a claimed fetch: a download broken off before the last
+    // byte costs nothing, but not more than DL_MAX_FETCHES times (review #565).
+    td.fetches = (td.fetches || 0) + 1;
     td.in_progress = true;
     const legacyTag = 'legacy:' + crypto.randomBytes(8).toString('hex');
     td.in_progress_by = legacyTag;
@@ -7699,9 +7712,9 @@ async function handleRelayRequest(req, res) {
       // and 'finish' would mean "nginx has it", not "the client has it".
       'X-Accel-Buffering': 'no',
     });
-    // Burned only after delivery (matrix API-30-K): hidden on 'finish' so a
-    // second GET answers 410 at once, destroyed once the connection stayed
-    // clean, put back when the receiver's side reset it.
+    // Burned once the last byte was written (matrix API-30-K, review #565 B1):
+    // hidden on 'finish' so a second GET answers 410 at once, destroyed after
+    // the settle window. Broken off before 'finish', nothing was hidden.
     afterDelivery(req, res, {
       onFinish: () => {
         td.used = true; td.gone = 'downloaded'; td.claim = null;
@@ -7713,13 +7726,9 @@ async function handleRelayRequest(req, res) {
         _notifyDownloaded(entry, blobHash, { via: 'link' });
         zeroBuffer(blob);
       },
-      onAborted: (why, afterFinish) => {
+      onAborted: (why) => {
         if (td.in_progress_by === legacyTag) td.in_progress = false;
-        if (afterFinish) {
-          td.used = false; td.gone = null;
-          if (Date.now() < td.expires_ms && !blobStore.has(blobHash)) blobPut(blobHash, entry);
-        }
-        log('warn', 'dl_aborted_before_delivery', { token: token.slice(0,8), hash: blobHash.slice(0,16), why, after_finish: !!afterFinish });
+        log('warn', 'dl_aborted_before_delivery', { token: token.slice(0,8), hash: blobHash.slice(0,16), why, fetch: td.fetches });
       },
     });
     return writeInPieces(res, blob);
@@ -9083,7 +9092,9 @@ async function handleRelayRequest(req, res) {
     let entry = blobStore.get(outm[1]);
     // The same key coming back right after a download whose connection closed
     // within DELIVERY_SETTLE_MS of the last byte: that download may have been
-    // broken off behind a proxy. It gets the blob once more (matrix API-35-K).
+    // broken off behind a proxy. It gets the blob once more (matrix API-35-K),
+    // and only once per blob: the download out of the hold is final (review
+    // #565, H1: the hold could be chained without end).
     if (!entry) {
       const held = outboundRetryHold.get(outm[1]);
       if (held && held.key && held.key === apiKey && Date.now() < held.until) {
@@ -9222,7 +9233,8 @@ async function handleRelayRequest(req, res) {
     afterDelivery(req, res, {
       onDelivered: delivered,
       onCleanCloseEarly: () => {
-        if (!burned || !apiKey) return delivered();
+        if (!burned || !apiKey || entry.retryHeld) return delivered();
+        entry.retryHeld = true;
         const timer = setTimeout(() => {
           const h = outboundRetryHold.get(outHash);
           if (h && h.entry === entry) { outboundRetryHold.delete(outHash); delivered(); }
@@ -9230,7 +9242,14 @@ async function handleRelayRequest(req, res) {
         if (timer.unref) timer.unref();
         outboundRetryHold.set(outHash, { entry, key: apiKey, until: Date.now() + DELIVERY_SETTLE_MS, timer });
       },
+      // Broken off before the last byte: the read does not count, at most
+      // DL_MAX_FETCHES times per blob; after that it counts (review #565).
       onAborted: (why) => {
+        entry.aborts = (entry.aborts || 0) + 1;
+        if (entry.aborts > DL_MAX_FETCHES) {
+          log('warn', 'outbound_aborted_counted', { hash: outHash.slice(0,16), why, aborts: entry.aborts });
+          return delivered();
+        }
         entry.views_remaining = (entry.views_remaining ?? 0) + 1;
         if (burned && Date.now() - entry.ts < entry.ttl && !blobStore.has(outHash)) blobPut(outHash, entry);
         log('warn', 'outbound_aborted_before_delivery', { hash: outHash.slice(0,16), why, restored: burned });
