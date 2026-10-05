@@ -68,7 +68,7 @@ function invoiceMail(record) {
     isInvoice ? '' : noteNl(invoiceMod.RECEIPT_NOTE),
     complete ? '' : `${BUYER_HINT_NL}.`,
     ``,
-    `Het document zit in de bijlage. Al uw documenten blijven beschikbaar op uw accountpagina.`,
+    `Het document zit in de bijlage. U vindt al uw documenten ook op uw accountpagina.`,
     ``,
     record.seller.name,
   ]);
@@ -83,7 +83,7 @@ function invoiceMail(record) {
     isInvoice ? '' : `${invoiceMod.RECEIPT_NOTE}`,
     complete ? '' : `${invoiceMod.BUYER_HINT}.`,
     ``,
-    `The document is attached, and every document stays available on your account page.`,
+    `The document is attached. You can also find all your documents on your account page.`,
     ``,
     record.seller.name,
   ]);
@@ -100,7 +100,7 @@ function creditNoteMail(record) {
   const nl = squeeze([
     chargedBack
       ? `Uw betaling is teruggeboekt. Daarom is de factuur hieronder gecrediteerd.`
-      : `Uw betaling is aan u terugbetaald. Daarom is de factuur hieronder gecrediteerd.`,
+      : `Wij hebben uw betaling terugbetaald. Daarom is de factuur hieronder gecrediteerd.`,
     ``,
     `${titleNl(record.title)} ${record.number}`,
     `Datum: ${dateNl(record.invoice_date)}`,
@@ -111,7 +111,7 @@ function creditNoteMail(record) {
     record.partial ? 'Dit is een gedeeltelijke creditering. De rest van die factuur blijft staan.' : '',
     noteNl(record.note),
     ``,
-    `Het document zit in de bijlage. Al uw documenten blijven beschikbaar op uw accountpagina.`,
+    `Het document zit in de bijlage. U vindt al uw documenten ook op uw accountpagina.`,
     ``,
     record.seller.name,
   ]);
@@ -129,7 +129,7 @@ function creditNoteMail(record) {
     record.partial ? 'This is a partial credit. The remainder of that invoice still stands.' : '',
     record.note || '',
     ``,
-    `The document is attached, and every document stays available on your account page.`,
+    `The document is attached. You can also find all your documents on your account page.`,
     ``,
     record.seller.name,
   ]);

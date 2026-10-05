@@ -68,8 +68,8 @@ const LANGS = [
     alarm: /Ontvangen is mislukt|ongeldig of onvolledig|werkt niet|Opnieuw proberen|Transfer failed|Invalid or missing|cannot be used|Try again|mislukt|Probeer het opnieuw/i, button: 'Zelf iets versturen',
     invalid: /Deze link is ongeldig of onvolledig/, stop: /Deze link werkt niet/ },
   { name: 'en', pre: '/en', empty: /Nothing to pick up yet/, opens: /This page opens by itself from the link you were sent\./,
-    alarm: /Transfer failed|Invalid or missing|cannot be used|Try again/i, button: 'Send something yourself',
-    invalid: /Invalid or missing session token/, stop: /cannot be used/ },
+    alarm: /Transfer failed|Invalid or missing|invalid or incomplete|cannot be used|Try again/i, button: 'Send something yourself',
+    invalid: /This link is invalid or incomplete/, stop: /cannot be used/ },
 ];
 
 for (const L of LANGS) {

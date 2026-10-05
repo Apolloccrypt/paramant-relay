@@ -13,9 +13,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="link">
-<meta name="description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download.">
+<meta name="description" content="A secure file is waiting for you. It opens in your browser and disappears after one download.">
 <meta property="og:title" content="A secure file is waiting · Paramant">
-<meta property="og:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta property="og:description" content="A secure file is waiting for you. It opens in your browser and disappears after one download. Nothing is stored on the server.">
 <meta property="og:url" content="https://paramant.app/en/get">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -23,7 +23,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="A secure file is waiting · Paramant">
-<meta name="twitter:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta name="twitter:description" content="A secure file is waiting for you. It opens in your browser and disappears after one download. Nothing is stored on the server.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/en/get">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/get">
@@ -188,7 +188,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- No token: public receive landing -->
 <div class="step" id="step-enter">
   <h1>Receive a file</h1>
-  <p class="sub">Paste the secure link you were sent. The file decrypts in your browser. The relay never has the key.</p>
+  <p class="sub">Paste the one-time link you were sent. The file opens in your browser. Paramant never has the key.</p>
   <div class="card">
     <div class="card-body">
       <label class="label" for="enter-link">Your one-time link</label>
@@ -215,7 +215,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- Downloading + decrypting -->
 <div class="step active" id="step-loading">
   <h1>Your file is on its way</h1>
-  <p class="sub">Downloading the encrypted file and decrypting it in your browser. The relay never had the key.</p>
+  <p class="sub">The sealed file is downloading and will open in your browser. Paramant never had the key.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title" id="loading-title">Preparing...</div></div>
@@ -246,10 +246,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     <details class="done-details">
       <summary>What made this safe</summary>
       <div class="done-details-body">
-        <p>The file was decrypted here, in your browser. The file arrived sealed and was opened with the key that sat in the link after the <code>#</code>, which is the part of a link a browser never sends to a server (<code>AES-256-GCM</code>).</p>
-        <p>A link from this web app opens once. The copy on our side was wiped once your browser had the whole file and could open it, so an interrupted download costs you nothing, and the link will not open a second time.</p>
-        <p>The file name travelled inside the sealed bytes rather than beside them, so it was never something we could read either.</p>
-        <p id="done-pdf-note" hidden>The pages above were drawn by this browser out of the file itself. Nothing was sent anywhere to draw them, and nothing of the document stays behind when you close this tab.</p>
+        <p>The file was opened here, in your browser. It arrived sealed (<code>AES-256-GCM</code>) and was opened with the key in the link after the <code>#</code>. A browser never sends that part of a link to a server.</p>
+        <p>A link from this web app works once. Our copy was wiped as soon as your browser had the whole file and could open it. So an interrupted download costs you nothing.</p>
+        <p>The file name was inside the sealed file, not next to it. So we could never read that either.</p>
+        <p id="done-pdf-note" hidden>This browser built the pages above from the file itself. Nothing was sent anywhere for that. When you close this tab, nothing of the document stays behind.</p>
       </div>
     </details>
   </div>
@@ -258,8 +258,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- Burned / already used -->
 <div class="step" id="step-burned">
   <span class="burned-icon" id="burned-icon" style="margin-top:16px">&#x1F525;</span>
-  <p class="burned-msg" id="burned-msg">This file has already been downloaded and burned.</p>
-  <p class="burned-sub" id="burned-sub">Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay.</p>
+  <p class="burned-msg" id="burned-msg">This file has already been downloaded and deleted.</p>
+  <p class="burned-sub" id="burned-sub">A Paramant link works only once. After the download, the file was permanently deleted from our server.</p>
   <a href="/en" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Go to paramant.app</a>
 </div>
 
@@ -320,6 +320,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
-<script src="/js/get.page.js?v=10" defer></script>
+<script src="/js/get.page.js?v=11" defer></script>
 </body>
 </html>

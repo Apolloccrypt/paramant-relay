@@ -194,7 +194,7 @@
     if (included === 2 && used === 2) {
       return '<div class="pa-sign-note" role="status">' +
         t('<span>Dat was uw tweede handtekening deze maand. Voor de volgende heeft u Firm nodig (EUR 29/maand, 100 handtekeningen).</span>',
-          '<span>That\'s your second signature this month. One more and you\'ll need Firm (EUR 29/month, 100 signatures).</span>') +
+          '<span>That was your second signature this month. For the next one you need Firm (EUR 29/month, 100 signatures).</span>') +
         '</div>';
     }
     // The last signature Firm includes. Said once, when it happens, so nobody
@@ -204,8 +204,8 @@
     // the new month, or for a bigger plan.
     if (included === 100 && used === 100) {
       return '<div class="pa-sign-note" role="status">' +
-        t('<span>Dat was de 100e handtekening die uw Firm-plan deze maand bevat. Ondertekenen kan weer vanaf ' + resetDate(quota) + '. Business (EUR 299/maand) bevat 1.000 per maand. <a href="/pricing">Plannen vergelijken</a></span>',
-          '<span>That was the 100th signature your Firm plan includes this month. Signing starts again on ' + resetDate(quota) + '. Business (EUR 299/month) includes 1,000 a month. <a href="/pricing">Compare plans</a></span>') +
+        t('<span>Daarmee zijn de 100 handtekeningen van uw Firm-plan voor deze maand op. Ondertekenen kan weer vanaf ' + resetDate(quota) + '. Business (EUR 299/maand) bevat 1.000 per maand. <a href="/pricing">Plannen vergelijken</a></span>',
+          '<span>That uses up the 100 signatures in your Firm plan for this month. Signing starts again on ' + resetDate(quota) + '. Business (EUR 299/month) includes 1,000 a month. <a href="/pricing">Compare plans</a></span>') +
         '</div>';
     }
     return '';

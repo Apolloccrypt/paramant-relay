@@ -54,7 +54,7 @@ function htmlShell(preheader, bodyHtml, lang = 'en') {
   const nl = lang === 'nl';
   const tagline = nl
     ? 'Paramant, versleuteld versturen en ondertekenen.'
-    : 'Paramant &mdash; post-quantum encrypted file relay.';
+    : 'Paramant, encrypted sending and signing.';
   return `<!DOCTYPE html>
 <html lang="${nl ? 'nl' : 'en'}">
 <head>
@@ -126,33 +126,33 @@ function setupEmail({ token, requestedAt, requestIP, isReset = false, validFor =
     : 'Scan de QR-code met uw authenticator-app om uw account af te maken.';
 
   const resetWarn = isReset
-    ? '\nIMPORTANT: delete your old Paramant entry from your authenticator app\nbefore scanning the new QR code — the old entry no longer works.\n'
+    ? '\nIMPORTANT: first delete the old Paramant entry from your authenticator app.\nIts codes no longer work.\n'
     : '';
 
   const enText = `Hi,
 
-${isReset ? 'Your TOTP authenticator has been reset.' : 'Welcome to Paramant.'} To ${isReset ? 'reset your' : 'finish setting up your'} account,
-connect an authenticator app. This is what Paramant uses instead of a password.
+${isReset ? 'Your authenticator app has been disconnected.' : 'Welcome to Paramant.'} Connect ${isReset ? 'a new authenticator app to use your account again' : 'an authenticator app to finish your account'}.
+Paramant uses it instead of a password.
 
-Complete setup:
+${isReset ? 'Set up new authenticator app' : 'Finish your account'}:
 ${url}
 ${resetWarn}
 The link opens a page with a QR code. Scan it with your authenticator app
-(Google Authenticator, Authy, 1Password, or any TOTP app). You can also
-enter the secret manually if scanning does not work.
+(for example Google Authenticator, Authy or 1Password). If scanning does
+not work, you can type the key in by hand.
 
-This link is valid for ${validFor}.
+This link works for ${validFor}.
 
 Why an authenticator?
 
-Passwords get reused, stolen, or phished. A TOTP code from your phone
-cannot be typed into a fake site or intercepted in a credential dump.
-It is the same mechanism your bank uses.
+Passwords get reused, stolen or phished. A code from your phone
+cannot be typed into a fake site or leak in a password dump.
+Your bank uses the same method.
 
-After setup you receive 10 backup codes. Save them somewhere safe
-(password manager, printed copy in a drawer) in case you lose your phone.
+After setup you get 10 backup codes. Keep them somewhere safe
+(a password manager, or on paper in a drawer) in case you lose your phone.
 
-${isReset ? 'Did not request this reset? Contact support immediately at hello@paramant.app.' : 'Did not sign up for Paramant? Ignore this email. No account is created until you complete setup.'}
+${isReset ? 'Did you not ask for this reset? Email hello@paramant.app straight away.' : 'Did you not sign up for Paramant? Then you can ignore this email. There is no account until setup is finished.'}
 
 Request details:
   Time:    ${formatTS(requestedAt || Date.now())}
@@ -163,23 +163,23 @@ https://paramant.app`;
 
   const resetBanner = isReset
     ? `<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:0 0 20px 0;">
-        <p style="margin:0;line-height:1.5;color:#92400E;font-size:14px;"><strong>Authenticator reset.</strong> Delete the old Paramant entry from your app before scanning the new QR code &mdash; the old entry no longer works.</p>
+        <p style="margin:0;line-height:1.5;color:#92400E;font-size:14px;"><strong>Authenticator app disconnected.</strong> First delete the old Paramant entry from your app. Its codes no longer work.</p>
       </div>`
     : '';
 
   const enHtml = `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${isReset ? 'Set up your new Paramant authenticator' : 'Complete your Paramant account setup'}</h1>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${isReset ? 'Set up your new authenticator app' : 'Finish your Paramant account'}</h1>
     ${resetBanner}
-    <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Your TOTP authenticator has been reset.' : 'Welcome to Paramant.'} To ${isReset ? 'reset your' : 'finish setting up your'} account, connect an authenticator app &mdash; this is what Paramant uses instead of a password.</p>
-    ${btn(url, isReset ? 'Set up new authenticator' : 'Complete setup')}
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">The link opens a page with a QR code. Scan it with your authenticator app (Google Authenticator, Authy, 1Password, or any TOTP app). You can also enter the secret manually.</p>
-    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link is valid for <strong>${escHtml(validFor)}</strong>.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Your authenticator app has been disconnected.' : 'Welcome to Paramant.'} Connect ${isReset ? 'a new authenticator app to use your account again' : 'an authenticator app to finish your account'}. Paramant uses it instead of a password.</p>
+    ${btn(url, isReset ? 'Set up new authenticator app' : 'Finish my account')}
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">The link opens a page with a QR code. Scan it with your authenticator app (for example Google Authenticator, Authy or 1Password). You can also type the key in by hand.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link works for <strong>${escHtml(validFor)}</strong>.</p>
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
     <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Why an authenticator?</h2>
-    <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Passwords get reused, stolen, or phished. A TOTP code from your phone cannot be typed into a fake site or intercepted in a credential dump. It is the same mechanism your bank uses.</p>
-    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">After setup you receive 10 backup codes. Save them somewhere safe (password manager, printed copy in a drawer) in case you lose your phone.</p>
+    <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Passwords get reused, stolen or phished. A code from your phone cannot be typed into a fake site or leak in a password dump. Your bank uses the same method.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">After setup you get 10 backup codes. Keep them somewhere safe (a password manager, or on paper in a drawer) in case you lose your phone.</p>
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
-    <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Did not request this reset?</strong> Contact support immediately at <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Did not sign up for Paramant?</strong> Ignore this email. No account is created until you complete setup.'}</p>
+    <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Did you not ask for this reset?</strong> Email <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a> straight away.' : '<strong>Did you not sign up for Paramant?</strong> Then you can ignore this email. There is no account until setup is finished.'}</p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">Time: ${formatTS(requestedAt || Date.now())}<br>IP: ${escHtml(maskIP(requestIP))}</p>
   `;
 
@@ -193,15 +193,15 @@ ${isReset ? 'Nieuwe authenticator-app instellen' : 'Account afmaken'}:
 ${url}
 ${isReset ? '\nBELANGRIJK: verwijder eerst de oude Paramant-regel uit uw authenticator-app.\nDie codes werken niet meer.\n' : ''}
 De link opent een pagina met een QR-code. Scan die met uw authenticator-app
-(Google Authenticator, Authy, 1Password of een andere TOTP-app). Lukt scannen
-niet, dan kunt u de sleutel ook met de hand invullen. U kunt daar ook een passkey kiezen.
+(bijvoorbeeld Google Authenticator, Authy of 1Password). Lukt scannen
+niet, dan vult u de sleutel met de hand in. U kunt daar ook een passkey kiezen.
 
 Deze link werkt ${nlValid}.
 
 Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek
 (wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.
 
-${isReset ? 'Hebt u deze reset niet aangevraagd? Mail dan meteen hello@paramant.app.' : 'Hebt u zich niet aangemeld bij Paramant? Dan kunt u deze mail negeren. Er komt pas een account als het instellen is afgerond.'}
+${isReset ? 'Hebt u deze reset niet aangevraagd? Mail dan meteen hello@paramant.app.' : 'Hebt u zich niet aangemeld bij Paramant? Dan kunt u deze mail negeren. Er is pas een account als u het instellen afrondt.'}
 
 Tijd:  ${formatTS(requestedAt || Date.now())}
 IP:    ${maskIP(requestIP)}
@@ -214,12 +214,12 @@ https://paramant.app`;
     ${isReset ? `<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:0 0 20px 0;">
         <p style="margin:0;line-height:1.5;color:#92400E;font-size:14px;"><strong>Authenticator-app losgekoppeld.</strong> Verwijder eerst de oude Paramant-regel uit uw app. Die codes werken niet meer.</p>
       </div>` : ''}
-    <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Uw authenticator-app is losgekoppeld.' : 'Welkom bij Paramant.'} Koppel een authenticator-app of een passkey om ${isReset ? 'uw account weer te gebruiken' : 'uw account af te maken'}. Die gebruikt Paramant in plaats van een wachtwoord.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Uw authenticator-app is losgekoppeld.' : 'Welkom bij Paramant.'} Koppel een authenticator-app of een passkey om ${isReset ? 'uw account weer te gebruiken' : 'uw account af te maken'}. Paramant gebruikt die in plaats van een wachtwoord.</p>
     ${btn(url, isReset ? 'Nieuwe authenticator-app instellen' : 'Account afmaken')}
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">De link opent een pagina met een QR-code. Scan die met uw authenticator-app (Google Authenticator, Authy, 1Password of een andere TOTP-app). U kunt de sleutel ook met de hand invullen.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">De link opent een pagina met een QR-code. Scan die met uw authenticator-app (bijvoorbeeld Google Authenticator, Authy of 1Password). U kunt de sleutel ook met de hand invullen.</p>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">Deze link werkt <strong>${escHtml(nlValid)}</strong>.</p>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek (wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.</p>
-    <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Deze reset niet aangevraagd?</strong> Mail dan meteen <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Niet aangemeld bij Paramant?</strong> Dan kunt u deze mail negeren. Er komt pas een account als het instellen is afgerond.'}</p>
+    <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Vroeg u deze reset niet aan?</strong> Mail dan meteen <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Niet aangemeld bij Paramant?</strong> Dan kunt u deze mail negeren. Er is pas een account als u het instellen afrondt.'}</p>
   `;
 
   return bilingualMail({
@@ -236,24 +236,21 @@ function resetConfirmationEmail({ confirmToken, requestedAt, requestIP }) {
 
   const enText = `Hi,
 
-Someone requested a reset of your Paramant authenticator (TOTP).
+Someone asked to connect a new authenticator app to your Paramant account.
 
-If this was you, click the link below to confirm. You will then receive
-a second email with your new authenticator setup link.
+Was this you? Confirm with the link below. You then get a second email
+with a link to set up the new app.
 
 Confirm reset:
 ${url}
 
-This link is valid for 1 hour.
+This link works for 1 hour.
 
-If you did not request this, ignore this email. Nothing will change.
-Your current authenticator keeps working as normal.
+Was this not you? Then ignore this email. Nothing changes, and your
+current authenticator app keeps working.
 
-Why two emails?
-
-This two-step flow protects you from accidental or malicious resets.
-An attacker who knows your email address alone cannot force a reset —
-they would also need access to your inbox to click this link.
+Why two emails? Someone who only knows your email address cannot
+force a reset this way. They would also need access to your inbox.
 
 Request details:
   Time: ${formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt))}
@@ -263,17 +260,16 @@ Paramant
 https://paramant.app`;
 
   const enHtml = `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Did you request a TOTP reset?</h1>
-    <p style="margin:0 0 16px 0;line-height:1.6;">Someone requested a reset of your Paramant authenticator (TOTP).</p>
-    <p style="margin:0 0 16px 0;line-height:1.6;">If this was you, click below to confirm. You will then receive a second email with your new authenticator setup link.</p>
-    ${btn(url, 'Confirm TOTP reset')}
-    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link is valid for <strong>1 hour</strong>.</p>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Did you ask for a new authenticator app?</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">Someone asked to connect a new authenticator app to your Paramant account.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;">Was this you? Confirm below. You then get a second email with a link to set up the new app.</p>
+    ${btn(url, 'Confirm reset')}
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link works for <strong>1 hour</strong>.</p>
     <div style="background:#F0F9FF;border-left:3px solid #1D4ED8;padding:12px 16px;margin:0 0 24px 0;">
-      <p style="margin:0;line-height:1.5;color:#0B3A6A;font-size:14px;"><strong>Did not request this?</strong> Ignore this email. Nothing will change. Your current authenticator keeps working as normal.</p>
+      <p style="margin:0;line-height:1.5;color:#0B3A6A;font-size:14px;"><strong>Was this not you?</strong> Then ignore this email. Nothing changes, and your current authenticator app keeps working.</p>
     </div>
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
-    <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Why two emails?</h2>
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:13px;">This two-step flow protects you from accidental or malicious resets. An attacker who knows your email address alone cannot force a reset &mdash; they would also need access to your inbox to click this link.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:13px;">Why two emails? Someone who only knows your email address cannot force a reset this way. They would also need access to your inbox.</p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">
       Time: ${formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt))}<br>
       IP: ${escHtml(maskIP(requestIP))}
@@ -285,15 +281,15 @@ https://paramant.app`;
 
 Iemand vroeg om uw Paramant-account aan een nieuwe authenticator-app te koppelen.
 
-Was u dat, bevestig het dan met de link hieronder. Daarna krijgt u een tweede
-mail met de link om de nieuwe authenticator-app in te stellen.
+Was u dat? Bevestig het dan met de link hieronder. Daarna krijgt u een tweede
+mail met een link om de nieuwe authenticator-app in te stellen.
 
 Reset bevestigen:
 ${url}
 
 Deze link werkt 1 uur.
 
-Was u dit niet, negeer deze mail dan. Er verandert niets en uw huidige
+Was u dit niet? Negeer deze mail dan. Er verandert niets en uw huidige
 authenticator-app blijft gewoon werken.
 
 Waarom twee mails? Wie alleen uw e-mailadres kent, kan zo geen reset
@@ -308,7 +304,7 @@ https://paramant.app`;
   const nlHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Vroeg u om een nieuwe authenticator-app?</h1>
     <p style="margin:0 0 16px 0;line-height:1.6;">Iemand vroeg om uw Paramant-account aan een nieuwe authenticator-app te koppelen.</p>
-    <p style="margin:0 0 16px 0;line-height:1.6;">Was u dat, bevestig het dan hieronder. Daarna krijgt u een tweede mail met de link om de nieuwe authenticator-app in te stellen.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;">Was u dat? Bevestig het dan hieronder. Daarna krijgt u een tweede mail met een link om de nieuwe authenticator-app in te stellen.</p>
     ${btn(url, 'Reset bevestigen')}
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">Deze link werkt <strong>1 uur</strong>.</p>
     <div style="background:#F0F9FF;border-left:3px solid #1D4ED8;padding:12px 16px;margin:0 0 24px 0;">
@@ -326,19 +322,19 @@ https://paramant.app`;
 
 // ── 3. WELCOME / API KEY EMAIL ────────────────────────────────────────────────
 function welcomeEmail({ apiKey, plan, label, sectors }) {
-  const preheader = 'Your Paramant API key is ready. Store it securely.';
+  const preheader = 'Your Paramant API key is ready. Keep it safe.';
   const masked = apiKey.slice(0, 12) + '...' + apiKey.slice(-4);
 
   const text = `Hi,
 
-Your Paramant API key has been created.
+We created your Paramant API key.
 
 Plan:    ${plan}
 Label:   ${label || '(unlabeled)'}
 Sectors: ${(sectors || []).join(', ') || 'all'}
 Key:     ${masked}
 
-The full key was provided separately by the administrator who issued it.
+The administrator who issued the key gave you the full key separately.
 
 What you can do now:
 
@@ -348,9 +344,9 @@ What you can do now:
 
 Storing your key safely:
 
-- Use a password manager — do not store it in plain text
-- Do not commit it to source control (.env files get leaked)
-- Rotate it immediately if you suspect exposure
+- Keep it in a password manager, never in plain text
+- Do not commit it to source control (.env files leak)
+- Replace it straight away if you think someone else has it
 
 Questions? Reply to this email.
 
@@ -366,7 +362,7 @@ https://paramant.app`;
       <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Sectors</td><td style="padding:8px 0;font-family:monospace;font-size:13px;">${escHtml((sectors || []).join(', ') || 'all')}</td></tr>
       <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Key (masked)</td><td style="padding:8px 0;font-family:monospace;font-size:13px;color:#0B3A6A;">${masked}</td></tr>
     </table>
-    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">The full key was provided separately by the administrator who issued it.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">The administrator who issued the key gave you the full key separately.</p>
     <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">What you can do now</h2>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>Use the key in the <code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">X-Api-Key</code> header when calling the relay</li>
@@ -376,9 +372,9 @@ https://paramant.app`;
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
     <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Storing your key safely</h2>
     <ul style="margin:0 0 16px 0;padding-left:20px;line-height:1.7;color:#475569;font-size:13px;">
-      <li>Use a password manager &mdash; do not store it in plain text</li>
-      <li>Do not commit it to source control (.env files get leaked)</li>
-      <li>Rotate it immediately if you suspect exposure</li>
+      <li>Keep it in a password manager, never in plain text</li>
+      <li>Do not commit it to source control (.env files leak)</li>
+      <li>Replace it straight away if you think someone else has it</li>
     </ul>
     <p style="margin:16px 0 0 0;color:#475569;font-size:14px;">Questions? Reply to this email.</p>
   `);
@@ -460,8 +456,8 @@ Your ${productName} plan has been updated.
 Product: ${productName}
 Tier:    ${tierName}
 
-Only your ${productName} entitlement changed. Your other Paramant products
-and their tiers are unaffected.
+Only your ${productName} plan changed. Your other Paramant products
+stay as they are.
 
 Questions? Reply to this email.
 
@@ -475,7 +471,7 @@ https://paramant.app`;
       <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Product</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;">${safeProduct}</td></tr>
       <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Tier</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${safeTier}</span></td></tr>
     </table>
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Only your ${safeProduct} entitlement changed. Your other Paramant products and their tiers are unaffected.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Only your ${safeProduct} plan changed. Your other Paramant products stay as they are.</p>
     <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Questions? Reply to this email.</p>
   `);
 
@@ -496,7 +492,7 @@ function billingCancellationEmail({ planName, cancelDate, cancelDateNl }) {
 
   const nlText = `Hallo,
 
-We hebben de opzegging van uw Paramant ${planName}-plan ingepland.
+Uw Paramant ${planName}-plan is opgezegd.
 
 Stopt op: ${dateNl}
 
@@ -506,24 +502,24 @@ Community-plan.
 Uw API-sleutel blijft werken. Bestanden die u al verstuurd heeft, blijven
 zoals ze zijn. De toegang per sector gaat naar de grenzen van Community.
 
-Bedacht? Beantwoord deze mail voor de einddatum, dan zetten we het terug.
+Toch niet opzeggen? Beantwoord deze mail voor de einddatum, dan zetten we het terug.
 
 Paramant
 https://paramant.app`;
 
   const enText = `Hi,
 
-We have scheduled the cancellation of your Paramant ${planName} plan.
+Your Paramant ${planName} plan has been cancelled.
 
 Ends on: ${cancelDate}
 
-You keep ${planName} access until that date. After that, your account
-reverts to the Community plan.
+You keep ${planName} until that date. After that, your account goes
+back to the Community plan.
 
-Your API key continues to work. Files you have already relayed are
-not affected. Sector access adjusts to Community tier limits.
+Your API key keeps working. Files you already sent stay as they are.
+Sector access moves to the Community limits.
 
-Changed your mind? Reply to this email before the end date to reactivate.
+Changed your mind? Reply to this email before the end date and we will switch it back.
 
 Paramant
 https://paramant.app`;
@@ -536,7 +532,7 @@ https://paramant.app`;
 
   const nlHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Opzegging gepland</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">We hebben de opzegging van uw Paramant ${planName}-plan ingepland.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Uw Paramant ${planName}-plan is opgezegd.</p>
     ${box('Stopt op', dateNl)}
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>Tot die datum houdt u <strong>${planName}</strong></li>
@@ -545,25 +541,25 @@ https://paramant.app`;
       <li>Bestanden die u al verstuurd heeft, blijven zoals ze zijn</li>
       <li>De toegang per sector gaat naar de grenzen van Community</li>
     </ul>
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Bedacht? Beantwoord deze mail voor de einddatum, dan zetten we het terug.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Toch niet opzeggen? Beantwoord deze mail voor de einddatum, dan zetten we het terug.</p>
   `;
 
   const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Cancellation scheduled</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">We have scheduled the cancellation of your Paramant ${planName} plan.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant ${planName} plan has been cancelled.</p>
     ${box('Ends on', cancelDate)}
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
-      <li>You keep <strong>${planName}</strong> access until that date</li>
-      <li>After that, your account reverts to the <strong>Community</strong> plan</li>
-      <li>Your API key continues to work</li>
-      <li>Files you have already relayed are not affected</li>
-      <li>Sector access adjusts to Community tier limits</li>
+      <li>You keep <strong>${planName}</strong> until that date</li>
+      <li>After that, your account goes back to the <strong>Community</strong> plan</li>
+      <li>Your API key keeps working</li>
+      <li>Files you already sent stay as they are</li>
+      <li>Sector access moves to the Community limits</li>
     </ul>
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Changed your mind? Reply to this email before the end date to reactivate.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Changed your mind? Reply to this email before the end date and we will switch it back.</p>
   `;
 
   return bilingualMail({
-    subject: 'Opzegging van uw Paramant-plan gepland / Your Paramant plan cancellation is scheduled',
+    subject: 'Uw Paramant-plan is opgezegd / Your Paramant plan has been cancelled',
     preheader, nlText, enText, nlHtml, enHtml,
     refId: 'cancel-' + Date.now(),
   });
@@ -577,8 +573,8 @@ function keyDisabledEmail({ disabledAt }) {
   const preheader = 'Your Paramant API key has been disabled.';
   const text = `Hi,
 
-Your Paramant API key was disabled on ${disabledAt}. It no longer works
-on any Paramant relay, as of now.
+We disabled your Paramant API key on ${disabledAt}. From now on it no
+longer works on any Paramant server.
 
 Files you sent before are not affected. If you did not expect this,
 reply to this email and we will look into it.
@@ -587,7 +583,7 @@ Paramant
 https://paramant.app`;
   const html = htmlShell(preheader, `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Your API key has been disabled</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant API key was disabled on <strong>${disabledAt}</strong>. It no longer works on any Paramant relay, as of now.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">We disabled your Paramant API key on <strong>${disabledAt}</strong>. From now on it no longer works on any Paramant server.</p>
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Files you sent before are not affected. If you did not expect this, reply to this email and we will look into it.</p>
   `);
   return {
@@ -611,19 +607,18 @@ function accountDeletionEmail({ email, deletedAt, reason }) {
 
 Your Paramant account (${email}) was deactivated on ${dateStr}.
 
-Its API key can no longer be used. Active sessions and the TOTP setup were removed, and your personal data was erased from our systems.
-
 What this means:
-- API key no longer works
-- Active sessions terminated
-- Personal data removed from our systems
-- Billing records kept for as long as tax law requires
+- The API key no longer works
+- Active sessions have ended
+- The link with your authenticator app has been removed
+- Your personal data has been erased from our systems
+- Billing records are kept for as long as tax law requires
 
-If you have a question about what was kept and why, contact privacy@paramant.app.
+Questions about what was kept and why? Email privacy@paramant.app.
 
 Reason: ${reason || 'not specified'}
 
-If this was a mistake or you want to restore access, contact
+Was this a mistake, or do you want access again? Email
 support@paramant.app.
 
 Paramant
@@ -632,31 +627,30 @@ https://paramant.app`;
   const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deactivated</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${escHtml(email)}) was deactivated on <strong>${dateStr}</strong>.</p>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Its API key can no longer be used. Active sessions and the TOTP setup were removed, and your personal data was erased from our systems.</p>
     <h2 style="margin:24px 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">What this means</h2>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
-      <li>API key no longer works</li>
-      <li>Active sessions terminated</li>
-      <li>Personal data removed from our systems</li>
-      <li>Billing records kept for as long as tax law requires</li>
+      <li>The API key no longer works</li>
+      <li>Active sessions have ended</li>
+      <li>The link with your authenticator app has been removed</li>
+      <li>Your personal data has been erased from our systems</li>
+      <li>Billing records are kept for as long as tax law requires</li>
     </ul>
-    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">If you have a question about what was kept and why, contact <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">Questions about what was kept and why? Email <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:12px 16px;margin:0 0 24px 0;">
       <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason ? escHtml(reason) : 'not specified'}</p>
     </div>
-    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to restore access, contact <a href="mailto:support@paramant.app" style="color:#1D4ED8;">support@paramant.app</a>.</p>
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Was this a mistake, or do you want access again? Email <a href="mailto:support@paramant.app" style="color:#1D4ED8;">support@paramant.app</a>.</p>
   `;
 
   const nlText = `Hallo,
 
-Uw Paramant-account (${email}) is gedeactiveerd op ${dateStr}.
-
-De API-sleutel werkt niet meer. Actieve sessies en de koppeling met uw authenticator-app zijn verwijderd, en uw persoonsgegevens zijn uit onze systemen gewist.
+Uw Paramant-account (${email}) is op ${dateStr} gedeactiveerd.
 
 Wat dit betekent:
 - De API-sleutel werkt niet meer
 - Actieve sessies zijn beëindigd
-- Persoonsgegevens zijn uit onze systemen verwijderd
+- De koppeling met uw authenticator-app is verwijderd
+- Uw persoonsgegevens zijn uit onze systemen gewist
 - Betaalgegevens bewaren wij zo lang als de belastingwet vraagt
 
 Vragen over wat er bewaard is en waarom? Mail privacy@paramant.app.
@@ -670,12 +664,12 @@ https://paramant.app`;
 
   const nlHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account gedeactiveerd</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Uw Paramant-account (${escHtml(email)}) is gedeactiveerd op <strong>${dateStr}</strong>.</p>
-    <p style="margin:0 0 20px 0;line-height:1.6;">De API-sleutel werkt niet meer. Actieve sessies en de koppeling met uw authenticator-app zijn verwijderd, en uw persoonsgegevens zijn uit onze systemen gewist.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Uw Paramant-account (${escHtml(email)}) is op <strong>${dateStr}</strong> gedeactiveerd.</p>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>De API-sleutel werkt niet meer</li>
       <li>Actieve sessies zijn beëindigd</li>
-      <li>Persoonsgegevens zijn uit onze systemen verwijderd</li>
+      <li>De koppeling met uw authenticator-app is verwijderd</li>
+      <li>Uw persoonsgegevens zijn uit onze systemen gewist</li>
       <li>Betaalgegevens bewaren wij zo lang als de belastingwet vraagt</li>
     </ul>
     <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">Vragen over wat er bewaard is en waarom? Mail <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
@@ -700,25 +694,25 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
   const enText = [
     'Verify your Paramant account',
     '',
-    `You requested an account for ${email}.`,
-    `Click the link below to verify your email and activate your account:`,
+    `You asked for a Paramant account for ${email}.`,
+    `Open the link below to confirm your email address and activate your account:`,
     '',
     url,
     '',
-    'This link expires in 24 hours. If you did not request this, you can safely ignore this email.',
+    'This link works for 24 hours. Did you not ask for this? Then you can ignore this email.',
     '',
     `Requested: ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}`,
     '',
-    '— Paramant',
+    'Paramant',
   ].join('\n');
 
   const enHtml = `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Verify your email</h1>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Confirm your email address</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">
-      You requested a Paramant account for <strong>${escHtml(email)}</strong>. Click the button below to confirm your email address and activate your account.
+      You asked for a Paramant account for <strong>${escHtml(email)}</strong>. Click the button to confirm your email address and activate your account.
     </p>
     <div style="text-align:center;margin:0 0 28px 0;">
-      <a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Verify email &amp; activate account</a>
+      <a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Confirm email address</a>
     </div>
     <p style="margin:0 0 8px 0;font-size:13px;color:#64748B;">
       Or copy this link into your browser:<br>
@@ -726,7 +720,7 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
     </p>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
       <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
-        This link expires in <strong>24 hours</strong>. If you did not request a Paramant account, ignore this email — no account will be created.
+        This link works for <strong>24 hours</strong>. Did you not ask for a Paramant account? Then ignore this email. No account will be created.
         <br>Requested ${dateStr}${requestIP ? ' · IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
@@ -740,7 +734,7 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
     '',
     url,
     '',
-    'Deze link werkt 24 uur. Hebt u dit niet aangevraagd, dan kunt u deze mail negeren.',
+    'Deze link werkt 24 uur. Vroeg u dit niet aan? Dan kunt u deze mail negeren.',
     '',
     `Aangevraagd: ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}`,
     '',
@@ -760,7 +754,7 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
       <a href="${url}" style="color:#1D4ED8;word-break:break-all;">${url}</a>
     </p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94A3B8;line-height:1.6;">
-      Deze link werkt <strong>24 uur</strong>. Hebt u geen Paramant-account aangevraagd, negeer deze mail dan. Er wordt dan geen account gemaakt.
+      Deze link werkt <strong>24 uur</strong>. Vroeg u geen Paramant-account aan? Negeer deze mail dan. Er komt dan geen account.
       <br>Aangevraagd ${dateStr}${requestIP ? ' · IP: ' + escHtml(maskedIp) : ''}.
     </p>
   `;
@@ -786,13 +780,13 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
   const enText = [
     'Signup attempt on your Paramant account',
     '',
-    `Someone just attempted to create a Paramant account using ${email}.`,
+    `Someone just tried to create a Paramant account with ${email}.`,
     'Your existing account was not changed and no new account was created.',
     '',
-    'If this was you trying to sign in, use the login page instead:',
+    'Were you trying to sign in? Use the login page:',
     loginUrl,
     '',
-    'If this was not you, ignore this email. The attempt was rate-limited.',
+    'Was this not you? Then ignore this email. We limit how often this can be tried.',
     '',
     `Attempt at: ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}`,
     '',
@@ -805,14 +799,14 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
       Someone just tried to create a Paramant account with <strong>${escHtml(email)}</strong>. Your existing account was not changed and no new account was created.
     </p>
     <p style="margin:0 0 20px 0;line-height:1.6;">
-      If this was you trying to sign in, use the login page:
+      Were you trying to sign in? Use the login page:
     </p>
     <div style="text-align:center;margin:0 0 28px 0;">
       <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Sign in to Paramant</a>
     </div>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
       <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
-        If this was not you, ignore this email. The attempt was rate-limited and no account was created.
+        Was this not you? Then ignore this email. We limit how often this can be tried, and no account was created.
         <br>Attempt at ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
@@ -827,7 +821,7 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
     'Wilde u zelf inloggen? Gebruik dan de inlogpagina:',
     loginUrl,
     '',
-    'Was u dit niet, negeer deze mail dan. Er geldt een limiet op zulke pogingen.',
+    'Was u dit niet? Negeer deze mail dan. Wij beperken hoe vaak dit kan.',
     '',
     `Poging op: ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}`,
     '',
@@ -844,7 +838,7 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
       <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Inloggen bij Paramant</a>
     </div>
     <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
-      Was u dit niet, negeer deze mail dan. Er geldt een limiet op zulke pogingen en er is geen account gemaakt.
+      Was u dit niet? Negeer deze mail dan. Wij beperken hoe vaak dit kan, en er is geen account gemaakt.
       <br>Poging op ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
     </p>
   `;
@@ -859,30 +853,30 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
 // ── BACKUP CODES RESET NOTIFICATION ─────────────────────────────────────────
 function backupCodesResetEmail({ email, requestedAt }) {
   const dateStr = formatTS(requestedAt);
-  const preheader = 'Your Paramant backup codes have been reset. Action required.';
+  const preheader = 'Your Paramant backup codes were reset. Please make new ones.';
 
   const text = [
     'Security notification: Paramant backup codes reset',
     '',
     `This is a security notification for ${email}.`,
     '',
-    'During an internal security audit we identified that backup codes were retained',
-    'in a format that did not meet our zero-knowledge standard. We have fixed the issue',
-    'and invalidated the affected backup codes as a precaution.',
+    'During an internal security check we found that backup codes were stored',
+    'in a way that did not meet our zero-knowledge standard. We fixed this and,',
+    'to be safe, cancelled the affected backup codes.',
     '',
-    'Your TOTP authenticator continues to work normally.',
+    'Your authenticator app keeps working as normal.',
     'Only your offline backup codes were affected.',
     '',
-    'Action required:',
-    '  Sign in to your account and generate a new set of backup codes.',
-    '  Store them in your password manager.',
+    'What to do:',
+    '  Sign in and create a new set of backup codes.',
+    '  Keep them in your password manager.',
     '',
     `Detected: ${dateStr}`,
-    'No evidence of external access. This notification is precautionary.',
+    'We found no sign that anyone else got in. We send this to be safe.',
     '',
     'Questions: privacy@paramant.app',
     '',
-    '— Paramant',
+    'Paramant',
   ].join('\n');
 
   const html = htmlShell(preheader, `
@@ -891,28 +885,28 @@ function backupCodesResetEmail({ email, requestedAt }) {
     </div>
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Backup codes reset</h1>
     <p style="margin:0 0 16px 0;line-height:1.6;">
-      During an internal security audit, we identified that your backup codes were retained in a format that did not meet our zero-knowledge standard.
-      We fixed the issue and invalidated the affected codes as a precaution.
+      During an internal security check we found that your backup codes were stored in a way that did not meet our zero-knowledge standard.
+      We fixed this and, to be safe, cancelled the affected codes.
     </p>
     <p style="margin:0 0 16px 0;line-height:1.6;">
-      <strong>Your TOTP authenticator continues to work normally.</strong> Only your offline backup codes were affected.
+      <strong>Your authenticator app keeps working as normal.</strong> Only your offline backup codes were affected.
     </p>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:16px;margin:0 0 24px 0;border-radius:4px;">
-      <p style="margin:0 0 8px 0;font-weight:600;color:#0B3A6A;">Action required</p>
-      <p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sign in to your account and generate a new set of backup codes. Store them in your password manager.</p>
+      <p style="margin:0 0 8px 0;font-weight:600;color:#0B3A6A;">What to do</p>
+      <p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sign in and create a new set of backup codes. Keep them in your password manager.</p>
     </div>
     <div style="text-align:center;margin:0 0 24px 0;">
       <a href="${BASE_URL}/account" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;">Go to account</a>
     </div>
     <div style="border-top:1px solid rgba(11,58,106,0.08);padding-top:16px;margin-top:8px;">
       <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
-        Detected ${formatTS(requestedAt)}. No evidence of external access — this is precautionary.
+        Detected ${formatTS(requestedAt)}. We found no sign that anyone else got in. We send this to be safe.
         Questions: <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>
       </p>
     </div>
   `);
 
-  return { ...wrap(text, html, { refId: 'backup-reset-' + requestedAt }), subject: 'Paramant backup codes reset — action required' };
+  return { ...wrap(text, html, { refId: 'backup-reset-' + requestedAt }), subject: 'Your Paramant backup codes were reset: please make new ones' };
 }
 
 // ── SEND HELPER ───────────────────────────────────────────────────────────────
@@ -1036,8 +1030,8 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       sender: senderLabel || 'Een Paramant-gebruiker',
       asks: 'heeft u gevraagd een document te bekijken en te ondertekenen.',
       carries: opensDocument
-        ? `De link opent het document in uw browser zodra u bent ingelogd. U ziet het document, ${paraaf ? 'zet uw paraaf en handtekening' : 'zet uw handtekening'} en bent klaar. Zonder inloggen opent de link niets.`
-        : 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Heeft u een eerdere uitnodigingsmail voor dit verzoek, open dan de link daaruit; die opent het document wel. Anders: vraag de afzender om de link opnieuw te sturen.',
+        ? `Log in, dan opent de link het document in uw browser. U leest het, zet uw ${paraaf ? 'paraaf en handtekening' : 'handtekening'} en bent klaar. Zonder inloggen opent de link niets.`
+        : 'Deze link opent het verzoek, maar niet het document. De sleutel van het document staat bewust niet in deze mail. Hebt u een eerdere uitnodiging voor dit verzoek? Gebruik dan de link uit die mail. Die opent het document wel. Lukt dat niet? Vraag de afzender dan om de link opnieuw te sturen.',
       open: opensDocument ? 'Open het document' : 'Open het verzoek',
       fromSender: 'Bericht van de afzender:',
       signIn: 'Log in met het e-mailadres waarop u bent uitgenodigd. Stuur de link niet door.',
@@ -1050,12 +1044,12 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       sender: senderLabel || 'A Paramant user',
       asks: 'has asked you to review and sign a document.',
       carries: opensDocument
-        ? `The link opens the document in your browser once you have signed in. You see the document, ${paraaf ? 'add your initials and signature' : 'add your signature'}, and you are done. Without signing in the link opens nothing.`
-        : 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email. If you have an earlier invitation email for this request, open the link from that one; it opens the document. Otherwise, ask the sender to send you the link again.',
+        ? `Sign in and the link opens the document in your browser. Read it, ${paraaf ? 'add your initials and signature' : 'add your signature'}, and you are done. Without signing in, the link opens nothing.`
+        : 'This link opens the request, but not the document. The document key is deliberately not in this email. Do you have an earlier invitation for this request? Use the link from that email. That one does open the document. Otherwise, ask the sender to send you the link again.',
       open: opensDocument ? 'Open the document' : 'Open the request',
       fromSender: 'Message from the sender:',
-      signIn: 'Sign in with this invited email address. Do not forward the link.',
-      closes: `Signing closes at ${expiryTs || '7 days after creation'}.`,
+      signIn: 'Sign in with the email address this invitation went to. Do not forward the link.',
+      closes: `You can sign until ${expiryTs || '7 days after the request was made'}.`,
       heading: 'Signature requested',
       pre: 'A document is waiting for your signature in Paramant.',
     },
@@ -1112,24 +1106,24 @@ function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId,
   const W = {
     nl: complete ? {
       heading: 'Iedereen heeft getekend',
-      line: m === 1 ? 'Uw document is ondertekend door de ondertekenaar.' : `Uw document is ondertekend door alle ${m} ondertekenaars.`,
+      line: m === 1 ? 'De ondertekenaar heeft uw document getekend.' : `Alle ${m} ondertekenaars hebben uw document getekend.`,
       next: safeResult
-        ? 'Open het getekende document met alle handtekeningen en download het bewijs. Log in met dit account; de link werkt 30 dagen.'
+        ? 'Open het document met alle handtekeningen en download het bewijs. Log in met dit account. De link werkt 30 dagen.'
         : 'Het getekende document en het bewijs staan bij uw documenten.',
       pre: 'Uw document is door iedereen ondertekend.',
       subject: 'Iedereen heeft getekend',
     } : {
       heading: 'Er is getekend',
       line: `${n} van de ${m} ondertekenaars ${heeft} nu getekend.`,
-      next: 'U krijgt weer bericht zodra er opnieuw iemand tekent.',
+      next: 'U krijgt weer bericht als de volgende tekent.',
       pre: `${n} van de ${m} ondertekenaars ${heeft} getekend.`,
       subject: `Er is getekend (${n} van ${m})`,
     },
     en: complete ? {
       heading: 'Everyone has signed',
-      line: m === 1 ? 'Your document has been signed by the signer.' : `Your document has been signed by all ${m} signers.`,
+      line: m === 1 ? 'The signer has signed your document.' : `All ${m} signers have signed your document.`,
       next: safeResult
-        ? 'Open the signed document with every signature and download the proof. Sign in with this account; the link works for 30 days.'
+        ? 'Open the document with every signature and download the proof. Sign in with this account. The link works for 30 days.'
         : 'The signed document and its proof are with your documents.',
       pre: 'Your document has been signed by everyone.',
       subject: 'Everyone has signed',
@@ -1178,10 +1172,10 @@ ${BASE_URL}`;
 function everyoneSignedPartyEmail({ partyCount, envelopeId }) {
   const m = Number.isInteger(partyCount) && partyCount > 1 ? partyCount : null;
   const W = {
-    nl: { heading: 'Iedereen heeft getekend', line: m ? `Het document dat u ondertekende, is nu door alle ${m} ondertekenaars getekend.` : 'Het document dat u ondertekende, is nu door iedereen getekend.',
-      next: 'Open de link uit uw uitnodigingsmail en log in met dit e-mailadres: daar downloadt u het complete document met alle handtekeningen en het bewijs.', pre: 'Het document is door iedereen ondertekend.', subject: 'Iedereen heeft getekend' },
-    en: { heading: 'Everyone has signed', line: m ? `The document you signed has now been signed by all ${m} signers.` : 'The document you signed has now been signed by everyone.',
-      next: 'Open the link from your invitation email and sign in with this email address: there you download the complete document with every signature, and the proof.', pre: 'The document has been signed by everyone.', subject: 'Everyone has signed' },
+    nl: { heading: 'Iedereen heeft getekend', line: m ? `Alle ${m} ondertekenaars hebben het document getekend dat u ook tekende.` : 'Iedereen heeft het document getekend dat u ook tekende.',
+      next: 'Open de link uit uw uitnodiging en log in met dit e-mailadres. Daar downloadt u het complete document met alle handtekeningen en het bewijs.', pre: 'Het document is door iedereen ondertekend.', subject: 'Iedereen heeft getekend' },
+    en: { heading: 'Everyone has signed', line: m ? `All ${m} signers have now signed the document you signed.` : 'Everyone has now signed the document you signed.',
+      next: 'Open the link from your invitation and sign in with this email address. There you can download the complete document with every signature, and the proof.', pre: 'The document has been signed by everyone.', subject: 'Everyone has signed' },
   };
   const textBlock = (l) => `${W[l].heading}
 
@@ -1210,8 +1204,8 @@ ${BASE_URL}`;
 function signatureDeclinedEmail({ envelopeId }) {
   const dashUrl = `${BASE_URL}/dashboard`;
   const W = {
-    nl: { heading: 'Er is geweigerd', line: 'Een ondertekenaar heeft uw verzoek om te ondertekenen geweigerd. Het verzoek is daarmee gestopt; niemand kan er nog op tekenen.', next: 'In uw documenten ziet u wie. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', open: 'Naar mijn documenten', subject: 'Verzoek geweigerd' },
-    en: { heading: 'A signer declined', line: 'A signer declined your signature request. The request has stopped; nobody can sign it any more.', next: 'Your documents show who. To try again, send a new request.', open: 'Go to my documents', subject: 'Request declined' },
+    nl: { heading: 'Er is geweigerd', line: 'Een ondertekenaar heeft uw verzoek geweigerd. Het verzoek is daarmee gestopt. Niemand kan nog tekenen.', next: 'Bij uw documenten ziet u wie het was. Wilt u het opnieuw proberen? Stuur dan een nieuw verzoek.', open: 'Naar mijn documenten', subject: 'Verzoek geweigerd' },
+    en: { heading: 'A signer declined', line: 'A signer declined your request. The request has stopped, and nobody can sign it any more.', next: 'Your documents show who it was. To try again, send a new request.', open: 'Go to my documents', subject: 'Request declined' },
   };
   const textBlock = (l) => `${W[l].heading}
 

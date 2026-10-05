@@ -102,7 +102,7 @@ test('A3: the dialog of an open request hands over the full link kept in this br
   assert.match(await page.locator('#dh-document-dialog').innerText(), /niet in deze browser[\s\S]*nieuw verzoek/);
   await ctx.close();
   const relay = read('relay/relay.js');
-  assert.match(relay, /Kopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde/, 'the mail to the sender points at that exact place');
+  assert.match(relay, /Open uw dashboard in de browser waarmee u het verzoek verstuurde/, 'the mail to the sender points at that exact place');
   assert.doesNotMatch(relay, /uit uw dashboard of uit uw eigen verzonden bericht/);
   assert.match(read('frontend/sign-flow.js'), /rememberSignerLinks\(envelope\.id/);
 });

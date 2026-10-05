@@ -340,7 +340,7 @@ tr:last-child td{border-bottom:none}
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Snel starten</h2>
-    <p>Verstuur uw eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak een gratis account aan</a> (beveiligd met TOTP, sleutel zichtbaar in het dashboard).</p>
+    <p>Verstuur uw eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak een gratis account aan</a> (beveiligd met TOTP; uw sleutel staat in het dashboard).</p>
 
     <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Installeer de SDK (Python 3.10+ of Node 18+; beide gebruiken dezelfde encoder voor wire format v1)</p></div></div>
     <div class="cb">
@@ -383,7 +383,7 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
     <!-- ── Authentication ──────────────────────────────────────── -->
     <h2 id="authentication">Authenticatie</h2>
-    <p>Er zijn twee soorten sleutels. Ze hebben elk een eigen rol en zijn nooit uitwisselbaar.</p>
+    <p>Er zijn twee soorten sleutels, elk met een eigen rol. U kunt ze nooit door elkaar gebruiken.</p>
     <table>
       <tr><th>Sleutel</th><th>Prefix</th><th>Voor wie</th><th>Doel</th></tr>
       <tr><td>pgp_</td><td><code>pgp_</code></td><td>Eindgebruikers</td><td>Bestanden versturen en ontvangen via de API</td></tr>

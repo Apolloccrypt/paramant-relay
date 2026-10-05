@@ -33,7 +33,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       else if (e.status === 422) errorDiv.textContent = nlEn('Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat u blijvend leest.', 'We cannot use this email address for an account. Please use an address you will keep reading.');
       else if (e.status === 429) errorDiv.textContent = nlEn('Te veel pogingen. Probeer het later opnieuw.', 'Too many attempts. Please try again later.');
       else errorDiv.textContent = (e.err && e.err.message) || nlEn('Er ging iets mis. Probeer het opnieuw.', 'Something went wrong. Please try again.');
-    } else { errorDiv.textContent = nlEn('Geen verbinding. Controleer uw internetverbinding.', 'Network error. Please check your connection.'); }
+    } else { errorDiv.textContent = nlEn('Geen verbinding. Controleer uw internetverbinding.', 'No connection. Check your internet connection.'); }
     errorDiv.classList.add('visible');
   }
 

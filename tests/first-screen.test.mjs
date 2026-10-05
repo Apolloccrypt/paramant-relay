@@ -335,7 +335,7 @@ const PAGES = [
     // Three questions, three answers, no scrolling. An answer whose last line
     // is cut off is a page that has not answered.
     claims: [
-      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Voor het ondertekenen van een document heeft u een account nodig' },
+      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Om te ondertekenen heeft u een account nodig' },
       { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is gratis' },
       // The third answer is where the page says the documents live in Germany,
       // which is the answer the buyer this page was rewritten for came to read.

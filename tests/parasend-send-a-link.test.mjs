@@ -115,7 +115,7 @@ const LANGS = [
     worksOnce: /Works once/, waiting: /Waiting for the receiver/,
     noReceipt: /no signed delivery receipt/i,
     gone: /permanently destroyed/i,
-    burned: /already been downloaded and burned/i, singleUse: /single-use/i,
+    burned: /already been downloaded and deleted/i, singleUse: /works only once/i,
   },
   {
     tag: 'nl', sendPath: '/parashare', getPrefix: '', markupFile: 'parashare.html',

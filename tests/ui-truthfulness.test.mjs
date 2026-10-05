@@ -29,8 +29,8 @@ assert.match(adminNlJs, /Account gedeactiveerd/);
 // left the address in users.json (audit finding 5 of 2026-07-21). A mail that
 // undersells an erasure is as untrue as one that oversells it, which is what
 // this file exists to catch.
-assert.match(email, /Personal data removed from our systems/);
-assert.match(email, /Billing records kept for as long as tax law requires/);
+assert.match(email, /personal data has been erased from our systems/);
+assert.match(email, /Billing records are kept for as long as tax law requires/);
 assert.doesNotMatch(email, /Account record and audit entries retained/);
 assert.doesNotMatch(email, /sign up again|Files already relayed are not affected/i);
 
@@ -124,6 +124,21 @@ assert.match(signEnHtml, /Signing a document needs an account/i,
   'en/sign.html must state the account requirement up front');
 assert.match(signEnHtml, /open a signing request someone sent you/i,
   'en/sign.html must say what an invited signer can still do without an account');
+// And it may not promise signing WITHOUT an account: co-sign.js asks the
+// invitee to sign in with the invited mailbox before the sign step, and sends
+// someone without an account to /signup with the invitation's address first
+// ("Nog geen account? Maak er gratis een met het e-mailadres van deze
+// uitnodiging"). So the page says an account is made first, then signed.
+assert.doesNotMatch(signHtml, /tekenen met de link uit die e-mail/i,
+  'sign.html must not promise signing without an account');
+assert.doesNotMatch(signEnHtml, /sign it with the link from that email/i,
+  'en/sign.html must not promise signing without an account');
+assert.match(signHtml, /maakt u met de link uit de mail gratis een account\s+op het adres van de uitnodiging/i,
+  'sign.html must say the invitee makes a free account on the invited address first');
+assert.match(signEnHtml, /create a free account on the\s+invited address/i,
+  'en/sign.html must say the invitee makes a free account on the invited address first');
+assert.match(read('frontend/co-sign.js'), /Maak er gratis een<\/a> met het e-mailadres van deze uitnodiging/,
+  'co-sign.js still sends an invitee without an account to signup with the invited address');
 assert.match(signJs, /function showSessionRequirement/,
   'sign-flow.js must have the session-requirement control');
 
@@ -139,17 +154,17 @@ assert.match(signJs, /function showSessionRequirement/,
 const authFirstSentence = {
   'frontend/en/auth/login.html': /No password to type: sign in with your passkey/i,
   'frontend/en/auth/setup.html': /Pick one now and add the other later/i,
-  'frontend/en/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
+  'frontend/en/auth/backup.html': /Each code works once\. You do not need your authenticator app for it/i,
   // A back-up code is required since the mailbox alone stopped being enough.
-  'frontend/en/auth/request-reset.html': /one of your back-up codes\. If they match, we send a\s+link/i,
+  'frontend/en/auth/request-reset.html': /one of your backup codes\. If they match, we first send an email to confirm the request/i,
   'frontend/en/auth/reset-confirm.html': /You get two emails, one after the other/i,
   'frontend/en/signup/verified.html': /Paramant has no passwords/i,
   'frontend/auth/login.html': /Geen wachtwoord nodig: log in met uw passkey/i,
   'frontend/auth/setup.html': /Kies er nu één en voeg de andere later toe/i,
-  'frontend/auth/backup.html': /Elke code\s+werkt één keer en laat u binnen zonder uw authenticator-app/i,
-  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan\s+sturen wij een link/i,
-  'frontend/auth/reset-confirm.html': /U krijgt twee mails, na elkaar/i,
-  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoorden/i,
+  'frontend/auth/backup.html': /Elke code werkt één keer\. Uw authenticator-app hebt u er niet voor nodig/i,
+  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan krijgt u eerst een mail om het verzoek te bevestigen/i,
+  'frontend/auth/reset-confirm.html': /U krijgt twee mails na elkaar/i,
+  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoord/i,
 };
 for (const [file, rx] of Object.entries(authFirstSentence)) {
   assert.match(read(file), rx, `${file} must open by saying what this screen does`);
@@ -306,7 +321,7 @@ assert.match(requestResetJs, /res\.status === 429/,
   'request-reset must handle 429 separately: retrying does not help for up to a day');
 assert.match(requestResetJs, /up to 24 hours to clear/i,
   'the 429 text must state the wait the server actually imposes (retry_after 86400)');
-assert.match(requestResetJs, /dus dit kan tot 24 uur duren/,
+assert.match(requestResetJs, /Het kan dus tot 24 uur duren/,
   'the Dutch 429 text must state the same wait');
 
 // 5. Every one of these screens must name the party behind the product and the
@@ -1015,9 +1030,9 @@ for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/))
 const helpNlAnswers = [...helpNlHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
 assert.equal(helpNlAnswers.split('\n').length, 3,
   'help/index.html must keep the three buyer answers in the Dutch block too');
-assert.match(helpNlAnswers, /Voor het ondertekenen van een document heeft u een account nodig\./,
+assert.match(helpNlAnswers, /Om te ondertekenen heeft u een account nodig\./,
   'help/index.html must answer whether an account is required');
-assert.match(helpNlAnswers, /Zonder account kunt u een verzoek tot ondertekenen wel openen\./,
+assert.match(helpNlAnswers, /Kreeg u een verzoek om te ondertekenen\? Dat opent u ook zonder account\./,
   'help/index.html must say what an invited signer can do without an account');
 assert.match(helpNlAnswers, /ParaSign Community is gratis, voor altijd, zonder betaalkaart: 2 handtekeningen per maand\./,
   'help/index.html must name the free allowance, not just promise that free exists');

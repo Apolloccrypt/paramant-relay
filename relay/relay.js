@@ -281,12 +281,12 @@ function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'een klant van Paramant')
-       + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld; de link '
-       + 'in deze mail opent het en die link bewaren wij niet.'
+       + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld. De link '
+       + 'in deze mail opent het. Die link bewaren wij niet.'
        + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
   const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'a Paramant customer')
-       + ' entered your address. Paramant keeps the file encrypted; the link in this '
+       + ' entered your address. Paramant keeps the file encrypted. The link in this '
        + 'mail opens it, and we do not keep that link.'
        + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
   const tekst = taal === 'en' ? en
@@ -2273,19 +2273,19 @@ async function notifySenderQuota(envelopeId, accountId) {
   const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
   const r = await mailer.stuur({
     to,
-    subject: 'Een ondertekenaar wacht op uw tegoed',
+    subject: 'Een ondertekenaar kan niet tekenen: uw tegoed is op',
     text: tweetaligTekst('nl',
-      'Iemand probeerde een document te tekenen dat u ter ondertekening verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is niet gezet; het verzoek blijft openstaan.'
-      + '\n\nVerhoog uw plan of wacht tot volgende maand; daarna kan de ondertekenaar met dezelfde link tekenen.'
+      'Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.'
+      + '\n\nKies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.'
       + '\n\n' + base + '/pricing',
-      'Someone tried to sign a document you sent for signing, but your signatures for this month are used up. The signature was not recorded; the request stays open.'
-      + '\n\nUpgrade your plan or wait until next month; then the signer can sign with the same link.'),
+      'Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.'
+      + '\n\nUpgrade your plan or wait until next month. Then the signer can sign with the same link.'),
     html: tweetaligHtml('nl',
-      '<p>Iemand probeerde een document te tekenen dat u ter ondertekening verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is niet gezet; het verzoek blijft openstaan.</p>'
-      + '<p>Verhoog uw plan of wacht tot volgende maand; daarna kan de ondertekenaar met dezelfde link tekenen.</p>'
+      '<p>Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.</p>'
+      + '<p>Kies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.</p>'
       + '<p><a href="' + base + '/pricing">Plannen bekijken</a></p>',
-      '<p>Someone tried to sign a document you sent for signing, but your signatures for this month are used up. The signature was not recorded; the request stays open.</p>'
-      + '<p>Upgrade your plan or wait until next month; then the signer can sign with the same link.</p>'),
+      '<p>Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.</p>'
+      + '<p>Upgrade your plan or wait until next month. Then the signer can sign with the same link.</p>'),
   });
   log('info', 'sender_quota_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);
@@ -2307,17 +2307,17 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
     to,
     subject: 'Een ondertekenaar vraagt de link opnieuw',
     text: tweetaligTekst('nl',
-      `${who} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.`
-      + '\n\nKopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde: klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat hij daar niet, trek het verzoek dan in en stuur een nieuw verzoek.'
+      `${who} vroeg de uitnodiging opnieuw aan. De nieuwe link opent alleen het verzoek, niet het document. De sleutel van het document zit alleen in de volledige link die u bij het versturen kreeg. Die link bewaren wij niet.`
+      + '\n\nOpen uw dashboard in de browser waarmee u het verzoek verstuurde. Klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat de link er niet? Trek het verzoek dan in en stuur een nieuw verzoek.'
       + '\n\n' + base + '/dashboard',
-      `${whoEn} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.`
-      + '\n\nCopy the link from your dashboard, in the browser you sent the request from: click this request and choose Copy link next to the signer. Send that link to the signer yourself. If it is not there, withdraw the request and send a new one.'),
+      `${whoEn} asked for the invitation again. The new link opens only the request, not the document. The document key is only in the full link you got when you sent it. We do not keep that link.`
+      + '\n\nOpen your dashboard in the browser you sent the request from. Click this request and choose Copy link next to the signer. Send that link to the signer yourself. Is the link not there? Then withdraw the request and send a new one.'),
     html: tweetaligHtml('nl',
-      `<p>${escHtml(who)} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.</p>`
-      + '<p>Kopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde: klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat hij daar niet, trek het verzoek dan in en stuur een nieuw verzoek.</p>'
+      `<p>${escHtml(who)} vroeg de uitnodiging opnieuw aan. De nieuwe link opent alleen het verzoek, niet het document. De sleutel van het document zit alleen in de volledige link die u bij het versturen kreeg. Die link bewaren wij niet.</p>`
+      + '<p>Open uw dashboard in de browser waarmee u het verzoek verstuurde. Klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat de link er niet? Trek het verzoek dan in en stuur een nieuw verzoek.</p>'
       + '<p><a href="' + base + '/dashboard">Naar uw dashboard</a></p>',
-      `<p>${escHtml(whoEn)} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.</p>`
-      + '<p>Copy the link from your dashboard, in the browser you sent the request from: click this request and choose Copy link next to the signer. Send that link to the signer yourself. If it is not there, withdraw the request and send a new one.</p>'),
+      `<p>${escHtml(whoEn)} asked for the invitation again. The new link opens only the request, not the document. The document key is only in the full link you got when you sent it. We do not keep that link.</p>`
+      + '<p>Open your dashboard in the browser you sent the request from. Click this request and choose Copy link next to the signer. Send that link to the signer yourself. Is the link not there? Then withdraw the request and send a new one.</p>'),
   });
   log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);
@@ -5962,7 +5962,7 @@ async function handleRelayRequest(req, res) {
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
-              + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld en bewaart deze link niet.'
+              + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld. Deze link bewaren wij niet.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
                 (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
               + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
@@ -5970,7 +5970,7 @@ async function handleRelayRequest(req, res) {
               + 'to this address, so only somebody who can read this mailbox can collect the '
               + 'file. Available until ' + totEn + '.'
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
-              + ' entered your address. Paramant keeps the file encrypted and does not keep this link.'
+              + ' entered your address. Paramant keeps the file encrypted. We do not keep this link.'
               + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
           html: tweetaligHtml(taal,
                 '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'
@@ -8409,7 +8409,7 @@ async function handleRelayRequest(req, res) {
         subject: taal2 === 'en' ? 'Your code to open the file'
                                 : 'Uw controlecode om het bestand te openen',
         text: tweetaligTekst(taal2,
-              'Uw controlecode is ' + vraag.code + '. De code is ' + minuten + ' minuten geldig.'
+              'Uw controlecode is ' + vraag.code + '. De code werkt ' + minuten + ' minuten.'
             + (bestandRuw2 ? '\n\nVoor het bestand: ' + bestandRuw2 : '')
             + (wie2 ? '\nGestuurd door ' + wie2 + ' via Paramant.' : '')
             + '\n\nHeeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders uw link. '
@@ -8424,8 +8424,8 @@ async function handleRelayRequest(req, res) {
             + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
             + (bestand2 ? '<p style="color:#666;font-size:13px">Voor het bestand: <strong>'
                           + bestand2 + '</strong></p>' : '')
-            + '<p style="color:#666;font-size:13px">De code is ' + minuten
-            + ' minuten geldig.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
+            + '<p style="color:#666;font-size:13px">De code werkt ' + minuten
+            + ' minuten.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
             + 'uw link. Geef de code niet door en laat het de afzender weten.</p>',
               '<p>Your code to open the file' + (taal2 === 'en' ? ':' : ' is the one above.') + '</p>'
             + (taal2 === 'en'
@@ -10938,7 +10938,7 @@ async function handleRelayRequest(req, res) {
       const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
         <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
         <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-          Your API key is ready to claim. The link below reveals it once and expires in 7 days. Save the key in your password manager the moment you see it — it is generated once and cannot be recovered.
+          Your API key is ready. The link below shows it once and works for 7 days. Save the key in your password manager as soon as you see it. It is made once and cannot be recovered.
         </div>
         <p style="color:#888;margin-bottom:24px">Plan: <strong style="color:#ededed">${escHtml((d.plan||'').toUpperCase())}</strong></p>
         <div style="margin-bottom:24px"><a href="${claimUrl}" style="display:inline-block;background:#ededed;color:#0c0c0c;text-decoration:none;padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600">Reveal my API key</a></div>
@@ -10951,7 +10951,7 @@ async function handleRelayRequest(req, res) {
       // whether their key is on its way.
       const resp = await mailer.stuur({
         from: 'PARAMANT <privacy@paramant.app>', to: d.email,
-        subject: 'Claim your PARAMANT API key', html,
+        subject: 'Your PARAMANT API key is ready', html,
       });
       if (resp.ok) {
         log('info', 'welcome_mail_sent', { email: maskEmail(d.email), provider: resp.provider, label: d.label });

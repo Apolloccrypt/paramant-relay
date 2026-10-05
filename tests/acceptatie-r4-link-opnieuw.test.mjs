@@ -44,9 +44,9 @@ test('the page and the dashboard note say the same to the signer', () => {
 test('the mail to the sender: copy it from the dashboard in the browser you sent from, else withdraw and resend', () => {
   const relay = read('relay/relay.js');
   const fn = relay.slice(relay.indexOf('async function notifySenderLinkRequested'), relay.indexOf('function senderLabelOf'));
-  assert.match(fn, /Kopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde/);
-  assert.match(fn, /trek het verzoek dan in en stuur een nieuw verzoek/);
-  assert.match(fn, /Copy the link from your dashboard, in the browser you sent the request from/);
+  assert.match(fn, /Open uw dashboard in de browser waarmee u het verzoek verstuurde\. Klik op dit verzoek en kies bij de ondertekenaar Link kopiëren/);
+  assert.match(fn, /Trek het verzoek dan in en stuur een nieuw verzoek/);
+  assert.match(fn, /Open your dashboard in the browser you sent the request from\. Click this request and choose Copy link/);
   // And the dashboard, where that copy happens, agrees: copy it there, else withdraw.
   const dash = read('frontend/js/dashboard.js');
   assert.match(dash, /open dit verzoek dan in die browser en kopieer de link daar\. Lukt dat niet, trek dit verzoek dan in en stuur een nieuw verzoek\./);

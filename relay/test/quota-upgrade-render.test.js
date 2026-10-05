@@ -190,13 +190,13 @@ ok('missing limit falls back to the tiers.js ceiling, not to Community');
 
 // ── signNotice: the inline 200-response notices ─────────────────────────────
 const second = q.signNotice({ used: 2, included: 2, reset_date: '2026-08-01' });
-assert(second.includes("That's your second signature this month. One more and you'll need Firm (EUR 29/month, 100 signatures)."),
+assert(second.includes("That was your second signature this month. For the next one you need Firm (EUR 29/month, 100 signatures)."),
   'free second-signature notice must carry the copy verbatim');
 ok('free second signature renders the inline notice verbatim');
 
 const last = q.signNotice({ used: 100, included: 100, reset_date: '2026-08-01' });
 for (const s of [
-  'That was the 100th signature your Firm plan includes this month. Signing starts again on 2026-08-01. Business (EUR 299/month) includes 1,000 a month.',
+  'That uses up the 100 signatures in your Firm plan for this month. Signing starts again on 2026-08-01. Business (EUR 299/month) includes 1,000 a month.',
   'Compare plans',
 ]) {
   assert(last.includes(s), 'Firm last-included notice misses: ' + s);
@@ -236,7 +236,7 @@ ok('signNotice stays silent on missing fields, other plans, and mid-quota signs'
   const note2 = qn.signNotice({ used: 2, included: 2 });
   const note100 = qn.signNotice({ used: 100, included: 100, reset_date: '2026-10-01' });
   assert(note2.includes('tweede handtekening'), 'nl second-signature note: ' + note2);
-  assert(note100.includes('100e handtekening') && note100.includes('2026-10-01'), 'nl 100th-signature note: ' + note100);
+  assert(note100.includes('100 handtekeningen van uw Firm-plan') && note100.includes('2026-10-01'), 'nl 100th-signature note: ' + note100);
   for (const card of [free, legacy, note2, note100]) {
     assert(!/\b(you|your|the|signatures|transfers|Upgrade|Maybe later|View plans|Compare plans)\b/.test(card.replace(/<[^>]+>/g, ' ')),
       'a Dutch quota card still carries English: ' + card);

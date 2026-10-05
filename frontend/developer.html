@@ -80,8 +80,8 @@ pre{margin:0;padding:20px;background:#0d1d33;color:#d7e7f8;overflow:auto;font-fa
 
   <div class="steps" aria-label="Verloop van de API voor Ondertekenen">
     <div class="step"><b>01 · AANMAKEN</b><span>Stuur een pdf en een lijst met ondertekenaars. U krijgt per ontvanger een eigen ondertekenlink terug.</span></div>
-    <div class="step"><b>02 · VOLGEN</b><span>Houd uw facturen of contracten bij met de status en ondertekende webhooks.</span></div>
-    <div class="step"><b>03 · BEWIJZEN</b><span>Haal het afgeronde .psign-bewijs op en controleer het zelfstandig.</span></div>
+    <div class="step"><b>02 · VOLGEN</b><span>Volg elke factuur of elk contract via de status en ondertekende webhooks.</span></div>
+    <div class="step"><b>03 · BEWIJZEN</b><span>Haal het afgeronde .psign-bewijs op en controleer het zelf, zonder ons.</span></div>
   </div>
 
   <div class="grid">
@@ -110,7 +110,7 @@ curl -X POST https://paramant.app/v1/envelopes \
 
     <aside class="stack">
       <section class="card" aria-labelledby="usage-title">
-        <div class="card-head"><div><h2 id="usage-title">Handtekeningen deze maand</h2><p class="card-sub">Actueel verbruik van uw tegoed voor ondertekenen.</p></div></div>
+        <div class="card-head"><div><h2 id="usage-title">Handtekeningen deze maand</h2><p class="card-sub">Hoeveel van uw tegoed u deze maand gebruikte.</p></div></div>
         <div class="usage-number"><strong id="sign-used">--</strong><span id="sign-cap">van --</span></div>
         <div class="bar" aria-hidden="true"><span id="sign-bar"></span></div>
         <p class="usage-note" id="usage-note">Verbruik wordt geladen.</p>
@@ -128,7 +128,7 @@ curl -X POST https://paramant.app/v1/envelopes \
       </section>
 
       <section class="card" aria-labelledby="activity-title">
-        <div class="card-head"><div><h2 id="activity-title">Activiteit bij ondertekenen</h2><p class="card-sub">De laatste gebeurtenissen van Ondertekenen voor dit account.</p></div></div>
+        <div class="card-head"><div><h2 id="activity-title">Activiteit bij ondertekenen</h2><p class="card-sub">Wat er laatst gebeurde bij Ondertekenen op dit account.</p></div></div>
         <div class="activity" id="activity"><div class="empty">Activiteit wordt geladen.</div></div>
       </section>
     </aside>
@@ -148,7 +148,7 @@ curl -X POST https://paramant.app/v1/envelopes \
     </div>
     <div data-view="secret" hidden>
       <h2>API-sleutel gemaakt</h2>
-      <div class="notice">Kopieer deze sleutel nu. Als dit venster sluit, toont Paramant alleen nog de afgeschermde aanduiding.</div>
+      <div class="notice">Kopieer deze sleutel nu. Sluit u dit venster, dan ziet u alleen nog een afgeschermde versie.</div>
       <div class="secret" id="psk-secret"></div>
       <p class="card-sub" id="psk-meta"></p>
       <div class="actions"><button class="btn btn-primary" id="psk-copy" type="button">Sleutel kopiëren</button><button class="btn btn-secondary" type="button" data-close>Klaar</button></div>
@@ -158,6 +158,6 @@ curl -X POST https://paramant.app/v1/envelopes \
 
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=18" defer></script>
-<script src="/js/developer.js?v=12" defer></script>
+<script src="/js/developer.js?v=13" defer></script>
 </body>
 </html>

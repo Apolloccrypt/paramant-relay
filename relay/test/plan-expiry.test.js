@@ -113,7 +113,7 @@ test('one sweep warns the account inside the window, tells the lapsed one, and l
   assert.ok(warn.text.indexOf('Uw Ondertekenen Pro') < warn.text.indexOf('Your ParaSign Pro'), 'the Dutch text comes first');
   assert.ok(warn.html.indexOf('loopt af op 1 oktober 2026') < warn.html.indexOf('ends on 1 October 2026'), 'the Dutch html comes first');
   assert.match(warn.text, /Your ParaSign Pro ends on 1 October 2026\./);
-  assert.match(warn.text, /Renew for another month or year, or let it fall back to Community; nothing is charged automatically\./);
+  assert.match(warn.text, /If you do nothing, your account goes back to Community, and nothing is charged automatically\./);
   assert.match(warn.text, /https:\/\/paramant\.app\/pricing/);
 
   const ended = send.sent.find((m) => m.to === 'gone@example.com');

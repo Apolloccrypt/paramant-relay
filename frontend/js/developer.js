@@ -64,7 +64,7 @@
     var percent = cap == null ? 0 : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
     var bar = byId('sign-bar'); bar.style.width = percent + '%'; bar.className = percent >= 80 ? 'warn' : '';
     var note = byId('usage-note');
-    note.textContent = cap == null ? 'Uw maandtegoed voor ondertekenen kon nu niet worden gelezen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
+    note.textContent = cap == null ? 'We kunnen uw maandtegoed nu niet ophalen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
     // At 80% the bar turns orange, and an orange bar alone tells nobody what
     // to do about it. The warning names the way up. It lived in dead code on
     // /dashboard and was never shown (fase 1, DASH-27-N).
@@ -106,7 +106,7 @@
         byId('psk-keys').innerHTML = '<div class="empty">Uw account heeft geen toegang tot de API voor Ondertekenen. Die hoort bij een betaald ParaSign-abonnement.</div>';
         return;
       }
-      byId('psk-keys').innerHTML = '<div class="empty">De API-sleutels konden niet worden geladen. ' + esc(error.message) + '</div>';
+      byId('psk-keys').innerHTML = '<div class="empty">We konden de API-sleutels niet ophalen. ' + esc(error.message) + '</div>';
     });
   }
   function loadSnapshot() {
@@ -133,7 +133,7 @@
     var button = byId('psk-generate');
     var label = byId('psk-label').value.trim();
     var error = byId('psk-error');
-    button.disabled = true; button.textContent = 'Bezig met maken'; error.hidden = true;
+    button.disabled = true; button.textContent = 'Een moment'; error.hidden = true;
     json(API, { method:'POST', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ label:label }) }).then(function (data) {
       byId('psk-secret').textContent = data.key || '';
       // The key's ParaSign tier as the relay minted it (plan_parasign), else
@@ -144,7 +144,7 @@
       byId('psk-meta').textContent = 'Sleutel ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · abonnement ' + (data.plan_parasign || snapTier || '--');
       showView('secret'); loadKeys();
     }).catch(function (failure) {
-      error.textContent = failure.status === 403 ? 'Uw account heeft geen toegang tot de API voor Ondertekenen. Controleer uw abonnement of vraag een beheerder om toegang.' : 'De sleutel kon niet worden gemaakt. ' + failure.message;
+      error.textContent = failure.status === 403 ? 'Uw account heeft geen toegang tot de API voor Ondertekenen. Controleer uw abonnement of vraag een beheerder om toegang.' : 'De sleutel maken lukte niet. ' + failure.message;
       error.hidden = false;
     }).finally(function () { button.disabled = false; button.textContent = 'Sleutel maken'; });
   }
@@ -153,7 +153,7 @@
     button.disabled = true;
     json(API, { method:'DELETE', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ kid:kid }) }).then(loadKeys).catch(function (error) {
       button.disabled = false;
-      window.alert('De sleutel kon niet worden ingetrokken. ' + error.message);
+      window.alert('Intrekken lukte niet. ' + error.message);
     });
   }
 

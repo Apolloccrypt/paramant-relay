@@ -25,10 +25,10 @@ function bodies(event, hashPrefix, bytes) {
   const ref = String(hashPrefix || '').slice(0, 16);
   const nl = `Een verzending van uw Paramant-account is ${event === 'download' ? 'opgehaald' : 'opgeslagen'}.\n\n`
     + `Kenmerk: ${ref}\nGrootte: ${bytes || 0} bytes\n\n`
-    + 'U krijgt deze meldingen omdat uw abonnement ze bevat.';
+    + 'U krijgt deze melding omdat die bij uw plan hoort.';
   const en = `A transfer on your Paramant account was ${event === 'download' ? 'downloaded' : 'stored'}.\n\n`
     + `Reference: ${ref}\nSize: ${bytes || 0} bytes\n\n`
-    + 'You receive these notifications because your plan includes them.';
+    + 'You get this notice because it is part of your plan.';
   return { nl, en };
 }
 
