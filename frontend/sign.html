@@ -659,22 +659,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </p>
     </details>
     <p class="ds-sub">
-      <strong>Wat zonder account kan:</strong> een verzoek openen dat iemand u stuurde, en
-      <a href="/verify">elk getekend document controleren</a> tegen het openbare logboek.
-      Om op zo'n verzoek te tekenen, maakt u met de link uit de mail gratis een account
-      op het adres van de uitnodiging. Daarna tekent u.
+      <strong>Wat zonder account kan:</strong> een verzoek openen dat iemand u stuurde. U ziet dan om welk
+      bestand het gaat en wie al tekende. Het document zelf opent pas als u inlogt met het adres waarop u
+      bent uitgenodigd. Nog geen account? Maak dan gratis een account op dat adres. Daarna opent het
+      document en tekent u. <a href="/verify">Een getekend document controleren</a> kan ook zonder account.
     </p>
-    <!-- .ds-btn was never defined in any stylesheet, so the one CTA a
-         session-less visitor gets rendered as two lines of plain blue text.
-         These are the house button classes the rest of this page already
-         uses, and sign-flow.js selects neither class, so nothing behavioural
-         changes. -->
-    <p class="ds-anon-actions">
-      <a class="btn btn-primary" href="/signup?next=/sign">Account maken</a>
-      <a class="btn btn-secondary" href="/auth/login?next=/sign">Inloggen</a>
-    </p>
+    <!-- No buttons here: the bar above (#ds-signedout) already carries
+         "Inloggen" and "Account maken", and two blocks with the same message
+         and the same buttons read as one message said twice (acceptance
+         3.1.1, 18). -->
     <p class="ds-sub ds-anon-foot">
-      Met een Community-account ondertekent u 2 documenten per maand. <a href="/pricing">Bekijk wat de betaalde abonnementen toevoegen</a>.
+      Met een Community-account zet u 2 handtekeningen per maand. Een paraaf op elke pagina telt niet apart. <a href="/pricing">Bekijk wat Firm toevoegt</a>.
     </p>
   </section>
 
@@ -684,7 +679,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-modes">
       <button type="button" class="ds-mode-card primary" data-mode="invite">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-badge">Aanbevolen voor organisaties</span><span class="ds-mode-t">Handtekeningen vragen</span><span class="ds-mode-d">Stuur een document naar een of meer mensen en zie wie al getekend heeft. Iedereen kan ook elke pagina parafen.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-badge">Aanbevolen voor organisaties</span><span class="ds-mode-t">Handtekeningen vragen</span><span class="ds-mode-d">Stuur een document naar een of meer mensen en zie wie al getekend heeft. Iedereen kan ook elke pagina paraferen.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="alone">
@@ -991,7 +986,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
         <div class="ds-usage-card" id="ds-party-links-card" hidden>
           <h3 class="ds-proof-h">Hun persoonlijke links</h3>
-          <p class="ds-usage-p" id="ds-party-links-copy">Eén link per ondertekenaar. De sleutel zit in de link.</p>
+          <p class="ds-usage-p" id="ds-party-links-copy">Elke link opent het document na inloggen, en is alleen voor die ene persoon.</p>
           <div class="ds-banner" id="ds-invite-delivery-result" hidden role="status" aria-live="polite"></div>
           <div class="ds-party-links" id="ds-party-links"></div>
           <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Mislukte e-mails opnieuw sturen</button>
@@ -1075,10 +1070,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=20" defer></script>
+<script src="/js/nav-auth.js?v=21" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=10" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=77"></script>
+<script type="module" src="/sign-flow.js?v=78"></script>
 </body>
 </html>

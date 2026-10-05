@@ -210,7 +210,7 @@ body.needs-login #sign-intro{display:none}
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <nav class="nav">
-  <a href="/en" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 </nav>
 
 <main id="main-content">
@@ -223,14 +223,14 @@ body.needs-login #sign-intro{display:none}
 
 <div class="step" id="step-error">
   <h1>This document does not open</h1>
-  <p class="sub">The link is wrong or has expired, or our server would not release the document.</p>
+  <p class="sub">The link is wrong, or the request has expired.</p>
   <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Unknown error.</div></div></div>
   <a href="/en" class="btn btn-outline">Back to the homepage</a>
 </div>
 
 <div class="step" id="step-cosign">
-  <h1>Co-sign envelope</h1>
-  <p class="sub">Read the document and add your signature.</p>
+  <h1 id="cosign-title">Sign this document</h1>
+  <p class="sub" id="cosign-sub">Read the document and add your signature.</p>
 
   <details class="how">
     <summary>HOW THIS WORKS</summary>
@@ -347,8 +347,8 @@ body.needs-login #sign-intro{display:none}
 </div>
 
 <div class="step" id="step-done">
-  <h1>Acknowledgement signed</h1>
-  <p class="sub" id="done-sub">Your signature is recorded. Once everyone has signed, the same link from your invitation opens the complete document with every signature.</p>
+  <h1>Your signature is in place</h1>
+  <p class="sub" id="done-sub">Once everyone has signed, the same link from your invitation opens the complete document with every signature.</p>
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Result</div></div>
     <div class="card-body">
@@ -369,10 +369,10 @@ body.needs-login #sign-intro{display:none}
         <span class="tag green">Signed locally</span>
       </div>
       <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Download PDF copy with visible marks</button>
-      <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Download final .psign proof</a>
+      <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Download the proof (.psign)</a>
       <button class="btn btn-outline" id="done-download-original" type="button" hidden style="margin-top:8px">Download the original document</button>
-      <p class="review-gate" id="done-download-note" hidden>The PDF with signatures is a readable copy. The proof (.psign) belongs with the original document: to check it, open the original together with the .psign file on /verify.</p>
-      <p class="review-gate" id="done-proof-wait" hidden>The final .psign proof becomes available after every invited signer has signed.</p>
+      <p class="review-gate" id="done-download-note" hidden>The PDF with signatures is for reading and keeping. To check later that everything is right, you need the original and the proof. You can check them at <a href="/en/verify">paramant.app/en/verify</a>.</p>
+      <p class="review-gate" id="done-proof-wait" hidden>The proof becomes available once everyone has signed.</p>
     </div>
   </div>
   <a href="/en" class="btn btn-outline">Back to the homepage</a>
@@ -385,6 +385,6 @@ body.needs-login #sign-intro{display:none}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=10" defer></script>
-<script type="module" src="/co-sign.js?v=43"></script>
+<script type="module" src="/co-sign.js?v=44"></script>
 </body>
 </html>

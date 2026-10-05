@@ -4616,7 +4616,7 @@ function showDoneInvite(r) {
     line: emailPartial
       ? L('Sommige uitnodigingen zijn niet bezorgd. Probeer het hieronder opnieuw, of stuur wie geen mail kreeg zelf de link hieronder.', 'Some invitations were not delivered. Retry below, or send anyone who got no mail their link below yourself.')
       : emailOk
-        ? L('Iedereen kreeg een eigen link die het document opent na inloggen. U hoeft niets meer te sturen. U krijgt bericht bij elke handtekening en aan het eind het complete document.', 'Everyone received their own link; it opens the document after sign-in. There is nothing more to send. You hear about every signature, and get the complete document at the end.')
+        ? L('Iedereen heeft een eigen link gekregen. U hoeft niets meer te sturen. U krijgt bericht bij elke handtekening, en aan het eind het complete document.', 'Everyone has their own link now. There is nothing more to send. You hear about every signature, and get the complete document at the end.')
         : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
@@ -4683,7 +4683,9 @@ function renderPartyLinks(mp) {
   if (copyLine) {
     copyLine.textContent = state.cosignShareError
       ? L('Deze links openen het verzoek, maar niet het document: dat kon niet worden meegestuurd. Stuur iedereen zelf de getekende pdf (Getekende pdf downloaden). Op de eigen pagina kiest ieder dat bestand en tekent dan.', 'These links open the request, but not the document: it could not be sent along. Send everyone the signed PDF yourself (Download signed PDF). On their own page each person chooses that file and then signs.')
-      : L('Eén link per persoon. Die opent het document na inloggen; geef hem alleen aan die persoon.', 'One link per person. It opens the document after sign-in; give it to that person only.');
+      : (state.inviteDelivery?.ok
+        ? L('Wilt u iemand de link toch zelf sturen? Elke link opent het document na inloggen, en is alleen voor die ene persoon.', 'Want to send someone the link yourself after all? Each link opens the document after sign-in, and is for that one person only.')
+        : L('Elke link opent het document na inloggen, en is alleen voor die ene persoon.', 'Each link opens the document after sign-in, and is for that one person only.'));
   }
   const covered = paraafCoveredNotice();
   let coveredEl = $('ds-paraaf-covered');
@@ -4703,8 +4705,9 @@ function renderPartyLinks(mp) {
       result.hidden = false; result.className = 'ds-banner';
       result.textContent = L('Er is geen e-mail verstuurd. Stuur iedereen zelf de eigen link.', 'No email was sent. Send each person their link yourself.');
     } else if (state.inviteDelivery?.ok) {
-      result.hidden = false; result.className = 'ds-banner ok';
-      result.textContent = L('Alle uitnodigingen zijn bezorgd.', 'Every invitation was delivered.');
+      // The heading already says the invitations went out; a second green
+      // banner and a tick per person said it twice more (acceptance 3.1.1, 13).
+      result.hidden = true;
     } else if (state.inviteDelivery) {
       const failedCount = state.inviteDelivery.failed_party_indexes?.length || 0;
       result.hidden = false; result.className = 'ds-banner err';
@@ -4719,12 +4722,15 @@ function renderPartyLinks(mp) {
     const recipientIndex = inviteOnly ? p.party_index : p.party_index - 1;
     const recipient = state.recipients[recipientIndex] || { label: 'Recipient ' + (recipientIndex + 1) };
     const fullUrl = location.origin + p.sign_path;
-    const deliveryStatus = deliveryByParty.get(p.party_index);
+    // A status per person only when not every mail arrived: then it says who.
+    const deliveryStatus = state.inviteDelivery?.ok ? null : deliveryByParty.get(p.party_index);
     const row = document.createElement('div');
     row.className = 'ds-party-link-row';
     row.innerHTML =
       `<div class="ds-pl-label">${escapeHtml(recipient.label)}${recipient.email ? '<div style="font-size:10px;color:var(--ink-dim);font-weight:400">' + escapeHtml(recipient.email) + '</div>' : ''}${deliveryStatus ? '<div class="ds-invite-status ' + (deliveryStatus.ok ? 'ok' : 'err') + '">' + (deliveryStatus.ok ? L('E-mail verstuurd', 'Email sent') : L('E-mail mislukt', 'Email failed')) + '</div>' : ''}</div>` +
-      `<div class="ds-pl-url" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>` +
+      // The raw link stays out of sight: the copy button is how it travels.
+      // It is still in the row, so the select-all fallback below can show it.
+      `<div class="ds-pl-url" title="${escapeHtml(fullUrl)}" hidden>${escapeHtml(fullUrl)}</div>` +
       L(`<button class="ds-pl-copy" type="button">Link kopiëren</button>`, `<button class="ds-pl-copy" type="button">Copy link</button>`);
     const btn = row.querySelector('.ds-pl-copy');
     btn.onclick = async () => {
@@ -4735,8 +4741,10 @@ function renderPartyLinks(mp) {
         setTimeout(() => { btn.textContent = L('Link kopiëren', 'Copy link'); btn.classList.remove('copied'); }, 1500);
       } catch {
         // Fallback: select the URL element for manual copy
+        const urlEl = row.querySelector('.ds-pl-url');
+        urlEl.hidden = false;
         const range = document.createRange();
-        range.selectNode(row.querySelector('.ds-pl-url'));
+        range.selectNode(urlEl);
         getSelection().removeAllRanges();
         getSelection().addRange(range);
         btn.textContent = L('Alles selecteren (Ctrl+C)', 'Select all (Ctrl+C)');
@@ -5200,7 +5208,7 @@ async function sendAfterAllowanceCheck() {
   const need = state.recipients.length;
   const left = await senderSignsLeft();
   if (left !== null && left < need) {
-    showRecipientsHint(L('Uw tegoed is bijna of helemaal op: u hebt deze maand nog ', 'Your allowance is (almost) used up: you have ') + left
+    showRecipientsHint(L('U heeft deze maand nog ', 'You have ') + left
       + L(left === 1 ? ' handtekening over' : ' handtekeningen over', left === 1 ? ' signature left this month' : ' signatures left this month')
       + L(', en dit verzoek vraagt er ', ', and this request needs ') + need
       + L('. Elke handtekening telt mee, dus zo kan dit verzoek niet weg. Verhoog uw plan op /pricing, nodig minder mensen uit, of verstuur het na het begin van de volgende maand.', '. Every signature counts, so this request cannot go out like this. Upgrade your plan on /pricing, invite fewer people, or send it after the start of next month.'), true);
@@ -5326,7 +5334,7 @@ async function showOwnPlan() {
   b.textContent = L('Uw plan: ', 'Your plan: ') + (PLAN_NAMES[tier] || tier);
   li.textContent = '';
   li.appendChild(b);
-  li.appendChild(document.createTextNode(L(' · uw handtekeningen vallen onder uw abonnement', ' · your signatures are covered by your subscription')));
+  li.appendChild(document.createTextNode(L(' · uw handtekeningen vallen onder dit plan', ' · your signatures are covered by this plan')));
 }
 
 // What the finished proof does and does not say. An open-mode envelope has no

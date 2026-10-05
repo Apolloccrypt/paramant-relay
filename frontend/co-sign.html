@@ -210,7 +210,7 @@ body.needs-login #sign-intro{display:none}
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
-  <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 </nav>
 
 <main id="main-content">
@@ -223,14 +223,14 @@ body.needs-login #sign-intro{display:none}
 
 <div class="step" id="step-error">
   <h1>Dit document opent niet</h1>
-  <p class="sub">De link klopt niet of is verlopen, of onze server gaf het document niet vrij.</p>
+  <p class="sub">De link klopt niet, of het verzoek is verlopen.</p>
   <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Onbekende fout.</div></div></div>
   <a href="/" class="btn btn-outline">Terug naar de startpagina</a>
 </div>
 
 <div class="step" id="step-cosign">
-  <h1>Document medeondertekenen</h1>
-  <p class="sub">Lees het document en zet uw handtekening.</p>
+  <h1 id="cosign-title">Document ondertekenen</h1>
+  <p class="sub" id="cosign-sub">Lees het document en zet uw handtekening.</p>
 
   <details class="how">
     <summary>HOE DIT WERKT</summary>
@@ -348,7 +348,7 @@ body.needs-login #sign-intro{display:none}
 
 <div class="step" id="step-done">
   <h1>Uw handtekening is gezet</h1>
-  <p class="sub" id="done-sub">Uw handtekening is vastgelegd. Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.</p>
+  <p class="sub" id="done-sub">Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.</p>
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Resultaat</div></div>
     <div class="card-body">
@@ -369,10 +369,10 @@ body.needs-login #sign-intro{display:none}
         <span class="tag green">Op uw apparaat ondertekend</span>
       </div>
       <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Pdf-kopie met zichtbare stempel downloaden</button>
-      <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Definitief .psign-bewijs downloaden</a>
+      <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Bewijs downloaden (.psign)</a>
       <button class="btn btn-outline" id="done-download-original" type="button" hidden style="margin-top:8px">Origineel document downloaden</button>
-      <p class="review-gate" id="done-download-note" hidden>De pdf met handtekeningen is een leesbare kopie. Het bewijs (.psign) hoort bij het originele document: wie wil controleren, opent op /verify het origineel samen met het .psign-bestand.</p>
-      <p class="review-gate" id="done-proof-wait" hidden>Het definitieve .psign-bewijs is beschikbaar zodra iedere uitgenodigde ondertekenaar heeft getekend.</p>
+      <p class="review-gate" id="done-download-note" hidden>De pdf met handtekeningen is om te lezen en te bewaren. Wil iemand later nagaan of alles klopt, dan heeft hij het origineel en het bewijs nodig. Dat kan op <a href="/verify">paramant.app/verify</a>.</p>
+      <p class="review-gate" id="done-proof-wait" hidden>Het bewijs komt beschikbaar zodra iedereen heeft getekend.</p>
     </div>
   </div>
   <a href="/" class="btn btn-outline">Terug naar de startpagina</a>
@@ -385,6 +385,6 @@ body.needs-login #sign-intro{display:none}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=10" defer></script>
-<script type="module" src="/co-sign.js?v=43"></script>
+<script type="module" src="/co-sign.js?v=44"></script>
 </body>
 </html>

@@ -561,11 +561,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -582,11 +582,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -669,22 +669,15 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </p>
     </details>
     <p class="ds-sub">
-      <strong>What you can do without one:</strong> open a signing request someone sent you, and
-      <a href="/en/verify">verify any signed document</a> against the public log.
-      To sign that request, use the link in the email to create a free account on the
-      invited address. Then you sign.
+      <strong>What you can do without one:</strong> open a signing request someone sent you. You then see
+      which file it is and who has signed. The document itself only opens once you sign in with the address
+      the invitation went to. No account yet? Create a free one on that address. Then the document opens
+      and you sign. <a href="/en/verify">Checking a signed document</a> works without an account too.
     </p>
-    <!-- .ds-btn was never defined in any stylesheet, so the one CTA a
-         session-less visitor gets rendered as two lines of plain blue text.
-         These are the house button classes the rest of this page already
-         uses, and sign-flow.js selects neither class, so nothing behavioural
-         changes. -->
-    <p class="ds-anon-actions">
-      <a class="btn btn-primary" href="/en/signup?next=/en/sign">Create an account</a>
-      <a class="btn btn-secondary" href="/en/auth/login?next=/en/sign">Sign in</a>
-    </p>
+    <!-- No buttons here: the bar above (#ds-signedout) already carries
+         "Sign in" and "Create account" (acceptance 3.1.1, 18). -->
     <p class="ds-sub ds-anon-foot">
-      Community accounts sign 2 documents a month. <a href="/en/pricing">See what the paid tiers add</a>.
+      A Community account gives you 2 signatures a month. Initials on every page do not count separately. <a href="/en/pricing">See what Firm adds</a>.
     </p>
   </section>
 
@@ -1001,7 +994,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
         <div class="ds-usage-card" id="ds-party-links-card" hidden>
           <h3 class="ds-proof-h">Their personal links</h3>
-          <p class="ds-usage-p" id="ds-party-links-copy">One link per signer. The key is in the link.</p>
+          <p class="ds-usage-p" id="ds-party-links-copy">Each link opens the document after sign-in, and is for that one person only.</p>
           <div class="ds-banner" id="ds-invite-delivery-result" hidden role="status" aria-live="polite"></div>
           <div class="ds-party-links" id="ds-party-links"></div>
           <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Retry failed emails</button>
@@ -1085,10 +1078,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=20" defer></script>
+<script src="/js/nav-auth.js?v=21" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=10" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=77"></script>
+<script type="module" src="/sign-flow.js?v=78"></script>
 </body>
 </html>
