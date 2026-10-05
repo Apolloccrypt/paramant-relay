@@ -611,7 +611,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        honours on the way back; signup still finishes through the emailed
        verification link and does not carry it yet. -->
   <div class="ds-signedout" id="ds-signedout" role="status" hidden>
-    <p class="ds-signedout-text">You are not signed in. You can prepare a document here; signing or sending it needs a free Community account.</p>
+    <p class="ds-signedout-text">You are not signed in. You can already prepare a document. To sign or send it, you need a free Community account.</p>
     <p class="ds-signedout-actions">
       <a class="btn btn-secondary" href="/en/auth/login?next=/en/sign">Sign in</a>
       <a class="btn btn-primary" href="/en/signup?next=/en/sign">Create account</a>
@@ -647,10 +647,9 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <details class="wp-fold">
       <summary>Why an account?</summary>
       <p class="ds-sub">
-        Not because the document goes anywhere. It does not: the file and your private key
-        stay in this browser, and the relay only ever sees a hash. The account exists because
-        a Paramant signature is made with a key that belongs to a passkey on your device, and
-        that key has to be enrolled somewhere before it can sign.
+        Your document goes nowhere. The file and your private key stay in this browser.
+        Our server only sees a fingerprint of the file. You sign with a key that belongs to
+        the passkey on your device, and that key first has to be tied to an account.
       </p>
     </details>
     <p class="ds-sub">
@@ -675,11 +674,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
-    <div class="ds-mode-intro"><div><h2>How should it be signed?</h2><p class="ds-sub">Choose a workflow. You can change it before sending.</p></div><span class="ds-mode-safe">Your signing key stays on your device</span></div>
+    <div class="ds-mode-intro"><div><h2>How should it be signed?</h2><p class="ds-sub">You can still change this before sending.</p></div><span class="ds-mode-safe">Your signing key stays on your device</span></div>
     <div class="ds-modes">
       <button type="button" class="ds-mode-card primary" data-mode="invite">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-badge">Recommended for business</span><span class="ds-mode-t">Request signatures</span><span class="ds-mode-d">Email a secure document to one or more people and follow their progress. Every signer can also initial every page.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-badge">Recommended for business</span><span class="ds-mode-t">Request signatures</span><span class="ds-mode-d">Send a document to one or more people and see who has signed. Everyone can also initial every page.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="alone">
@@ -689,7 +688,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </button>
       <button type="button" class="ds-mode-card" data-mode="cosign">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 19c.5-4 2-6 5-6s4.5 2 5 6"/><path d="M14 14c3-1 5 1 6 4"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-t">Sign together</span><span class="ds-mode-d">Sign first, then invite others to add their signatures, each with initials on every page if you want.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Sign together</span><span class="ds-mode-d">Sign first, then invite others. If you want, everyone also initials every page.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
     </div>
@@ -746,7 +745,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </div>
       <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Sign every page with this signature (initials)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Use saved position</button>
-      <span class="ds-edit-tip" id="ds-seal-tip">The other pages get small initials in a free spot in the margin. If a page has no free spot, you see that here before you sign. Position and scale are remembered for next time (never your name or signature image).</span>
+      <span class="ds-edit-tip" id="ds-seal-tip">The other pages get small initials in a free spot in the margin. If a page has no free spot, you see that here before you sign. We remember the position and size for next time, never your name or signature.</span>
     </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
@@ -769,8 +768,8 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
   <!-- Step 2-alt (non-PDF): hash-only mode -->
   <section class="ds-step" id="step-hash-only" hidden>
-    <h2>Hash-only signature</h2>
-    <p class="ds-sub">This file type cannot be visually stamped. You will sign its SHA3-256 fingerprint (a unique checksum of the file). Recipients verify by hashing the same file again.</p>
+    <h2>Signature without a stamp</h2>
+    <p class="ds-sub">This kind of file cannot take a visible stamp. You sign a fingerprint of the file (SHA3-256). Recipients check the signature with the same file.</p>
     <div class="ds-info-card">
       <dl>
         <dt>File</dt>          <dd id="ds-hash-only-name">-</dd>
@@ -779,7 +778,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </dl>
     </div>
     <p class="ds-doc-error" id="ds-hash-only-note" role="alert" hidden></p>
-    <p class="ds-edit-hint">This file type is attested by hash: no preview, no visual editing. The full PDF editor (+ Text, + Date, highlights, notes and page management) appears when you pick a PDF file.</p>
+    <p class="ds-edit-hint">For this kind of file you sign only the fingerprint. There is no preview and no visual editing. The full PDF editor (+ Text, + Date, highlights, notes and page management) appears when you pick a PDF file.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Back</button>
       <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Continue</button>
@@ -789,7 +788,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Add co-signers (optional)</h2>
-    <p class="ds-sub">Add each person who needs to sign. Their invitation is bound to the exact email address below. The encrypted document travels with the request, so nobody needs a separate copy of the file.</p>
+    <p class="ds-sub">Add each person who needs to sign. Each invitation works only for the email address you enter here. The document travels along encrypted, so nobody needs a separate copy.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -799,7 +798,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
       <legend>Email invitation</legend>
-      <p class="ds-usage-p">Paramant emails each recipient an invitation with a link of their own. It opens the document once they sign in with the invited email address. The mail carries only half of the key; we hand the other half to that account alone, so the mail provider cannot open the document.</p>
+      <p class="ds-usage-p">Paramant emails each recipient an invitation with a link of their own. It opens the document once they sign in with the invited email address. The mail carries only half of the key. Only that account gets the other half, so the mail provider cannot open the document.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
         <label><span class="ds-label">Email subject</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
         <label><span class="ds-label">Message (optional)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Add context, a reference or the requested deadline."></textarea></label>
@@ -808,11 +807,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Security settings</summary>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="email" checked>
-          <span><strong>Email everyone an invitation</strong><span>Recommended. The invitation works only for the invited Paramant account, and the whole key never reaches our mail provider.</span></span>
+          <span><strong>Email everyone an invitation</strong><span>Recommended. The invitation works only for the invited account. The whole key never reaches our mail provider.</span></span>
         </label>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="copy">
-          <span><strong>Create links without sending anything</strong><span>No email at all. You share each personal link yourself.</span></span>
+          <span><strong>Create links without sending anything</strong><span>We send no email. You share each link yourself.</span></span>
         </label>
       </details>
     </fieldset>
@@ -828,7 +827,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 3: identity -->
   <section class="ds-step" id="step-identity" hidden>
     <h2>Who is signing?</h2>
-    <p class="ds-sub">Your name goes into the visible stamp (for PDFs) and into the .psign envelope.</p>
+    <p class="ds-sub">Your name goes into the stamp (for PDFs) and into the proof file (.psign).</p>
     <div class="ds-field">
       <label class="ds-label" for="ds-signer-name">Your name</label>
       <input class="ds-input" type="text" id="ds-signer-name" maxlength="80" placeholder="e.g. Mick Beer" autocomplete="name">
@@ -845,7 +844,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <p class="ds-hint">Your name will appear as text inside the stamp. Choose 'Draw' if you want a handwritten signature.</p>
       </div>
       <div class="ds-sig-panel" id="ds-sig-panel-drawn" role="tabpanel" aria-labelledby="ds-tab-drawn" tabindex="0" hidden>
-        <p class="ds-hint">Draw with your mouse or finger. Use a steady stroke: the result is saved as a PNG image and embedded in the PDF.</p>
+        <p class="ds-hint">Draw with your mouse or finger. A steady line works best. Your line goes into the PDF as an image.</p>
         <canvas id="ds-sig-canvas" width="500" height="160" role="img" aria-label="Signature drawing area: draw your signature with your mouse or finger"></canvas>
         <p class="ds-hint" id="ds-sig-draw-status" aria-live="polite">Your line appears here while you draw.</p>
         <div class="ds-actions" style="margin-top:8px">
@@ -865,7 +864,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-field">
       <label class="ds-label">Cryptographic key (ML-DSA-65)</label>
       <p class="ds-hint" id="ds-signing-identity">Checking your signing key...</p>
-      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your signing key (ML-DSA-65), unlocked the moment you sign with your passkey (Face ID, Touch ID or a security key) or, without a passkey, with the code from your authenticator app, and never exported. Recipients you add sign at <code>/co-sign</code> with their own signing key.</p>
+      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What really binds the signature is your signing key (ML-DSA-65). You unlock it when you sign: with your passkey (Face ID, Touch ID or a security key), or without a passkey with the code from your authenticator app. The key is never exported. Recipients you add sign at <code>/co-sign</code> with their own signing key.</p>
     </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-identity-back" type="button">Back</button>
@@ -876,12 +875,12 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Review and sign</h2>
-    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, you confirm with your passkey (Face ID, Touch ID or a security key) or, if you have no passkey, with the code from your authenticator app. That unlocks your signing key for this one document, and the signature is created on your device.</p>
+    <p class="ds-sub">This is what you are about to sign. Check the document, your signature and the details. When you click <strong>Sign this document</strong>, you confirm with your passkey (Face ID, Touch ID or a security key) or, if you have no passkey, with the code from your authenticator app. That unlocks your signing key for this one document, and the signature is created on your device.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
         <h3 class="ds-review-h">Document preview: visual seal</h3>
-        <p class="ds-review-cap">The stamp on the document is the visible Paramant seal. Drag it during placement; this is what readers see.</p>
+        <p class="ds-review-cap">This is how readers see the document, with the Paramant stamp on it. You can drag the stamp while placing it.</p>
         <div id="ds-review-doc-preview" class="ds-review-pane"></div>
       </div>
       <div class="ds-review-col">
@@ -893,7 +892,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <div class="ds-proof-card">
       <h3 class="ds-proof-h">Cryptographic proof (.psign envelope)</h3>
-      <p class="ds-review-cap">The visual seal is supporting evidence. This envelope is the mathematical proof anyone can verify offline using only your public key. The signature itself is produced when you click Sign this document.</p>
+      <p class="ds-review-cap">The stamp is what people see. This file is the real proof: anyone can check it offline with only your public key. The signature itself is produced when you click Sign this document.</p>
       <dl class="ds-proof-dl">
         <dt>Algorithm</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
         <dt>Hash algorithm</dt>     <dd>SHA3-256</dd>
@@ -974,10 +973,9 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
            -> mrz-unverified). Shown by sign-flow.js only for binding_mode
            'open'. -->
       <p class="ds-proof-scope" id="ds-proof-scope" hidden>
-        <strong>Signer not verified.</strong> This document was signed in open mode, so no
-        email invitation tied a person to a slot. The proof shows that a specific key signed
-        this exact document, and that the key is the one recorded in the envelope. It does not
-        show who holds that key. For a signature bound to an invited email address, use
+        <strong>Signer not verified.</strong> This document was signed without an email
+        invitation, so nothing ties a person to a slot. The proof shows that one specific key
+        signed this exact document. It does not show who holds that key. For a signature bound to an invited email address, use
         <em>Request signatures</em> instead.
       </p>
 
@@ -1007,7 +1005,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <details class="done-details" id="ds-invite-details" hidden>
         <summary>What made this safe</summary>
         <div class="done-details-body">
-          <p>The document was sealed in your browser before any of it left this device, and each personal link carries that one person's key after the <code>#</code>, which is the part of a link a browser never sends to a server. What sits on our side is bytes we have no way to read. The key stayed here too: the invitation email carries only a notice, so the mail provider that delivers it holds no way into the document and neither do we.</p>
+          <p>Your browser encrypted the document before any of it left this device. Each personal link carries that one person's key after the <code>#</code>. A browser never sends that part of a link to a server. What we hold is data we cannot read. The key stayed here too: the invitation email carries only a notice. So the mail provider cannot get into the document, and neither can we.</p>
           <p>A link is bound to the address you gave it, so it opens for that signer and not for whoever else it is forwarded to. When they sign, the signature is made on their own device with a key of their own (<code>ML-DSA-65</code>) and recorded on our relay and in the public <a href="/en/ct-log">CT log</a>, so you can show later that it happened and when.</p>
           <p>Nobody has signed anything yet. This screen is the moment the requests went out.</p>
         </div>

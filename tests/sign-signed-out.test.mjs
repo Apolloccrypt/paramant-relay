@@ -92,8 +92,9 @@ async function pickJpeg(page) {
 // ── signed out: the bar, and what it does not do ─────────────────────────────
 const out = await openSign(false);
 await out.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
+// Mick 05-10: taalronde
 ok('signed out, the flow carries a bar that says so',
-  /U bent niet ingelogd\. U kunt hier een document klaarzetten; voor ondertekenen of versturen is een gratis Community-account nodig\./.test(await out.locator('#ds-signedout').innerText()),
+  /U bent niet ingelogd\. U kunt al wel een document klaarzetten\. Om te tekenen of te versturen heeft u een gratis Community-account nodig\./.test(await out.locator('#ds-signedout').innerText()),
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /sign afterwards',

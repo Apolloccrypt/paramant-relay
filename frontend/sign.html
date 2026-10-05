@@ -601,7 +601,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        honours on the way back; signup still finishes through the emailed
        verification link and does not carry it yet. -->
   <div class="ds-signedout" id="ds-signedout" role="status" hidden>
-    <p class="ds-signedout-text">U bent niet ingelogd. U kunt hier een document klaarzetten; voor ondertekenen of versturen is een gratis Community-account nodig.</p>
+    <p class="ds-signedout-text">U bent niet ingelogd. U kunt al wel een document klaarzetten. Om te tekenen of te versturen heeft u een gratis Community-account nodig.</p>
     <p class="ds-signedout-actions">
       <a class="btn btn-secondary" href="/auth/login?next=/sign">Inloggen</a>
       <a class="btn btn-primary" href="/signup?next=/sign">Account maken</a>
@@ -637,10 +637,9 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <details class="wp-fold">
       <summary>Waarom is een account nodig?</summary>
       <p class="ds-sub">
-        Uw document gaat nergens heen: het bestand en uw privésleutel blijven in deze browser,
-        en de relay ziet alleen een hash. U heeft een account nodig omdat u tekent met een sleutel
-        die hoort bij een passkey op uw apparaat. Die sleutel moet eerst zijn vastgelegd voordat
-        hij kan tekenen.
+        Uw document gaat nergens heen. Het bestand en uw privésleutel blijven in deze browser.
+        Onze server ziet alleen een vingerafdruk van het bestand. U tekent met een sleutel die
+        bij de passkey op uw apparaat hoort, en die sleutel moet eerst aan een account vastzitten.
       </p>
     </details>
     <p class="ds-sub">
@@ -664,11 +663,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
-    <div class="ds-mode-intro"><div><h2>Hoe wilt u ondertekenen?</h2><p class="ds-sub">Kies een werkwijze. U kunt die voor het versturen nog wijzigen.</p></div><span class="ds-mode-safe">Uw ondertekensleutel blijft op uw apparaat</span></div>
+    <div class="ds-mode-intro"><div><h2>Hoe wilt u ondertekenen?</h2><p class="ds-sub">U kunt dit voor het versturen nog veranderen.</p></div><span class="ds-mode-safe">Uw ondertekensleutel blijft op uw apparaat</span></div>
     <div class="ds-modes">
       <button type="button" class="ds-mode-card primary" data-mode="invite">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-badge">Aanbevolen voor organisaties</span><span class="ds-mode-t">Handtekeningen vragen</span><span class="ds-mode-d">Stuur een beveiligd document naar een of meer mensen en volg wie al getekend heeft. Elke ondertekenaar kan ook een paraaf op elke pagina zetten.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-badge">Aanbevolen voor organisaties</span><span class="ds-mode-t">Handtekeningen vragen</span><span class="ds-mode-d">Stuur een document naar een of meer mensen en zie wie al getekend heeft. Iedereen kan ook elke pagina parafen.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="alone">
@@ -678,7 +677,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </button>
       <button type="button" class="ds-mode-card" data-mode="cosign">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 19c.5-4 2-6 5-6s4.5 2 5 6"/><path d="M14 14c3-1 5 1 6 4"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-t">Samen ondertekenen</span><span class="ds-mode-d">Teken eerst zelf en nodig daarna anderen uit om mee te tekenen, ieder met een paraaf op elke pagina als u dat wilt.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Samen ondertekenen</span><span class="ds-mode-d">Teken eerst zelf en nodig daarna anderen uit. Als u wilt, parafeert iedereen ook elke pagina.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
     </div>
@@ -735,7 +734,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </div>
       <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Onderteken elke pagina met deze handtekening (paraaf)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Opgeslagen positie gebruiken</button>
-      <span class="ds-edit-tip" id="ds-seal-tip">Op de andere pagina's komt een kleine paraaf in een vrije plek in de marge. Is er op een pagina geen vrije plek, dan ziet u dat hier voordat u tekent. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).</span>
+      <span class="ds-edit-tip" id="ds-seal-tip">Op de andere pagina's komt een kleine paraaf op een vrije plek in de marge. Is er op een pagina geen vrije plek, dan ziet u dat hier voordat u tekent. We onthouden de plek en de grootte voor de volgende keer, nooit uw naam of handtekening.</span>
     </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Vorige pagina">&#8593;</button>
@@ -758,8 +757,8 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
   <!-- Step 2-alt (non-PDF): hash-only mode -->
   <section class="ds-step" id="step-hash-only" hidden>
-    <h2>Handtekening op de hash</h2>
-    <p class="ds-sub">Dit bestandstype kan geen zichtbare stempel krijgen. U ondertekent de SHA3-256-hash van het bestand; ontvangers controleren door hetzelfde bestand opnieuw te hashen.</p>
+    <h2>Handtekening zonder stempel</h2>
+    <p class="ds-sub">Op dit soort bestand past geen zichtbare stempel. U ondertekent een vingerafdruk van het bestand (SHA3-256). Ontvangers controleren de handtekening met hetzelfde bestand.</p>
     <div class="ds-info-card">
       <dl>
         <dt>Bestand</dt>          <dd id="ds-hash-only-name">-</dd>
@@ -768,7 +767,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </dl>
     </div>
     <p class="ds-doc-error" id="ds-hash-only-note" role="alert" hidden></p>
-    <p class="ds-edit-hint">Bij dit bestandstype ondertekent u alleen de hash. U ziet geen voorbeeld en kunt niets zichtbaar bewerken. De volledige pdf-editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) verschijnt als u een pdf kiest.</p>
+    <p class="ds-edit-hint">Bij dit soort bestand ondertekent u alleen de vingerafdruk. U ziet geen voorbeeld en kunt niets zichtbaar bewerken. De volledige pdf-editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) verschijnt als u een pdf kiest.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Terug</button>
       <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Verder</button>
@@ -778,7 +777,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Medeondertekenaars toevoegen (optioneel)</h2>
-    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig.</p>
+    <p class="ds-sub">Voeg iedereen toe die moet tekenen. Elke uitnodiging werkt alleen voor het e-mailadres dat u hier invult. Het document gaat versleuteld mee, dus niemand heeft een aparte kopie nodig.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -788,7 +787,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
       <legend>Uitnodiging per e-mail</legend>
-      <p class="ds-usage-p">Paramant stuurt elke ontvanger een uitnodiging met een eigen link. De ontvanger logt in met het uitgenodigde e-mailadres, en dan opent de link het document. In de mail staat maar de helft van de sleutel; de andere helft geven wij alleen aan dat account. Zo kan de mailprovider het document niet openen.</p>
+      <p class="ds-usage-p">Iedereen krijgt een uitnodiging met een eigen link. Na inloggen met dat e-mailadres opent de link het document. In de mail staat maar de helft van de sleutel. De andere helft krijgt alleen dat account. Zo kan de mailprovider het document niet openen.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
         <label><span class="ds-label">Onderwerp van de e-mail</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
         <label><span class="ds-label">Bericht (optioneel)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Voeg uitleg, een kenmerk of de gewenste termijn toe."></textarea></label>
@@ -797,11 +796,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Beveiligingsinstellingen</summary>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="email" checked>
-          <span><strong>Stuur iedereen een uitnodiging per e-mail</strong><span>Aanbevolen. De uitnodiging werkt alleen voor het uitgenodigde Paramant-account, en de volledige sleutel komt nooit bij onze mailprovider.</span></span>
+          <span><strong>Stuur iedereen een uitnodiging per e-mail</strong><span>Aanbevolen. De uitnodiging werkt alleen voor het uitgenodigde account. De volledige sleutel komt nooit bij onze mailprovider.</span></span>
         </label>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="copy">
-          <span><strong>Maak links zonder iets te versturen</strong><span>Helemaal geen e-mail. U deelt elke persoonlijke link zelf.</span></span>
+          <span><strong>Maak links zonder iets te versturen</strong><span>Wij sturen geen e-mail. U deelt elke link zelf.</span></span>
         </label>
       </details>
     </fieldset>
@@ -817,7 +816,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 3: identity -->
   <section class="ds-step" id="step-identity" hidden>
     <h2>Wie ondertekent?</h2>
-    <p class="ds-sub">Uw naam komt in de zichtbare stempel (bij pdf-bestanden) en in de .psign-envelop.</p>
+    <p class="ds-sub">Uw naam komt in de stempel (bij pdf-bestanden) en in het bewijsbestand (.psign).</p>
     <div class="ds-field">
       <label class="ds-label" for="ds-signer-name">Uw naam</label>
       <input class="ds-input" type="text" id="ds-signer-name" maxlength="80" placeholder="bijv. Jan de Vries" autocomplete="name">
@@ -834,7 +833,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <p class="ds-hint">Uw naam verschijnt als tekst in de stempel. Kies 'Handtekening tekenen' voor een handgeschreven handtekening.</p>
       </div>
       <div class="ds-sig-panel" id="ds-sig-panel-drawn" role="tabpanel" aria-labelledby="ds-tab-drawn" tabindex="0" hidden>
-        <p class="ds-hint">Teken met muis of vinger. Gebruik een rustige lijn; het resultaat wordt als PNG in de pdf gezet.</p>
+        <p class="ds-hint">Teken met muis of vinger. Een rustige lijn werkt het best. Uw lijn komt als afbeelding in de pdf.</p>
         <canvas id="ds-sig-canvas" width="500" height="160" role="img" aria-label="Tekenvlak voor de handtekening: teken uw handtekening met muis of vinger"></canvas>
         <p class="ds-hint" id="ds-sig-draw-status" aria-live="polite">Uw lijn verschijnt hier terwijl u tekent.</p>
         <div class="ds-actions" style="margin-top:8px">
@@ -854,7 +853,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-field">
       <label class="ds-label">Cryptografische sleutel (ML-DSA-65)</label>
       <p class="ds-hint" id="ds-signing-identity">Uw ondertekensleutel wordt gecontroleerd...</p>
-      <p class="ds-hint" style="margin-top:6px">De soort handtekening is wat mensen zien. Wat de handtekening cryptografisch vastlegt, is uw ondertekensleutel (ML-DSA-65). Die ontgrendelt u op het moment dat u tekent met uw passkey (Face ID, Touch ID of een beveiligingssleutel) of, zonder passkey, met de code uit uw authenticator-app, en hij wordt nooit geëxporteerd. Ontvangers die u toevoegt, tekenen op <code>/co-sign</code> met hun eigen ondertekensleutel.</p>
+      <p class="ds-hint" style="margin-top:6px">De soort handtekening is wat mensen zien. Wat de handtekening echt vastlegt, is uw ondertekensleutel (ML-DSA-65). Die ontgrendelt u als u tekent: met uw passkey (Face ID, Touch ID of een beveiligingssleutel), of zonder passkey met de code uit uw authenticator-app. De sleutel wordt nooit geëxporteerd. Ontvangers die u toevoegt, tekenen op <code>/co-sign</code> met hun eigen ondertekensleutel.</p>
     </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-identity-back" type="button">Terug</button>
@@ -865,12 +864,12 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Controleren en ondertekenen</h2>
-    <p class="ds-sub">Dit is wat u gaat ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met uw passkey (Face ID, Touch ID of beveiligingssleutel) of, als u geen passkey heeft, met de code uit uw authenticator-app. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
+    <p class="ds-sub">Dit is wat u gaat ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met uw passkey (Face ID, Touch ID of beveiligingssleutel) of, als u geen passkey heeft, met de code uit uw authenticator-app. Dat ontgrendelt uw ondertekensleutel voor dit ene document. De handtekening ontstaat op uw apparaat.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
         <h3 class="ds-review-h">Voorbeeld van het document: zichtbare stempel</h3>
-        <p class="ds-review-cap">De stempel is het zichtbare Paramant-zegel. Zo zien lezers het document. Tijdens het plaatsen kunt u de stempel verslepen.</p>
+        <p class="ds-review-cap">Zo zien lezers het document, met de stempel van Paramant erop. Bij Plaatsen kunt u de stempel verslepen.</p>
         <div id="ds-review-doc-preview" class="ds-review-pane"></div>
       </div>
       <div class="ds-review-col">
@@ -882,7 +881,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <div class="ds-proof-card">
       <h3 class="ds-proof-h">Cryptografisch bewijs (.psign-envelop)</h3>
-      <p class="ds-review-cap">De zichtbare stempel is ondersteunend bewijs. Deze envelop is het wiskundige bewijs dat iedereen offline kan controleren met alleen uw publieke sleutel. De handtekening zelf ontstaat als u op Dit document ondertekenen klikt.</p>
+      <p class="ds-review-cap">De stempel is wat mensen zien. Dit bestand is het echte bewijs: iedereen kan het offline controleren met alleen uw publieke sleutel. De handtekening zelf ontstaat als u op Dit document ondertekenen klikt.</p>
       <dl class="ds-proof-dl">
         <dt>Algoritme</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
         <dt>Hash-algoritme</dt>     <dd>SHA3-256</dd>
@@ -963,11 +962,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
            -> mrz-unverified). Shown by sign-flow.js only for binding_mode
            'open'. -->
       <p class="ds-proof-scope" id="ds-proof-scope" hidden>
-        <strong>Ondertekenaar niet geverifieerd.</strong> Dit document is in open modus ondertekend.
-        Er was dus geen e-mailuitnodiging die een persoon aan een plek koppelde. Het bewijs toont dat een
-        bepaalde sleutel precies dit document ondertekende, en dat dit de sleutel uit de envelop is. Het
-        toont niet wie die sleutel heeft. Wilt u een handtekening die aan een uitgenodigd e-mailadres
-        gebonden is, gebruik dan <em>Handtekeningen vragen</em>.
+        <strong>Ondertekenaar niet geverifieerd.</strong> Dit document is ondertekend zonder
+        e-mailuitnodiging. Niets koppelt dus een persoon aan een plek. Het bewijs toont dat één bepaalde
+        sleutel precies dit document tekende. Het toont niet wie die sleutel heeft. Wilt u een handtekening
+        die vastzit aan een uitgenodigd e-mailadres, gebruik dan <em>Handtekeningen vragen</em>.
       </p>
 
       <div class="done-payload">
@@ -996,7 +994,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <details class="done-details" id="ds-invite-details" hidden>
         <summary>Waarom dit veilig was</summary>
         <div class="done-details-body">
-          <p>Het document werd in uw browser versleuteld voordat er iets van dit apparaat vertrok, en elke persoonlijke link bevat de sleutel van die ene persoon na de <code>#</code>, het deel van een link dat een browser nooit naar een server stuurt. Bij ons staan alleen bytes die wij niet kunnen lezen. Ook de sleutel bleef hier: de uitnodiging per e-mail bevat alleen een bericht, dus de mailprovider die hem bezorgt kan niet bij het document, en wij ook niet.</p>
+          <p>Uw browser versleutelde het document voordat er iets dit apparaat verliet. Elke persoonlijke link bevat de sleutel van die ene persoon, achter de <code>#</code>. Dat deel van een link stuurt een browser nooit naar een server. Bij ons staan alleen gegevens die wij niet kunnen lezen. Ook de sleutel bleef hier: de uitnodigingsmail bevat alleen een bericht. De mailprovider kan dus niet bij het document, en wij ook niet.</p>
           <p>Een link is gebonden aan het adres dat u opgaf, dus hij opent voor die ondertekenaar en niet voor iemand anders naar wie hij wordt doorgestuurd. Tekent de ontvanger, dan ontstaat de handtekening op diens eigen apparaat met een eigen sleutel (<code>ML-DSA-65</code>) en wordt die vastgelegd op onze relay en in het openbare <a href="/ct-log">CT-logboek</a>, zodat u later kunt aantonen dat het gebeurde en wanneer.</p>
           <p>Er heeft nog niemand getekend. Op dit moment zijn alleen de verzoeken verstuurd.</p>
         </div>
