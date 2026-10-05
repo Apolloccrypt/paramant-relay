@@ -221,14 +221,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -242,14 +242,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/iot-integration" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/iot-integration" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div><main>
 
@@ -274,53 +274,51 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="device-grid">
     <div class="device-card">
       <h4>Raspberry Pi Zero / Zero 2</h4>
-      <p>Full Linux stack. Use the Python SDK or curl directly. TLS 1.3 works out of the box.</p>
+      <p>Full Linux stack. Use the Python example below or the Python SDK (<code>pip install paramant-sdk</code>). TLS 1.3 works out of the box.</p>
     </div>
     <div class="device-card">
       <h4>ESP32 / ESP8266</h4>
-      <p>Use the REST API over HTTPS. The Arduino and ESP-IDF HTTP clients both support the required headers.</p>
+      <p>Possible when the firmware has AES-256-GCM and HTTPS: mbedTLS in ESP-IDF has both. MicroPython has no AES-GCM, and we have no ready-made example for it. Let such a device send through a gateway or a Pi.</p>
     </div>
     <div class="device-card">
       <h4>OT gateways</h4>
-      <p>Any gateway that can make outbound HTTPS calls (such as Tosibox, HMS Anybus or Ewon Flexy) can send files through the API.</p>
+      <p>A gateway that makes outbound HTTPS calls and can run a script (Python 3 with <code>cryptography</code>) can use the example below.</p>
     </div>
   </div>
 
   <h2>Sending a file from a Linux device</h2>
 
-  <p>With curl, which is available on all Pi and gateway images:</p>
+  <p>There is no route that takes a readable file: the relay only ever receives encrypted bytes. So the device encrypts the file itself, uploads the sealed blob to <code>POST /v2/inbound</code> and gets a <code>download_token</code> back. From that it builds a link to <code>/get</code>, with the key after the <code>#</code>, so the relay never sees it. Python 3 with the <code>cryptography</code> package:</p>
 
-  <div class="code-block">curl -X POST https://api.paramant.app/v1/upload \
-  -H "X-Api-Key: pgp_YOUR_API_KEY" \
-  -F "file=@/path/to/sensor-log.csv" \
-  -F "recipient=recipient@example.com" \
-  -F "ttl=3600"</div>
+  <div class="code-block">import os, json, base64, hashlib, struct, urllib.request
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-  <p>The response contains a burn-on-read download URL you can pass to the recipient through any channel:</p>
+API_KEY = os.environ["PARAMANT_API_KEY"]   # pgp_...
+RELAY   = "https://health.paramant.app"    # the sector your key belongs to
+SECTOR  = "health"
+PATH    = "/var/log/sensor-log.csv"        # one block: at most about 5 MB
 
-  <div class="code-block">{"id":"abc123","url":"https://paramant.app/get/abc123","expires_at":"..."}</div>
+# 1. Seal the file on the device: [uint32-LE name length][name][bytes]
+name  = os.path.basename(PATH).encode()
+plain = struct.pack("&lt;I", len(name)) + name + open(PATH, "rb").read()
+key, iv = AESGCM.generate_key(bit_length=256), os.urandom(12)
+sealed  = AESGCM(key).encrypt(iv, plain, None)
 
-  <h2>Sending a file from MicroPython (ESP32)</h2>
+# 2. Upload the ciphertext with its SHA-256
+body = json.dumps({"hash": hashlib.sha256(sealed).hexdigest(),
+                   "payload": base64.b64encode(sealed).decode(),
+                   "ttl_ms": 3600000}).encode()
+req = urllib.request.Request(RELAY + "/v2/inbound", data=body, method="POST",
+      headers={"X-Api-Key": API_KEY, "Content-Type": "application/json"})
+token = json.load(urllib.request.urlopen(req))["download_token"]
 
-  <div class="code-block">import urequests, uos
+# 3. The link: the key travels after the #, the relay never sees it
+frag = base64.urlsafe_b64encode(key + iv).rstrip(b"=").decode()
+print(f"https://paramant.app/get?t={token}&amp;r={SECTOR}#{frag}")</div>
 
-API_KEY = "pgp_YOUR_API_KEY"
-FILE_PATH = "/sd/reading.bin"
+  <p>Give the link to the recipient through any channel. They open it in a browser; the page decrypts the file, and only then is it deleted on the relay. The link works once and expires after the <code>ttl_ms</code> the relay reports back (at most 1 hour on Community, 24 hours on Firm). One upload is one block of at most 5 MB; a larger file goes in several blocks, which the SDK does for you. The format is described in <a href="/docs/api.md">docs/api.md</a> under "The share link".</p>
 
-with open(FILE_PATH, "rb") as f:
-    data = f.read()
-
-resp = urequests.post(
-    "https://api.paramant.app/v1/upload",
-    headers={"X-Api-Key": API_KEY,
-             "Content-Type": "application/octet-stream",
-             "X-Filename": "reading.bin",
-             "X-Recipient": "ops@example.com"},
-    data=data
-)
-print(resp.json()["url"])</div>
-
-  <div class="tip"><p>Keep the API key in flash storage, not compiled into firmware. On ESP32 use NVS (Non-Volatile Storage) or a separate credentials partition so you can update the key without reflashing.</p></div>
+  <div class="tip"><p>Keep the API key in flash storage or an environment variable, not compiled into firmware. On ESP32 use NVS (Non-Volatile Storage) or a separate credentials partition so you can update the key without reflashing.</p></div>
 
   <h2>Key rotation on deployed devices</h2>
 
@@ -407,6 +405,6 @@ print(resp.json()["url"])</div>
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=17" defer></script>
 </body>
 </html>

@@ -227,6 +227,7 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
    the reading, so the shape of the page does not change under a reader. */
 .hw-quiet{font-size:15px;line-height:1.6;color:var(--fg-mid);margin:14px 0 0;max-width:34ch}
 
+.home-notice{margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;font-size:.95rem}
 html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
 /* A new account already has both first steps inside its own card, so the row
    underneath would be the same two buttons a second time. js/home-auth.js sets
@@ -562,6 +563,7 @@ html[data-session="in"] .lang-switch{display:none}
     </div>
     <div class="home-state" data-home="in" hidden>
       <h2 class="paramant-h1">Uw documenten<span class="home-hi-name" data-home-name></span>.</h2>
+      <p class="home-notice" data-home-notice role="status" hidden>We kunnen uw sessie nu even niet controleren, de server is druk. Deze pagina probeert het vanzelf opnieuw; uw documenten verschijnen zodra dat lukt.</p>
 
       <!-- The workbench. Every value in here is written by js/home-auth.js from
            /api/user/documents, /api/user/dashboard/overview and
@@ -801,8 +803,8 @@ html[data-session="in"] .lang-switch{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=17" defer></script>
 <script src="/js/format-date.js?v=3" defer></script>
-<script src="/js/home-auth.js?v=8" defer></script>
+<script src="/js/home-auth.js?v=9" defer></script>
 </body>
 </html>

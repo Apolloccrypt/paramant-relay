@@ -328,7 +328,6 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     root.classList.add('dh-loaded');
 
     if (!keySetupChecked) { keySetupChecked = true; checkKeySetup(); }
-    loadOperations();
     loadInbox();
     loadSends();
     loadDocuments();
@@ -1222,88 +1221,13 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     });
   }
 
-  // ---- Operations: read-only live keys / usage / activity cards ----
-  // Fed by GET /api/user/dashboard/overview (authUser). Polled every 5s so the
-  // usage bars stay current; the audit feed and key are refreshed on the same tick.
-  var opsAudit = [], opsFilter = '', opsPollTimer = 0;
-  function fmtTime(ts) {
-    if (!ts) return '--:--:--';
-    var d = new Date(ts);
-    function p(n) { return (n < 10 ? '0' : '') + n; }
-    var hm = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-    var now = new Date();
-    if (d.toDateString() === now.toDateString()) return hm;
-    var mon = [nlEn('jan', 'Jan'), nlEn('feb', 'Feb'), nlEn('mrt', 'Mar'), nlEn('apr', 'Apr'), nlEn('mei', 'May'), nlEn('jun', 'Jun'), nlEn('jul', 'Jul'), nlEn('aug', 'Aug'), nlEn('sep', 'Sep'), nlEn('okt', 'Oct'), nlEn('nov', 'Nov'), nlEn('dec', 'Dec')][d.getMonth()];
-    var day = d.getDate() + ' ' + mon + (d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '');
-    return day + ' ' + hm;
-  }
-  // The caps arrive per product from the relay's own entitlement layer, which
-  // is the thing that enforces them. A missing cap therefore means "not read",
-  // never "no ceiling": no tier is unbounded. So an absent number draws as --
-  // with an empty bar rather than as an infinity sign nobody is entitled to.
-  function opsBar(used, cap) {
-    var known = (typeof cap === 'number');
-    var pct = known ? Math.min(100, Math.round(((used || 0) / Math.max(1, cap)) * 100)) : 0;
-    return { pct: pct, warn: known && pct >= 80, capTxt: known ? String(cap) : '--' };
-  }
-  function renderOpsTimeline() {
-    var el = document.getElementById('dh-ops-timeline');
-    if (!el) return;
-    var f = (opsFilter || '').toLowerCase();
-    var rows = opsAudit.filter(function (ev) {
-      if (!f) return true;
-      return (ev.event_type || '').toLowerCase().indexOf(f) >= 0 ||
-             JSON.stringify(ev.metadata || {}).toLowerCase().indexOf(f) >= 0;
-    });
-    el.innerHTML = rows.length
-      ? rows.slice(0, 50).map(function (ev) {
-          return '<div class="dh-tl-row"><span class="t">' + fmtTime(ev.ts) + '</span><span class="e">' + esc(ev.event_type || 'event') + '</span></div>';
-        }).join('')
-      : nlEn('<div class="dh-ops-dim">', '<div class="dh-ops-dim">No activity') + (f ? nlEn('Geen activiteit die past bij "', ' matches "') + esc(opsFilter) + '"' : nlEn('Nog geen activiteit', ' yet')) + '.</div>';
-  }
-  function renderOps(d) {
-    // No key on this page, not even a masked one. /account is the one page that
-    // shows the account key, behind its "Advanced account key" fold and only
-    // when that fold is opened; /dashboard authenticates to the relay with a
-    // short-lived scoped pst_ token instead (js/app-session-token.js), so it has
-    // no reason to hold or print a key shape at all. The overview endpoint stopped
-    // sending key_masked with it.
-    var keysEl = document.getElementById('dh-ops-keys');
-    if (keysEl) {
-      keysEl.innerHTML =
-        nlEn('<div class="dh-ops-row"><span class="dim">accountsleutel</span><span class="dim"><a href="/account">op uw accountpagina</a></span></div>', '<div class="dh-ops-row"><span class="dim">account key</span><span class="dim"><a href="/account">on your account page</a></span></div>') +
-        nlEn('<div class="dh-ops-row"><span class="dim">laatst gebruikt</span><span class="dim">zie activiteit</span></div>', '<div class="dh-ops-row"><span class="dim">last used</span><span class="dim">tracked via activity</span></div>');
-    }
-    var q = d.quota || { transfers: 0, signs: 0, caps: {} };
-    var caps = q.caps || {};
-    function usageRow(label, used, cap) {
-      var b = opsBar(used, cap);
-      return '<div class="dh-usage-row"><div class="dh-usage-lab"><span>' + label + '</span><span><b>' + (used || 0) + '</b> / ' + b.capTxt + '</span></div>' +
-        '<div class="dh-bar' + (b.warn ? ' warn' : '') + '"><i style="width:' + b.pct + '%"></i></div>' +
-        // The link goes to /pricing, so it has to name a card that is on it.
-        (b.warn ? nlEn('<a class="dh-usage-upsell" href="/pricing">Overstappen naar Firm</a>', '<a class="dh-usage-upsell" href="/pricing">Upgrade to Firm</a>') : '') + '</div>';
-    }
-    var usageEl = document.getElementById('dh-ops-usage');
-    if (usageEl) {
-      usageEl.innerHTML = usageRow(nlEn('Verzendingen', 'Transfers'), q.transfers, caps.transfers) + usageRow(nlEn('Ondertekeningen', 'Signings'), q.signs, caps.signs) +
-        nlEn('<div class="dh-ops-dim" style="font-size:10px">Live, elke 5 seconden vernieuwd.</div>', '<div class="dh-ops-dim" style="font-size:10px">Live, refreshes every 5s.</div>');
-    }
-    opsAudit = d.audit || [];
-    renderOpsTimeline();
-  }
-  function loadOperations() {
-    if (!document.getElementById('dh-ops')) return;
-    var fi = document.getElementById('dh-ops-filter');
-    if (fi && !fi._wired) { fi._wired = 1; fi.addEventListener('input', function () { opsFilter = fi.value; renderOpsTimeline(); }); }
-    function pull() {
-      return fetch('/api/user/dashboard/overview', { credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) { if (d) renderOps(d); })
-        .catch(function () {});
-    }
-    pull();
-    if (!opsPollTimer) opsPollTimer = setInterval(pull, 5000);
-  }
+  // ---- Usage ----
+  // There was an operations panel here (live keys, usage bars with an upgrade
+  // link at 80%, an activity feed), polled every five seconds. /dashboard has
+  // carried no #dh-ops for months, so it never drew and the 80% warning it
+  // promised in code was shown to nobody (fase 1, DASH-27-N). The usage bar
+  // and the warning live on /developer, which reads the same snapshot once;
+  // /dashboard stays without a polling usage feed (DASH-27-A).
 
   // Listeners go on once. start() runs again for every poll round after a
   // payment (refreshAccount), and each round used to add another set: one click

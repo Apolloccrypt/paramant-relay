@@ -60,6 +60,18 @@
         })
       });
     }).then(function (r) {
+      /* A 409 is an answer, not a failure: the relay refused on purpose
+       * (other_plan_running: a second plan next to a running one would be
+       * paid twice) and says why. Until 2026-10-05 the body was thrown away
+       * and the buyer read "Could not start checkout... Please try again",
+       * an invitation to repeat the refused purchase (fase 1, PLAN-07). */
+      if (r.status === 409) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          var e = new Error('checkout_http_409');
+          e.body = j || {};
+          throw e;
+        });
+      }
       if (!r.ok) throw new Error('checkout_http_' + r.status);
       return r.json();
     }).then(function (j) {
@@ -139,6 +151,38 @@
   // /pricing is Dutch since 23 September 2026, /en/pricing is the English copy.
   var NL = document.documentElement.lang === 'nl';
 
+  var PRODUCT = { parasign: 'ParaSign', parasend: 'ParaSend' };
+  var TIER = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+  var MONTHS_NL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli',
+    'augustus', 'september', 'oktober', 'november', 'december'];
+
+  /* The refusal in the page's language. The relay's own `message` is English
+   * and is what the English page shows; the Dutch page builds the same
+   * sentence from the fields that come with it. Nothing was charged, and the
+   * way to change plans is a mail, so the text says that and does not ask the
+   * buyer to try again. */
+  function refusalText(body) {
+    if (body.error !== 'other_plan_running') {
+      return NL
+        ? 'Dit plan kan nu niet worden afgerekend. Er is niets afgeschreven. Wilt u van plan wisselen, mail dan privacy@paramant.app.'
+        : (body.message || 'This plan cannot be bought right now. Nothing has been charged. To change plans, mail privacy@paramant.app.');
+    }
+    if (!NL && body.message) return body.message;
+    var plan = (PRODUCT[body.product] || 'Paramant') + ' ' + (TIER[body.running] || body.running || '');
+    var until = '';
+    if (body.paid_until) {
+      var d = new Date(body.paid_until);
+      if (!isNaN(d.getTime())) {
+        until = NL
+          ? ' tot ' + d.getUTCDate() + ' ' + MONTHS_NL[d.getUTCMonth()] + ' ' + d.getUTCFullYear()
+          : ' until ' + d.toISOString().slice(0, 10);
+      }
+    }
+    return NL
+      ? 'U heeft al ' + plan.trim() + until + '. Dit plan zou ernaast lopen en dan betaalt u dezelfde weken twee keer, dus er is geen betaling gestart en niets afgeschreven. Wilt u van plan wisselen, mail dan privacy@paramant.app.'
+      : 'You already have ' + plan.trim() + until + '. This plan would run alongside it and you would pay twice for the same weeks, so no payment was started. To change plans, mail privacy@paramant.app.';
+  }
+
   Array.prototype.forEach.call(buttons, function (btn) {
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
@@ -165,6 +209,10 @@
             msg.indexOf('checkout_http_403') === 0) {
           rememberIntent(btn);
           window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
+          return;
+        }
+        if (msg === 'checkout_http_409') {
+          showError(btn, refusalText(err.body || {}));
           return;
         }
         showError(btn, NL

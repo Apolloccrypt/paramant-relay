@@ -160,7 +160,11 @@ def to_english_links(block):
     def swap(m):
         path, frag = m.group(1), m.group(2) or ''
         rel = 'index.html' if path == '/' else path.lstrip('/') + '.html'
-        if os.path.exists(os.path.join(frontend, 'en', rel)):
+        # /help is a folder (help/index.html), not help.html: without the
+        # second test the English drawer kept sending Help to the Dutch page
+        # (fase 2 SITE-03-F*).
+        if (os.path.exists(os.path.join(frontend, 'en', rel)) or
+                os.path.exists(os.path.join(frontend, 'en', path.strip('/'), 'index.html'))):
             return 'href="' + ('/en' if path == '/' else '/en' + path) + frag + '"'
         return m.group(0)
     return re.sub(r'href="(/[^"#?]*)(#[^"]*)?"', swap, block)
@@ -307,7 +311,7 @@ LEGAL_STRIP_NL = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=32">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=28">'
 NAV_JS    = '<script src="/nav.js?v=16" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=16" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=17" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,

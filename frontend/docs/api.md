@@ -1,10 +1,10 @@
-# API Reference — PARAMANT v3.0.0
+# API Reference: PARAMANT v3.0.0
 
 ## Base URLs
 
 | Sector | URL | Compliance |
 |--------|-----|------------|
-| General | https://relay.paramant.app | — |
+| General | https://relay.paramant.app | - |
 | Healthcare | https://health.paramant.app | NEN 7510, DICOM |
 | Legal | https://legal.paramant.app | eIDAS, KNB |
 | Finance | https://finance.paramant.app | NIS2, DORA |
@@ -12,18 +12,86 @@
 
 ## Authentication
 
-All data-plane endpoints require: `X-Api-Key: your_key`
+Three credential types are in use across different API surfaces:
 
-- `pgp_` prefix, end user key. Community plan: 50 transfers a month, 500 MB per file.
-- `plk_` prefix — operator license key (unlimited, from `.env`)
+| Credential | Header / Mechanism | Used for |
+|------------|-------------------|----------|
+| API key (`pgp_` prefix) | `X-Api-Key: pgp_your_key` | Data plane: uploads, downloads (developer clients). Community plan: 50 transfers a month, 500 MB per file. |
+| Operator key (`plk_` prefix) | `X-Api-Key: plk_your_key` | Data plane: unlimited throughput (operator license) |
+| DID signature | `X-DID: did:paramant:…` + `X-DID-Signature: <sig over request URL>` | Data plane: **active fallback** when no `X-Api-Key` is sent (see Device Identity) |
+| ParaSend session token (`pst_` prefix) | `Authorization: Bearer pst_…` | Data plane: the five ParaSend transfer routes only, 15 minutes, minted for a browser session (see below) |
+| Session cookie | `Cookie: paramant_user_session=<token>` | `/api/user/*` endpoints: set automatically after TOTP login |
+| Admin token | `X-Admin-Token: <token>` | `/admin/api/admin/*` endpoints: admin panel only |
 
-CT log and STH endpoints are **public** — no API key required.
+> **DID fallback semantics.** When a request carries no API key but a valid
+> `X-DID` + `X-DID-Signature` pair, the relay authenticates the device **as the
+> API key the DID was enrolled under**: the request runs with that owner's real
+> plan and entitlements, and monthly quotas (`transfers_month`, `signs_month`)
+> count on the owner's account exactly as if the owner's `X-Api-Key` had been
+> sent, including the same `402` responses over quota. A keyless enrollment
+> (e.g. an `inv_` receiver session), a revoked enrollment, or an enrollment
+> whose owner key is revoked or deleted grants no principal (`401`). An
+> enrolled device credential is therefore a full data-plane credential for the
+> owner's account, not merely an attribution label: treat device private keys
+> with the same care as API keys, and revoke the DID enrollment when a device
+> is retired or compromised.
+
+> **Browser session tokens.** A `pst_` token is a narrow, short-lived stand-in
+> for an account API key, so a browser never has to hold the key itself. It is
+> minted by the admin panel on behalf of a logged-in user, which asks the relay
+> for it over the internal channel; the browser is only ever handed the token,
+> never the key. Properties, all enforced by the relay:
+>
+> - **Purpose, and two allowlists.** A token is minted FOR a purpose, and the
+>   purpose picks the list it is judged against. `parasend`
+>   (`POST /api/user/parasend/token`, used by `/parashare`) opens
+>   `/v2/check-key`, `POST /v2/ws-ticket`, `POST /v2/pubkey`,
+>   `GET /v2/pubkey/:device` and `POST /v2/inbound`. `app`
+>   (`POST /api/user/app/token`, used by `/pricing`, `/dashboard` and the
+>   signed-in homepage) opens `POST /v2/billing/checkout`,
+>   `POST /v2/billing/redeem`, `GET /v2/user/history`,
+>   `GET /v2/parasign/audit-export` and `GET /v2/parasign/inbox`. The two lists are disjoint: neither purpose
+>   can do the other's work. The purpose is fixed by the admin route, not by the
+>   caller, and an unknown one is refused at the mint with `400 unknown_purpose`.
+> - **Scope.** The allowlist is checked above every route handler. Any path not
+>   on the list for that purpose answers `403 session_token_out_of_scope`,
+>   including the rest of `/v2/user/*`, `/v2/keys`, `/v2/outbound/:hash`,
+>   `/v2/audit`, `/v2/admin/*`, the ParaSign envelope routes, and a second
+>   `POST /v2/session-token`: no token mints another, whatever it was minted
+>   for.
+> - **Identity.** Inside that scope the token authenticates **as the API key it
+>   was minted for**. Monthly quotas (`transfers_month`), the audit chain,
+>   device queues and per-tier limits all resolve against the owner's account,
+>   byte-identical to a request that carried the owner's `X-Api-Key`.
+> - **Lifetime.** 15 minutes, held in the relay's shared Redis so all five
+>   sectors honour the same token. It is not configurable. The stored record
+>   carries the owner as a SHA-256 hash, never as an API key, and the relay
+>   resolves it against the key table it already holds in memory; a read-only
+>   copy of the store therefore contains no usable credential. A record without
+>   a numeric expiry is refused outright.
+> - **Ceiling.** At most 20 live tokens per account. The 21st mint answers
+>   `429 session_token_cap_reached` with `Retry-After`; tokens already issued
+>   keep working, and room returns as they expire.
+> - **Audit.** A transfer made with a token appears in the owner's audit chain
+>   like any other, with one extra field, `"via": "pst"`. It is a note on the
+>   credential, not a second identity.
+> - **Revocation.** Revoking the API key deletes every live token for it, and a
+>   token whose owner key is revoked or deleted grants no principal even if that
+>   sweep did not run.
+> - **Precedence.** A request that carries `X-Api-Key` is that key's request; the
+>   `Authorization` header is only read when no API key was sent.
+> - **Outage.** With the store unreachable a token is answered `503
+>   redis_unavailable` with `Retry-After`, never `401`.
+
+CT log and STH endpoints are **public**: no credential required.
+
+The `/v2/auth/capabilities` endpoint is public and returns which authentication modes are enabled on this relay instance.
 
 ---
 
 ## Data plane
 
-### POST /v2/inbound — Upload an encrypted blob
+### POST /v2/inbound: Upload an encrypted blob
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/inbound \
@@ -123,14 +191,23 @@ burns anything:
 | Route | What it does |
 |---|---|
 | `GET /v2/dl/:token` | An HTML confirmation page. Safe for link preloaders and mail scanners: known preload user-agents get a static placeholder, and nothing is spent. |
-| `GET /v2/dl/:token/get` | The download itself, and the only route that burns. Answers `410` to a known preload user-agent's twin, `409` while another download of the same token is in flight, and `410` once the token is spent or expired. |
-| `GET /v2/dl/:token/info` | `{ ok, enc_meta, file_size, ttl_left_s, used }` while the link is live, `404` once it is not. No credential. |
+| `GET /v2/dl/:token/get` | The download itself, and the only route that burns. Answers `403` (`Automated clients not permitted`) to a known link-preview user-agent (Slackbot, WhatsApp, Googlebot and the like), `409` while another download of the same token is in flight, and `410` (or `404` when the relay no longer knows the token) once the token is spent, expired or its blob is gone. |
+| `GET /v2/dl/:token/info` | `{ ok, enc_meta, file_size, ttl_left_s, used }` while the link is live; `404` with `{ ok: false, error, reason }` once it is not, where `reason` is `downloaded`, `expired`, `withdrawn`, `exhausted`, `lost` or `unknown`. No credential. |
 
-**5. It works exactly once.** The blob is deleted and its buffer zeroed on the
-`finish` event of the download response, not when the response starts: a
-transfer that dies mid-flight leaves the token spendable, so a dropped
-connection is a retry and not a lost file. Once a download does finish, the
-token is marked used and the bytes are gone. The TTL is enforced separately by a
+**5. It works exactly once.** Two modes, and they differ on a broken line:
+
+- With `?claim=<32 hex>` (what `/get` in the browser does) nothing burns on the
+  download. The receiver fetches, decrypts and checks, and only then confirms
+  with `POST /v2/dl/:token/ack`. A transfer that dies mid-flight leaves the token
+  spendable, so a dropped connection is a retry and not a lost file.
+- Without a claim (old SDKs and scripts) the blob is deleted and its buffer
+  zeroed on the `finish` event of the download response: the moment the last
+  byte is handed to the kernel or the proxy in front of the relay, not when the
+  receiver has it. A connection that breaks after that point costs the file.
+  Use the claim mode if your client can.
+
+Once a download is confirmed (claim) or finished (no claim), the token is marked
+used and the bytes are gone. The TTL is enforced separately by a
 timer, so a link nobody opens is destroyed when it expires whether or not
 anybody asks.
 
@@ -138,15 +215,19 @@ anybody asks.
 `GET /v2/outbound/:hash`, the API's own download path, and you fetch it back
 from `GET /v2/transfers/:receipt_id/receipt`. The `/v2/dl` family signs nothing.
 If you need proof that a specific person took the file, use `/v2/outbound` and
-its receipt; `/v2/dl/:token/info` gives you a status and not a proof, and it
-cannot tell "downloaded" apart from "expired" on its own: both answer `404`.
-A caller that recorded the expiry at upload time can separate the two by its own
-clock, which is what the web app's "sent links" list does, and that inference is
-the caller's, not the relay's.
+its receipt; `/v2/dl/:token/info` gives you a status and not a proof. Once the
+link is spent it answers `404` with a `reason` (`downloaded`, `expired`, ...),
+so it does tell "downloaded" apart from "expired"; that is the relay's own
+record of what happened to the token, not a signed statement.
 
 ---
 
-### GET /v2/outbound/:hash — Download (burn-on-read)
+### GET /v2/outbound/:hash: Download (burn-on-read)
+
+The blob is burned when the last byte of the response is handed to the kernel
+or the proxy, not when your client has it: a download that breaks after that
+point costs the file, and a second `GET` answers `404`. This route has no claim
+mode; for retry-safe delivery use the share link with `?claim=` (above).
 
 ```bash
 curl https://relay.paramant.app/v2/outbound/a3f2… \
@@ -197,7 +278,7 @@ Three things can take it away, and all three answer with the same 404:
 | | |
 |---|---|
 | **Time** | 15 minutes from the download. |
-| **Your own volume** | The relay keeps your account's most recent receipts, up to twice your tier's hourly download ceiling: community 100, pro 1000, business 4000, enterprise 10000. Past that your oldest receipts drop. Another account's downloads can never take yours. |
+| **Your own volume** | The relay keeps your account's most recent receipts, up to twice your ParaSend tier's hourly download ceiling: Community 100, Firm 1000, legacy business 4000, Enterprise 10000. Past that your oldest receipts drop. Another account's downloads can never take yours. |
 | **A relay without redis** | A relay configured with `REDIS_URL` keeps receipts in redis, so they survive a restart of the relay process. A relay without one keeps them in memory, and then a restart or a deploy loses every outstanding receipt. |
 
 If none of that is acceptable for your use, the receipt can still be delivered
@@ -229,21 +310,27 @@ verifiable end to end.
 ```json
 {
   "blob_hash":               "a3f2…",
+  "ts":                      "2026-04-15T09:00:00.000Z",
+  "retrieved_at":            1744707600000,
   "sector":                  "health",
-  "retrieved_at":            "2026-04-15T09:00:00.000Z",
   "relay_id":                "health.paramant.app",
   "tree_size_at_retrieval":  43,
-  "inclusion_proof":         { "leaf_hash": "d4e1…", "audit_path": […], "root": "c7a9…" },
+  "inclusion_proof":         { "leaf_hash": "d4e1…", "leaf_index": 42, "tree_size": 43, "audit_path": […], "root": "c7a9…", "sth": {…}, "sth_signature": "…" },
   "burn_confirmed":          true,
   "signature":               "ML-DSA-65 base64…"
 }
 ```
 
+`retrieved_at` is a Unix timestamp in milliseconds (a number), because that is
+the value inside the signature; `ts` is the CT-log time of the leaf.
+`relay_id` is the relay's `RELAY_SELF_URL`, or `<sector>.paramant.app` when that
+is unset.
+
 Pass this to `POST /v2/verify-receipt` to cryptographically confirm delivery.
 
 ---
 
-### POST /v2/verify-receipt — Verify a delivery receipt
+### POST /v2/verify-receipt: Verify a delivery receipt
 
 Requires an API key (`X-Api-Key`); without one the relay answers 401.
 
@@ -255,6 +342,7 @@ same four checks in the browser.
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
+  -H "X-Api-Key: pgp_your_key" \
   -H "Content-Type: application/json" \
   -d '{"receipt":"<base64url from GET /v2/transfers/:receipt_id/receipt>"}'
 ```
@@ -265,11 +353,18 @@ Success:
 {
   "valid": true,
   "blob_hash": "a3f2…",
+  "retrieved_at": "2026-04-15T09:00:00.000Z",
+  "sector": "health",
+  "relay_id": "health.paramant.app",
   "burn_confirmed": true,
-  "tree_size_at_retrieval": 43,
-  "retrieved_at": "2026-04-15T09:00:00.000Z"
+  "tree_size": 43,
+  "leaf_index": 42,
+  "tree_size_at_retrieval": 43
 }
 ```
+
+Here `retrieved_at` is the receipt's millisecond timestamp written out as an
+ISO string; `tree_size` and `leaf_index` come from the inclusion proof.
 
 Failure (signature invalid, proof mismatch, missing fields):
 
@@ -282,7 +377,7 @@ Verification performs two independent checks: ML-DSA-65 signature over the canon
 
 ---
 
-### GET /v2/stream-next — Poll for next pending blob
+### GET /v2/stream-next: Poll for next pending blob
 
 ```bash
 curl https://relay.paramant.app/v2/stream-next \
@@ -294,7 +389,7 @@ curl https://relay.paramant.app/v2/stream-next \
 
 ---
 
-### GET /v2/status/:hash — Check blob availability
+### GET /v2/status/:hash: Check blob availability
 
 ```bash
 curl https://relay.paramant.app/v2/status/a3f2… \
@@ -306,9 +401,9 @@ curl https://relay.paramant.app/v2/status/a3f2… \
 
 ## Certificate Transparency log
 
-All CT endpoints are **public** — no API key required.
+All CT endpoints are **public**: no API key required.
 
-### GET /v2/sth — Latest Signed Tree Head
+### GET /v2/sth: Latest Signed Tree Head
 
 ```bash
 curl https://relay.paramant.app/v2/sth
@@ -323,11 +418,12 @@ curl https://relay.paramant.app/v2/sth
     "tree_size":  43,
     "timestamp":  1744123456789,
     "version":    1,
-    "signature":  "ML-DSA-65 base64…",
-    "pk_hash":    "sha3-256 of relay public key"
+    "signature":  "ML-DSA-65 base64…"
   }
 }
 ```
+
+The head carries no key fingerprint; take `pk_hash` from `GET /v2/pubkey`.
 
 The relay signs `{relay_id, sha3_root, timestamp, tree_size, version}` (keys sorted, JSON-serialised) using ML-DSA-65. Verify the signature against the key returned by `GET /v2/pubkey`.
 
@@ -347,7 +443,7 @@ field is how an outside monitor tells that apart from a quiet week.
 
 ---
 
-### GET /v2/sth/history — STH history
+### GET /v2/sth/history: STH history
 
 ```bash
 curl "https://relay.paramant.app/v2/sth/history?limit=10"
@@ -358,17 +454,17 @@ curl "https://relay.paramant.app/v2/sth/history?limit=10"
 
 ---
 
-### GET /v2/sth/:unixms — STH at or after a timestamp
+### GET /v2/sth/:unixms: STH at or after a timestamp
 
 ```bash
 curl https://relay.paramant.app/v2/sth/1744100000000
-# {"ok":true,"sth":{…}}   — first STH at or after that Unix millisecond timestamp
+# {"ok":true,"sth":{…}}  : first STH at or after that Unix millisecond timestamp
 # 404 if none exists
 ```
 
 ---
 
-### GET /v2/pubkey — Relay identity public key
+### GET /v2/pubkey: Relay identity public key
 
 ```bash
 curl https://relay.paramant.app/v2/pubkey
@@ -387,12 +483,14 @@ Use this key to independently verify any STH signature or delivery receipt signa
 
 ---
 
-### GET /v2/ct/log — CT log entries
+### GET /v2/ct/log: CT log entries
 
 ```bash
-curl "https://relay.paramant.app/v2/ct/log?limit=20"
-# {"ok":true,"entries":[{…}],"tree_size":43,"root":"c7a9…"}
+curl "https://relay.paramant.app/v2/ct/log?limit=20&offset=0"
+# {"ok":true,"size":43,"root":"c7a9…","entries":[{"index":0,"type":"transfer","leaf_hash":"d4e1…","tree_hash":"…","ts":"2026-04-15T09:00:00.000Z"},…]}
 ```
+
+`size` is the number of leaves in the log (the tree size).
 
 `index` is the entry's position in the log, counted from the start. It is
 derived at request time, so it always matches the index `/v2/ct/proof` resolves
@@ -400,16 +498,19 @@ and the leaf position the Merkle tree commits to.
 
 ---
 
-### GET /v2/ct/proof — Inclusion proof for a specific index
+### GET /v2/ct/proof: Inclusion proof for a specific index
 
 ```bash
 curl "https://relay.paramant.app/v2/ct/proof?index=7"
-# {"ok":true,"leaf_hash":"d4e1…","audit_path":[…],"root":"c7a9…","tree_size":43}
+# {"ok":true,"index":7,"leaf_hash":"d4e1…","tree_hash":"c7a9…","proof":[…],"ts":"2026-04-15T09:00:00.000Z"}
 ```
+
+`proof` is the audit path from the leaf to `tree_hash`, the root at the time
+the leaf was appended.
 
 ---
 
-### GET /v2/sth/consistency — RFC 6962 consistency proof
+### GET /v2/sth/consistency: RFC 6962 consistency proof
 
 Prove that tree at size `from` is a prefix of tree at size `to`:
 
@@ -426,7 +527,7 @@ curl "https://relay.paramant.app/v2/sth/consistency?from=20&to=43"
 
 These endpoints power the peer-to-peer STH exchange. They allow any relay (or auditor) to independently archive and verify each other's tree heads.
 
-### POST /v2/sth/ingest — Submit a peer STH
+### POST /v2/sth/ingest: Submit a peer STH
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/sth/ingest \
@@ -447,7 +548,7 @@ The relay verifies the ML-DSA-65 signature before storing. Replay attacks are bl
 
 ---
 
-### GET /v2/sth/peers — List mirrored peer relays
+### GET /v2/sth/peers: List mirrored peer relays
 
 ```bash
 curl https://relay.paramant.app/v2/sth/peers
@@ -472,7 +573,7 @@ curl https://relay.paramant.app/v2/sth/peers
 
 ---
 
-### GET /v2/sth/peers/:pk_hash — Full STH history for a specific peer
+### GET /v2/sth/peers/:pk_hash: Full STH history for a specific peer
 
 ```bash
 curl "https://relay.paramant.app/v2/sth/peers/a1b2…?limit=50&offset=0"
@@ -485,9 +586,9 @@ curl "https://relay.paramant.app/v2/sth/peers/a1b2…?limit=50&offset=0"
 
 | Path | Description |
 |------|-------------|
-| `GET /ct/` | Public web UI — live tree view, verify button, no auth |
+| `GET /ct/` | Public web UI: live tree view, verify button, no auth |
 | `GET /ct/feed` | JSON feed for the UI (auto-refresh every 10s). `t` is rounded to the hour, as in `/v2/ct/log` |
-| `GET /ct/feed.xml` | RSS feed — last 20 STHs. Subscribe to independently archive roots. |
+| `GET /ct/feed.xml` | RSS feed: last 20 STHs. Subscribe to independently archive roots. |
 
 The RSS feed is designed for external archiving: any subscriber retains an independent copy of each signed tree head, making log tampering detectable even if the relay is compromised later.
 
@@ -495,54 +596,21 @@ The RSS feed is designed for external archiving: any subscriber retains an indep
 
 ## Other endpoints
 
-### GET /health — Relay status (public)
+### GET /health: Relay status (public)
 
 ```bash
 curl https://relay.paramant.app/health
 # {"ok":true,"version":"3.0.0","sector":"relay","edition":"community"}
 ```
 
-### GET /v2/relays — Relay registry (public)
+### GET /v2/relays: Relay registry (public)
 
 ```bash
 curl https://relay.paramant.app/v2/relays
 # {"total":5,"relays":[{"url":"…","version":"3.0.0","sector":"relay",…}]}
 ```
 
-### GET /v2/capabilities — Negotiable crypto capabilities (public)
-
-Advertises the algorithm set this relay accepts on the wire. Since v3.0.0 the relay ships in `core` mode by default — a compact, two-algorithm set (ML-KEM-768 + ML-DSA-65) — with extended algorithm sets available opt-in via the `CRYPTO_MODE` environment variable (ADR R006). SDKs negotiate against this endpoint so a client and relay always agree on a shared, byte-compatible set.
-
-```bash
-curl https://relay.paramant.app/v2/capabilities
-# {"ok":true,"mode":"core","kem":["ML-KEM-768"],"sig":["ML-DSA-65"],"wire":"v1"}
-```
-
-### GET /v2/health/deep — Comprehensive health check (public)
-
-A deeper readiness probe than `/health`: in addition to the version and sector it reports on dependent subsystems (storage volume, CT log writability, relay identity key, peer reachability). Used by the setup wizard and by monitoring to distinguish "process up" from "fully operational".
-
-```bash
-curl https://relay.paramant.app/v2/health/deep
-# {"ok":true,"version":"3.0.0","checks":{"storage":"ok","ct_log":"ok","identity":"ok","peers":"ok"}}
-```
-
-### POST /v2/setup/check + /v2/setup/apply — First-run onboarding (M11)
-
-The first-run setup wizard at `/setup` drives these endpoints (ADR R005). They are gated to a relay with no keys yet (or an explicit `SETUP_MODE` flag) and are inert once the relay is provisioned.
-
-- `POST /v2/setup/check` — validate a proposed configuration (domain, DNS, TLS readiness) and run `/v2/health/deep` before any change is written.
-- `POST /v2/setup/apply` — generate the admin token, enroll TOTP, mint the first key and persist the configuration, returning an all-systems-go summary.
-
-```bash
-# Inspect readiness (safe, read-only)
-curl -X POST https://relay.paramant.app/v2/setup/check \
-  -H "Content-Type: application/json" \
-  -d '{"domain":"relay.example.com"}'
-# {"ok":true,"setup_mode":true,"dns":"ok","tls":"pending","health":{…}}
-```
-
-### POST /v2/pubkey — Register device public keys
+### POST /v2/pubkey: Register device public keys
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/pubkey \
@@ -552,7 +620,7 @@ curl -X POST https://relay.paramant.app/v2/pubkey \
 # {"ok":true}
 ```
 
-### GET /v2/pubkey/:device — Fetch a device's public keys
+### GET /v2/pubkey/:device: Fetch a device's public keys
 
 ```bash
 curl https://relay.paramant.app/v2/pubkey/phone-001 \
@@ -560,13 +628,51 @@ curl https://relay.paramant.app/v2/pubkey/phone-001 \
 # {"device_id":"phone-001","ecdh_pub":"…","kyber_pub":"…","registered_at":"…"}
 ```
 
+### POST /v2/session-token: mint a ParaSend session token (internal)
+
+Not reachable from a browser or from the public internet. It requires the
+internal channel header **and** the account's API key, and the admin panel is
+the only caller: it sends the key of the session that asked, so a browser can
+never name an account other than the one it is signed in as. See the
+Authentication section above for what the resulting token can and cannot do.
+
+```bash
+curl -X POST https://health.paramant.app/v2/session-token \
+  -H "X-Internal-Auth: $INTERNAL_AUTH_TOKEN" \
+  -H "X-Api-Key: pgp_your_key"
+# {"ok":true,"token":"pst_…","expires_ms":1767225600000,"expires_in_s":900}
+```
+
+| Status | Meaning |
+|--------|---------|
+| 200 | Token minted. The response never contains the API key. |
+| 401 | Missing or wrong `X-Internal-Auth`, or no live account key. The two are not distinguishable. |
+| 403 | The caller presented a session token; a token cannot mint another one. |
+| 429 | The account already holds 20 live tokens. `Retry-After: 60`. |
+| 503 | The relay store is unreachable, so no checkable token can be issued. |
+
+The browser-facing half of this is two routes on the admin panel, both session
+cookie, both ignoring their request body, both returning only `token` and
+`expires_in_s`: `POST /api/user/parasend/token` mints purpose `parasend` and
+`POST /api/user/app/token` mints purpose `app`. The purpose is a property of the
+route, so a page cannot ask for the other one's authority.
+
+`POST /v2/session-token` itself takes an optional body `{"purpose": "parasend" |
+"app"}`. An absent purpose means `parasend`, so a caller written before purposes
+existed is unchanged; an unrecognised one is `400 unknown_purpose`.
+
 ---
 
 ## Device Identity
 
 Ghost Pipe supports W3C-compatible decentralised identifiers (`did:paramant:`) for field devices. Registering a device identity enrolls it in the CT log and allows transfers to be attributed to a specific device without exposing the API key.
 
-### POST /v2/did/register — Enroll a device
+Note that an enrolled DID is also an **authentication fallback**: a request
+without an API key but with a valid `X-DID` + `X-DID-Signature` is accepted
+and runs under the plan and quotas of the API key the DID was enrolled under
+(see Authentication).
+
+### POST /v2/did/register: Enroll a device
 
 ```bash
 curl -X POST https://iot.paramant.app/v2/did/register \
@@ -574,8 +680,8 @@ curl -X POST https://iot.paramant.app/v2/did/register \
   -H "Content-Type: application/json" \
   -d '{
     "device_id": "plc-factory-01",
-    "ecdh_pub":  "<base64 ECDH P-256 or X25519 public key>",
-    "dsa_pub":   "<base64 ML-DSA-65 public key — optional>"
+    "ecdh_pub":  "<base64 ECDH P-256 uncompressed public key, 65 bytes>",
+    "dsa_pub":   "<base64 ML-DSA-65 public key: optional>"
   }'
 ```
 
@@ -600,15 +706,15 @@ Response:
 }
 ```
 
-`ct_index` is the CT log position of this registration — auditors can verify the enrollment timestamp via `/v2/ct/proof?index=42`.
+`ct_index` is the CT log position of this registration: auditors can verify the enrollment timestamp via `/v2/ct/proof?index=42`.
 
 Limits: max 500 DIDs per API key. Receiver sessions (`device_id` starting with `inv_`) do not require an API key.
 
 ---
 
-### GET /v2/did/:did — Resolve a DID document
+### GET /v2/did/:did: Resolve a DID document
 
-Public endpoint — no API key required.
+Public endpoint: no API key required.
 
 ```bash
 curl https://iot.paramant.app/v2/did/did:paramant:a3f2b7c1…
@@ -618,7 +724,7 @@ Returns the W3C DID document including the device's public key and CT registrati
 
 ---
 
-### GET /v2/did — List enrolled devices
+### GET /v2/did: List enrolled devices
 
 ```bash
 curl https://iot.paramant.app/v2/did \
@@ -638,7 +744,7 @@ curl https://iot.paramant.app/v2/did \
 
 ---
 
-### POST /v2/attest — Attest a device
+### POST /v2/attest: Attest a device
 
 Verify that a device holds the private key corresponding to its registered public key:
 
@@ -677,8 +783,7 @@ him. An account with no tier on file is held to Community.
 | Link lifetime (max TTL) | 1 hour | 24 hours | 7 days |
 | Reads per link (max views) | 1 | 10 | 100 |
 | Registered devices | 5 | 50 | unlimited |
-| Max file size | 500 MB | 500 MB | 500 MB (tier `file_mb`) |
-| Max blob size | 5 MB | 5 MB | 5 MB (relay `MAX_BLOB`, one padded block) |
+| Max blob size | 5 MB | 5 MB | 5 MB (relay `MAX_BLOB`) |
 | Downloads per hour | 50 | 500 | unlimited |
 
 Notes:
@@ -687,25 +792,49 @@ Notes:
   `GET /v2/outbound/:hash`; over it the relay answers `429`. It also sets how
   many delivery receipts your account keeps (twice this number, see above).
 - **Max blob size** is the lower of the tier's ceiling and the operator's
-  `MAX_BLOB`, which is 5 MB on the hosted relay: that is the size every packet
-  is padded to, so a blob larger than one block is malformed rather than merely
-  big. It is not the file limit. A file is sent as a run of blocks, so the file
-  ceiling is the tier's `file_mb` (500 MB), enforced by counting the blocks that
-  share a `meta.file_id`. `GET /v2/admin/usage` reports `file_mb`, the number
-  you can actually send, and not the block size.
+  `MAX_BLOB`, which is 5 MB on the hosted relay and bounds relay memory. The
+  operator's value is always the last word, which is why an Enterprise account
+  is held to 5 MB as well and why `GET /v2/admin/usage` reports 5 rather than
+  "uncapped" for it.
+- **Reads per link** and **link lifetime** are ceilings, not defaults: a request
+  asking for more gets the ceiling back in the upload response, so the clamp is
+  visible to the caller. Asking for less is honoured as asked.
+- **Registered devices** is a ceiling on how many device public keys an account
+  may hold, not a limit on requests. A device the account already holds may
+  always re-register, so an account that is over the ceiling keeps its existing
+  devices working and is refused only a new one.
+- A legacy `business` plan is a ParaSign tier name. On ParaSend it keeps its own
+  row (2000 transfers a month, 100 devices, a 7 day link, 25 reads, 2000
+  downloads an hour) rather than being raised to Enterprise or cut to Firm. It is
+  resolved, never sold: ParaSend cannot be bought or granted at that tier.
 
 ---
 
 ## Error codes
 
+Two body shapes, and they are not the same:
+
+- `/v1` (the ParaSign API) answers `{ "error": "<code>", "message": "<sentence>" }`,
+  for example `{"error":"unauthorized","message":"Missing or malformed API key..."}`.
+  Branch on `error`; the codes are listed in `docs/parasign-open-api-spec.md`.
+- `/v2` answers `{ "error": "<sentence>" }` on most routes, for example
+  `{"error":"Invalid API key","hint":"X-Api-Key: pgp_..."}`. Branch on the HTTP
+  status; the sentence is for people and may change. Some routes add a machine
+  code in a field of its own (`reason`, `dimension`, `code`), named where the
+  route is described.
+
 | Code | Meaning |
 |------|---------|
-| 400 | Bad request — missing or invalid fields |
+| 400 | Bad request: missing or invalid fields |
 | 401 | Invalid API key or signature |
-| 403 | Forbidden — wrong API key for this blob |
+| 402 | Plan limit reached: `monthly_sign_quota_reached` on `/v1/envelopes` and the sign path (with `plan`, `limit`, `used`, `reset_date`, `Retry-After: 86400`), `monthly_transfer_quota_reached` (`dimension: "transfers_month"`) on uploads, or the account key limit on a key mint |
+| 403 | Forbidden: wrong API key for this blob, `session_token_out_of_scope`, or an automated client on `/v2/dl/:token/get` |
 | 404 | No blob / no STH at that timestamp |
-| 429 | Rate limit exceeded |
-| 503 | ML-DSA-65 not available on this relay |
+| 409 | Conflict: hash already in use, a download of the same link in flight |
+| 410 | A link that is spent, expired or withdrawn |
+| 413 | Blob, file or document too large |
+| 429 | Rate limit exceeded (`Retry-After` says when to try again) |
+| 503 | ML-DSA-65 not available on this relay, or the relay is at capacity |
 | 500 | Relay error |
 
 ---
@@ -720,71 +849,50 @@ pip install paramant-sdk
 from paramant_sdk import GhostPipe
 
 gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
+gp.receive_setup()            # register this device's keys first (once per device)
 
-# Send — returns (hash, inclusion_proof)
+# Send: returns (hash, inclusion_proof)
 hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
-print(proof["root"])          # Merkle root at time of upload
-print(proof["leaf_index"])    # Position in the tree
 
-# Receive — returns (data, receipt)
+# Receive: returns (data, receipt); burn-on-read
 data, receipt = gp.receive(hash_)
-print(receipt["burn_confirmed"])   # True if blob was destroyed
-print(receipt["tree_size_at_retrieval"])
-
-# Verify receipt (calls POST /v2/verify-receipt)
-result = gp.verify_receipt(receipt)
-print(result["valid"])        # True if ML-DSA-65 sig + Merkle proof both check out
 
 # Anonymous drop (BIP39 mnemonic)
 mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data, _   = gp.receive(mnemonic)  # pickup by mnemonic
+data = gp.pickup(mnemonic)    # pickup by mnemonic returns the bytes
 ```
+
+This is `paramant-sdk` 3.0.0 on PyPI. In 3.0.0 `receipt` is usually `None`: the
+SDK reads it only from the inline `X-Paramant-Receipt` header, which the relay
+no longer sends by default (see `GET /v2/outbound/:hash`). Fetch the receipt by
+reference with `GET /v2/transfers/:receipt_id/receipt` and check it with
+`POST /v2/verify-receipt` or offline on `/verify#receipt`.
 
 ---
 
 ## CLI tools
 
-Install via:
+There is no installable CLI. `frontend/install-client.sh` is retired (it only
+prints a notice and exits), and the SDK packages ship no commands. The scripts
+below live in this repository and run from a clone.
+
+| Script | What it does |
+|---|---|
+| `scripts/paramant-sender.py` | encrypt and upload a file, stdin or text; `--watch DIR` sends new files. `--relay` chooses among the hosted sectors only |
+| `scripts/paramant-receiver.py` | fetch and decrypt by hash; `--listen` keeps polling |
+| `scripts/paramant-verify-sth` | fetch `/v2/sth` and `/v2/pubkey`, verify the ML-DSA-65 signature, exit non-zero if invalid |
+| `scripts/paramant-verify-peers` | fetch `/v2/sth/peers` and check that each mirrored head is consistent and that tree sizes only grow |
+| `deploy/paramant-admin.py` | manage users and keys on your own relay |
 
 ```bash
-curl -fsSL https://paramant.app/install-client.sh | bash
+node scripts/paramant-verify-sth --relay https://relay.paramant.app
+node scripts/paramant-verify-sth --relay https://health.paramant.app --verbose
+node scripts/paramant-verify-peers --relay https://relay.paramant.app
 ```
 
-Or included in [paramantOS](https://github.com/Apolloccrypt/ParamantOS). Full list and source: [`scripts/`](../scripts/).
-
-### CT log verification
-
-```bash
-# Fetch the latest STH and verify the ML-DSA-65 signature
-paramant-verify-sth --relay https://relay.paramant.app
-
-# Verify against a specific relay and print the tree state
-paramant-verify-sth --relay https://health.paramant.app --verbose
-
-# Cross-check STH consistency across all peer relays
-paramant-verify-peers
-paramant-verify-peers --relay https://relay.paramant.app
-```
-
-`paramant-verify-sth` fetches `/v2/sth` and `/v2/pubkey`, verifies the ML-DSA-65 signature, and exits non-zero if invalid.
-
-`paramant-verify-peers` fetches `/v2/sth/peers` and verifies that each mirrored STH is internally consistent and that tree sizes only grow.
-
-### Delivery receipts
-
-```bash
-# View the receipt returned after a receive operation
-paramant-receipt --hash a3f2…
-
-# Save receipt to file
-paramant-receipt --hash a3f2… --save receipt.json
-
-# Verify a saved receipt
-paramant-receipt --verify receipt.json
-paramant-receipt --verify <base64url>
-```
-
-`paramant-receipt --verify` calls `POST /v2/verify-receipt` and prints the result. Exit code 0 = valid, 1 = invalid.
+A delivery receipt has no command of its own: fetch it with
+`GET /v2/transfers/:receipt_id/receipt` and check it with
+`POST /v2/verify-receipt` (both above), or drop it on `/verify#receipt`.
 
 ---
 
@@ -792,9 +900,528 @@ paramant-receipt --verify <base64url>
 
 The CT log follows the same trust model as [Certificate Transparency (RFC 6962)](https://tools.ietf.org/html/rfc6962): you need at least one honest participant in the ecosystem to detect misbehaviour.
 
-- **Monitors** call `GET /v2/sth` on a schedule and archive each root. A root that changes without a corresponding tree extension is a fork — proof of log manipulation.
+- **Monitors** call `GET /v2/sth` on a schedule and archive each root. A root that changes without a corresponding tree extension is a fork: proof of log manipulation.
 - **Auditors** call `GET /v2/ct/proof?index=N` to check inclusion of any known blob hash.
 - **Gossip** (`/v2/sth/ingest`, `/v2/sth/peers`) lets relays cross-check each other's trees. A relay cannot silently show different trees to different parties if peers are exchanging STHs.
 - **RSS archiving** (`/ct/feed.xml`) lets anyone subscribe to the STH feed. Once published, a root cannot be un-published without leaving evidence.
 
-You do not need to trust the relay operator to detect log tampering — you only need to trust that at least one monitor, auditor, or RSS subscriber is honest and retains their copy.
+You do not need to trust the relay operator to detect log tampering: you only need to trust that at least one monitor, auditor, or RSS subscriber is honest and retains their copy.
+
+---
+
+## User account API
+
+All `/api/user/` endpoints are served by the **admin panel** (`https://paramant.app`), not the sector relays. They require either an active session cookie or are part of the unauthenticated signup and login flows.
+
+### POST /api/user/signup
+
+```bash
+curl -X POST https://paramant.app/api/user/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com"}'
+# {"ok":true}
+```
+
+Sends a TOTP setup link to the given email address. Rate-limited per IP and per email.
+
+### POST /api/user/auth/setup/:token
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/setup/abc123... \
+  -H "Content-Type: application/json"
+# {"secret":"BASE32SECRET","backup_codes":["code1","code2",…]}
+```
+
+Returns the TOTP secret (as a Base32 string) and one-time backup codes. Idempotent: if the enrollment is provisional (QR scanned but not yet confirmed), the same secret is returned on repeat calls. Returns 409 only if TOTP is already fully activated.
+
+### POST /api/user/auth/setup/:token/confirm
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/setup/abc123.../confirm \
+  -H "Content-Type: application/json" \
+  -d '{"totp_code":"123456"}'
+# {"ok":true}
+```
+
+Verifies the first TOTP code and activates the account. After this call the setup token is consumed and cannot be reused.
+
+### POST /api/user/auth/login
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","totp_code":"123456"}'
+# Sets: Set-Cookie: paramant_user_session=<token>; HttpOnly; Secure; SameSite=Strict
+# {"ok":true}
+```
+
+**Rate limits on this endpoint.** Two counters, and they are deliberately not
+the same kind of thing:
+
+| Keyed on | Counts | Window | Over the limit |
+|----------|--------|--------|----------------|
+| IP address | every attempt | 15 min | `429 rate_limited` after 5 |
+| Email address | failed sign-ins only | 15 min | `428 pow_required` after 10, never a refusal |
+
+The per-IP counter is a hard refusal, because the IP address is the caller's own
+resource. The per-email counter is not, because the address is request input:
+anyone can name yours. It counts only attempts that actually failed, a
+successful sign-in deletes it, and once it is over the threshold the next
+attempt has to carry a solved proof-of-work (`challenge_id` + `nonce` from
+`GET /api/captcha/challenge`, the same 2^18 challenge signup uses) instead of
+being turned away. The request that asks for the proof is not charged to the
+per-IP counter, so the five attempts stay five real attempts.
+
+Be clear about what that proof buys. It is a fixed 2^18 challenge: measured on
+this repository a native solver finds a nonce in roughly 150 to 250 ms, and a
+browser doing the same work through WebCrypto takes one to two seconds. It makes
+each automated guess measurably more expensive and it stops a stranger from
+switching your account off, but it is not the brake on guessing. The brake is
+the per-IP limit above: five attempts per IP per fifteen minutes.
+
+```bash
+# after ten failed attempts on this address
+curl -X POST https://paramant.app/api/user/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","totp_code":"123456","challenge_id":"...","nonce":12345}'
+```
+
+A `503 totp_unavailable` means the single-use guard behind TOTP verification
+could not reach Redis. The code was not rejected and nothing is wrong with the
+account; verification fails closed rather than accepting a code it cannot mark
+as spent. See SECURITY.md.
+
+**Every credential answer on this route is held to a floor**, so a 401 for an
+address that has an account takes exactly as long as one for an address that
+does not. The floor is `PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms) plus what
+the address owes for its own recorded failures: 250 ms per failure past ten,
+capped at 2000 ms. So a clean address is answered at 250 ms and one with twenty
+failures at 2250 ms, either way whether or not it exists.
+
+That second part used to be charged by the relay against the ACCOUNT, and only
+an address with an account could reach it, so the anti-guessing delay was itself
+an existence oracle: 509.91 ms against 251.61 ms at twelve prior failures, with
+no overlap. The `503 totp_unavailable` answer was unfloored for the same reason
+and is floored now too. The 428 and the 429 are not held back: their status
+codes tell them apart whatever the clock says, and the login page is waiting on
+the 428 to start hashing.
+
+An address over the failure threshold still answers 428 where one under it
+answers 401, so the status code remains a distinguisher for an attacker willing
+to burn ten failures and a proof-of-work per address. That is the deliberate
+price of pricing an attempt rather than refusing it.
+
+### POST /api/user/auth/login-with-backup
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/login-with-backup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","backup_code":"abc-def-ghi"}'
+# {"ok":true}
+```
+
+Backup codes are single-use. The account is re-locked after use; a new TOTP enrollment is required.
+
+**This route is floored too, and higher.** A wrong backup code is verified
+against every stored hash, so a miss costs ten argon2id verifications at 64 MiB:
+about half a second, and an address with no account pays none of it. Every
+credential answer is held to `PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS` (default
+1500 ms) plus 250 ms per prior attempt on that address past the first, capped at
+2000 ms. Five attempts per address and ten per source address per fifteen
+minutes are refused outright with a 429.
+
+A body whose `email` or `backup_code` is not a string is a `400 missing_fields`,
+the same answer for every caller.
+
+### POST /api/user/auth/logout
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/logout \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true}
+```
+
+### GET /api/user/session/verify
+
+```bash
+curl https://paramant.app/api/user/session/verify \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true,"user_id":"…","email":"jane@example.com"}
+```
+
+### GET /api/user/account
+
+Returns the account profile, active sessions, and billing status.
+
+```bash
+curl https://paramant.app/api/user/account \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true,"email":"jane@example.com","plan":"free","sessions":[…]}
+```
+
+### DELETE /api/user/account
+
+Permanently deletes the account and all associated Redis state.
+
+```bash
+curl -X DELETE https://paramant.app/api/user/account \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true}
+```
+
+### POST /api/user/account/totp/reset
+
+Sends a new TOTP setup link, invalidating the current TOTP secret. Requires an active session.
+
+### POST /api/user/account/sessions/revoke-others
+
+Revokes all sessions except the current one.
+
+### POST /api/user/account/backup-codes/regenerate
+
+Generates a new set of backup codes and invalidates all previous ones.
+
+### POST /api/user/billing/checkout (410 Gone)
+
+Removed on 20 July 2026 and kept as a 410 so a stale client gets a clean answer: it granted a plan without a payment. `GET /api/user/billing/checkout/:token` and `POST /api/user/billing/checkout/:token/confirm` answer the same.
+
+```bash
+curl -X POST https://paramant.app/api/user/billing/checkout \
+  -H "Cookie: paramant_user_session=<token>"
+# 410
+# {"error":"billing_stub_removed","message":"Checkout moved to Mollie; this endpoint no longer grants plans."}
+```
+
+The one path to a paid plan is the Mollie checkout on the relay, `POST /v2/billing/checkout`, see [Billing (Mollie)](#billing-mollie) below. The tier is granted by `/v2/billing/webhook` only after Mollie confirms the payment as paid for the amount the catalog names, and that same webhook issues the invoice or payment receipt. The `stub_notice` field this section used to point at is gone from `GET /api/user/billing/status` too.
+
+### POST /api/user/billing/cancel
+
+Schedules a downgrade at the end of the current billing period. Returns `{"scheduled_downgrade_at":"…"}`.
+
+### GET /api/user/billing/status
+
+Returns current plan and subscription state: `current_plan`, `period`, `amount_eur`, `next_billing_date`, `cancellation_scheduled_at`.
+
+### GET /api/user/billing/history
+
+Returns one chronological list, newest first: the payments and credit notes the
+relay has documents for, the plan terms that ended, and the admin plan changes
+from the audit log (plan changes, scheduled cancellations, downgrades). Rows
+carry `ts`, `type`, `label`, `detail`, `amount`, `currency` and `document`; a row
+with a `document` is downloadable at
+`/api/user/billing/invoices/<number>.pdf`.
+
+### GET /api/user/billing/invoices
+
+Returns this account's invoices and credit notes, proxied from the relay.
+
+---
+
+## Billing (Mollie)
+
+Paid ParaSend and ParaSign plans are billed through [Mollie](https://www.mollie.com). The relay creates the payment and grants the entitlement from the webhook. Prices come from the server-side catalog (`relay/lib/billing-catalog.js`); the caller can never set an amount.
+
+### POST /v2/billing/checkout: Start a Mollie payment
+
+Requires an API key. The body names a product, plan, and interval; the price is looked up server-side.
+
+```bash
+curl -X POST https://relay.paramant.app/v2/billing/checkout \
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"product":"firm","plan":"firm","interval":"monthly"}'
+# {"ok":true,"payment_id":"tr_…","checkout_url":"https://www.mollie.com/checkout/…","mode":"live"}
+```
+
+| Field | Values |
+|-------|--------|
+| `product` | `firm`, `parasign`, `parasend` |
+| `plan` | `firm` (firm); `business` (parasign); legacy `pro` (parasign, parasend) |
+| `interval` | `monthly`, `yearly` |
+
+`firm`/`firm` is the bundle, and the only paid plan sold alongside
+`parasign`/`business`. One payment grants **both** product entitlements,
+ParaSign `pro` and ParaSend `pro`, from one catalog amount and with **one**
+`paid_until` written to both, so a Firm term ends on one day. The single
+exception is upward: a product that already carries a LATER `paid_until`, bought
+before the change, keeps it. Buying Firm never shortens a term somebody paid
+for, so it can only ever leave one product ahead of the other, never behind.
+
+`parasign`/`pro` and `parasend`/`pro` are no longer sold. They stay resolvable
+in the catalog on purpose: an outstanding renewal of a term bought before the
+change still checks out at its own price, and an existing Mollie subscription
+created against one of them keeps charging and keeps being granted. Nothing on
+the site links to them.
+
+Redirect the buyer to `checkout_url` to complete the payment; Mollie then redirects back to `/dashboard?billing=return`. `mode` is `live` or `test`, controlled by `BILLING_MODE` and which Mollie key (`MOLLIE_API_KEY` / `MOLLIE_TEST_API_KEY`) is configured. The recurring layer (a Mollie customer, a `sequenceType: first` payment and a subscription created after the grant) runs only when `BILLING_MODE` is set explicitly to `live` or `test`; with `BILLING_MODE` empty the relay creates plain one-off payments, and the `billing_config` log line at boot says which stance is active.
+
+Errors: `401 unauthorized` (missing or invalid API key), `400 bad_json` / `unknown_product` / `unknown_plan` / `unknown_interval`, `502 checkout_failed` (Mollie unreachable or rejected the payment).
+
+### POST /v2/billing/webhook: Mollie status callback
+
+Called by Mollie with `id=tr_…` (form-encoded). The relay ignores everything else in the webhook body, re-fetches the payment from the Mollie API as the only source of truth, verifies the amount actually paid against the catalog, and grants the product tier idempotently. Responds `200` on every handled event, `400 bad_payment_id` for a malformed id, and `503` on a transient Mollie fetch failure (so Mollie retries).
+
+A `firm` payment is a bundle: one handled event sets **two** entitlements,
+ParaSign to `pro` and ParaSend to `pro`, both with the same `paid_until`. A
+single-product payment (the legacy `pro` plans, or `parasign`/`business`) sets
+one. Idempotency is per payment id, so a Mollie retry of a bundle grants both
+again without extending either term.
+
+Not intended to be called by clients.
+
+A refund or a chargeback arrives on the same `tr_` id as the payment. A
+**chargeback** also takes the entitlement back: a charged-back `firm` payment
+returns **both** products to their floor, ParaSign to `free` and ParaSend to
+`community`, because the one payment is what held both up, and it clears the
+paid period with them. A charged-back single-product payment returns only that
+product. A **full refund** does exactly the same, and it counts as full whether
+Mollie reports it as the status `refunded` or as an `amountRefunded` equal to the
+amount on a payment that is still `paid`. A **partial refund** moves no
+entitlement, and it does not renew one either. The relay issues a **credit note**
+for either: its own sequential number in its own series
+(`CN-2026-0001`, per calendar year), referring to the invoice it credits by
+number and date, with negative net, VAT and total. One per reversal, idempotent
+against a Mollie retry. A partial refund is credited for the amount that went
+back, with VAT pro rata in whole cents; the invoice itself is only marked
+reversed once the whole of it has been credited.
+
+### GET /v2/billing/invoices: this account's documents
+
+Requires `X-Api-Key`. Returns every document issued to the account, newest
+first: invoices (`PS-…`), payment receipts, and credit notes (`CN-…`, `kind`
+`credit_note`, with `credit_for` naming the invoice and `partial` saying whether
+the rest of it still stands). Each row carries `pdf_url`.
+
+### GET /v2/billing/invoices/:number.pdf: one document
+
+Requires `X-Api-Key`. Serves the PDF for one `PS-` or `CN-` number, rendered on
+demand from the stored record. `400 bad_invoice_number` for a malformed number,
+`404` for a number that does not belong to this account.
+
+### GET /v2/billing/history: one chronological list
+
+Requires `X-Api-Key`. Derived, never stored: the invoice and credit-note records
+for the money, and the paid periods on those same records for the terms that
+ended. Rows carry `ts`, `type` (`invoice`, `credit_note`, `term_ended`), `label`,
+`detail`, `amount`, `currency`, `document` and `pdf_url`. A period end that a
+renewal extended is not an ending and is not listed.
+
+### GET /v2/admin/billing/export: the books for one period
+
+Requires `X-Admin-Token` (`ADMIN_TOKEN`), like every other `/v2/admin/*` path.
+This is the whole customer base's billing in one answer, so it is never reachable
+with a customer key.
+
+```
+GET /v2/admin/billing/export?from=2026-09-01&to=2026-09-30&format=csv
+GET /v2/admin/billing/export?from=2026-09-01&to=2026-09-30&format=json
+GET /v2/admin/billing/export?from=2026-09-01&to=2026-09-30&pdfs=1
+```
+
+Every document issued in the period, both ends inclusive, both series, filtered
+on the date the document itself states. One row per document, with the columns
+`number`, `date`, `type`, `customer_name`, `customer_email`, `customer_vat`,
+`description`, `amount_net`, `vat_rate`, `amount_vat`, `amount_gross`,
+`currency`, `payment_id` (the Mollie `tr_` id), `credit_for` (the invoice a
+credit note reverses) and `moneybird_id`. A credit note carries negative
+amounts; nothing is netted off.
+
+`format=csv` (the default) answers with a downloadable file for a Dutch Excel:
+semicolon separated, a UTF-8 BOM, CRLF line endings and a comma as the decimal
+mark. `format=json` answers with the same rows using dots, plus `totals` over
+the period and `missing`, the numbers in the series whose record could not be
+read. `pdfs=1` answers with a `application/zip` holding the ledger file and one
+PDF per document, stored without compression.
+
+`400 bad_period` for a date that is not `YYYY-MM-DD` or a `from` after the `to`;
+`400 bad_format` for anything but `csv` or `json`; `503 export_unavailable` when
+redis is not reachable, because the documents live there.
+
+## Gift codes
+
+A code gives an account a term without any money moving. It is **not** a
+checkout with a 100% discount: nothing reaches Mollie, no invoice number is
+drawn, and nothing lands in the books as revenue, because nothing was sold. What
+a redemption does share with a payment is the half the customer cares about, and
+it shares it by calling the same `setProductPlan` the webhook calls, so
+`plan_<product>` and `paid_until_<product>` are written the ordinary way and the
+entitlement layer, the expiry index and the reminder mails need no special case.
+
+Rules the store enforces (`relay/lib/coupon.js`):
+
+- codes are case-insensitive, `A-Z`, `0-9` and `-`, 3 to 32 characters;
+- one redemption per **account** per code;
+- the cap is real: the claim is a single Lua script, so the redemption after the
+  last seat is refused rather than racing past it;
+- a term is **added**, never substituted. An account with a paid term still
+  running gets the gift days after that term, not instead of it.
+
+### POST /v2/admin/coupons: create a code
+
+Requires `X-Admin-Token` (`ADMIN_TOKEN`), like every other `/v2/admin/*` path.
+
+The example below is the live campaign: the code handed to the Buy Me a Coffee
+supporters, three months of both products, a hundred places, redeemable up to
+and including 30 September 2026.
+
+```bash
+curl -X POST https://health.paramant.app/v2/admin/coupons \
+  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"COFFEE","max_redemptions":100,"valid_until":"2026-09-30T23:59:59Z",
+       "created_by":"mick","note":"Buy Me a Coffee supporters",
+       "grants":[{"product":"parasign","tier":"pro","days":90},
+                 {"product":"parasend","tier":"pro","days":90}]}'
+# 201 {"ok":true,"coupon":{"code":"COFFEE","used":0,"remaining":100,
+#      "describes":"3 months of ParaSign Pro and ParaSend Pro", ...}}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `code` | The code itself. Upper-cased; `A-Z0-9-`, 3 to 32 characters |
+| `grants` | One entry per product: `{product, tier, days}`. Optional; the default is ParaSign Pro and ParaSend Pro for 90 days. Every entry must carry the same `days` |
+| `max_redemptions` | The cap. Default 100, ceiling 100000 |
+| `valid_until` | Optional end date. Absent means no end date |
+| `created_by`, `note` | Free text, for the admin's own trail |
+
+Errors: `400 bad_code`, `400 invalid_product` / `invalid_tier` / `floor_tier` /
+`bad_days` / `mixed_days` / `bad_max_redemptions` / `bad_valid_until`,
+`409 code_exists` (a code is created once; withdraw it and make another rather
+than changing a cap people are already redeeming against), `503
+coupons_unavailable` when redis is not reachable.
+
+### GET /v2/admin/coupons: every code with its counter
+
+Requires `X-Admin-Token`. Returns each code with `grants`, `max_redemptions`,
+`used`, `remaining`, `valid_until`, `revoked_at` and `describes` (the one-line
+English summary of what it gives).
+
+### DELETE /v2/admin/coupons/:code: withdraw a code
+
+Requires `X-Admin-Token`. The code is in the path and the request carries no
+body, deliberately: a DELETE body that the admin gate refuses before reading
+leaves those bytes on the wire and desynchronises a kept-alive connection.
+
+Stamps `revoked_at`; the code stops being redeemable immediately. Nothing is
+deleted and no term already given is taken back: the redemptions are the record
+of what was given away. `404 unknown_code` for a code that was never created.
+
+### GET /v2/admin/coupons/:code/redemptions: who took a seat
+
+Requires `X-Admin-Token`. The coupon plus one row per redemption
+(`account`, `at`).
+
+### POST /v2/billing/redeem: spend a code
+
+Authenticated as the account, either with `X-Api-Key` or with a `pst_` session
+token minted with purpose `app` (it is one of the five routes in that
+allowlist). Body `{"code":"COFFEE"}`. **The account is the one the relay
+resolved from the credential, never one the body names.**
+
+```bash
+curl -X POST https://relay.paramant.app/v2/billing/redeem \
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"COFFEE"}'
+# {"ok":true,"code":"COFFEE",
+#  "granted":[{"product":"parasign","tier":"pro","days":90,"ends":"2026-12-03T…"},
+#             {"product":"parasend","tier":"pro","days":90,"ends":"2026-12-03T…"}],
+#  "message":"Your code is redeemed. You now have ParaSign Pro until 3 December
+#             2026 and ParaSend Pro until 3 December 2026. Nothing was charged."}
+```
+
+Every answer carries `message`, one plain English sentence meant to be printed
+to the person who typed the code. The machine-readable `error` is for logs and
+tests:
+
+| Status | `error` | What the reader is told |
+|---|---|---|
+| 404 | `unknown` | We do not know that code. Check the spelling and try again. |
+| 409 | `expired` | That code has expired. |
+| 409 | `already_used` | You have already used this code on this account. |
+| 409 | `exhausted` | That code has been fully claimed. It has run out. |
+| 409 | `revoked` | That code is no longer valid. |
+| 500 | `grant_failed` | Nothing was changed; the seat is given back. |
+| 503 | `redeem_unavailable` | The coupon store did not answer. |
+
+A redemption writes **one line in the billing history** (`GET
+/v2/billing/history`, type `gift`, e.g. `Gift: 3 months of ParaSign Pro and
+ParaSend Pro, code COFFEE`, with no amount and no document) and sends **one
+confirmation mail**. It writes no invoice and no credit note. The seven-day
+expiry warning and the "your plan has ended" mail follow on their own, because
+`paid_until_<product>` was written the ordinary way.
+
+### Moneybird
+
+With `MONEYBIRD_TOKEN` and `MONEYBIRD_ADMINISTRATION_ID` set, every invoice and
+credit note is also pushed to Moneybird as an **external sales invoice**: our own
+number goes in `reference`, Moneybird draws no number of its own and sends
+nothing to the customer, and the PDF is attached. The Moneybird id is written
+back onto the record as `moneybird_id`, so a document is never pushed twice; a
+failed push is queued and retried by a six-hour sweep. The push is aftercare and
+can never fail a payment or an invoice. Without both variables nothing is sent at
+all. See `deploy/DEPLOY-3.1.md` for how to make the token.
+
+---
+
+## Relay internal endpoints (operators only)
+
+These endpoints are served by the sector relays and are intended for internal calls from the admin panel. They require the `X-Internal-Auth` header set to the value of `INTERNAL_AUTH_TOKEN` in the relay environment.
+
+They are not accessible from the public internet.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/v2/auth/capabilities` | Public: returns `{user_totp_available: bool}` |
+| `POST` | `/v2/user/setup-totp` | Provision a TOTP secret; idempotent for provisional state |
+| `POST` | `/v2/user/verify-totp` | Verify a TOTP code against the stored secret |
+| `POST` | `/v2/user/activate-totp` | Mark TOTP as fully activated |
+| `POST` | `/v2/user/consume-backup` | Consume and invalidate a single backup code |
+| `POST` | `/v2/user/regenerate-backup` | Generate a new backup code set |
+| `POST` | `/v2/user/delete-totp` | Remove all TOTP state for a user |
+| `POST` | `/v2/user/get-totp-provisional` | Return the existing secret if enrollment is provisional |
+| `POST` | `/v2/user/get-backup-codes-plaintext` | Return plaintext backup codes (used during setup display) |
+
+**Idempotency note for `/v2/user/setup-totp`:** If a TOTP secret already exists but `totp_active` is `false` (provisional), the endpoint returns the existing secret and backup codes rather than 409. A 409 is returned only when `totp_active` is `true`.
+
+---
+
+## Error codes
+
+| HTTP | Code | Meaning |
+|------|------|---------|
+| 400 | `bad_request` | Malformed request body or missing required field |
+| 401 | `unauthorized` | Missing or invalid API key, session cookie, or admin token |
+| 401 | `invalid_or_expired_token` | Setup token not found or past TTL |
+| 401 | `invalid_totp_code` | TOTP code incorrect or outside allowed window |
+| 401 | `invalid_backup_code` | Backup code not found or already consumed |
+| 403 | `totp_not_activated` | Account exists but TOTP setup was not completed |
+| 404 | `not_found` | Resource does not exist |
+| 409 | `totp_already_configured` | TOTP is fully activated; cannot re-enroll without a reset |
+| 409 | `email_already_registered` | Signup attempted for an email that already has an account |
+| 428 | `pow_required` | This email address has collected enough failed sign-ins that the next attempt must carry a solved proof-of-work. Not a refusal: solve `GET /api/captcha/challenge` and post again |
+| 429 | `rate_limited` | Too many requests from this IP address |
+| 503 | `totp_unavailable` | The TOTP single-use guard could not reach Redis. Verification fails closed; retry when the relay reports healthy |
+| 503 | `redis_unavailable` | Any other Redis-backed route whose store did not answer inside `PARAMANT_REDIS_DEADLINE_MS` (default 1000 ms). Carries `Retry-After: 5`. Nothing is wrong with the request; the relay refuses rather than waiting for a store that may never answer |
+| 503 | `session_store_unavailable` | The admin could not read the session behind an authenticated request, for the same reason |
+| 500 | `internal` | Unexpected server error; check relay logs |
+
+### POST /admin/api/admin/force-totp
+
+Require or remove TOTP for a specific user.
+
+**Body:**
+```json
+{ "key": "pgp_...", "required": true, "reason": "compliance policy" }
+```
+
+**Effect when `required: true`:**
+- `paramant:user:totp_required:{key}` set in Redis
+- All active user sessions revoked
+- Setup email sent automatically
+- Login blocked until TOTP active
+
+**Rate limit:** 20/admin/24h
+**Audit event:** `admin_totp_required_toggled`
+
+---

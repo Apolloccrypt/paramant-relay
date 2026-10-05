@@ -350,14 +350,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -371,14 +371,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/architecture" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/architecture" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
@@ -642,7 +642,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">06</div>
     <h2 class="section-title">Where it runs</h2>
-    <p class="section-desc">One jurisdiction. One data centre. No CDN caching your files. No US entity holds ciphertext or a key; the one American sub-processor sends transactional email under Standard Contractual Clauses.</p>
+    <p class="section-desc">One jurisdiction. One data centre. No CDN caching your files. No US entity stores ciphertext. The one American sub-processor, Resend, sends the email under Standard Contractual Clauses, and that email sometimes carries key material: for a send to named recipients the link with the token and, in a second email, the pickup code, which together open the file; for a signing invite half of the document key. The CLOUD Act can reach that.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
       <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
@@ -675,7 +675,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">US Cloud Act</div>
-        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Not applicable<br><span style="font-size:12px;color:var(--ink-dim)">no US entity</span></div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Not on the relay<br><span style="font-size:12px;color:var(--ink-dim)">it does reach email via Resend (US)</span></div>
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Storage</div>
@@ -831,6 +831,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=17" defer></script>
 </body>
 </html>

@@ -34,7 +34,19 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
   // surfaced as key_id for per-user actions, so this needs the full value.
   try { r = await relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN); }
   catch (e) { console.error('[telemetry] relay unavailable:', e.message); return []; }
-  const keys = r.body?.keys || [];
+  const all = r.body?.keys || [];
+  // A psk_ key is a ParaSign /v1 API key that belongs to an account (minted by
+  // mint-parasign or the account page); it is not an account of its own. Listed
+  // as a row it looked like a customer, and every action on it answered
+  // invalid_key, because the /admin/ routes act on pgp_ accounts (ADMIN-06-psk).
+  // It is counted on the row of the account it belongs to instead.
+  const pskCount = new Map();
+  for (const k of all) {
+    if (typeof k?.key === 'string' && k.key.startsWith('psk_') && k.active !== false) {
+      pskCount.set(k.account_id, (pskCount.get(k.account_id) || 0) + 1);
+    }
+  }
+  const keys = all.filter(k => !(typeof k?.key === 'string' && k.key.startsWith('psk_')));
   const users = await Promise.all(keys.map(async k => {
     if (!k?.key) return null;
     const [totpActive, totpSecret, metaRaw] = await Promise.all([
@@ -60,6 +72,7 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       email: meta.email || k.email || null, label: k.label || null,
       plan: k.plan || 'community', sectors: k.sectors || [],
       parasign: k.parasign === true, /*MARK:parasign_user*/
+      parasign_keys: pskCount.get(k.account_id || k.key) || 0,
       // Per-product tiers so the panel shows the ParaSign/ParaSend truth, not just
       // the coarse unified plan. Relay always fills these (stored or derived).
       plan_parasign: k.plan_parasign || null,

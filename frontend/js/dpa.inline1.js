@@ -24,7 +24,7 @@
       var r = await fetch('/api/sign-dpa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, title, org, kvk, email,
+        body: JSON.stringify({ name, title, org, kvk, email, lang: 'nl',
           signed_at: new Date().toISOString(), version: ((document.querySelector('[data-dpa-versie]') || {}).dataset || {}).dpaVersie || '' })
       });
       var d = await r.json();

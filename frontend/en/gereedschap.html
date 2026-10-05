@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lock a file or check a signature · Paramant</title>
+<meta property="og:title" content="Lock a file or check a signature · Paramant">
+<meta property="og:description" content="What works on Paramant without an account: locking a file, checking a signature or a delivery receipt, and reading the public log.">
+<meta property="og:url" content="https://paramant.app/en/gereedschap">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://paramant.app/en/gereedschap">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/gereedschap">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/gereedschap">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/gereedschap">
+<meta name="description" content="What works on Paramant without an account: locking a file, checking a signature or a delivery receipt, and reading the public log.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lock a file or check a signature &middot; Paramant">
+<meta name="twitter:description" content="What works on Paramant without an account: locking a file, checking a signature or a delivery receipt, and reading the public log.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="Paramant">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
+<style>
+.tool-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);margin-top:var(--space-6)}
+.tool-grid,.tool-card{min-width:0}
+.tool-card{padding:var(--space-6);background:var(--bone);display:flex;flex-direction:column}
+.tool-card h3{font-size:var(--text-lg);color:var(--navy);margin-bottom:var(--space-3);line-height:1.3}
+.tool-card p{font-size:var(--text-base);color:var(--ink);line-height:1.7;margin-bottom:var(--space-3)}
+.tool-card p.edge{color:var(--ink-2)}
+.tool-card .btn{align-self:flex-start;white-space:normal;line-height:1.45}
+.tool-note{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)}
+.tool-tech{margin-top:auto;padding-top:var(--space-5);border-top:1px solid var(--ink-hair)}
+.tool-tech>summary{font-size:var(--text-sm);color:var(--ink-dim);cursor:pointer;list-style:none;padding:var(--space-2) 0}
+.tool-tech>summary::-webkit-details-marker{display:none}
+.tool-tech>summary::before{content:"+";display:inline-block;width:1.1em;font-family:var(--mono);color:var(--ink-dim)}
+.tool-tech[open]>summary::before{content:"\2212"}
+.tool-tech>summary:hover,.tool-tech>summary:focus-visible{color:var(--ink)}
+.tool-tech-body{font-size:var(--text-sm);line-height:1.7;color:var(--ink-dim);padding-bottom:var(--space-3)}
+.ladder{border-top:1px solid var(--invert-hair);max-width:70ch}
+.ladder-step{border-bottom:1px solid var(--invert-hair);padding:var(--space-5) 0}
+.ladder-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-2)}
+.ladder-step p{font-size:var(--text-base);color:var(--invert-ink);line-height:1.7;margin:0}
+.ladder-step p a{color:var(--cobalt)}
+.section-dark .ladder-name,.section-dark .ladder-step p a,.section-dark .marker .num{color:var(--lime)}
+.section-dark .marker .tag{color:var(--bone-on-navy-dim)}
+@media(max-width:767px){
+.tool-grid{grid-template-columns:1fr;margin-top:var(--space-4)}
+.section-lg{padding-top:var(--space-6);padding-bottom:var(--space-5)}
+.section{padding-top:var(--space-6)}
+.tool-card{padding:var(--space-5)}
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/en/gereedschap#webpage",
+      "url": "https://paramant.app/en/gereedschap",
+      "name": "Lock a file or check a signature · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "What works on Paramant without an account: locking a file, checking a signature or a delivery receipt, and reading the public log."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/gereedschap#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Lock a file or check a signature"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+<script src="/js/theme.js?v=6"></script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/en/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/gereedschap" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/gereedschap" hreflang="en" lang="en" aria-current="true">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/gereedschap" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/gereedschap" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
+</div>
+<main>
+
+<section class="section section-lg" id="main-content" tabindex="-1">
+  <div class="container">
+    <div class="eyebrow"><span class="bar"></span>tools</div>
+    <h1 class="hero-h1">Use them on their own, <em>no account needed.</em></h1>
+    <p class="lede" style="max-width:720px">Part of Paramant is simply a set of tools: you open a page, do what you came to do, and close it again.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">01</div>
+      <h2>No account.</h2>
+      <div class="tag">no sign-up<br>no payment</div>
+    </div>
+
+    <div class="tool-grid">
+
+      <div class="tool-card">
+        <div class="tool-note">works right away</div>
+        <h3>Lock a file</h3>
+        <p>Choose a file and a passphrase. Your browser turns it into a locked file that only opens again with that passphrase.</p>
+        <p class="edge">The file and the passphrase stay on your own device. We never receive them, so we cannot recover the passphrase for you either. If you lose it, the file is gone.</p>
+        <a href="/en/vault" class="btn btn-primary">Lock a file</a>
+        <details class="tool-tech">
+          <summary>The technical detail</summary>
+          <div class="tool-tech-body">AES-256-GCM. The key is derived from your passphrase with PBKDF2-SHA-256 over 600,000 rounds, with a random salt and nonce. The number of rounds is stored in the file itself, so older files keep opening. The page makes no network request at all.</div>
+        </details>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">works right away</div>
+        <h3>Check a signature or a delivery receipt</h3>
+        <p>Put a signed document next to its signature file, or open the receipt of a transfer. The page works out whether it holds.</p>
+        <p class="edge">The check runs in your browser, even offline. One exception: signatures in the old format can only be checked by the server, and that needs a key. The page tells you when that is the case.</p>
+        <a href="/en/verify" class="btn btn-primary">Check something</a>
+        <details class="tool-tech">
+          <summary>The technical detail</summary>
+          <div class="tool-tech-body">For the current format, SHA3-256 is computed over your document, then the ML-DSA-65 signature over that hash is checked, and then the validity period. A receipt is checked against keys that are built into the page itself. In both cases not a single request leaves your device.</div>
+        </details>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">works right away</div>
+        <h3>Read the public log</h3>
+        <p>Every registration of a public key is added to a log that can only grow, and that anyone may read.</p>
+        <p class="edge">You see hashes and times. Documents, file names and the names of people are not in it, and cannot be derived from it.</p>
+        <a href="/en/ct-log" class="btn btn-primary">Open the log</a>
+        <details class="tool-tech">
+          <summary>The technical detail</summary>
+          <div class="tool-tech-body">A Merkle tree stored on disk that survives a restart. The public view rounds times to the hour. On 5 September 2026 it held 891 entries.</div>
+        </details>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">you need a link</div>
+        <h3>Pick up a file someone sent you</h3>
+        <p>If someone sent you a Paramant link, you pick up the file here and your browser opens it again.</p>
+        <p class="edge">You cannot start anything here yourself. Without a link from a sender there is nothing to pick up. A link from the web app opens once; after that our copy is gone.</p>
+        <a href="/en/get" class="btn btn-primary">Open a link</a>
+        <details class="tool-tech">
+          <summary>The technical detail</summary>
+          <div class="tool-tech-body">The key sits after the # in the link. A browser never sends that part of an address to a server, so we do not have the key and cannot open the file. The file name is encrypted inside the file itself and is not stored next to it.</div>
+        </details>
+      </div>
+
+    </div>
+    <p class="dim mono" style="font-size:11px;margin-top:var(--space-5)">Checked against the code and against paramant.app on 5 September 2026</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">02</div>
+      <h2>These do need an account.</h2>
+      <div class="tag">free account<br>said up front</div>
+    </div>
+
+    <p style="max-width:70ch;font-size:var(--text-base);color:var(--ink);line-height:1.75">These two need an account. An account costs nothing: the Community plan is free and stays free. It is said here so you know before you choose a file, not after. Both buttons therefore go to the sign-in screen first, and then straight on to the tool.</p>
+
+    <div class="tool-grid">
+
+      <div class="tool-card">
+        <div class="tool-note">account needed</div>
+        <h3>Have a document signed</h3>
+        <p>Prepare a PDF, place your signature and sign it, or send the document to the people who need to sign.</p>
+        <p class="edge">Preparing the document and placing the signature work without signing in; the signing itself does not. The Community plan gives two signatures a month.</p>
+        <a href="/en/auth/login?next=/en/sign" class="btn btn-secondary">Sign in first, then sign</a>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">account needed</div>
+        <h3>Send a file securely</h3>
+        <p>Encrypt a file in your browser and hand it over live to the recipient, or leave it behind a link that expires by itself.</p>
+        <p class="edge">This page asks you to sign in first, so without an account you cannot get in. The Community plan gives fifty transfers a month. A live transfer can carry a file of up to 500 MB; a one-time link is a single sealed block and takes up to 5 MB per file.</p>
+        <a href="/en/auth/login?next=/en/parashare" class="btn btn-secondary">Sign in first, then send</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="section section-dark">
+  <div class="container">
+    <div class="marker">
+      <div class="num">03</div>
+      <h2 style="color:var(--invert-ink)">What comes after.</h2>
+      <div class="tag">four steps<br>no hurry</div>
+    </div>
+
+    <div class="ladder">
+      <div class="ladder-step">
+        <div class="ladder-name">Tools</div>
+        <p>The tools above cost nothing, and what works without an account today keeps working without one.</p>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-name">Firm</div>
+        <p>29 euros a month, excl. VAT, for a whole office instead of per user: one hundred signatures and five hundred transfers a month, and access to the API. <a href="/en/pricing">The full price list</a>.</p>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-name">The monthly measurement</div>
+        <p>From 250 euros a month I measure every month, in the same way, what your site or app sends out, and what changed in that since last month. The work is done in Dutch. <a href="mailto:info@paramant.app?subject=The%20monthly%20measurement">Ask about it</a>.</p>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-name">Research to order</div>
+        <p>One question, one investigation, a fixed price agreed in advance. <a href="mailto:info@paramant.app?subject=Research%20to%20order">Ask about it</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/en/about">About</a>
+          <a href="/en/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/en/privacy">Privacy Policy</a>
+          <a href="/en/dpa">Data Processing Agreement</a>
+          <a href="/en/terms">Terms of Service</a>
+          <a href="/en/sla">SLA</a>
+          <a href="/en/license">License</a>
+          <a href="/en/partners">Partners</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=17" defer></script>
+</body>
+</html>

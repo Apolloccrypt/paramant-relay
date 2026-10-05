@@ -90,7 +90,7 @@ for (const L of LANGS) {
         const actions = await visibleActions(page);
         assert.equal(actions.length, 1, JSON.stringify(actions));
         assert.equal(actions[0].text, L.button);
-        assert.equal(actions[0].href, '/parasend');
+        assert.equal(actions[0].href, L.pre + '/parasend');
       } finally { await page.close(); }
     });
   }

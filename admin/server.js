@@ -248,7 +248,19 @@ async function authMiddleware(req, res, next) {
 // stay first-gate only: the anonymous inbound proxy sends an empty token, and a
 // header the caller did not earn should not ride along behind it. Routes that
 // mutate an entitlement pass it; callRelay always sends it.
+// A write to the key set (create, revoke, plan, reload) makes the kid cache
+// below stale, so the next kid lookup reads it again. Without this an account
+// made in the panel answered 404 unknown_key when it was acted on within a
+// second of any other kid lookup (fase-1 herrun P11, ADMIN-F2-kidcache).
+const KEYSET_WRITE_RE = /^\/v2\/(?:admin\/keys(?:\/|$|\?)|reload-users)/;
 function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, withInternal) {
+  const p = _relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, withInternal);
+  if (method && method !== 'GET' && KEYSET_WRITE_RE.test(relPath)) {
+    return p.finally(() => { _kidCache.at = 0; });
+  }
+  return p;
+}
+function _relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, withInternal) {
   return new Promise((resolve, reject) => {
     const base = SECTORS[sector];
     if (!base) return reject(new Error(`Unknown sector: ${sector}`));
@@ -4173,7 +4185,8 @@ async function sendCancellationScheduled(email, plan, cancelAt) {
   if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
   const planName = publicPlans.planName(plan);
   const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate });
+  const cancelDateNl = new Date(cancelAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+  const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate, cancelDateNl });
   const res = await mailer.stuur({
     to: email, from: msg.from, replyTo: msg.replyTo,
     subject: msg.subject, text: msg.text, html: msg.html,
@@ -4394,6 +4407,24 @@ const AUDIT_LABEL = {
   plan_cancellation_scheduled: () => 'Cancellation scheduled',
   plan_downgraded: (m) => `Plan downgraded to ${m.to || 'Community'}`,
 };
+const AUDIT_LABEL_NL = {
+  plan_changed: (m) => `Plan gewijzigd van ${m.from || 'onbekend'} naar ${m.to || 'onbekend'}`,
+  plan_cancellation_scheduled: () => 'Opzegging gepland',
+  plan_downgraded: (m) => `Plan verlaagd naar ${m.to || 'Community'}`,
+};
+
+// One clock for both halves. The relay rows carry an ISO string, the audit
+// rows the number logAuditEvent wrote (Date.now()). Date.parse of that number
+// is NaN, so until 2026-10-05 every audit row (the cancellation among them)
+// sorted to the bottom under older payments (fase 1, PLAN-19). The row goes
+// out as ISO, like the rest, and the sort compares milliseconds.
+function historyTimeMs(ts) {
+  if (typeof ts === 'number') return ts;
+  const n = Number(ts);
+  if (typeof ts === 'string' && ts.trim() !== '' && Number.isFinite(n)) return n;
+  const p = Date.parse(ts);
+  return Number.isFinite(p) ? p : 0;
+}
 
 api.get("/user/billing/history", authUser, async (req, res) => {
   const { user_id } = req.userSession;
@@ -4409,10 +4440,13 @@ api.get("/user/billing/history", authUser, async (req, res) => {
   const audit = (events || []).map((e) => {
     const meta = e.metadata || {};
     const label = AUDIT_LABEL[e.event_type];
+    const labelNl = AUDIT_LABEL_NL[e.event_type];
+    const ms = historyTimeMs(e.ts);
     return {
-      ts: e.ts,
+      ts: ms ? new Date(ms).toISOString() : e.ts,
       type: e.event_type,
       label: label ? label(meta) : e.event_type,
+      label_nl: labelNl ? labelNl(meta) : null,
       detail: null,
       amount: null,
       currency: null,
@@ -4439,7 +4473,7 @@ api.get("/user/billing/history", authUser, async (req, res) => {
 
   const history = documents.concat(audit)
     .filter((row) => row && row.ts)
-    .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
+    .sort((a, b) => historyTimeMs(b.ts) - historyTimeMs(a.ts))
     .slice(0, 50);
   res.json({ history });
 });
@@ -5248,10 +5282,14 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   const started = Date.now();
   let child;
   try {
+    // detached: the handler leads its own process group, so a kill reaches
+    // what it started too (docker compose logs --follow under bash). Killing
+    // only the bash pid left that grandchild streaming on its own.
     child = spawn(handlerPath, argv, {
       cwd: cliCommands.SCRIPTS_DIR,
       env: cliChildEnv(cmd),
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
     });
   } catch (err) {
     sse('output', { stream: 'stderr', chunk: `[spawn error] ${err.message}\r\n` });
@@ -5262,7 +5300,10 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
 
   // Hard timeout so no command can run away.
   const TIMEOUT_MS = 60_000;
-  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, TIMEOUT_MS);
+  const killGroup = () => {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} }
+  };
+  const killer = setTimeout(killGroup, TIMEOUT_MS);
 
   // Convert bare \n to \r\n so the xterm renderer advances columns correctly.
   const toTerm = s => s.replace(/\r?\n/g, '\r\n');
@@ -5270,12 +5311,18 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   child.stderr.on('data', d => sse('output', { stream: 'stderr', chunk: toTerm(d.toString()) }));
 
   // 10-11. Client cancel (Ctrl+C closes the stream) -> kill the child.
+  // res 'close', not req 'close': since Node 16 the request emits 'close' as
+  // soon as its body has been read, which express.json() did before this
+  // handler ran. The listener on req never fired, so Ctrl+C left the command
+  // running until the 60 s watchdog (ADMIN-46-A). The response closes when the
+  // client goes away, or when we end it ourselves (writableEnded).
   let finished = false;
-  req.on('close', () => {
-    if (finished) return;
+  res.on('close', () => {
+    if (finished || res.writableEnded) return;
     finished = true;            // mark done so the close/error handlers no-op
     clearTimeout(killer);       // the watchdog is moot once the client is gone
-    try { child.kill('SIGKILL'); } catch {}
+    killGroup();
+    cliAudit.logCommand('cli_command_cancelled', { admin_id: adminId, command });
   });
 
   child.on('error', err => {

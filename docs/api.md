@@ -1,10 +1,10 @@
-# API Reference — PARAMANT v3.0.0
+# API Reference: PARAMANT v3.0.0
 
 ## Base URLs
 
 | Sector | URL | Compliance |
 |--------|-----|------------|
-| General | https://relay.paramant.app | — |
+| General | https://relay.paramant.app | - |
 | Healthcare | https://health.paramant.app | NEN 7510, DICOM |
 | Legal | https://legal.paramant.app | eIDAS, KNB |
 | Finance | https://finance.paramant.app | NIS2, DORA |
@@ -16,12 +16,12 @@ Three credential types are in use across different API surfaces:
 
 | Credential | Header / Mechanism | Used for |
 |------------|-------------------|----------|
-| API key (`pgp_` prefix) | `X-Api-Key: pgp_your_key` | Data plane — uploads, downloads, CT log (developer clients) |
-| Operator key (`plk_` prefix) | `X-Api-Key: plk_your_key` | Data plane — unlimited throughput (operator license) |
-| DID signature | `X-DID: did:paramant:…` + `X-DID-Signature: <sig over request URL>` | Data plane — **active fallback** when no `X-Api-Key` is sent (see Device Identity) |
+| API key (`pgp_` prefix) | `X-Api-Key: pgp_your_key` | Data plane: uploads, downloads (developer clients). Community plan: 50 transfers a month, 500 MB per file. |
+| Operator key (`plk_` prefix) | `X-Api-Key: plk_your_key` | Data plane: unlimited throughput (operator license) |
+| DID signature | `X-DID: did:paramant:…` + `X-DID-Signature: <sig over request URL>` | Data plane: **active fallback** when no `X-Api-Key` is sent (see Device Identity) |
 | ParaSend session token (`pst_` prefix) | `Authorization: Bearer pst_…` | Data plane: the five ParaSend transfer routes only, 15 minutes, minted for a browser session (see below) |
-| Session cookie | `Cookie: paramant_user_session=<token>` | `/api/user/*` endpoints — set automatically after TOTP login |
-| Admin token | `X-Admin-Token: <token>` | `/admin/api/admin/*` endpoints — admin panel only |
+| Session cookie | `Cookie: paramant_user_session=<token>` | `/api/user/*` endpoints: set automatically after TOTP login |
+| Admin token | `X-Admin-Token: <token>` | `/admin/api/admin/*` endpoints: admin panel only |
 
 > **DID fallback semantics.** When a request carries no API key but a valid
 > `X-DID` + `X-DID-Signature` pair, the relay authenticates the device **as the
@@ -83,7 +83,7 @@ Three credential types are in use across different API surfaces:
 > - **Outage.** With the store unreachable a token is answered `503
 >   redis_unavailable` with `Retry-After`, never `401`.
 
-CT log and STH endpoints are **public** — no credential required.
+CT log and STH endpoints are **public**: no credential required.
 
 The `/v2/auth/capabilities` endpoint is public and returns which authentication modes are enabled on this relay instance.
 
@@ -91,7 +91,7 @@ The `/v2/auth/capabilities` endpoint is public and returns which authentication 
 
 ## Data plane
 
-### POST /v2/inbound — Upload an encrypted blob
+### POST /v2/inbound: Upload an encrypted blob
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/inbound \
@@ -191,14 +191,23 @@ burns anything:
 | Route | What it does |
 |---|---|
 | `GET /v2/dl/:token` | An HTML confirmation page. Safe for link preloaders and mail scanners: known preload user-agents get a static placeholder, and nothing is spent. |
-| `GET /v2/dl/:token/get` | The download itself, and the only route that burns. Answers `410` to a known preload user-agent's twin, `409` while another download of the same token is in flight, and `410` once the token is spent or expired. |
-| `GET /v2/dl/:token/info` | `{ ok, enc_meta, file_size, ttl_left_s, used }` while the link is live, `404` once it is not. No credential. |
+| `GET /v2/dl/:token/get` | The download itself, and the only route that burns. Answers `403` (`Automated clients not permitted`) to a known link-preview user-agent (Slackbot, WhatsApp, Googlebot and the like), `409` while another download of the same token is in flight, and `410` (or `404` when the relay no longer knows the token) once the token is spent, expired or its blob is gone. |
+| `GET /v2/dl/:token/info` | `{ ok, enc_meta, file_size, ttl_left_s, used }` while the link is live; `404` with `{ ok: false, error, reason }` once it is not, where `reason` is `downloaded`, `expired`, `withdrawn`, `exhausted`, `lost` or `unknown`. No credential. |
 
-**5. It works exactly once.** The blob is deleted and its buffer zeroed on the
-`finish` event of the download response, not when the response starts: a
-transfer that dies mid-flight leaves the token spendable, so a dropped
-connection is a retry and not a lost file. Once a download does finish, the
-token is marked used and the bytes are gone. The TTL is enforced separately by a
+**5. It works exactly once.** Two modes, and they differ on a broken line:
+
+- With `?claim=<32 hex>` (what `/get` in the browser does) nothing burns on the
+  download. The receiver fetches, decrypts and checks, and only then confirms
+  with `POST /v2/dl/:token/ack`. A transfer that dies mid-flight leaves the token
+  spendable, so a dropped connection is a retry and not a lost file.
+- Without a claim (old SDKs and scripts) the blob is deleted and its buffer
+  zeroed on the `finish` event of the download response: the moment the last
+  byte is handed to the kernel or the proxy in front of the relay, not when the
+  receiver has it. A connection that breaks after that point costs the file.
+  Use the claim mode if your client can.
+
+Once a download is confirmed (claim) or finished (no claim), the token is marked
+used and the bytes are gone. The TTL is enforced separately by a
 timer, so a link nobody opens is destroyed when it expires whether or not
 anybody asks.
 
@@ -206,15 +215,19 @@ anybody asks.
 `GET /v2/outbound/:hash`, the API's own download path, and you fetch it back
 from `GET /v2/transfers/:receipt_id/receipt`. The `/v2/dl` family signs nothing.
 If you need proof that a specific person took the file, use `/v2/outbound` and
-its receipt; `/v2/dl/:token/info` gives you a status and not a proof, and it
-cannot tell "downloaded" apart from "expired" on its own: both answer `404`.
-A caller that recorded the expiry at upload time can separate the two by its own
-clock, which is what the web app's "sent links" list does, and that inference is
-the caller's, not the relay's.
+its receipt; `/v2/dl/:token/info` gives you a status and not a proof. Once the
+link is spent it answers `404` with a `reason` (`downloaded`, `expired`, ...),
+so it does tell "downloaded" apart from "expired"; that is the relay's own
+record of what happened to the token, not a signed statement.
 
 ---
 
-### GET /v2/outbound/:hash — Download (burn-on-read)
+### GET /v2/outbound/:hash: Download (burn-on-read)
+
+The blob is burned when the last byte of the response is handed to the kernel
+or the proxy, not when your client has it: a download that breaks after that
+point costs the file, and a second `GET` answers `404`. This route has no claim
+mode; for retry-safe delivery use the share link with `?claim=` (above).
 
 ```bash
 curl https://relay.paramant.app/v2/outbound/a3f2… \
@@ -297,21 +310,27 @@ verifiable end to end.
 ```json
 {
   "blob_hash":               "a3f2…",
+  "ts":                      "2026-04-15T09:00:00.000Z",
+  "retrieved_at":            1744707600000,
   "sector":                  "health",
-  "retrieved_at":            "2026-04-15T09:00:00.000Z",
   "relay_id":                "health.paramant.app",
   "tree_size_at_retrieval":  43,
-  "inclusion_proof":         { "leaf_hash": "d4e1…", "audit_path": […], "root": "c7a9…" },
+  "inclusion_proof":         { "leaf_hash": "d4e1…", "leaf_index": 42, "tree_size": 43, "audit_path": […], "root": "c7a9…", "sth": {…}, "sth_signature": "…" },
   "burn_confirmed":          true,
   "signature":               "ML-DSA-65 base64…"
 }
 ```
 
+`retrieved_at` is a Unix timestamp in milliseconds (a number), because that is
+the value inside the signature; `ts` is the CT-log time of the leaf.
+`relay_id` is the relay's `RELAY_SELF_URL`, or `<sector>.paramant.app` when that
+is unset.
+
 Pass this to `POST /v2/verify-receipt` to cryptographically confirm delivery.
 
 ---
 
-### POST /v2/verify-receipt — Verify a delivery receipt
+### POST /v2/verify-receipt: Verify a delivery receipt
 
 Requires an API key (`X-Api-Key`); without one the relay answers 401.
 
@@ -323,6 +342,7 @@ same four checks in the browser.
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
+  -H "X-Api-Key: pgp_your_key" \
   -H "Content-Type: application/json" \
   -d '{"receipt":"<base64url from GET /v2/transfers/:receipt_id/receipt>"}'
 ```
@@ -333,11 +353,18 @@ Success:
 {
   "valid": true,
   "blob_hash": "a3f2…",
+  "retrieved_at": "2026-04-15T09:00:00.000Z",
+  "sector": "health",
+  "relay_id": "health.paramant.app",
   "burn_confirmed": true,
-  "tree_size_at_retrieval": 43,
-  "retrieved_at": "2026-04-15T09:00:00.000Z"
+  "tree_size": 43,
+  "leaf_index": 42,
+  "tree_size_at_retrieval": 43
 }
 ```
+
+Here `retrieved_at` is the receipt's millisecond timestamp written out as an
+ISO string; `tree_size` and `leaf_index` come from the inclusion proof.
 
 Failure (signature invalid, proof mismatch, missing fields):
 
@@ -350,7 +377,7 @@ Verification performs two independent checks: ML-DSA-65 signature over the canon
 
 ---
 
-### GET /v2/stream-next — Poll for next pending blob
+### GET /v2/stream-next: Poll for next pending blob
 
 ```bash
 curl https://relay.paramant.app/v2/stream-next \
@@ -362,7 +389,7 @@ curl https://relay.paramant.app/v2/stream-next \
 
 ---
 
-### GET /v2/status/:hash — Check blob availability
+### GET /v2/status/:hash: Check blob availability
 
 ```bash
 curl https://relay.paramant.app/v2/status/a3f2… \
@@ -374,9 +401,9 @@ curl https://relay.paramant.app/v2/status/a3f2… \
 
 ## Certificate Transparency log
 
-All CT endpoints are **public** — no API key required.
+All CT endpoints are **public**: no API key required.
 
-### GET /v2/sth — Latest Signed Tree Head
+### GET /v2/sth: Latest Signed Tree Head
 
 ```bash
 curl https://relay.paramant.app/v2/sth
@@ -391,11 +418,12 @@ curl https://relay.paramant.app/v2/sth
     "tree_size":  43,
     "timestamp":  1744123456789,
     "version":    1,
-    "signature":  "ML-DSA-65 base64…",
-    "pk_hash":    "sha3-256 of relay public key"
+    "signature":  "ML-DSA-65 base64…"
   }
 }
 ```
+
+The head carries no key fingerprint; take `pk_hash` from `GET /v2/pubkey`.
 
 The relay signs `{relay_id, sha3_root, timestamp, tree_size, version}` (keys sorted, JSON-serialised) using ML-DSA-65. Verify the signature against the key returned by `GET /v2/pubkey`.
 
@@ -415,7 +443,7 @@ field is how an outside monitor tells that apart from a quiet week.
 
 ---
 
-### GET /v2/sth/history — STH history
+### GET /v2/sth/history: STH history
 
 ```bash
 curl "https://relay.paramant.app/v2/sth/history?limit=10"
@@ -426,17 +454,17 @@ curl "https://relay.paramant.app/v2/sth/history?limit=10"
 
 ---
 
-### GET /v2/sth/:unixms — STH at or after a timestamp
+### GET /v2/sth/:unixms: STH at or after a timestamp
 
 ```bash
 curl https://relay.paramant.app/v2/sth/1744100000000
-# {"ok":true,"sth":{…}}   — first STH at or after that Unix millisecond timestamp
+# {"ok":true,"sth":{…}}  : first STH at or after that Unix millisecond timestamp
 # 404 if none exists
 ```
 
 ---
 
-### GET /v2/pubkey — Relay identity public key
+### GET /v2/pubkey: Relay identity public key
 
 ```bash
 curl https://relay.paramant.app/v2/pubkey
@@ -455,12 +483,14 @@ Use this key to independently verify any STH signature or delivery receipt signa
 
 ---
 
-### GET /v2/ct/log — CT log entries
+### GET /v2/ct/log: CT log entries
 
 ```bash
-curl "https://relay.paramant.app/v2/ct/log?limit=20"
-# {"ok":true,"entries":[{…}],"tree_size":43,"root":"c7a9…"}
+curl "https://relay.paramant.app/v2/ct/log?limit=20&offset=0"
+# {"ok":true,"size":43,"root":"c7a9…","entries":[{"index":0,"type":"transfer","leaf_hash":"d4e1…","tree_hash":"…","ts":"2026-04-15T09:00:00.000Z"},…]}
 ```
+
+`size` is the number of leaves in the log (the tree size).
 
 `index` is the entry's position in the log, counted from the start. It is
 derived at request time, so it always matches the index `/v2/ct/proof` resolves
@@ -468,16 +498,19 @@ and the leaf position the Merkle tree commits to.
 
 ---
 
-### GET /v2/ct/proof — Inclusion proof for a specific index
+### GET /v2/ct/proof: Inclusion proof for a specific index
 
 ```bash
 curl "https://relay.paramant.app/v2/ct/proof?index=7"
-# {"ok":true,"leaf_hash":"d4e1…","audit_path":[…],"root":"c7a9…","tree_size":43}
+# {"ok":true,"index":7,"leaf_hash":"d4e1…","tree_hash":"c7a9…","proof":[…],"ts":"2026-04-15T09:00:00.000Z"}
 ```
+
+`proof` is the audit path from the leaf to `tree_hash`, the root at the time
+the leaf was appended.
 
 ---
 
-### GET /v2/sth/consistency — RFC 6962 consistency proof
+### GET /v2/sth/consistency: RFC 6962 consistency proof
 
 Prove that tree at size `from` is a prefix of tree at size `to`:
 
@@ -494,7 +527,7 @@ curl "https://relay.paramant.app/v2/sth/consistency?from=20&to=43"
 
 These endpoints power the peer-to-peer STH exchange. They allow any relay (or auditor) to independently archive and verify each other's tree heads.
 
-### POST /v2/sth/ingest — Submit a peer STH
+### POST /v2/sth/ingest: Submit a peer STH
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/sth/ingest \
@@ -515,7 +548,7 @@ The relay verifies the ML-DSA-65 signature before storing. Replay attacks are bl
 
 ---
 
-### GET /v2/sth/peers — List mirrored peer relays
+### GET /v2/sth/peers: List mirrored peer relays
 
 ```bash
 curl https://relay.paramant.app/v2/sth/peers
@@ -540,7 +573,7 @@ curl https://relay.paramant.app/v2/sth/peers
 
 ---
 
-### GET /v2/sth/peers/:pk_hash — Full STH history for a specific peer
+### GET /v2/sth/peers/:pk_hash: Full STH history for a specific peer
 
 ```bash
 curl "https://relay.paramant.app/v2/sth/peers/a1b2…?limit=50&offset=0"
@@ -553,9 +586,9 @@ curl "https://relay.paramant.app/v2/sth/peers/a1b2…?limit=50&offset=0"
 
 | Path | Description |
 |------|-------------|
-| `GET /ct/` | Public web UI — live tree view, verify button, no auth |
+| `GET /ct/` | Public web UI: live tree view, verify button, no auth |
 | `GET /ct/feed` | JSON feed for the UI (auto-refresh every 10s). `t` is rounded to the hour, as in `/v2/ct/log` |
-| `GET /ct/feed.xml` | RSS feed — last 20 STHs. Subscribe to independently archive roots. |
+| `GET /ct/feed.xml` | RSS feed: last 20 STHs. Subscribe to independently archive roots. |
 
 The RSS feed is designed for external archiving: any subscriber retains an independent copy of each signed tree head, making log tampering detectable even if the relay is compromised later.
 
@@ -563,21 +596,21 @@ The RSS feed is designed for external archiving: any subscriber retains an indep
 
 ## Other endpoints
 
-### GET /health — Relay status (public)
+### GET /health: Relay status (public)
 
 ```bash
 curl https://relay.paramant.app/health
 # {"ok":true,"version":"3.0.0","sector":"relay","edition":"community"}
 ```
 
-### GET /v2/relays — Relay registry (public)
+### GET /v2/relays: Relay registry (public)
 
 ```bash
 curl https://relay.paramant.app/v2/relays
 # {"total":5,"relays":[{"url":"…","version":"3.0.0","sector":"relay",…}]}
 ```
 
-### POST /v2/pubkey — Register device public keys
+### POST /v2/pubkey: Register device public keys
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/pubkey \
@@ -587,7 +620,7 @@ curl -X POST https://relay.paramant.app/v2/pubkey \
 # {"ok":true}
 ```
 
-### GET /v2/pubkey/:device — Fetch a device's public keys
+### GET /v2/pubkey/:device: Fetch a device's public keys
 
 ```bash
 curl https://relay.paramant.app/v2/pubkey/phone-001 \
@@ -639,7 +672,7 @@ without an API key but with a valid `X-DID` + `X-DID-Signature` is accepted
 and runs under the plan and quotas of the API key the DID was enrolled under
 (see Authentication).
 
-### POST /v2/did/register — Enroll a device
+### POST /v2/did/register: Enroll a device
 
 ```bash
 curl -X POST https://iot.paramant.app/v2/did/register \
@@ -648,7 +681,7 @@ curl -X POST https://iot.paramant.app/v2/did/register \
   -d '{
     "device_id": "plc-factory-01",
     "ecdh_pub":  "<base64 ECDH P-256 uncompressed public key, 65 bytes>",
-    "dsa_pub":   "<base64 ML-DSA-65 public key — optional>"
+    "dsa_pub":   "<base64 ML-DSA-65 public key: optional>"
   }'
 ```
 
@@ -673,15 +706,15 @@ Response:
 }
 ```
 
-`ct_index` is the CT log position of this registration — auditors can verify the enrollment timestamp via `/v2/ct/proof?index=42`.
+`ct_index` is the CT log position of this registration: auditors can verify the enrollment timestamp via `/v2/ct/proof?index=42`.
 
 Limits: max 500 DIDs per API key. Receiver sessions (`device_id` starting with `inv_`) do not require an API key.
 
 ---
 
-### GET /v2/did/:did — Resolve a DID document
+### GET /v2/did/:did: Resolve a DID document
 
-Public endpoint — no API key required.
+Public endpoint: no API key required.
 
 ```bash
 curl https://iot.paramant.app/v2/did/did:paramant:a3f2b7c1…
@@ -691,7 +724,7 @@ Returns the W3C DID document including the device's public key and CT registrati
 
 ---
 
-### GET /v2/did — List enrolled devices
+### GET /v2/did: List enrolled devices
 
 ```bash
 curl https://iot.paramant.app/v2/did \
@@ -711,7 +744,7 @@ curl https://iot.paramant.app/v2/did \
 
 ---
 
-### POST /v2/attest — Attest a device
+### POST /v2/attest: Attest a device
 
 Verify that a device holds the private key corresponding to its registered public key:
 
@@ -779,14 +812,29 @@ Notes:
 
 ## Error codes
 
+Two body shapes, and they are not the same:
+
+- `/v1` (the ParaSign API) answers `{ "error": "<code>", "message": "<sentence>" }`,
+  for example `{"error":"unauthorized","message":"Missing or malformed API key..."}`.
+  Branch on `error`; the codes are listed in `docs/parasign-open-api-spec.md`.
+- `/v2` answers `{ "error": "<sentence>" }` on most routes, for example
+  `{"error":"Invalid API key","hint":"X-Api-Key: pgp_..."}`. Branch on the HTTP
+  status; the sentence is for people and may change. Some routes add a machine
+  code in a field of its own (`reason`, `dimension`, `code`), named where the
+  route is described.
+
 | Code | Meaning |
 |------|---------|
-| 400 | Bad request — missing or invalid fields |
+| 400 | Bad request: missing or invalid fields |
 | 401 | Invalid API key or signature |
-| 403 | Forbidden: wrong API key for this blob, or `session_token_out_of_scope` |
+| 402 | Plan limit reached: `monthly_sign_quota_reached` on `/v1/envelopes` and the sign path (with `plan`, `limit`, `used`, `reset_date`, `Retry-After: 86400`), `monthly_transfer_quota_reached` (`dimension: "transfers_month"`) on uploads, or the account key limit on a key mint |
+| 403 | Forbidden: wrong API key for this blob, `session_token_out_of_scope`, or an automated client on `/v2/dl/:token/get` |
 | 404 | No blob / no STH at that timestamp |
-| 429 | Rate limit exceeded |
-| 503 | ML-DSA-65 not available on this relay |
+| 409 | Conflict: hash already in use, a download of the same link in flight |
+| 410 | A link that is spent, expired or withdrawn |
+| 413 | Blob, file or document too large |
+| 429 | Rate limit exceeded (`Retry-After` says when to try again) |
+| 503 | ML-DSA-65 not available on this relay, or the relay is at capacity |
 | 500 | Relay error |
 
 ---
@@ -801,71 +849,50 @@ pip install paramant-sdk
 from paramant_sdk import GhostPipe
 
 gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
+gp.receive_setup()            # register this device's keys first (once per device)
 
-# Send — returns (hash, inclusion_proof)
+# Send: returns (hash, inclusion_proof)
 hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
-print(proof["root"])          # Merkle root at time of upload
-print(proof["leaf_index"])    # Position in the tree
 
-# Receive — returns (data, receipt)
+# Receive: returns (data, receipt); burn-on-read
 data, receipt = gp.receive(hash_)
-print(receipt["burn_confirmed"])   # True if blob was destroyed
-print(receipt["tree_size_at_retrieval"])
-
-# Verify receipt (calls POST /v2/verify-receipt)
-result = gp.verify_receipt(receipt)
-print(result["valid"])        # True if ML-DSA-65 sig + Merkle proof both check out
 
 # Anonymous drop (BIP39 mnemonic)
 mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data, _   = gp.receive(mnemonic)  # pickup by mnemonic
+data = gp.pickup(mnemonic)    # pickup by mnemonic returns the bytes
 ```
+
+This is `paramant-sdk` 3.0.0 on PyPI. In 3.0.0 `receipt` is usually `None`: the
+SDK reads it only from the inline `X-Paramant-Receipt` header, which the relay
+no longer sends by default (see `GET /v2/outbound/:hash`). Fetch the receipt by
+reference with `GET /v2/transfers/:receipt_id/receipt` and check it with
+`POST /v2/verify-receipt` or offline on `/verify#receipt`.
 
 ---
 
 ## CLI tools
 
-Install via:
+There is no installable CLI. `frontend/install-client.sh` is retired (it only
+prints a notice and exits), and the SDK packages ship no commands. The scripts
+below live in this repository and run from a clone.
+
+| Script | What it does |
+|---|---|
+| `scripts/paramant-sender.py` | encrypt and upload a file, stdin or text; `--watch DIR` sends new files. `--relay` chooses among the hosted sectors only |
+| `scripts/paramant-receiver.py` | fetch and decrypt by hash; `--listen` keeps polling |
+| `scripts/paramant-verify-sth` | fetch `/v2/sth` and `/v2/pubkey`, verify the ML-DSA-65 signature, exit non-zero if invalid |
+| `scripts/paramant-verify-peers` | fetch `/v2/sth/peers` and check that each mirrored head is consistent and that tree sizes only grow |
+| `deploy/paramant-admin.py` | manage users and keys on your own relay |
 
 ```bash
-curl -fsSL https://paramant.app/install-client.sh | bash
+node scripts/paramant-verify-sth --relay https://relay.paramant.app
+node scripts/paramant-verify-sth --relay https://health.paramant.app --verbose
+node scripts/paramant-verify-peers --relay https://relay.paramant.app
 ```
 
-Or included in [paramantOS](https://github.com/Apolloccrypt/ParamantOS). Full list and source: [`scripts/`](../scripts/).
-
-### CT log verification
-
-```bash
-# Fetch the latest STH and verify the ML-DSA-65 signature
-paramant-verify-sth --relay https://relay.paramant.app
-
-# Verify against a specific relay and print the tree state
-paramant-verify-sth --relay https://health.paramant.app --verbose
-
-# Cross-check STH consistency across all peer relays
-paramant-verify-peers
-paramant-verify-peers --relay https://relay.paramant.app
-```
-
-`paramant-verify-sth` fetches `/v2/sth` and `/v2/pubkey`, verifies the ML-DSA-65 signature, and exits non-zero if invalid.
-
-`paramant-verify-peers` fetches `/v2/sth/peers` and verifies that each mirrored STH is internally consistent and that tree sizes only grow.
-
-### Delivery receipts
-
-```bash
-# View the receipt returned after a receive operation
-paramant-receipt --hash a3f2…
-
-# Save receipt to file
-paramant-receipt --hash a3f2… --save receipt.json
-
-# Verify a saved receipt
-paramant-receipt --verify receipt.json
-paramant-receipt --verify <base64url>
-```
-
-`paramant-receipt --verify` calls `POST /v2/verify-receipt` and prints the result. Exit code 0 = valid, 1 = invalid.
+A delivery receipt has no command of its own: fetch it with
+`GET /v2/transfers/:receipt_id/receipt` and check it with
+`POST /v2/verify-receipt` (both above), or drop it on `/verify#receipt`.
 
 ---
 
@@ -873,12 +900,12 @@ paramant-receipt --verify <base64url>
 
 The CT log follows the same trust model as [Certificate Transparency (RFC 6962)](https://tools.ietf.org/html/rfc6962): you need at least one honest participant in the ecosystem to detect misbehaviour.
 
-- **Monitors** call `GET /v2/sth` on a schedule and archive each root. A root that changes without a corresponding tree extension is a fork — proof of log manipulation.
+- **Monitors** call `GET /v2/sth` on a schedule and archive each root. A root that changes without a corresponding tree extension is a fork: proof of log manipulation.
 - **Auditors** call `GET /v2/ct/proof?index=N` to check inclusion of any known blob hash.
 - **Gossip** (`/v2/sth/ingest`, `/v2/sth/peers`) lets relays cross-check each other's trees. A relay cannot silently show different trees to different parties if peers are exchanging STHs.
 - **RSS archiving** (`/ct/feed.xml`) lets anyone subscribe to the STH feed. Once published, a root cannot be un-published without leaving evidence.
 
-You do not need to trust the relay operator to detect log tampering — you only need to trust that at least one monitor, auditor, or RSS subscriber is honest and retains their copy.
+You do not need to trust the relay operator to detect log tampering: you only need to trust that at least one monitor, auditor, or RSS subscriber is honest and retains their copy.
 
 ---
 
@@ -1094,7 +1121,7 @@ Returns this account's invoices and credit notes, proxied from the relay.
 
 Paid ParaSend and ParaSign plans are billed through [Mollie](https://www.mollie.com). The relay creates the payment and grants the entitlement from the webhook. Prices come from the server-side catalog (`relay/lib/billing-catalog.js`); the caller can never set an amount.
 
-### POST /v2/billing/checkout — Start a Mollie payment
+### POST /v2/billing/checkout: Start a Mollie payment
 
 Requires an API key. The body names a product, plan, and interval; the price is looked up server-side.
 
@@ -1130,7 +1157,7 @@ Redirect the buyer to `checkout_url` to complete the payment; Mollie then redire
 
 Errors: `401 unauthorized` (missing or invalid API key), `400 bad_json` / `unknown_product` / `unknown_plan` / `unknown_interval`, `502 checkout_failed` (Mollie unreachable or rejected the payment).
 
-### POST /v2/billing/webhook — Mollie status callback
+### POST /v2/billing/webhook: Mollie status callback
 
 Called by Mollie with `id=tr_…` (form-encoded). The relay ignores everything else in the webhook body, re-fetches the payment from the Mollie API as the only source of truth, verifies the amount actually paid against the catalog, and grants the product tier idempotently. Responds `200` on every handled event, `400 bad_payment_id` for a malformed id, and `503` on a transient Mollie fetch failure (so Mollie retries).
 
@@ -1345,7 +1372,7 @@ They are not accessible from the public internet.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET`  | `/v2/auth/capabilities` | Public — returns `{user_totp_available: bool}` |
+| `GET`  | `/v2/auth/capabilities` | Public: returns `{user_totp_available: bool}` |
 | `POST` | `/v2/user/setup-totp` | Provision a TOTP secret; idempotent for provisional state |
 | `POST` | `/v2/user/verify-totp` | Verify a TOTP code against the stored secret |
 | `POST` | `/v2/user/activate-totp` | Mark TOTP as fully activated |

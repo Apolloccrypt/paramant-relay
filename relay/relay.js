@@ -39,6 +39,7 @@ const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
 const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
+const dpaMail       = require('./lib/dpa-mail');        // DPA confirmation, NL or EN
 const rateLimit     = require('./lib/rate-limit');
 const mailer        = require('./lib/mail');            // one way out, carrier is a setting
 const authThrottle  = require('./lib/auth-throttle');
@@ -3986,6 +3987,23 @@ function _persistParaSignScope(key, { parasign, plan } = {}) {
   return { ok: true };
 }
 
+// Where sign_url and the receipt's relay_pubkey_url point when the operator
+// set no PARASIGN_PUBLIC_ORIGIN (P10 API-16-N). It used to be paramant.app on
+// every relay, so a self-host without the variable handed its signers links to
+// the hosted service and told verifiers to fetch the hosted relay's key. The
+// next operator-set value is this relay's own public URL (RELAY_SELF_URL,
+// never a request header, so it cannot be spoofed); paramant.app is left only
+// for a relay that names neither, and that relay says so once at start.
+function parasignFallbackOrigin() {
+  // A paramant.app RELAY_SELF_URL is the hosted fleet (or compose's default for
+  // an unset variable): that keeps https://paramant.app, exactly as before.
+  if (RELAY_SELF_URL && /^https:\/\/[^/\s]+/i.test(RELAY_SELF_URL)
+      && !/^https:\/\/([a-z0-9-]+\.)*paramant\.app(\/|:|$)/i.test(RELAY_SELF_URL)) {
+    return RELAY_SELF_URL.replace(/\/+$/, '');
+  }
+  return 'https://paramant.app';
+}
+
 // -- ParaSign /v1 key issuance -- THE single generator -------------------------
 // Used by BOTH /v2/user/parasign-keys (self-serve) and /v2/admin/keys/mint-parasign
 // (admin), so there is exactly one psk_ format + one storage path (no drift).
@@ -4073,7 +4091,9 @@ function mintParasignKey(accountId, opts = {}) {
   // The same pass the pgp_ mint runs. Without it a psk_ key was invisible to
   // over_limit until the next reload-users, which is only ever manual.
   applyKeyLimitEnforcement();
-  return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+  // plan is the legacy unified plan; plan_parasign is the ParaSign tier this
+  // key works under, which is what a ParaSign key page shows (P10 API-05-A).
+  return { key, kid, account_id: accountId, plan: record.plan, plan_parasign: record.plan_parasign || null, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
 }
 
 // A mint refused by a cap is a 402 with the numbers, not a 400 or a 500. Shared
@@ -4806,7 +4826,7 @@ async function handleRelayRequest(req, res) {
     const _host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
     const _hostOk = /^([a-z0-9-]+\.)*paramant\.app$/i.test(_host);
     const _publicOrigin = process.env.PARASIGN_PUBLIC_ORIGIN
-      || (_hostOk ? `https://${_host}` : 'https://paramant.app');
+      || (_hostOk ? `https://${_host}` : parasignFallbackOrigin());
     return parasignOpenApi.route({
       req, res, method: req.method, path, query, clientIp,
       authHeader: req.headers['authorization'] || '',
@@ -5245,7 +5265,12 @@ async function handleRelayRequest(req, res) {
       } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
     } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
 
-    let tlsStatus = 'yellow', tlsDetail = 'TLS terminated at the edge (not on this relay)';
+    // A relay behind a proxy that holds the certificate is the normal setup
+    // (install.sh, docker-compose), and a new install has no API keys yet.
+    // Neither is a warning about this relay, so both report 'info': shown,
+    // never counted in the verdict. A fresh install used to read "Actief, met
+    // waarschuwingen" forever and never "Alles werkt" (fase 2 SITE-13-A).
+    let tlsStatus = 'info', tlsDetail = 'TLS terminated at the edge (not checked on this relay)';
     try {
       const certFile = process.env.TLS_CERT_FILE || nodePath.join(process.cwd(), 'deploy/certs/cert.pem');
       if (fs.existsSync(certFile) && typeof crypto.X509Certificate === 'function') {
@@ -5257,7 +5282,8 @@ async function handleRelayRequest(req, res) {
     } catch (e) { tlsDetail = 'cert unreadable: ' + (e.code || e.message); }
     add('tls', tlsStatus, tlsDetail);
 
-    add('users', apiKeys.size > 0 ? 'green' : 'yellow', apiKeys.size + ' API key(s) loaded');
+    add('users', apiKeys.size > 0 ? 'green' : 'info',
+      apiKeys.size > 0 ? apiKeys.size + ' API key(s) loaded' : 'no API keys yet (normal on a new install)');
     add('audit', 'green', 'Merkle hash chain active');
 
     // The store, said out loud. Until now nothing in either health route
@@ -5279,7 +5305,7 @@ async function handleRelayRequest(req, res) {
       }
     }
 
-    const rank = { green: 0, yellow: 1, red: 2 };
+    const rank = { info: 0, green: 0, yellow: 1, red: 2 };
     const overall = checks.reduce((m, c) => (rank[c.status] > rank[m] ? c.status : m), 'green');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ overall, version: VERSION, sector: SECTOR, checks }));
@@ -6687,7 +6713,7 @@ async function handleRelayRequest(req, res) {
       const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
       log("info", "parasign_key_self_minted", { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode });
       res.writeHead(201, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, plan_parasign: out.plan_parasign, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
@@ -6708,6 +6734,15 @@ async function handleRelayRequest(req, res) {
         .map(k => [k, apiKeys.get(k)])
         .filter(([k, v]) => v && (v.scope === "parasign" || v.product === "parasign" || /^psk_/.test(k)))
         .map(([k, v]) => ({ kid: v.kid || keysTable.computeKid(k), key_masked: maskKey(k), mode: /^psk_test_/.test(k) ? "test" : "live", plan: v.plan, label: v.label || "", active: v.active !== false, created: v.created || null }));
+      // The same question as POST (P10 API-11-A). An account without the
+      // ParaSign API got 200 and an empty list, so /account showed it a key
+      // block whose only button answered 403. Without the right AND without a
+      // key it is the same 403; an account that lost the right but still holds
+      // keys keeps seeing them, so it can revoke what it has.
+      if (keys.length === 0 && !parasignApiEntitled(accountId)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten." }));
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, account_id: accountId, count: keys.length, keys }));
     } catch (err) {
@@ -6905,33 +6940,17 @@ async function handleRelayRequest(req, res) {
       const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: maskIp(getClientIp(req)) });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
-      // Send countersigned DPA email
+      // Send countersigned DPA email, in the language the page was signed in.
       if (mailer.gereed()) {
-        const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
-          <p style="color:#888;margin-bottom:24px">This email confirms that a Data Processing Agreement (GDPR Art. 28) has been signed on behalf of <strong style="color:#ededed">${escHtml(org)}</strong>.</p>
-          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px;font-size:13px">
-            <div style="color:#555;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Agreement details</div>
-            <table style="width:100%;border-collapse:collapse">
-              <tr><td style="color:#555;padding:4px 0;width:40%">Reference</td><td style="color:#ededed">${ref}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${escHtml(version)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
-            </table>
-          </div>
-          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
-          <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
-        </div>`;
+        const { subject: dpaSubject, html } = dpaMail.dpaConfirmation({
+          name, title, org, ref, signed_at, version, lang: d.lang === 'nl' ? 'nl' : 'en' });
         // Through the one door, like every other message. A DPA confirmation
         // that talks about EU jurisdiction should not be carried out of it.
         mailer.stuur({
           from: 'PARAMANT <privacy@paramant.app>',
           to: email,
           cc: 'privacy@paramant.app',
-          subject: `DPA signed — ${org} (${ref})`,
+          subject: dpaSubject,
           html,
         }).then(r => {
           if (r.ok) log('info', 'dpa_email_sent', { ref, email: maskEmail(email), provider: r.provider });
@@ -7786,7 +7805,12 @@ async function handleRelayRequest(req, res) {
 
     // Refuse to wipe a populated Map with an empty load — defends against the
     // 2026-05-08 race where a concurrent write left the file readable but empty.
-    if (candidate.size === 0 && prevCount > 0) {
+    // A file whose keys are all there and all revoked (active:false, the mark
+    // paramant-admin.py revoke writes) is not that race: it is the operator
+    // revoking the last key. Refused, that key stayed valid (SELF-11-A), so it
+    // goes through; only a file with no entries at all is still refused.
+    const allRevoked = parsed.api_keys.length > 0 && parsed.api_keys.every((k) => k && typeof k.key === 'string' && k.active === false);
+    if (candidate.size === 0 && prevCount > 0 && !allRevoked) {
       log('warn', 'reload_users_rejected', { prev: prevCount, candidate: 0, reason: 'refusing_to_wipe_populated_map' });
       res.writeHead(409); return res.end(J({ ok: false, error: 'sanity_check_failed', prev: prevCount, candidate: 0 }));
     }
@@ -9231,7 +9255,7 @@ async function handleRelayRequest(req, res) {
       sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
       relayIdentity,
       canonicalJSON: parasign.canonicalJSON,
-      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app',
+      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
     });
   }
 
@@ -10356,7 +10380,7 @@ async function handleRelayRequest(req, res) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
     if (!redisClient || !redisClient.isReady) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     let body;
     try { body = JSON.parse((await readBody(req, 512)).toString() || '{}'); }
@@ -10372,7 +10396,7 @@ async function handleRelayRequest(req, res) {
       if (redisOutage503(e, res)) return;
       log('warn', 'coupon_claim_failed', { account: String(accountId).slice(0, 12), err: e.message });
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     if (!claim.ok) {
       // 409 for a code that exists and cannot be spent (run out, already used,
@@ -10382,7 +10406,7 @@ async function handleRelayRequest(req, res) {
       const status = claim.error === 'unknown' || claim.error === 'bad_code' ? 404 : 409;
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: claim.error });
       res.writeHead(status, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error) }));
+      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error), message_nl: coupon.messageForNl(claim.error) }));
     }
 
     // Rule 3 (lib/coupon.js): the gift is ADDED to a term that is still
@@ -10431,7 +10455,7 @@ async function handleRelayRequest(req, res) {
       await coupon.release(redisClient, claim.code, accountId);
       log('error', 'coupon_grant_failed', { account: String(accountId).slice(0, 12), code: claim.code, reason: failure });
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed }));
+      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed, message_nl: coupon.MESSAGES_NL.grant_failed }));
     }
     if (granted.length === 0) {
       // Nothing to add anywhere. The seat goes back, so the code is not spent
@@ -10440,7 +10464,7 @@ async function handleRelayRequest(req, res) {
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: 'nothing_to_add',
         kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') });
       res.writeHead(409, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept) }));
+      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept), message_nl: coupon.nothingToAddMessageNl(kept) }));
     }
 
     // The line on /account. Written after the term is really on the account, so
@@ -10451,6 +10475,7 @@ async function handleRelayRequest(req, res) {
     await billingHistory.recordGift(redisClient, accountId, {
       code: claim.code,
       label: coupon.historyLabel(claim.code, granted),
+      label_nl: coupon.historyLabelNl(claim.code, granted),
       grants: granted,
       redeemed_at: redeemedAt,
     });
@@ -10484,6 +10509,7 @@ async function handleRelayRequest(req, res) {
       // The sentence the page prints. Built here so the mail, the history line
       // and the page all name the same plans and the same dates.
       message: coupon.successMessage(granted, kept),
+      message_nl: coupon.successMessageNl(granted, kept),
     }));
   }
 
@@ -10801,7 +10827,7 @@ async function handleRelayRequest(req, res) {
       const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
       try { auditAppend(out.key, 'admin_parasign_key_minted', { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode, plan: out.plan }); } catch {}
       res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, plan_parasign: out.plan_parasign, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
     } catch(e) { if (keyCapReject(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
@@ -11970,6 +11996,9 @@ async function handleRelayRequest(req, res) {
         burn_confirmed: receiptObj.burn_confirmed,
         tree_size:      proof.tree_size,
         leaf_index:     proof.leaf_index,
+        // The log size the receipt itself names, as docs/api.md promises
+        // (P10 API-29-N). Signed inside the receipt; repeated here unchanged.
+        tree_size_at_retrieval: Number.isFinite(receiptObj.tree_size_at_retrieval) ? receiptObj.tree_size_at_retrieval : null,
       }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
@@ -12261,6 +12290,16 @@ if (!RELAY_SELF_URL) {
     relay_id: SECTOR + '.paramant.app',
     hint: 'Set RELAY_SELF_URL (RELAY_SELF_URL_<SECTOR> in docker-compose.yml) to this relay\'s own public URL; '
         + 'until then signed heads and receipts name a paramant.app host.',
+  });
+}
+// The same, for ParaSign links and receipts (P10 API-16-N). Without
+// PARASIGN_PUBLIC_ORIGIN they fall back to RELAY_SELF_URL, and only when that
+// is unset too to paramant.app: say which, once, at boot.
+if (!process.env.PARASIGN_PUBLIC_ORIGIN) {
+  log('warn', 'parasign_public_origin_unset', {
+    using: parasignFallbackOrigin(),
+    hint: 'Set PARASIGN_PUBLIC_ORIGIN to the site your signers open (https://your-host); '
+        + 'sign_url and the receipt\'s relay_pubkey_url are built from it.',
   });
 }
 loadUsers();
