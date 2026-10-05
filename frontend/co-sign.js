@@ -1675,7 +1675,9 @@ function wireResultCard({ proofUrl }) {
   if (note) {
     note.hidden = false;
     note.textContent = complete
-      ? L('Het bewijs (.psign) toont aan wie waar heeft getekend. Controleer het op /verify samen met het originele document: de pdf met handtekeningen is een leesbare kopie daarvan.', 'The proof (.psign) shows who signed where. Check it on /verify together with the original document: the pdf with signatures is a readable copy of it.')
+      ? L('Het bewijs (.psign) toont aan wie waar heeft getekend. Controleer het op /verify samen met het bestand dat iedereen tekende: ', 'The proof (.psign) shows who signed where. Check it on /verify together with the file everyone signed: ') +
+        String(__envelope.original_filename || L('het originele document', 'the original document')) +
+        L(' (de knop voor het origineel hierboven). De pdf met alle handtekeningen is een leesbare kopie daarvan en geeft op /verify rood.', ' (the button for the original above). The pdf with every signature is a readable copy of it and shows red on /verify.')
       : L('Het bewijs komt beschikbaar zodra iedereen heeft getekend.', 'The proof becomes available once everyone has signed.');
   }
 }

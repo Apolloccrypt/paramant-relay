@@ -15,9 +15,16 @@
     try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_KEY) === 0) out.push(k); } } catch (e) { /* storage off */ }
     return out;
   }
+  var COSIGN_LINKS = 'paramant.cosign.links.v1:';
+  function cosignLinks() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_LINKS) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    return out;
+  }
   function wipeLocal() {
     wipeDraft();
     cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    cosignLinks().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
     try { localStorage.removeItem(OWNER); } catch (e) {}
   }
   window.paramantWipeLocal = wipeLocal;
@@ -33,6 +40,10 @@
   var COSIGN_KEY_MAX_MS = 864e5;
   (function sweep() {
     var now = Date.now();
+    // The signer links (sign-flow.js rememberSignerLinks) go when they expire.
+    cosignLinks().forEach(function(k) {
+      try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || !(now < Number(r.exp))) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
+    });
     cosignKeys().forEach(function(k) {
       try {
         var raw = localStorage.getItem(k) || '';

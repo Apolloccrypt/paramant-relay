@@ -296,7 +296,8 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>ECDH + ML-KEM key pairs</strong>: generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
 <li><strong>Nonce registry</strong>: replay-attack protection (SDK sessions)</li>
 <li><strong>Status history</strong> (<code>paramant_status_v1</code>): the last 24 hours of relay health checks your own browser made on the status page</li>
-<li><strong>Key of a document you sent for signing</strong> (<code>paramant.cosign.key.v1:&hellip;</code>): when you send a document for signing on /sign, this browser keeps the key of that encrypted document, so you can open the complete signed document here later. It is your own document; the key is not sent to us. It is wiped when you sign out, when another account signs in on this browser, when the request is withdrawn, declined or expired, and at the latest seven days after everyone signed.</li>
+<li><strong>Key of a document you sent for signing</strong> (<code>paramant.cosign.key.v1:&hellip;</code>): when you send a document for signing on /sign, this browser keeps the key of that encrypted document, so you can open the complete signed document here later. It is your own document; the key is not sent to us. It is wiped when you sign out, when your session runs out, when another account signs in on this browser, when the request is withdrawn, declined or expired, as soon as you open the completed document here, and in any case after 24 hours.</li>
+<li><strong>Signing links of a request you sent</strong> (<code>paramant.cosign.links.v1:&hellip;</code>): each signer's personal link, with the half of the document key that is also in the invitation, so you can give a signer the link again from your dashboard. That half opens nothing without the invited email address signing in. They are not sent to us and are wiped when you sign out, when another account signs in on this browser, and when the request expires (at the latest after eight days).</li>
 <li><strong>Authenticator tip seen</strong> (<code>paramant.sha1tip.v1</code>): that you have seen the tip after signing in once, so it does not come back at every sign-in</li>
 <li><strong>Which account signed in here last</strong> (<code>paramant.local.owner</code>): a hash of the email address, not the address itself. When another account signs in here, this browser wipes the previous account's draft and document keys. It is not sent to us.</li>
 <li><strong>Draft of a document you prepared</strong> (in IndexedDB, under the name paramant-sign-draft): if your session on /sign expires halfway, this browser keeps the document, the spot and the recipients, so everything is back after you sign in. All of it is encrypted with a key that belongs to your account and is not stored in this browser, so another account cannot open the draft. It is wiped as soon as you send or sign, when you start over, when you sign out, when another account signs in here, and otherwise after two hours. The document is not sent to us.</li>
@@ -393,6 +394,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=16" defer></script>
 </body>
 </html>

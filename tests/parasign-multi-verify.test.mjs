@@ -107,10 +107,10 @@ async function runOnce({ url, verdict, receipt, doc, trustRelay }) {
 // /en/verify, the Dutch words on /verify. One parasign-verify.js serves both.
 const runs = [
   { url:'/en/verify.html', verdict:/Signature valid[\s\S]*(Envelope|Counter)|Signature INVALID|Test proof|This is not the signed file/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
-    unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/reading copy/, stampedHead:/This is not the signed file[\s\S]*check with the original/, stampedMark:/Paramant ParaSign · PQ/,
+    unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/is a reading copy of it/, stampedHead:/This is not the signed file[\s\S]*check with the original/, stampedMark:/Paramant ParaSign · PQ/,
     wrongFile:/This is not the signed file\. Check with the original file\./, qes:/qualified signature \(PAdES\) from Cleverbase[\s\S]*does not check that second signature/ },
   { url:'/verify.html', verdict:/Handtekening geldig[\s\S]*(Envelop|Bekrachtigd)|Handtekening ONGELDIG|Testbewijs|Dit is niet het ondertekende bestand/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
-    unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/leesbare kopie/, stampedHead:/Dit is niet het ondertekende bestand[\s\S]*Controleer dan met het origineel/, stampedMark:/Paramant ParaSign · PQ/,
+    unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/is daar een leesbare kopie van/, stampedHead:/Dit is niet het ondertekende bestand[\s\S]*Controleer dan met het origineel/, stampedMark:/Paramant ParaSign · PQ/,
     wrongFile:/Dit is niet het ondertekende bestand\. Controleer met het originele bestand\./, qes:/gekwalificeerde handtekening \(PAdES\) van Cleverbase[\s\S]*controleert deze pagina niet/ },
 ];
 const outcomes = [];

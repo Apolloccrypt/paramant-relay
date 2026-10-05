@@ -3631,12 +3631,15 @@ api.get("/user/parasign/inbox", authUser, async (req, res) => {
 // created_at, so the resent link expires at the same moment as the first one and
 // the link already in the reader's mailbox keeps working.
 //
-// WHAT NO INVITATION MAIL CARRIES. The document is unlocked by a key that lives
-// in the URL fragment. Browsers never transmit a fragment, so no server has ever
-// held it; the first invitation was assembled in the sender's browser. Since the
-// key would otherwise reach a mail provider outside the EU, the first invitation
-// does not carry it either: both mails are the same notice, and the sender hands
-// the opening link over themselves.
+// WHAT THE RESENT MAIL CARRIES. The document is unlocked by a key that lives in
+// the URL fragment, and no server ever holds it. The first invitation carries
+// half of a split key (#ks=), added in the sender's browser; the relay holds
+// the other half and releases it only to the invited mailbox. This resent mail
+// is built here, from the stored invite token alone, so it carries no key half:
+// it opens the request, not the document. The full link stays in the sender's
+// browser, where the dashboard shows it per signer with a copy button
+// (frontend/js/dashboard.js signerLinksHtml); the sender is told so by mail
+// (relay.js notifySenderLinkRequested).
 //
 // One per envelope per hour, per account. The bucket is keyed on the session
 // account and the envelope together, never on the envelope alone: an id the
