@@ -104,7 +104,7 @@ let _wire;
 async function loadSdkJsWire() {
   if (_wire) return _wire;
   const path = process.env.PARAMANT_SDK_JS_WIRE
-    || join(process.env.PWD || '.', 'sdk-js', 'src', 'wire-format.js');
+    || join(process.cwd(), 'sdk-js', 'src', 'wire-format.js');
   try {
     _wire = await import(pathToFileURL(path).href);
   } catch (e) {
