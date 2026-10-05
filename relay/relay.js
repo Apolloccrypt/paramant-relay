@@ -3218,7 +3218,7 @@ function grantParasignOnPaidPlan(accountId) {
 }
 
 // ── Billing ledger: every settled Mollie payment id, durable ──────────────
-const { BillingLedger } = require('./lib/billing-ledger');
+const { BillingLedger, backfillLedger } = require('./lib/billing-ledger');
 const BILLING_LEDGER_FILE = process.env.BILLING_LEDGER_FILE
   || nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'billing-processed.jsonl');
 const billingLedger = new BillingLedger(BILLING_LEDGER_FILE, log).load();
@@ -12321,6 +12321,21 @@ if (redisClient && RELAY_REDIS_URL) {
     }))
     .then(() => log('info', 'shared_grant_subscriber_ready', { channel: sharedGrants.CHANNEL }))
     .catch(e => log('warn', 'shared_grant_subscriber_failed', { err: e.message }));
+}
+
+// ── Billing ledger backfill ──────────────────────────────────────────────────
+// Every payment id this relay already knows as settled (paid_by_<product> on
+// the accounts, paramant:billing:done:* in redis) goes into the durable ledger
+// once at boot, so an old tr_ id cannot be granted again after its redis
+// marker expires (review #555, M3). Idempotent, so every boot may run it.
+// BILLING_LEDGER_BACKFILL_DELAY_MS moves it, for a test.
+{
+  const _bfDelay = parseInt(process.env.BILLING_LEDGER_BACKFILL_DELAY_MS || '', 10);
+  setTimeout(() => {
+    const records = [...apiKeys.values(), ...accounts.values()];
+    backfillLedger(billingLedger, { redis: redisClient, records, products: entitlements.PRODUCTS, log })
+      .catch((e) => log('warn', 'billing_ledger_backfill_failed', { err: e.message }));
+  }, Number.isFinite(_bfDelay) ? _bfDelay : 5000).unref?.();
 }
 
 // ── The party worklist migration ─────────────────────────────────────────────

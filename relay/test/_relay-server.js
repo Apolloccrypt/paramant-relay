@@ -168,6 +168,9 @@ async function boot(opts = {}) {
     // stays up". A suite that wants either job sets its own value.
     PLAN_EXPIRY_BOOT_DELAY_MS: String(3600000),
     PARTY_INDEX_BOOT_DELAY_MS: String(3600000),
+    // Same reason: the ledger backfill SCANs paramant:billing:done:* in the
+    // shared redis and would copy another suite's markers into this ledger.
+    BILLING_LEDGER_BACKFILL_DELAY_MS: String(3600000),
   };
   for (const k of ['MOLLIE_API_KEY', 'MOLLIE_TEST_API_KEY', 'BILLING_MODE']) delete env[k];
 

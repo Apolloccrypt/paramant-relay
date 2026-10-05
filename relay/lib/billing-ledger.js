@@ -60,4 +60,50 @@ class BillingLedger {
   }
 }
 
-module.exports = { BillingLedger };
+// Backfill (review #555, M3). The ledger started empty on the day it was
+// deployed, while the payments settled before it lived only in redis markers
+// (60-day TTL) and in paid_by_<product> on the account (the LAST payment
+// only). Once a marker expired and paid_by had moved on, an old tr_ id was
+// grantable again through the public webhook. So at boot every id the relay
+// already knows as settled goes into the ledger: every paid_by_<product>
+// pointer on an account record, and every paramant:billing:done:* marker in
+// redis. Idempotent: an id the ledger has is never written again.
+const DONE_PREFIX = 'paramant:billing:done:';
+async function backfillLedger(ledger, { redis, records, products, log } = {}) {
+  const say = log || (() => {});
+  const add = [];
+  const seen = new Set();
+  const want = (id, val) => {
+    if (typeof id !== 'string' || !/^tr_[A-Za-z0-9]+$/.test(id)) return;
+    if (seen.has(id) || ledger.status(id)) return;
+    seen.add(id);
+    add.push([id, val]);
+  };
+  for (const rec of records || []) {
+    if (!rec || typeof rec !== 'object') continue;
+    for (const p of products || []) want(rec['paid_by_' + p], 'granted');
+  }
+  let scanned = 0;
+  if (redis && redis.isReady) {
+    try {
+      for await (const batch of redis.scanIterator({ MATCH: DONE_PREFIX + '*', COUNT: 500 })) {
+        const keys = Array.isArray(batch) ? batch : [batch];
+        for (const k of keys) {
+          scanned++;
+          const id = String(k).slice(DONE_PREFIX.length);
+          if (ledger.status(id) || seen.has(id)) continue;
+          let v = null;
+          try { v = await redis.get(k); } catch { v = null; }
+          want(id, v === 'revoked' ? 'revoked' : 'granted');
+        }
+      }
+    } catch (e) { say('warn', 'billing_ledger_backfill_scan_failed', { err: e.message }); }
+  }
+  for (const [id, val] of add) {
+    try { await ledger.record(id, val); } catch { /* logged by the ledger */ }
+  }
+  say('info', 'billing_ledger_backfilled', { added: add.length, markers_scanned: scanned });
+  return { added: add.length, scanned };
+}
+
+module.exports = { BillingLedger, backfillLedger, DONE_PREFIX };
