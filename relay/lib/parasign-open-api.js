@@ -15,7 +15,8 @@
 //     with the same TTL as the envelope, so a restart no longer loses documents.
 //
 // Status of the surface (honest labelling):
-//   FUNCTIONAL: auth (Bearer psk_ + parasign scope), POST /v1/envelopes
+//   FUNCTIONAL: auth (Bearer psk_ + parasign scope; a new envelope also needs
+//     the account's ParaSign entitlement), POST /v1/envelopes
 //     (create + hash + durable blob store + webhook_url validation +
 //     envelope.sent webhook + psk_test_ sandbox auto-signer), GET /v1/envelopes/:id
 //     (status + external status mapping), POST /v1/envelopes/:id/void
@@ -57,12 +58,43 @@ function resolveStore(deps) {
 // accepted representations so this survives the reserved-single-scope enum in
 // lib/keys-table.js without forcing a schema migration:
 //   rec.scope === 'parasign'  |  rec.parasign === true  |  rec.scopes[] has it.
+// This says what the KEY is. Whether the account behind it may still start new
+// work is asked separately, by accountEntitled() below.
 function hasParaSignScope(rec) {
   if (!rec) return false;
   if (rec.scope === 'parasign') return true;
   if (rec.parasign === true) return true;
   if (Array.isArray(rec.scopes) && rec.scopes.includes('parasign')) return true;
   return false;
+}
+
+// ── Entitlement (account) ─────────────────────────────────────────────────────
+// A psk_ key carries scope 'parasign' for as long as it exists. The right it was
+// minted under does not: a chargeback or a refund floors the account and clears
+// the `parasign` flag on every member key, and a paid term runs out. Neither can
+// take the scope off a key, so a router that asked only the key kept every key
+// working after the money went back (finding R1 of 2026-09-25: three new
+// envelopes, 201 each, after a chargeback).
+//
+// So a call that starts NEW WORK also asks the ACCOUNT, with the same rule POST
+// /v2/user/parasign-keys applies before it mints a key
+// (keys-table.accountHasParasignEntitlement over the account's member records).
+// relay.js injects it as deps.parasignEntitled(token, rec), because the member
+// records live there and this module owns no state.
+//
+// New work is a new envelope: new invitations, new signatures to collect and,
+// on a psk_test_ key, the sandbox signer. Reading, fetching the evidence of and
+// voiding an envelope the account made earlier are NOT gated here, and stay
+// behind the per-envelope owner and participant checks below: a customer whose
+// term ended or whose money went back keeps the proof of contracts that were
+// already signed. A future /v1 route that starts work or costs money belongs
+// behind this gate too.
+//
+// Fails CLOSED: a router wired without the gate creates nothing, rather than
+// quietly letting everyone create.
+async function accountEntitled(deps, token, rec) {
+  if (typeof deps.parasignEntitled !== 'function') return false;
+  return (await deps.parasignEntitled(token, rec)) === true;
 }
 
 // Constant-time compare of two equal-length hex strings (SHA3-256 fingerprints).
@@ -231,12 +263,14 @@ function authenticateBearer(authHeader, apiKeys) {
 
 // ── main router ───────────────────────────────────────────────────────────────
 // deps: { req, res, method, path, query, clientIp, authHeader, publicOrigin,
-//         apiKeys, envStore, envCreateRateOk, safeHttpsRequest, canonicalJSON,
-//         sigEngine, relayIdentity, readBody, J, log }
+//         apiKeys, parasignEntitled, envStore, envCreateRateOk, safeHttpsRequest,
+//         canonicalJSON, sigEngine, relayIdentity, readBody, J, log }
 async function route(deps) {
   const { res, method, path, query, apiKeys, envStore, J } = deps;
 
   // 1) AUTH - Bearer psk_live_/psk_test_ (authenticateBearer) + parasign scope.
+  //    A new envelope also needs the account's entitlement (see the create
+  //    branch below).
   const auth = authenticateBearer(deps.authHeader, apiKeys);
   if (!auth.ok) return errRes(res, auth.code, auth.error, auth.message, J);
   const { token, mode, rec } = auth;
@@ -255,6 +289,11 @@ async function route(deps) {
   }
 
   if (path === '/v1/envelopes' && method === 'POST') {
+    // New work: only for an account that still holds ParaSign (accountEntitled).
+    if (!(await accountEntitled(deps, token, rec))) {
+      return errRes(res, 403, 'parasign_not_entitled',
+        'This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten.', J);
+    }
     return createEnvelope(deps, token, mode, rec);
   }
 

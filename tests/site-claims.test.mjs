@@ -1961,9 +1961,14 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
     `the checkout payload now sends ${fields.join(', ')}; the /dpa data column has to say so`);
   const meta = /metadata:\s*\{([^}]*)\}/.exec(payload);
   assert.ok(meta, 'the checkout payload must still carry a metadata object');
-  const metaKeys = meta[1].split(',').map((k) => k.split(':')[0].trim()).filter(Boolean);
+  const metaEntries = meta[1].split(',').map((k) => k.split(':')[0].trim()).filter(Boolean);
+  const metaKeys = metaEntries.filter((k) => !k.startsWith('...'));
   assert.deepEqual(metaKeys, ['accountId', 'product', 'plan', 'interval'],
     `the payment metadata is now ${metaKeys.join(', ')}; the /dpa and /privacy columns name the old set`);
+  // The one spread: a reverse-charged sale adds its VAT terms (relay/lib/vat.js).
+  // Anything else spread into the payload would reach Mollie unnamed.
+  assert.deepEqual(metaEntries.filter((k) => k.startsWith('...')), ['...vatMod.metadataOf(vatTerms)'],
+    'the checkout metadata spreads in something other than the VAT terms; the /dpa and /privacy columns do not name it');
   assert.ok(!/email/i.test(payload),
     'the checkout payload now carries an email field; /dpa and /privacy say no email address is sent');
 
@@ -1975,9 +1980,15 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.match(rec, /email:\s*\(rec && rec\.email\)/,
     'the customer record no longer sends the account email; rewrite the Mollie rows rather than delete this line');
 
+  // What that spread adds, asked of the module rather than copied: the pages
+  // have to name these keys, and only for a reverse-charged sale.
+  const { createRequire } = await import('node:module');
+  const vatLib = createRequire(import.meta.url)(path.join(ROOT, 'relay/lib/vat.js'));
+  assert.deepEqual(vatLib.metadataOf({ treatment: 'standard' }), {}, 'a 21% sale must add nothing to the Mollie metadata');
+  const vatKeys = Object.keys(vatLib.metadataOf({ treatment: 'reverse_charge', vatId: 'BE0999000001', country: 'BE' }));
+
   // The stance itself, called rather than pattern-matched: an unset
   // BILLING_MODE with a live key is production today, and it is one-off only.
-  const { createRequire } = await import('node:module');
   const mollieLib = createRequire(import.meta.url)(path.join(ROOT, 'relay/lib/mollie.js'));
   const savedEnv = { BILLING_MODE: process.env.BILLING_MODE, MOLLIE_API_KEY: process.env.MOLLIE_API_KEY, MOLLIE_TEST_API_KEY: process.env.MOLLIE_TEST_API_KEY };
   try {
@@ -2000,9 +2011,13 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
     'dpa (nl): the Mollie data column must name the amount and the description');
   assert.ok(dpaNl.includes('Er wordt geen e-mailadres verstuurd zolang terugkerende betaling uit staat'),
     'dpa (nl): the Mollie data column must say no email address is sent');
+  assert.ok(dpaNl.includes(`Alleen bij verlegde btw komen daar het btw-nummer van het bedrijf en het bewijs van de controle bij: ${vatKeys.join(', ')}`),
+    `dpa (nl): the Mollie data column must name the keys a reverse-charged sale adds (${vatKeys.join(', ')})`);
   const privNl = visible(page('privacy'));
   assert.ok(privNl.includes(`betaalmetadata (${metaKeys.join(', ')})`),
     'privacy (nl): the Mollie entry must name the same metadata keys');
+  assert.ok(privNl.includes(`Alleen bij verlegde btw komen daar het btw-nummer van het bedrijf en het bewijs van de controle bij (${vatKeys.join(', ')})`),
+    'privacy (nl): the Mollie entry must name the keys a reverse-charged sale adds');
   assert.ok(privNl.includes('Elke betaling is eenmalig, voor de termijn die u koopt; er zijn geen abonnementen'),
     'privacy (nl): the Mollie entry must describe one-off payments only');
   const termsNl = visible(page('terms'));
@@ -2024,9 +2039,13 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.ok(dpaPage.includes('No email address is sent while recurring billing is off'),
     'dpa: the Mollie data column must say no email address is sent, because the payload carries none');
 
+  assert.ok(dpaPage.includes(`Only when the VAT is reverse charged are the business's VAT number and the proof of the check added: ${vatKeys.join(', ')}`),
+    `dpa: the Mollie data column must name the keys a reverse-charged sale adds (${vatKeys.join(', ')})`);
   const privPage = visible(page('en/privacy'));
   assert.ok(privPage.includes(`payment metadata (${metaKeys.join(', ')})`),
     'privacy: the Mollie entry must name the same metadata keys');
+  assert.ok(privPage.includes(`Only when the VAT is reverse charged are the business's VAT number and the proof of the check added (${vatKeys.join(', ')})`),
+    'privacy: the Mollie entry must name the keys a reverse-charged sale adds');
   assert.ok(privPage.includes('Every payment is a one-off for the term you buy; there are no subscriptions'),
     'privacy: the Mollie entry must describe the stance the code takes, which is one-off payments only');
   const termsPage = visible(page('en/terms'));
@@ -3758,4 +3777,45 @@ test('the sign-in and account pages exist in both languages and link each other'
     if (!conf.includes(`location ${p} { try_files ${p.replace(/\/$/, '')}.html =404; }`)) problems.push(`nginx: ${p} is not served`);
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// ── Co-signing: no fixed order, initials on every page for every signer ──────
+// /parasign promised "Medeondertekenaars in een vaste volgorde" and the English
+// page "Co-signing with routing order", while the relay never checked it:
+// sign() in relay/envelope.js fills any party slot at any time, and the
+// create body carries no order field. A law firm that relies on that sentence
+// gets a second signature before the first. Found 27 September 2026 while
+// answering the first paying customer, who wanted two people to initial every
+// page. What is true since #528 is the opposite half: every signer, the
+// invited ones included, can repeat their mark on every page (all_pages).
+// So the pages say that, and no page may promise an order until the relay
+// enforces one. Build the order first, then lift this check.
+test('no page promises a signing order the relay does not enforce, and /parasign names initials on every page', () => {
+  const envelope = read('relay/envelope.js');
+  const enforcesOrder = /\b(signing_order|sign_order|routing_order|sequential)\b/.test(envelope);
+  assert.equal(enforcesOrder, false, 'relay/envelope.js now knows a signing order; update the /parasign card and this test together');
+  assert.match(envelope, /field\.all_pages/, 'the relay no longer accepts all_pages; /parasign promises initials on every page');
+  for (const slug of ['co-sign', 'en/co-sign']) {
+    assert.match(page(slug), /id="appearance-allpages"/, `${slug} lost the every-page checkbox the /parasign card promises`);
+  }
+
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const must = {
+    parasign: ['Samen tekenen, met een paraaf op elke pagina', 'Er is geen vaste volgorde'],
+    'en/parasign': ['Co-signing, with initials on every page', 'There is no fixed order'],
+  };
+  const missing = [];
+  for (const [slug, phrases] of Object.entries(must)) {
+    for (const p of phrases) if (!flat(slug).includes(p)) missing.push(`${slug}: must say "${p}"`);
+  }
+  assert.deepEqual(missing, [], `\n  ${missing.join('\n  ')}\n`);
+
+  const offenders = [];
+  const promise = /\bvaste volgorde\b(?! dwingt)|\bin de volgorde waarin ze (?:onder)?tekenen\b|\brouting order\b|\bsigning order\b|\bin the order they should sign\b/i;
+  for (const slug of publicPages()) {
+    const text = flat(slug).replace(/Er is geen vaste volgorde/g, '').replace(/There is no fixed order/g, '');
+    const m = promise.exec(text);
+    if (m) offenders.push(`${slug}: "${m[0]}"`);
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });

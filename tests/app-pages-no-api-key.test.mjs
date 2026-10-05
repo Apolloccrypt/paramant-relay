@@ -113,12 +113,18 @@ for (const route of ['/account', '/pricing', '/dashboard']) {
     await page.locator('#acct-advanced').evaluate((node) => !node.open));
   const before = asked.filter((u) => u === KEY_URL).length;
 
-  await page.locator('#acct-advanced > summary').click();
   // Wait for the thing itself: the key request going out and its answer landing.
-  // Waiting for the text to leave the placeholder broke on 2026-09-23, when the
-  // placeholder changed from an em-dash to "-" and the wait ended before any
-  // request was made.
+  // Waiting for the text to leave a fixed placeholder broke on 2026-09-23, when
+  // the placeholder changed from an em-dash to "-" and the wait ended before any
+  // request was made. So the placeholder is read off the page, and it is read
+  // BEFORE the click. Read after it, it raced the answer: the route above
+  // answers the key request in milliseconds, the "placeholder" was then already
+  // the masked key, and the wait below waited 30 seconds for a change that had
+  // already happened (sign-e2e, 25-09). The page writes this row only once the
+  // key request has been answered (account.inline1.js, the toggle handler), so
+  // any change from the text read here means the request went out and landed.
   const placeholder = await page.locator('#api-key').evaluate((node) => node.textContent.trim());
+  await page.locator('#acct-advanced > summary').click();
   await page.waitForFunction((ph) => document.getElementById('api-key').textContent.trim() !== ph, placeholder);
   const after = asked.filter((u) => u === KEY_URL).length;
   ok('opening the fold is what asks for the key, exactly once', before === 0 && after === 1, `${before} -> ${after}`);

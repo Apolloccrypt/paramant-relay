@@ -116,6 +116,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `DEV_PORT` | `scripts/dev-local-proxy.js` | `'8080'` | poort van de dev-proxy |
 | `FAKE_MOLLIE_URL` | `tests/helpers/mollie-intercept.cjs` | geen | stuurt https-verkeer naar api.mollie.com door naar de nagebouwde Mollie van de koperspoort; leeg (productie) doet de preload niets |
 | `FAKE_RESEND_URL` | `tests/helpers/mollie-intercept.cjs` | geen | zelfde omleiding voor api.resend.com, zodat een test de facturen en waarschuwingsmails kan lezen die anders ongezien vertrekken |
+| `FAKE_VIES_URL` | `tests/helpers/mollie-intercept.cjs` | geen | zelfde omleiding voor ec.europa.eu, zodat een test de btw-controle bij VIES kan naspelen en nooit een echt btw-nummer navraagt |
 | `FLEET_LIVE` | `tests/verify-knows-the-fleet.test.mjs` | geen | zet de test aan die de gepinde sleutels tegen de live relays houdt; staat in geen enkele workflow, draait dus nergens |
 | `GH_TOKEN` | `scripts/guards-live.mjs` | valt terug op `GITHUB_TOKEN`, dan leeg | token waarmee de waarborgcontrole de GitHub-API leest |
 | `GITHUB_OUTPUT` | `scripts/guards-live.mjs` | geen | pad waar de waarborgcontrole zijn uitkomst voor de workflow neerlegt; ontbreekt hij, dan schrijft hij niets en meldt dat niet |
@@ -136,7 +137,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `LANDEN_ROOT` | `scripts/check-landen.mjs` | de repowortel | welke repo de landingspoort meet; `tests/landen-poort.test.mjs` wijst hem hiermee naar een wegwerp-repo |
 | `LANDEN_TERMIJN_DAGEN` | `scripts/check-landen.mjs` | `7` | hoeveel dagen een tak ongeland mag blijven voordat de poort rood wordt; verzet hem niet om groen te worden, daar is `deploy/landen-uitstel.json` voor |
 | `METING_TIMEOUT_MS` | `scripts/meet-de-server.mjs` | `8000` | hoe lang een meting op productie mag duren voor hij opgeeft |
-| `METING_WACHT_MS` | `scripts/meet-de-server.mjs` | `1500` | hoe lang de grensmeting op stilte wacht; onder de grens antwoordt nginx niet maar wacht hij op een body die nooit komt, en die stilte is het signaal |
+| `METING_WACHT_MS` | `scripts/meet-de-server.mjs` | `1500` | hoe lang de grensmeting op stilte wacht, gerekend vanaf het versturen van de kop; onder de grens antwoordt nginx niet maar wacht hij op een body die nooit komt, en die stilte is het signaal |
+| `METING_HANDDRUK_MS` | `scripts/meet-de-server.mjs` | `10000` | hoe lang de grensmeting op de TLS-handdruk wacht; lukt die niet, dan is de meting een fout en geen stilte, want een trage handdruk las op 2026-10-01 als "onder de grens" |
 | `PARAMANT_API_KEY` | `scripts/prod-groep-proef.mjs` | geen | de API-sleutel waarmee de proef op de echte server een groepsverzending doet; zonder hem stopt het script meteen |
 | `PARAMANT_BASE_URL` | `scripts/heartbeat/lib.mjs`, `tests/links.test.mjs` en 1 meer | `'https://paramant.app'` | welke site de heartbeat en de linkcontrole meten |
 | `PARAMANT_COSIGN_SCREENSHOT_PATH` | `tests/cosign-document-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |

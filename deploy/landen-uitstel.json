@@ -34,27 +34,27 @@
     },
     {
       "tak": "feat/parasign-pdf-preview",
-      "stapel": "waarde",
-      "tot": "2026-09-26",
-      "reden": "sign-flow.js:2297 op main is nog Math.min(340, Math.floor(pane.clientWidth || 340)); de vangst redt alleen een exacte 0, en er is geen generatieteller. Dezelfde 65 regels als document-intelligence en privacy-statement-v2, land er een."
+      "stapel": "in-main-anders",
+      "tot": "2026-09-30",
+      "reden": "De sign-flow.js-reparatie staat op main via PR #531, met de hand geport omdat main doorliep: breedte geklemd op 280-340 en 280-820 in js/preview-render.js, een generatie per voorbeeldvlak, een frame wachten voor het meten, witte canvas. Toets: tests/preview-render.test.mjs. De plaatsingsstap had al een eigen placeRenderToken."
     },
     {
       "tak": "feat/parasign-document-intelligence",
-      "stapel": "waarde",
-      "tot": "2026-09-26",
-      "reden": "Zelfde boom als feat/parasign-pdf-preview, geen enkel verschil in de diff. Land een van de drie en gooi de andere twee weg."
+      "stapel": "in-main-anders",
+      "tot": "2026-09-30",
+      "reden": "Zelfde boom als feat/parasign-pdf-preview; die inhoud staat op main via PR #531 (frontend/js/preview-render.js, tests/preview-render.test.mjs)."
     },
     {
       "tak": "feat/privacy-statement-v2",
-      "stapel": "waarde",
-      "tot": "2026-09-26",
-      "reden": "Dezelfde sign-flow.js-reparatie plus een privacyherschrijving die main langs een andere weg al heeft. Alleen de sign-flow-helft telt nog."
+      "stapel": "in-main-anders",
+      "tot": "2026-09-30",
+      "reden": "De sign-flow.js-helft staat op main via PR #531 (zie feat/parasign-pdf-preview); de privacyhelft had main al langs een andere weg."
     },
     {
       "tak": "feat/outlook-402",
-      "stapel": "waarde",
-      "tot": "2026-09-26",
-      "reden": "extensions/outlook-addin/manifest.xml:69 gebruikt resource= waar het schema resid= eist, dus het manifest zakt door validatie. En geen extensie-client herkent de 402 die de relay op vier plekken wel stuurt."
+      "stapel": "in-main-anders",
+      "tot": "2026-09-30",
+      "reden": "Manifestfix (resid=, geen Icon onder Group, hoogte 450) en de 402-melding in add-in en extensie staan op main via PR #531, getoetst in tests/outlook-addin-402.test.mjs. Bewust niet mee: relay/test/inbound-quota-gate.test.js bouwde de 402-body zelf na in plaats van relay.js te toetsen, en addin-smoke.sh in post-deploy-verify raakt de uitrol."
     },
     {
       "tak": "test/sdk-relay-conformance",

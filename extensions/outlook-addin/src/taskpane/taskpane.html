@@ -112,6 +112,14 @@
       <div class="progress-text" id="progress-text">Encrypting...</div>
     </div>
 
+    <!-- Shown when the relay returns 402 monthly_transfer_quota_reached -->
+    <div id="quota-notice" class="quota-notice hidden" role="alert">
+      <strong>Monthly transfer limit reached</strong>
+      <p id="quota-notice-text"></p>
+      <a id="quota-notice-link" href="https://paramant.app/pricing" target="_blank"
+         rel="noopener" class="quota-upgrade">Upgrade your plan</a>
+    </div>
+
     <button id="logout-btn-2" class="tertiary">Sign out</button>
   </div>
 
