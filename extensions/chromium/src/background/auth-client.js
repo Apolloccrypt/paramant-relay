@@ -121,10 +121,23 @@ export async function verifySession() {
 // (fase 1, EXT-03-A). A TOTP session holds no API key, and must not: it asks
 // the account for the same short-lived ParaSend session token /parashare uses
 // (POST /api/user/parasend/token, fifteen minutes, five transfer routes), and
-// uploads with that as a Bearer. The token is minted on the health relay, so
-// that is where it is used.
+// uploads with that as a Bearer. The admin mints it on the sector where the
+// account's key lives and says which (admin/server.js mintSessionToken,
+// `sector`); the token only works there, so that is where it is used. Health
+// is the default the admin tries first.
 export const SESSION_TOKEN_URL = `${ADMIN_BASE}/parasend/token`;
 export const SESSION_TOKEN_RELAY = 'https://health.paramant.app';
+const SECTOR_RELAYS = {
+  health: 'https://health.paramant.app',
+  legal: 'https://legal.paramant.app',
+  finance: 'https://finance.paramant.app',
+  iot: 'https://iot.paramant.app',
+  main: 'https://relay.paramant.app',
+  relay: 'https://relay.paramant.app',
+};
+export function relayForSector(sector) {
+  return SECTOR_RELAYS[String(sector || '').toLowerCase()] || SESSION_TOKEN_RELAY;
+}
 const TOKEN_MARGIN_MS = 60_000;
 let cachedToken = null; // { token, exp } in memory only; an evicted worker mints anew
 
@@ -137,7 +150,7 @@ export async function getUploadCredentials() {
   }
   if (s.auth_mode === 'totp') {
     if (cachedToken && Date.now() < cachedToken.exp - TOKEN_MARGIN_MS) {
-      return { bearer: cachedToken.token, relay: SESSION_TOKEN_RELAY };
+      return { bearer: cachedToken.token, relay: cachedToken.relay };
     }
     let res;
     try {
@@ -149,8 +162,9 @@ export async function getUploadCredentials() {
     if (!res.ok) throw new Error(res.status === 429 ? 'Too many attempts. Wait a minute and try again.' : 'Upload failed. Please try again.');
     const d = await res.json().catch(() => ({}));
     if (!d.token) throw new Error('Upload failed. Please try again.');
-    cachedToken = { token: d.token, exp: Date.now() + (Number(d.expires_in_s) || 900) * 1000 };
-    return { bearer: d.token, relay: SESSION_TOKEN_RELAY };
+    const relay = relayForSector(d.sector);
+    cachedToken = { token: d.token, relay, exp: Date.now() + (Number(d.expires_in_s) || 900) * 1000 };
+    return { bearer: d.token, relay };
   }
   return null;
 }

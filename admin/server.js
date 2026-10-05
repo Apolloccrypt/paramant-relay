@@ -338,20 +338,33 @@ const api = express.Router();
 // full pgp_ key still works for the API and the CLI.
 const KID_RE = /^k_[0-9a-f]{6,64}(?:_\d{1,4})?$/;
 let _kidCache = { at: 0, map: new Map() };
+async function _refreshKidCache() {
+  const r = await relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN);
+  const map = new Map();
+  for (const k of (r.body?.keys || [])) if (k.kid && k.key) map.set(k.kid, k.key);
+  _kidCache = { at: Date.now(), map };
+}
 async function keyFromKid(kid) {
-  if (Date.now() - _kidCache.at > 10_000) {
-    const r = await relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN);
-    const map = new Map();
-    for (const k of (r.body?.keys || [])) if (k.kid && k.key) map.set(k.kid, k.key);
-    _kidCache = { at: Date.now(), map };
-  }
+  if (Date.now() - _kidCache.at > 10_000) await _refreshKidCache();
+  // A kid the cache does not know yet (an account made seconds ago) gets one
+  // fresh read before it is called unknown: that answered 404 for ten seconds
+  // after every new account (fase-1 herrun P11). At most one read per second.
+  if (!_kidCache.map.has(kid) && Date.now() - _kidCache.at > 1_000) await _refreshKidCache();
   return _kidCache.map.get(kid) || null;
+}
+// What a response may say about the key: the kid the panel sent, else the
+// masked form. Never the full key (ADMIN-06-H, also after a kid lookup).
+function keyHandle(req, key) {
+  if (req && req._kid) return req._kid;
+  const k = String(key || '');
+  return k.length > 12 ? k.slice(0, 8) + '...' + k.slice(-4) : k;
 }
 api.use('/admin', async (req, res, next) => {
   try {
     if (req.body && typeof req.body.key === 'string' && KID_RE.test(req.body.key)) {
       const full = await keyFromKid(req.body.key);
       if (!full) return res.status(404).json({ error: 'unknown_key' });
+      req._kid = req.body.key;
       req.body.key = full;
     }
   } catch { return res.status(502).json({ error: 'relay_unreachable' }); }
@@ -2197,6 +2210,15 @@ api.post("/user/envelopes", authUser, idempotency.middleware({ redis: () => redi
       body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 5, creator_public_key: creatorPublicKey, requested_appearance: requestedAppearance }),
     });
     const body = await rr.json().catch(() => ({}));
+    // A 402 carries the numbers the page needs for the purchase moment
+    // (relay.js sign_quota_insufficient: needed, room, plan, reset_date). They
+    // are the caller's own counts, so they pass; every other refusal stays bare.
+    if (rr.status === 402) {
+      const q = {};
+      for (const k of ["error", "needed", "room", "used", "pending", "limit", "plan", "reset_date", "message", "message_nl"]) if (body[k] !== undefined) q[k] = body[k];
+      if (!q.error) q.error = "envelope_create_failed";
+      return res.status(402).json(q);
+    }
     if (rr.status !== 200) return res.status(rr.status).json({ error: body.error || "envelope_create_failed" });
     // Someone else has to sign, so the sender wants to hear when they do
     // (lib/sign-notify.js). Best effort: never costs the envelope.
@@ -4902,7 +4924,7 @@ api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
     // floor tier is a revoke and is never refused this way.
     const sectorCount = Object.keys(SECTORS).length;
     if (mutation.failed.length === sectorCount && mutation.failed.every(f => f.status === 409 && f.error === 'lower_than_running')) {
-      return res.status(409).json({ ok: false, error: 'lower_than_running', message: mutation.failed[0].message, key, product, tier, failed_sectors: mutation.failed, sector_count: sectorCount });
+      return res.status(409).json({ ok: false, error: 'lower_than_running', message: mutation.failed[0].message, key: keyHandle(req, key), product, tier, failed_sectors: mutation.failed, sector_count: sectorCount });
     }
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
     const readBack = await readEntitlementsFleet(meta.account_id);
@@ -4914,7 +4936,7 @@ api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
       emailTemplates.sendEmail(meta.email, emailTemplates.productPlanChangeEmail({ productName, tierName })).catch(e => console.error('[admin/set-product-plan] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_product_plan_changed', { product, tier, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.status(allOk ? 200 : 207).json({ ok: allOk, partial_failure: !allOk, error: allOk ? null : 'fleet_not_consistent', key, product, tier, failed_sectors: mutation.failed, read_back_failed: readBack.failed, verification_failed: mismatched, retried_sectors: mutation.retried, entitlements_by_sector: readBack.results, sector_count: Object.keys(SECTORS).length, email_sent: !!(allOk && notify && meta.email) });
+    res.status(allOk ? 200 : 207).json({ ok: allOk, partial_failure: !allOk, error: allOk ? null : 'fleet_not_consistent', key: keyHandle(req, key), product, tier, failed_sectors: mutation.failed, read_back_failed: readBack.failed, verification_failed: mismatched, retried_sectors: mutation.retried, entitlements_by_sector: readBack.results, sector_count: Object.keys(SECTORS).length, email_sent: !!(allOk && notify && meta.email) });
   } catch (err) { console.error('[admin/set-product-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 
@@ -4934,7 +4956,7 @@ api.post('/admin/set-parasign', authMiddleware, async (req, res) => {/*MARK:para
     if (!anyOk) return res.status(502).json({ error: 'relay_error', results });
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
     try { await logAuditEvent(key, enabled ? 'admin_parasign_enabled' : 'admin_parasign_disabled', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.json({ ok: true, key, parasign: enabled });
+    res.json({ ok: true, key: keyHandle(req, key), parasign: enabled });
   } catch (err) { console.error('[admin/set-parasign]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 

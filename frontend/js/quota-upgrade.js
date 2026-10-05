@@ -103,7 +103,11 @@
   function isQuota402(status, data) {
     return status === 402 && !!data &&
       (data.error === 'monthly_transfer_quota_reached' ||
-       data.error === 'monthly_sign_quota_reached');
+       data.error === 'monthly_sign_quota_reached' ||
+       // Sender pays (relay.js): refused at creation, before anything is made.
+       // Nothing left at all is the same purchase moment; a request that
+       // needs more than what is left gets its own sentence (sign-flow.js).
+       (data.error === 'sign_quota_insufficient' && Number(data.room) === 0));
   }
 
   // First day of the next month (client clock), the fallback when the 402 body
@@ -173,8 +177,8 @@
   }
 
   function html(data) {
-    if (data && data.error === 'monthly_sign_quota_reached' &&
-        (data.plan === 'free' || data.plan == null)) return freeSignHtml(data);
+    var freeTier = data && (data.plan == null || PLAN_KEY[String(data.plan).toLowerCase()] === 'community');
+    if (data && (data.error === 'monthly_sign_quota_reached' || data.error === 'sign_quota_insufficient') && freeTier) return freeSignHtml(data);
     return legacyHtml(data);
   }
 

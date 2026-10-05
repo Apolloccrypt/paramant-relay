@@ -4183,14 +4183,17 @@ async function doSign() {
     // through by the admin proxy): a purchase moment, not an error dump.
     // Rate limit or the SENDER's allowance: a plain sentence, no upgrade pitch
     // (it is not this signer's plan that ran out).
-    const lim = limitMessage(e);
-    if (lim) {
-      $('ds-sign-status').textContent = lim;
+    // The purchase card first: since "sender pays" the free plan's third
+    // signature is refused at creation (sign_quota_insufficient, room 0), and
+    // the plain sentence below swallowed the card (fase-1 PLAN-33-A).
+    if (e && e.status === 402 && window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(e.status, e.data)) {
+      $('ds-sign-status').innerHTML = window.paQuotaUpgrade.html(e.data);
       $('ds-sign-now').disabled = false;
       return;
     }
-    if (e && e.status === 402 && window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(e.status, e.data)) {
-      $('ds-sign-status').innerHTML = window.paQuotaUpgrade.html(e.data);
+    const lim = limitMessage(e);
+    if (lim) {
+      $('ds-sign-status').textContent = lim;
       $('ds-sign-now').disabled = false;
       return;
     }
