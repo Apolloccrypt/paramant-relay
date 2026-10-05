@@ -275,6 +275,11 @@
 <section id="state-welcome" class="section hidden">
   <div class="eyebrow"><span class="bar"></span>klaar</div>
   <h2>Alles staat klaar.</h2>
+  <div id="welcome-doc-return" hidden>
+    <p class="lede mt-3">Uw account is actief. U gaat nu terug naar het document dat op uw handtekening wacht.</p>
+    <a id="welcome-doc-link" class="btn btn-primary mt-3" href="/co-sign">Terug naar het document</a>
+  </div>
+  <div id="welcome-default">
   <p class="lede mt-3">Uw account is actief. Twee dingen die u nu kunt doen.</p>
   <div class="grid2 mt-3">
     <a href="/parashare" class="card" style="border-left:3px solid var(--ochre);text-decoration:none;display:block">
@@ -287,6 +292,7 @@
     </a>
   </div>
   <p class="small mt-3">U komt hier altijd terug via uw <a href="/dashboard">dashboard</a>.</p>
+</div>
 </section>
 
 <p class="small" style="color:var(--ink-dim);margin-top:24px">
@@ -299,6 +305,7 @@
 <script src="/js/nav-auth.js?v=19" defer></script>
 <script src="/js/auth-setup.js?v=7"></script>
 <script type="module" src="/js/passkey.js?v=9"></script>
+<script type="module" src="/js/setup-doc-return.js?v=1"></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/en/auth/setup" hreflang="en" lang="en">This page in English</a></span>

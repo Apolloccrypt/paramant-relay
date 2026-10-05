@@ -748,7 +748,7 @@ function parseCookies(req) {
 }
 
 // Call relay internal endpoint (with X-Internal-Auth)
-async function callRelay(endpoint, body, method = "POST", sector = "health") {
+async function callRelay(endpoint, body, method = "POST", sector = "health", extraHeaders = {}) {
   const relayUrl = SECTORS[sector];
   if (!relayUrl) throw new Error(`Unknown sector: ${sector}`);
   const opts = {
@@ -761,6 +761,7 @@ async function callRelay(endpoint, body, method = "POST", sector = "health") {
       // The customer's own address, so the relay's per-IP limits are per
       // customer and not one bucket for everyone (lib/client-ip-forward.js).
       ...clientIpForward.headers(),
+      ...extraHeaders,
     },
     keepalive: false,
   };
@@ -2326,19 +2327,26 @@ api.post("/user/envelopes/:id/document", authUser, docBody, async (req, res) => 
     }
   });
 
+// The invite token of a co-sign link. The page sends it in the
+// X-Parasign-Invite-Token header, so it stays out of request lines and access
+// logs; ?t= is still read for a page that was loaded before that change.
+function inviteTokenOf(req) {
+  return (req.get("x-parasign-invite-token") || req.query.t || "").toString();
+}
+
 // GET /api/user/envelopes/:id/document -- authenticated recipient delivery.
 // The relay requires the invite capability plus this proxy's verified session
 // email assertion. The browser never sends its fragment key to either server.
 api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
   const id = (req.params.id || "").toString();
   const partyIndex = Number(req.query.p);
-  const token = (req.query.t || "").toString();
+  const token = inviteTokenOf(req);
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
   const emailHash = partyEmailHashAdmin(req.userSession.email);
   try {
-    const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+    const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}`, null, "GET", "health", { "X-Parasign-Invite-Token": token });
     // A relay 429 is "too many requests, try again", not "this document does
     // not exist". It was turned into 404 and the signer read that the document
     // was unavailable while it was there all along (sweep-pdf).
@@ -2350,9 +2358,9 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
     if (!partyView.ok) return res.status(partyView.status === 410 ? 410 : 404).json({ error: "invitation_not_found" });
     const env = (await partyView.json()).envelope;
     if (!env?.party || !emailHash || env.party.email_hash !== emailHash) return res.status(403).json({ error: "recipient_mismatch" });
-    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}`, {
       method: "GET",
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, "X-Parasign-Invite-Token": token, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(30000),
     });
     if (!rr.ok) {
@@ -2377,14 +2385,14 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
 api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
   const id = (req.params.id || "").toString();
   const partyIndex = Number(req.query.p);
-  const token = (req.query.t || "").toString();
+  const token = inviteTokenOf(req);
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
   const emailHash = partyEmailHashAdmin(req.userSession.email);
   try {
-    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}`, {
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, "X-Parasign-Invite-Token": token, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(15000),
     });
     const body = Buffer.from(await rr.arrayBuffer());
@@ -2472,7 +2480,7 @@ api.post("/user/envelopes/:id/invitations", authUser, idempotency.middleware({ r
     }
     let env;
     try {
-      const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+      const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}`, null, "GET", "health", { "X-Parasign-Invite-Token": token });
       if (!partyView.ok) return res.status(400).json({ error: "invalid_invitation" });
       env = (await partyView.json()).envelope;
     } catch {
@@ -2643,7 +2651,7 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
   // exact document hash == the envelope's doc_hash.
   let env;
   try {
-    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}&t=${encodeURIComponent(invite_token)}`, null, "GET");
+    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}`, null, "GET", "health", { "X-Parasign-Invite-Token": String(invite_token) });
     // A relay 429 is a rate limit, not a verdict on who the signer is. It used
     // to come back as 403 not_authorized, which the signing page reads as
     // "this invitation belongs to a different email address": the wrong reason,
