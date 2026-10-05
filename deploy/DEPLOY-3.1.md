@@ -1,4 +1,4 @@
-# Deploy runbook: main (3.1.0) to production
+# Deploy runbook: main (3.1.1) to production
 
 > `deploy/deploy-3.1.sh` executes this runbook. One command from the NUC
 > (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
@@ -643,7 +643,7 @@ shape:
 `recurring:false` and `mode_source:inferred` are the brake. If it says
 `recurring:true`, `BILLING_MODE` is set somewhere: stop, find it, and do not
 continue until the line reads as above. `relay_started` must say
-`version:"3.1.0"`.
+`version:"3.1.1"`.
 
 Then the rest:
 
@@ -675,6 +675,12 @@ git tag -a v3.1.1 -m "Release 3.1.1" "$C"
 git push origin v3.1.1
 git ls-remote --tags origin v3.1.1             # must print the tag before step 5
 ```
+
+`deploy-3.1.sh` enforces this: before phase 2 (step `1z`, nothing written yet)
+and again right before phase 5 (step `5-pre`) it reads the tag the three
+installers pin, runs `git ls-remote --tags origin <tag>`, and stops when the tag
+is missing on origin or names another commit than the one it deploys. The stop
+line carries the exact `git tag -a ... && git push origin ...` to run.
 
 The tag push also starts `docker-publish.yml` (images `3.1.1`). If the server
 checkout is not on `$C` after step 3, stop: the tag would name a commit other
@@ -1070,7 +1076,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://iot.paramant.app/v1/par
 curl -s -o /dev/null -w '%{http_code}\n' https://paramant.app/sign                                   # 200
 
 # 6f. the version the relay reports
-curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.0
+curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.1
 
 # 6g. billing stance on every relay, once more, from the logs
 for c in main health finance legal iot; do printf '%-8s' $c; docker logs paramant-relay-$c 2>&1 | grep '"billing_config"' | tail -1 | grep -o '"recurring":[a-z]*'; done
@@ -1082,15 +1088,20 @@ aa-status --enabled && aa-status | grep 'profiles are in enforce mode'   # at le
 ```
 
 Step 6l also runs under `--verify-only`. It writes one line per point to the
-deploy log and stops when auditd is not active, AIDE is missing, has no
+deploy log and flags a miss when auditd is not active, AIDE is missing, has no
 database or last checked more than 2 days ago (`PARAMANT_AIDE_MAX_AGE_DAYS`),
-or AppArmor is not enabled with at least one profile in enforce mode. /dpa
-promises exactly these three points; a miss is a stop because the page says
-it, not a rollback: the containers are fine, the host is not what /dpa says.
+or AppArmor is not enabled with at least one profile in enforce mode. A miss is
+a WARN, in the log and again in the summary under "HOST NOT PROVEN", and the
+deploy goes on to write the deployed-head marker: 6l runs after everything is
+live, and the host state was never measured before this step existed, so a stop
+here only left the next run stuck in 1a (review-574 N1). `--host-strict` makes
+a miss a STOP (never a rollback: the containers are fine). /dpa therefore
+promises the check ("we check at every deploy whether ..."), not its outcome.
+Once the host is right, confirm with `--verify-only --host-strict`.
 
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without
-`3.1.0`, or a `billing_config` line with `recurring:true`. A
+`3.1.1`, or a `billing_config` line with `recurring:true`. A
 `post-deploy-verify.sh` exit 1 stops the script too, but it is a non-critical
 failure: read the list, fix it, do not roll back on it.
 

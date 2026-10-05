@@ -3833,9 +3833,52 @@ else
 fi
 grep -q 'judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS" || host_fails=$?' "$SCRIPT" \
   && grep -q 'host promises on /dpa do not hold' "$SCRIPT" \
-  && pass "phase 6 stops the deploy when a host promise does not hold" \
-  || fail "phase 6 does not stop on a broken host promise"
+  && pass "phase 6 reports a broken host promise" \
+  || fail "phase 6 does not report a broken host promise"
+# review-574 N1: a miss is a WARN that still lets phase 7 write the marker;
+# --host-strict turns it into a STOP.
+hasF() { if grep -qF -- "$1" "$SCRIPT"; then pass "$2"; else fail "$2 (missing: $1)"; fi; }
+hasF 'warn "6l host NOT PROVEN: $host_msg"' "a host miss is a WARN in the log and the summary"
+hasF '[ "$HOST_STRICT" -eq 1 ] && die "$host_msg (--host-strict)"' "--host-strict makes a host miss a STOP"
+hasF 'HOST NOT PROVEN (step 6l, a warning, not a stop):' "the end summary repeats an unproven host"
+if grep -qF '|| die "$host_fails of the three host promises' "$SCRIPT"; then
+  fail "a host miss without --host-strict still dies before phase 7"
+else pass "a host miss without --host-strict no longer dies before phase 7"; fi
+( cd "$ROOT" && bash "$SCRIPT" --host-strict --preflight-only >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--host-strict with --preflight-only exits 2" || fail "--host-strict was accepted with --preflight-only"
+( cd "$ROOT" && bash "$SCRIPT" --host-strict --rollback 20260101-0000 >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--host-strict with --rollback exits 2" || fail "--host-strict was accepted with --rollback"
+VOS="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only --host-strict 2>&1 )"
+grep -q '^\[step\] 6l\. host hardening' <<< "$VOS" \
+  && pass "--dry-run --verify-only --host-strict reaches 6l" || fail "--host-strict breaks --verify-only"
 rm -rf "$HH"
+
+# ------------------------------------- release tag gate before phase 5 (N2) --
+echo ""
+echo "N2. the tag the installers pin must exist on origin and name the deploy commit"
+eval "$(sed -n '/^release_tag_verdict()/,/^}/p' "$SCRIPT")"
+if declare -F release_tag_verdict >/dev/null && declare -F sha_eq >/dev/null; then
+  S1=1111111aaaaaaaabbbbbbbbccccccccdddddddd; S2=2222222aaaaaaaabbbbbbbbccccccccdddddddd
+  T="$(release_tag_verdict v3.1.1 "$S1" "$S1")" && grep -q '^OK tag v3.1.1' <<< "$T" \
+    && pass "a tag on the deploy commit passes" || fail "a correct tag did not pass: $T"
+  T="$(release_tag_verdict v3.1.1 "" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && grep -q "STOP tag v3.1.1 does not exist on origin" <<< "$T" \
+    && grep -qF "git tag -a v3.1.1 $S1 -m \"Release 3.1.1\" && git push origin v3.1.1" <<< "$T" \
+    && pass "a missing tag stops with the exact tag command" || fail "a missing tag: rc $R, $T"
+  T="$(release_tag_verdict v3.1.1 "$S2" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && grep -q "points at 2222222" <<< "$T" \
+    && pass "a tag on another commit stops" || fail "a tag on another commit: rc $R, $T"
+  T="$(release_tag_verdict "" "" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && pass "installers that disagree on the tag stop" || fail "disagreeing installers passed"
+else
+  fail "release_tag_verdict could not be extracted"
+fi
+grep -q '^release_tag_gate "5-pre"$' "$SCRIPT" && grep -B1 '^phase_5$' "$SCRIPT" | grep -q 'release_tag_gate "5-pre"' \
+  && pass "the tag gate runs right before phase 5" || fail "the tag gate does not run right before phase 5"
+grep -B1 '^phase_2$' "$SCRIPT" | grep -q 'release_tag_gate "1z"' \
+  && pass "the tag gate also runs before phase 2 writes anything" || fail "the tag gate does not run before phase 2"
+grep -q "git ls-remote --tags origin \"refs/tags/\$tag\"" "$SCRIPT" \
+  && pass "the gate asks origin, not the local tag list" || fail "the gate does not use git ls-remote on origin"
 
 # ------------------------------------------------------------------- result --
 echo ""

@@ -2273,8 +2273,12 @@ test('the host hardening on /dpa is what deploy step 6l measures, and no more', 
   assert.match(step, /aa-status --enabled/, '6l checks AppArmor is enabled');
   assert.match(step, /profiles are in enforce mode/, '6l counts profiles in enforce mode');
   const judge = deploy.slice(deploy.indexOf('judge_host_hardening() {'));
-  assert.match(judge, /\$\(\(fails \+ 1\)\)/, '6l counts a miss as a failure, not a warning');
-  assert.match(deploy, /host promises on \/dpa do not hold/, 'a miss stops the deploy');
+  assert.match(judge, /\$\(\(fails \+ 1\)\)/, '6l counts every miss');
+  assert.match(deploy, /host promises on \/dpa do not hold/, 'a miss is reported');
+  // review-574 N1: a miss is a WARN (STOP only under --host-strict), so /dpa
+  // may promise the check, never its outcome as a standing fact.
+  assert.match(deploy, /warn "6l host NOT PROVEN: \$host_msg"/, 'a miss is a warning in the log and the summary');
+  assert.match(deploy, /\[ "\$HOST_STRICT" -eq 1 \] && die "\$host_msg \(--host-strict\)"/, '--host-strict makes a miss a stop');
   const days = /^HOST_AIDE_MAX_AGE_DAYS="\$\{PARAMANT_AIDE_MAX_AGE_DAYS:-(\d+)\}"$/m.exec(deploy);
   assert.ok(days, 'deploy-3.1.sh names the AIDE age limit');
 
@@ -2285,14 +2289,14 @@ test('the host hardening on /dpa is what deploy step 6l measures, and no more', 
   };
   const en = rowOf(page('en/dpa'), 'Integrity and availability');
   const nl = rowOf(page('dpa'), 'Integriteit en beschikbaarheid');
-  assert.ok(en.includes('auditd is active'), 'dpa: names auditd active');
-  assert.ok(en.includes(`AIDE is installed and the daily file integrity check ran at most ${days[1]} days ago`), 'dpa: names the AIDE age 6l checks');
+  assert.ok(en.includes('We check at every deploy') && en.includes('whether auditd is active'), 'dpa: names the auditd check');
+  assert.ok(en.includes(`whether AIDE is installed and the daily file integrity check ran at most ${days[1]} days ago`), 'dpa: names the AIDE age 6l checks');
   assert.ok(en.includes('AppArmor is enabled with profiles in enforce mode'), 'dpa: names AppArmor enforcing');
-  assert.ok(en.includes('--verify-only') && en.includes('If a point does not hold, the check fails.'), 'dpa: says when it is checked and that a miss fails');
-  assert.ok(nl.includes('auditd is actief'), 'dpa (nl): names auditd active');
-  assert.ok(nl.includes(`AIDE is geïnstalleerd en de dagelijkse integriteitscontrole van bestanden draaide hooguit ${days[1]} dagen geleden`), 'dpa (nl): names the AIDE age 6l checks');
+  assert.ok(en.includes('--verify-only') && en.includes('this page states the check, not its outcome'), 'dpa: promises the check, not the outcome');
+  assert.ok(nl.includes('We controleren bij elke uitrol') && nl.includes('of auditd actief is'), 'dpa (nl): names the auditd check');
+  assert.ok(nl.includes(`of AIDE geïnstalleerd is en de dagelijkse integriteitscontrole van bestanden hooguit ${days[1]} dagen geleden draaide`), 'dpa (nl): names the AIDE age 6l checks');
   assert.ok(nl.includes('AppArmor staat aan met profielen in enforcing-modus'), 'dpa (nl): names AppArmor enforcing');
-  assert.ok(nl.includes('--verify-only') && nl.includes('Houdt een punt geen stand, dan faalt de controle.'), 'dpa (nl): says when it is checked and that a miss fails');
+  assert.ok(nl.includes('--verify-only') && nl.includes('deze pagina noemt de controle, niet de uitkomst'), 'dpa (nl): promises the check, not the outcome');
   // More than 6l measures: figures, or CIS as a result rather than a guideline.
   for (const [name, row, guide] of [['en', en, 'CIS Ubuntu 24.04 benchmark as a guideline; that is not a checked claim'],
                                     ['nl', nl, 'CIS Ubuntu 24.04-benchmark als richtlijn; dat is geen getoetste claim']]) {
