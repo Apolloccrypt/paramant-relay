@@ -238,7 +238,7 @@ function applyConfig() {
   var setupToken = tokenInput ? String(tokenInput.value || '').trim() : '';
   if (!setupToken) {
     if (applyBtn) { applyBtn.disabled = false; }
-    if (status) { status.style.color = '#b00020'; status.textContent = 'Fill in the setup code first. The relay writes it to its log on first start, and to the file setup-token next to users.json.'; }
+    if (status) { status.style.color = '#b00020'; status.textContent = 'Fill in the setup code first. The relay writes it on start to the file setup-token next to users.json.'; }
     if (tokenInput) { tokenInput.focus(); }
     return Promise.resolve();
   }
@@ -267,7 +267,7 @@ function applyConfig() {
       } else {
         // 4xx: validation -- show message and let the user correct an earlier step.
         if (res.status === 401 && res.body && res.body.error === 'setup_token_required') {
-          status.textContent = 'The setup code is not right. Copy it again from the relay log or from the file setup-token.';
+          status.textContent = 'The setup code is not right. Copy it again from the file setup-token next to users.json.';
           return;
         }
         status.textContent = (res.body && res.body.error)

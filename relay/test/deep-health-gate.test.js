@@ -170,3 +170,27 @@ test('storage: red, and the whole verdict goes red with it, when the data dir ca
     `the red must name the directory it tried, got: ${storage.detail}`);
   assert.strictEqual(r.body.overall, 'red', 'one red component makes the verdict red');
 });
+
+// Fase 2 SITE-13-A: a fresh full-mode install behind a proxy (the setup
+// install.sh and docker-compose make) has no certificate on the relay and no
+// API keys yet. Neither is a fault of this relay, and /all-systems-go read
+// "Actief, met waarschuwingen" forever on such an install. Both now report
+// 'info': shown with their detail, never counted in the verdict.
+test('fresh install: TLS at the edge and an empty key set are info, and do not colour the verdict', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deep-health-fresh-'));
+  const { port } = await bootHealthyRelay({
+    RELAY_MODE: 'full',
+    USERS_FILE: path.join(dataDir, 'users.json'),
+    TLS_CERT_FILE: path.join(dataDir, 'no-cert.pem'),
+  });
+  const r = await deep(port);
+  assert.strictEqual(r.status, 200);
+  const tls = deepCheck(r.body, 'tls');
+  const users = deepCheck(r.body, 'users');
+  assert.strictEqual(tls.status, 'info', `tls at the edge must be info, got ${tls.status}: ${tls.detail}`);
+  assert.match(tls.detail, /edge/);
+  if (!/^[1-9]/.test(users.detail)) assert.strictEqual(users.status, 'info', `no keys yet must be info, got ${users.status}: ${users.detail}`);
+  const counted = (r.body.checks || []).filter((c) => c.status === 'yellow' || c.status === 'red');
+  if (counted.length === 0) assert.strictEqual(r.body.overall, 'green', `no counted warning, so the verdict is green; got ${r.body.overall}`);
+  assert.ok(!counted.some((c) => c.name === 'tls' || c.name === 'users'), JSON.stringify(counted));
+});

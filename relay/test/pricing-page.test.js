@@ -67,7 +67,7 @@ ok('6 checkout buttons with data-billing-*');
 for (const b of buttons) {
   assert(!/payment-links\.mollie\.com/.test(b.href),
     'checkout button falls back to a static Mollie link (no metadata, unattributable): ' + b.href);
-  assert(b.href.startsWith('/auth/login'),
+  assert(b.href.startsWith('/auth/login') || b.href.startsWith('/en/auth/login'),
     'no-JS fallback must be sign-in, got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
   // Every button, not only the variants below: a button the checkout refuses
   // is a price the site shows and nobody can pay.

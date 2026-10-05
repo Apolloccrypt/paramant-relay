@@ -135,10 +135,10 @@ async function stampPdf(originalPdf, opts = {}) {
   page.drawText('ML-DSA-65 signature and the relay counter-signature. This stamped copy is for reading only.',
     { x: M, y, size: 8, font, color: sub });
 
-  // The same reading-copy marker /co-sign writes (frontend/co-sign.js), in a
-  // plain Info entry: /verify explains a hash mismatch as "the stamped copy of
-  // this envelope" only when it finds exactly this marker. Without it the
-  // relay's own copy (GET /v1/envelopes/:id/document) read as a wrong file.
+  // The same reading-copy label /co-sign writes (frontend/co-sign.js), in a
+  // plain Info entry. A label, not evidence: no signature covers it, so
+  // /verify ignores it and calls this copy "not the signed file" like any
+  // other (review #555, B1).
   const envId = String(opts.envelopeId || '');
   const docHash = String(opts.docHash || '');
   let marked = false;
@@ -147,7 +147,7 @@ async function stampPdf(originalPdf, opts = {}) {
       const { PDFName, PDFString } = await loadPdfLib();
       doc.getInfoDict().set(PDFName.of('ParamantStampedCopy'), PDFString.of('env=' + envId + ';doc=' + docHash));
       marked = true;
-    } catch { /* no marker: /verify then says plainly that the hash differs */ }
+    } catch { /* no label: nothing changes for /verify */ }
   }
   const bytes = await doc.save(marked ? { useObjectStreams: false } : undefined);
   return Buffer.from(bytes);

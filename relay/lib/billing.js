@@ -200,6 +200,15 @@ async function processPayment(payment, deps) {
         revoked.push({ product: g.product, tier: left.getTime() > nowR.getTime() ? g.tier : floor, paidUntil: left.toISOString(), partial: true });
         continue;
       }
+      // This payment was an upgrade that paused a lower paid term (Pro year,
+      // then Business month on top): the pause was undone above, so only this
+      // payment's own tier comes off. Flooring here wiped the Pro year the
+      // customer still paid for (review #555, M2).
+      if (per && Array.isArray(per.paused) && per.paused.length) {
+        try { await d.setProductPlan(accountId, g.product, g.tier, new Date(nowR.getTime() - 1000), null, { shorten: true }); } catch { /* logged by caller */ }
+        revoked.push({ product: g.product, tier: String(per.paused[0].tier), partial: true });
+        continue;
+      }
       // null clears the period along with the tier: money reclaimed leaves no
       // paid time on record.
       try { await d.setProductPlan(accountId, g.product, floor, null, null); } catch { /* logged by caller via reason */ }

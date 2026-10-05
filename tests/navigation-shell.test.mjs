@@ -152,7 +152,7 @@ ok('closing the mobile menu restores the page position', await publicPage.evalua
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => document.querySelector('#nav-mobile')?.classList.contains('open'));
 const phoneHelp = await publicPage.evaluate(() => {
-  const links = Array.from(document.querySelectorAll('nav.nav a[href="/help"], .nav-mobile-tail a[href="/help"]'));
+  const links = Array.from(document.querySelectorAll('nav.nav a[href="/help"], .nav-mobile-tail a[href="/help"], nav.nav a[href="/en/help"], .nav-mobile-tail a[href="/en/help"]'));
   return links.map((link) => {
     const box = link.getBoundingClientRect();
     return { display:getComputedStyle(link).display, width:Math.round(box.width), height:Math.round(box.height) };
@@ -256,7 +256,8 @@ const hamburgerWithoutTail = everyPage
   .filter(([, html]) => html.includes('id="nav-hamburger"') && !html.includes('id="nav-mobile-tail"'))
   .map(([name]) => name);
 ok('no page carries a menu button without the strip that catches what it takes away', hamburgerWithoutTail.length === 0, hamburgerWithoutTail.join(', ') || `${everyPage.filter(([, html]) => html.includes('id="nav-hamburger"')).length} pages with a menu button`);
-const withoutHelp = stamped.filter(([, html]) => !/<a href="\/help"/.test(html)).map(([name]) => name);
+// An English page links the English help centre (fase 2 SITE-03-F*).
+const withoutHelp = stamped.filter(([name, html]) => !(/^en\//.test(name) ? /<a href="\/en\/help"/ : /<a href="\/help"/).test(html)).map(([name]) => name);
 ok('every stamped page links support', stamped.length > 0 && withoutHelp.length === 0, withoutHelp.join(', ') || `${stamped.length} pages`);
 // A page that declares lang="en" names the English legal texts, under /en.
 const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${/<html\b[^>]*\blang="en/i.test(html) ? '/en' + href : href}"`))).map(([name]) => name);

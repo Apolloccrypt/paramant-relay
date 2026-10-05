@@ -90,3 +90,7 @@ deploy/logs/
 # Nothing tracked has ever lived under a backups/ path, so ignoring it costs
 # nothing and keeps the server checkout clean for the next deploy.
 backups/
+
+# One-time setup token the relay writes next to users.json (never commit)
+setup-token
+**/setup-token

@@ -121,11 +121,13 @@ test('an ordinary signed-in page load stays under the /api/user/ limit', () => {
   // address), must fit, and the old 9-request /account load with ample room.
   assert.ok(gen.burst + 1 >= 2 * seen.length, `burst ${gen.burst} is too small for ${seen.length} distinct calls x2`);
   assert.ok(SNIPPET.user_session && SNIPPET.user_session.perMin >= 120, 'user_session refills at 120 a minute or more');
-  // Per signed-in session since sweep-chaos 6 (an office behind one NAT
-  // address ran out at ~17 people); the address is the fallback without a cookie.
-  assert.equal(SNIPPET.user_session.key, '$user_session_key', 'user_session is keyed per session');
+  // Per client IP. Keyed on the session cookie it was unlimited for anyone
+  // who sent a random cookie, or a junk cookie before the real one (review
+  // #555, H1): a key may never be a value the client picks.
+  assert.equal(SNIPPET.user_session.key, '$binary_remote_addr', 'user_session is keyed per client IP');
   const snippetText = read('deploy/nginx/snippets/paramant-limit-req.conf');
-  assert.match(snippetText, /map \$cookie_paramant_user_session \$user_session_key \{[^}]*""\s+\$binary_remote_addr;[^}]*default\s+\$cookie_paramant_user_session;/, 'the session key falls back to the address');
+  assert.doesNotMatch(snippetText.replace(/^\s*#.*$/gm, ''), /\$cookie_/, 'no limit key is built from a cookie');
+  for (const [zone, z] of Object.entries(SNIPPET)) assert.equal(z.key, '$binary_remote_addr', `${zone} is keyed per client IP`);
 });
 
 test('every /api/user/ block strips the internal headers and sets the client address', () => {

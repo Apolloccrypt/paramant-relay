@@ -73,3 +73,21 @@ test('a partial failure (207 or partial_failure) is not replayed: the retry runs
   await go({ inv: 2 }, 200, { ok: true });
   assert.strictEqual(runs, 4, 'partial_failure in a 200 body is not stored either');
 });
+
+test('the same Idempotency-Key with a different body is refused, not replayed (review #555)', async () => {
+  const redis = fakeRedis();
+  const mw = middleware({ redis: () => redis, scope: 't' });
+  let runs = 0;
+  const go = (body) => new Promise((done) => {
+    const rs = res(); rs.done = () => done(rs);
+    mw(req(body, { 'idempotency-key': 'client-key-0001' }), rs, () => { runs++; rs.status(200).json({ id: 'env_' + runs }); });
+  });
+  const first = await go({ to: 'a@example.com' });
+  assert.deepStrictEqual(first.body, { id: 'env_1' });
+  const second = await go({ to: 'b@example.com' });
+  assert.strictEqual(second.statusCode, 422, JSON.stringify(second.body));
+  assert.strictEqual(second.body.error, 'idempotency_key_reused');
+  assert.strictEqual(runs, 1);
+  const same = await go({ to: 'a@example.com' });
+  assert.deepStrictEqual(same.body, { id: 'env_1' }, 'the same body still gets the first answer');
+});

@@ -136,7 +136,8 @@ test('with no ceiling known, the precheck refuses before anything is uploaded, w
     await page.waitForSelector('#step-over-limit.active', { timeout: 10000 });
     const line = await page.textContent('#over-limit-line');
     assert.match(line, /Your plan sends to 1 person at a time\. You listed 2\./);
-    assert.equal(await page.getAttribute('#step-over-limit a.btn', 'href'), '/pricing');
+    assert.doesNotMatch(line, /1 recipients/);
+    assert.equal(await page.getAttribute('#step-over-limit a.btn', 'href'), '/en/pricing');
     assert.equal(calls.precheck, 1);
     assert.equal(calls.inbound, 0, 'nothing was uploaded');
     assert.equal(calls.sends, 0);

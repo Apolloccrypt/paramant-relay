@@ -244,14 +244,14 @@ tr:last-child td{border-bottom:none}
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -265,14 +265,14 @@ tr:last-child td{border-bottom:none}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/docs" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/docs" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
@@ -446,13 +446,15 @@ gp = GhostPipe(
     device  = "device-001",
     sector  = "health",     <span class="cm"># routes to health.paramant.app</span>
 )
+gp.receive_setup()          <span class="cm"># register this device's keys first (once per device)</span>
 
-<span class="cm"># Send: returns blob hash</span>
-hash_ = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
+<span class="cm"># Send: returns (blob hash, inclusion proof)</span>
+hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
 
-<span class="cm"># Receive: burn-on-read, returns plaintext bytes</span>
-data = gp.receive(hash_)</pre>
+<span class="cm"># Receive: burn-on-read, returns (plaintext bytes, receipt or None)</span>
+data, receipt = gp.receive(hash_)</pre>
     </div>
+    <p>This is <code>paramant-sdk</code> 3.0.0 from PyPI. <code>send</code> and <code>receive</code> each return a pair. A device that receives registers its keys first with <code>receive_setup()</code>; without it <code>send</code> refuses with "No pubkeys for this device". The receipt is usually <code>None</code> in 3.0.0: the SDK only reads it from the old <code>X-Paramant-Receipt</code> header, which the relay no longer sends by default since September 2026. Fetch the receipt with <code>GET /v2/transfers/:receipt_id/receipt</code> (see <a href="/docs/api.md">docs/api.md</a>).</p>
 
     <!-- ── Use cases ──────────────────────────────────────────── -->
     <h2 id="usecases">Use cases</h2>
@@ -585,7 +587,7 @@ Relay POSTs to your url when a blob for that device arrives (POST /v2/inbound):
 And when it is downloaded (via the link or GET /v2/outbound):
 { "event": "blob_downloaded", "device_id": "scanner-01", "ts": "...",
   "hash": "...", "size": 5242880, "via": "link" }   // or "api"</span></pre>
-    <p>Pro plan and up. Every webhook is signed. If you send a <code>secret</code>, the relay signs with it. If you leave it out, the relay makes one (<code>whsec_</code>…) and returns it once in the response; store it right away, it is not shown again. Each call carries the headers <code>X-Paramant-Event</code> (the event name) and <code>X-Paramant-Sig</code>: the hex HMAC-SHA256 of the raw body, keyed with the secret. Recompute it over the unparsed body, compare in constant time and reject callbacks whose signature does not match. The registration is stored in redis (memory is only a cache), so it survives a restart and holds on every sector; the last 20 registrations per device are kept. The relay tries once (5-second timeout) and does not retry.</p>
+    <p>Pro plan and up. Every webhook is signed. If you send a <code>secret</code>, the relay signs with it. If you leave it out, the relay makes one (<code>whsec_</code>…) and returns it once in the response; store it right away, it is not shown again. Each call carries the headers <code>X-Paramant-Event</code> (the event name) and <code>X-Paramant-Sig</code>: the hex HMAC-SHA256 of the raw body, keyed with the secret. Each call also carries <code>X-Paramant-Timestamp</code> and <code>X-Paramant-Signature: t=&lt;unix seconds&gt;,v1=&lt;hex&gt;</code>, the HMAC-SHA256 over <code>&lt;t&gt;.&lt;raw body&gt;</code>: the time is inside the signature, so reject a call older than five minutes and a captured call cannot be replayed later. Recompute the signature over the unparsed body, compare in constant time and reject callbacks whose signature does not match. The registration is stored in redis (memory is only a cache), so it survives a restart and holds on every sector; the last 5 registrations per device are kept, an account has at most 20 devices with a webhook, and a registration expires after 90 days unless you register it again. The relay tries once (5-second timeout) and does not retry.</p>
 
     <h2 id="health">GET /health</h2>
     <pre><span class="cm">{
@@ -618,11 +620,21 @@ curl -X POST https://paramant.app/v1/envelopes \
         "signers": [ { "name": "A. Jansen", "email": "a@example.org" } ]
       }'
 
-<span class="cm"># On completion, pull the offline-verifiable proof.</span>
-curl https://paramant.app/v1/envelopes/env_.../receipt \
+<span class="cm"># On completion, pull the offline-verifiable proof (id from the 201 above).</span>
+curl https://paramant.app/v1/envelopes/&lt;id&gt;/receipt \
   -H "Authorization: Bearer psk_live_..." --output quote-8842.psign</pre>
-    <p>Quota: 50 envelope creations per key per hour; an envelope is kept for 30 days by default (set <code>ttl_days</code>, up to 365). While it exists the relay also keeps the PDF itself, encrypted in redis, because the signers have to open it and the stamped PDF is made from it. When it expires it is gone. Webhooks: set <code>webhook_url</code> and <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> and <code>envelope.voided</code> arrive signed with HMAC-SHA256 in the <code>X-Paramant-Sig</code> header. There is one delivery attempt and no retry, so also check the status yourself with <code>GET /v1/envelopes/:id</code>. Receipts verify offline against the public CT log; see <a href="/en/verify">/verify</a>.</p>
-    <p>Safe retries: send an <code>Idempotency-Key</code> header with <code>POST /v1/envelopes</code> (8 to 128 characters of <code>A-Z a-z 0-9 _ . : -</code>). When the same key comes again from the same API key within 24 hours, you get the first <code>201</code> response back with <code>Idempotent-Replay: true</code>, with no second envelope and no quota spent. Only a successful <code>201</code> is stored. The relay checks the body before the hourly quota, so <code>400 ambiguous_document</code> (both <code>content_base64</code> and <code>url</code>), <code>400 invalid_binding_mode</code> (not <code>email</code> or <code>open</code>), <code>400 invalid_signer_email</code> (with <code>email</code> binding every signer needs a valid address; <code>signer_index</code> names the first bad one) and <code>400 invalid_idempotency_key</code> cost no creation. A <code>429 rate_limited</code> carries <code>Retry-After</code> with the seconds until the current hour ends.</p>
+    <pre><span class="cm">201 (shortened):</span>
+{
+  "id": "Us4rFoLj35sU_4cOlPJcs3eMZlw4xjMp",
+  "status": "sent",
+  "signers": [
+    { "index": 0, "name": "A. Jansen", "status": "pending",
+      "sign_url": "https://paramant.app/co-sign?env=...&amp;p=0&amp;t=..." }
+  ]
+}</pre>
+    <p>The <code>id</code> is a random string of 20 to 64 characters with no prefix. Each signer gets their own <code>sign_url</code> to the hosted page <code>/co-sign</code>. A signer is <code>pending</code> until they have signed and <code>signed</code> after, the same word in the create response and in <code>GET /v1/envelopes/:id</code>.</p>
+    <p>Quota: 50 envelope creations per key per clock hour. The counter starts again at every full hour (UTC), so around the hour boundary up to 100 can be created close together. An envelope is kept for 30 days by default (set <code>ttl_days</code>, up to 365). While it exists the relay also keeps the PDF itself, encrypted in redis, because the signers have to open it and the stamped PDF is made from it. When it expires it is gone. Webhooks: set <code>webhook_url</code> and <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> and <code>envelope.voided</code> arrive signed with HMAC-SHA256 in the <code>X-Paramant-Sig</code> header. A delivery that fails (no connection, or a 5xx or 429 from your side) is tried again after 2 and after 10 seconds, three attempts in all, with the same body and the same <code>X-Paramant-Delivery</code>, so you can recognise a repeat by that id; <code>X-Paramant-Attempt</code> says which attempt it is. The events of one envelope go out in order, one at a time, and every body carries a rising <code>seq</code> (<code>envelope.sent</code> 1, <code>signer.completed</code> 1 plus the number of signatures, <code>envelope.completed</code> and <code>envelope.voided</code> the number of signers plus 2). After three failed attempts the relay gives up, so also check the status yourself with <code>GET /v1/envelopes/:id</code>. Receipts verify offline against the public CT log; see <a href="/en/verify">/verify</a>.</p>
+    <p>Safe retries: send an <code>Idempotency-Key</code> header with <code>POST /v1/envelopes</code> (8 to 128 characters of <code>A-Z a-z 0-9 _ . : -</code>). When the same key comes again from the same API key within 24 hours, you get the first <code>201</code> response back with <code>Idempotent-Replay: true</code>, with no second envelope and no quota spent. Only a successful <code>201</code> is stored. The relay checks the body before the hourly quota, so <code>400 ambiguous_document</code> (both <code>content_base64</code> and <code>url</code>), <code>400 invalid_binding_mode</code> (not <code>email</code> or <code>open</code>), <code>400 invalid_signer_email</code> (with <code>email</code> binding every signer needs a valid address; <code>signer_index</code> names the first bad one) <code>400 invalid_metadata</code> (<code>metadata</code> is not an object) and <code>400 invalid_idempotency_key</code> cost no creation. Further: <code>400 missing_signers</code>, <code>400 missing_document</code> (neither <code>content_base64</code> nor <code>url</code>), <code>400 empty_document</code> (an empty <code>content_base64</code>), <code>400 too_many_signers</code> (more names than your plan allows on one document; <code>max_signers</code> says how many), <code>413 document_too_large</code>, <code>422 not_a_pdf</code> and <code>422 document_unfetchable</code>. A <code>429 rate_limited</code> carries <code>Retry-After</code> with the seconds until the current clock hour ends. When your plan's monthly signature quota is used up the relay answers <code>402 monthly_sign_quota_reached</code> with <code>plan</code>, <code>limit</code>, <code>used</code>, <code>reset_date</code> and <code>Retry-After: 86400</code>, and nothing is created. An error on <code>/v1</code> always has the shape <code>{"error": "&lt;code&gt;", "message": "&lt;sentence&gt;"}</code>.</p>
 
     <!-- ── Account & billing API ────────────────────────────────── -->
     <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
@@ -858,7 +870,7 @@ open https://your-domain.com/admin/</pre>
       <p><strong style="color:var(--lime)">Guided setup:</strong> a first-run web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: generating the admin token, enrolling TOTP and minting the first key from the browser. The wizard is gated to first boot (no keys yet) or an explicit <code>SETUP_MODE</code> flag, and runs deeper <code>/v2/health/deep</code> and DNS checks before it reports that everything is ready (design: ADR R005). Once the relay is running, <code>/admin/settings</code> shows the relay configuration in the panel, so you no longer edit <code>.env</code> by hand, and <code>/admin/cli</code> gives admins a browser terminal for debugging without SSH.</p>
     </div>
     <div class="callout"><span class="callout-label">Setup code</span>
-      <p><strong style="color:var(--lime)">Finishing setup is not anonymous:</strong> <code>POST /v2/setup/apply</code> needs the one-time setup token in the <code>X-Setup-Token</code> header (or your <code>ADMIN_TOKEN</code> in <code>X-Admin-Token</code>), otherwise it answers <code>401 setup_token_required</code>. On first start the relay writes the token (<code>pst_...</code>) to its log (line <code>setup_token</code>) and to the file <code>setup-token</code> next to <code>users.json</code>. Paste it into the <strong>Setup code</strong> field of the wizard. After setup it is deleted and stops working. Find it with <code>docker compose logs relay-main | grep setup_token</code>.</p>
+      <p><strong style="color:var(--lime)">Finishing setup is not anonymous:</strong> <code>POST /v2/setup/apply</code> needs the one-time setup token in the <code>X-Setup-Token</code> header (or your <code>ADMIN_TOKEN</code> in <code>X-Admin-Token</code>), otherwise it answers <code>401 setup_token_required</code>. On start the relay writes a fresh token (<code>pst_...</code>) to the file <code>setup-token</code> next to <code>users.json</code> (mode 600); the log only names the file, never the token. Paste it into the <strong>Setup code</strong> field of the wizard. After setup it is deleted and stops working. Find it with <code>docker compose exec relay-main cat /data/setup-token</code>.</p>
     </div>
     <div class="callout"><span class="callout-label">New in 3.0.0</span>
       <p><strong style="color:var(--lime)">Plug-and-play serving:</strong> set <code>SERVE_FRONTEND=true</code> to have a single relay serve its own UI from a read-only static handler, so a fresh self-host needs no separate web server (opt-in, default off; ADR R011). Set <code>CRYPTO_MODE</code> to choose the algorithm set the relay advertises on <code>/v2/capabilities</code>: <code>core</code> (the default: ML-KEM-768 + ML-DSA-65) or <code>extended</code> for the full opt-in set (ADR R006).</p>
@@ -890,20 +902,22 @@ docker compose up -d --build
     </div>
 
     <h2 id="client-cli">CLI reference</h2>
+    <p>There is no installable CLI: <code>pip install paramant-sdk</code> and <code>npm install paramant-sdk</code> ship the library only, no commands. What does exist are scripts in the relay repository, which you run from a clone:</p>
     <table>
-      <tr><th>Command</th><th>Description</th></tr>
-      <tr><td>paramant-send</td><td>Encrypt and upload a file or stdin</td></tr>
-      <tr><td>paramant-receive</td><td>Download and decrypt by hash</td></tr>
-      <tr><td>paramant-watch</td><td>Watch a directory and auto-send new files</td></tr>
-      <tr><td>paramant-stream</td><td>Listen for incoming blobs via WebSocket</td></tr>
-      <tr><td>paramant-admin</td><td>Manage users, keys, and relay config</td></tr>
-      <tr><td>paramant-scan</td><td>Discover relay nodes on the network</td></tr>
+      <tr><th>Script</th><th>Description</th></tr>
+      <tr><td>scripts/paramant-sender.py</td><td>Encrypt and upload a file, stdin or text; with <code>--watch DIR</code> watch a directory</td></tr>
+      <tr><td>scripts/paramant-receiver.py</td><td>Fetch and decrypt by hash; with <code>--listen</code> keep listening</td></tr>
+      <tr><td>scripts/paramant-verify-sth</td><td>Check a relay's signed tree head (STH)</td></tr>
+      <tr><td>scripts/paramant-verify-peers</td><td>Check the mirrored tree heads of other relays</td></tr>
+      <tr><td>scripts/paramant-scan.sh</td><td>Find relay nodes through the registry</td></tr>
+      <tr><td>deploy/paramant-admin.py</td><td>Manage users and keys on your own relay</td></tr>
     </table>
-    <pre><span class="cm"># Example: send a file and wait for ACK</span>
-paramant-send --key pgp_xxx --sector health --ack scan.dcm
+    <p>The two Python scripts only choose among the hosted sectors with <code>--relay</code> (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>); for your own relay use the SDK or the HTTP API. They encrypt with a transfer secret of their own (<code>--secret</code> or <code>PARAMANT_TRANSFER_SECRET</code>), never with the API key.</p>
+    <pre><span class="cm"># Example: send a file (the transfer secret is printed once; give it to the receiver)</span>
+python3 scripts/paramant-sender.py --key pgp_xxx --relay health --file scan.dcm
 
-<span class="cm"># Example: stream mode (process persists, receives all blobs)</span>
-paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/api</pre>
+<span class="cm"># Example: receive by hash with that secret</span>
+python3 scripts/paramant-receiver.py --key pgp_xxx --relay health --hash &lt;hash&gt; --secret &lt;secret&gt;</pre>
 
     <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Crypto stack</h2>
@@ -1010,7 +1024,7 @@ python3 deploy/paramant-admin.py sync</pre>
       <tr><th>Date</th><th>Auditor</th><th>Findings</th><th>Status</th></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (verification)</td><td>14 total (1H · 8M · 5L)</td><td>All resolved: e6f216d</td></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (independent)</td><td>6 total (3H · 3M)</td><td>All resolved: 0db3ef0</td></tr>
-      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>Fixed in 0db3ef0, except two: #4 (critical, filename readable in relay RAM) and #14 (CT tree not RFC 6962) are still open, see <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a></td></tr>
+      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>Fixed in 0db3ef0, except three: #4 (critical, filename readable in relay RAM), #6 (high, key zeroization in the Python scripts only works on CPython and does not warn yet) and #14 (CT tree not RFC 6962) are still open, see <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a></td></tr>
     </table>
     <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)" rel="noopener">SECURITY.md</a>. To report a vulnerability, email <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
 
@@ -1113,9 +1127,9 @@ python3 deploy/paramant-admin.py sync</pre>
   </div>
 </div>
 
-<script src="/js/docs.inline1.js?v=1"></script>
+<script src="/js/docs.inline1.js?v=2"></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </main>
 <footer>
   <div class="container-lg">

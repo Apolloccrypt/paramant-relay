@@ -845,7 +845,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-field">
       <label class="ds-label">Cryptografische sleutel (ML-DSA-65)</label>
       <p class="ds-hint" id="ds-signing-identity">Uw ondertekensleutel wordt gecontroleerd...</p>
-      <p class="ds-hint" style="margin-top:6px">De soort handtekening is wat mensen zien. Wat de handtekening cryptografisch vastlegt, is uw ondertekensleutel (ML-DSA-65). Die ontgrendelt u met Face ID, Touch ID of een beveiligingssleutel op het moment dat u tekent, en hij wordt nooit geëxporteerd. Ontvangers die u toevoegt, tekenen op <code>/co-sign</code> met hun eigen ondertekensleutel.</p>
+      <p class="ds-hint" style="margin-top:6px">De soort handtekening is wat mensen zien. Wat de handtekening cryptografisch vastlegt, is uw ondertekensleutel (ML-DSA-65). Die ontgrendelt u op het moment dat u tekent met uw passkey (Face ID, Touch ID of een beveiligingssleutel) of, zonder passkey, met de code uit uw authenticator-app, en hij wordt nooit geëxporteerd. Ontvangers die u toevoegt, tekenen op <code>/co-sign</code> met hun eigen ondertekensleutel.</p>
     </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-identity-back" type="button">Terug</button>
@@ -856,7 +856,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Controleren en ondertekenen</h2>
-    <p class="ds-sub">Dit is wat u gaat ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
+    <p class="ds-sub">Dit is wat u gaat ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met uw passkey (Face ID, Touch ID of beveiligingssleutel) of, als u geen passkey heeft, met de code uit uw authenticator-app. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
@@ -1051,10 +1051,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=8" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=71"></script>
+<script type="module" src="/sign-flow.js?v=73"></script>
 </body>
 </html>

@@ -98,7 +98,7 @@
       <div id="review-summary" aria-live="polite"></div>
       <label for="setup-token" style="display:block;margin-top:16px">Setup code</label>
       <input type="text" id="setup-token" name="setup-token" autocomplete="off" spellcheck="false" placeholder="pst_..." style="font-family:monospace">
-      <p class="hint">On first start the relay writes this one-time code to its log and to the file <code>setup-token</code> next to <code>users.json</code>. That way only whoever runs the server can finish the setup.</p>
+      <p class="hint">On start the relay writes this one-time code to the file <code>setup-token</code> next to <code>users.json</code> (not to its log). That way only whoever runs the server can finish the setup.</p>
       <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
         <button class="back btn btn-secondary" type="button">Back</button>
         <button id="apply" class="btn btn-primary" type="button">Apply configuration</button>
@@ -110,11 +110,11 @@
       <h2>Your relay is live</h2>
       <div id="done-body">
         <p>Setup complete. Sign in to the dashboard to send your first file.</p>
-        <a href="/auth/login" class="btn">Sign in</a>
+        <a href="/en/auth/login" class="btn">Sign in</a>
       </div>
     </div>
   </main>
 
-  <script src="/setup.en.js?v=4"></script>
+  <script src="/setup.en.js?v=5"></script>
 </body>
 </html>

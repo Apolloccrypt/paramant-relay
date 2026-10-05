@@ -39,6 +39,7 @@ const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
 const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
+const dpaMail       = require('./lib/dpa-mail');        // DPA confirmation, NL or EN
 const rateLimit     = require('./lib/rate-limit');
 const mailer        = require('./lib/mail');            // one way out, carrier is a setting
 const authThrottle  = require('./lib/auth-throttle');
@@ -713,8 +714,23 @@ if (CT_FILE) {
   try { leafBuf = fs.readFileSync(CT_LEAVES_FILE); }
   catch (e) { if (e.code !== 'ENOENT') log('warn', 'ct_leaves_load_failed', { err: e.message }); }
   const leafCount = Math.floor(leafBuf.length / 32);
+  let leafFileAligned = true;
   for (let i = 0; i < leafCount; i++) ctTree.append(leafBuf.toString('hex', i * 32, (i + 1) * 32));
-  if (leafBuf.length % 32) log('warn', 'ct_leaves_partial_tail', { bytes: leafBuf.length % 32 });
+  if (leafBuf.length % 32) {
+    // A crash or a full disk in the middle of a 32-byte write leaves a partial
+    // last leaf. Cut it off BEFORE anything is appended: recovered leaves and
+    // new ones written after it would otherwise sit 1..31 bytes out of step,
+    // and the next boot would read a different tree (review #555, M1). The
+    // leaf it belonged to is recovered from CT_FILE below like any other.
+    log('warn', 'ct_leaves_partial_tail', { bytes: leafBuf.length % 32 });
+    try {
+      fs.truncateSync(CT_LEAVES_FILE, leafCount * 32);
+      log('info', 'ct_leaves_partial_tail_cut', { leaves: leafCount });
+    } catch (e) {
+      log('error', 'ct_leaves_truncate_failed', { err: e.message, file: CT_LEAVES_FILE });
+      leafFileAligned = false;
+    }
+  }
 
   const firstIdx = loaded.length ? loaded[0].index : 0;
   const wantSize = loaded.length ? firstIdx + loaded.length : 0;
@@ -742,7 +758,7 @@ if (CT_FILE) {
       }
     }
   }
-  if (recovered.length) {
+  if (recovered.length && leafFileAligned) {
     try { fs.appendFileSync(CT_LEAVES_FILE, Buffer.concat(recovered.map(h => Buffer.from(h, 'hex'))), { flag: 'a' }); }
     catch (e) { log('warn', 'ct_leaves_recover_write_failed', { err: e.message }); }
     log('info', 'ct_leaves_recovered', { leaves: recovered.length, tree_size: ctTree.size });
@@ -1807,7 +1823,8 @@ h1{font-size:1.1rem;font-weight:600;margin-bottom:8px}
     <div class="meta-row"><span class="meta-label">Expires in</span><span class="meta-val">${ttlStr}</span></div>
   </div>
   <p class="warn">This file is deleted from the server once it has arrived in full. A broken download costs nothing: try again.</p>
-  <a class="btn" href="/v2/dl/${token}/get" data-token="${token}">Download &amp; Burn</a>
+  <a class="btn" href="/v2/dl/${token}#download" data-token="${token}" rel="nofollow">Download &amp; Burn</a>
+  <noscript><form method="post" action="/v2/dl/${token}/get"><button class="btn" type="submit">Download &amp; Burn</button></form></noscript>
   <p class="sub" id="dl-state" role="status" aria-live="polite"></p>
   <script src="/v2/dl/confirm.js" defer></script>
   <p class="footer">ML-KEM-768 encrypted · Zero plaintext stored · PARAMANT</p>
@@ -2291,16 +2308,16 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
     subject: 'Een ondertekenaar vraagt de link opnieuw',
     text: tweetaligTekst('nl',
       `${who} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.`
-      + '\n\nStuur de ondertekenaar de volledige link opnieuw, uit uw dashboard of uit uw eigen verzonden bericht.'
+      + '\n\nOpen uw dashboard, klik op dit verzoek en kopieer bij de ondertekenaar de volledige link. Die staat alleen in de browser waarmee u het verzoek verstuurde. Staat hij daar niet meer, trek het verzoek dan in en stuur een nieuw verzoek.'
       + '\n\n' + base + '/dashboard',
       `${whoEn} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.`
-      + '\n\nSend the signer the full link again, from your dashboard or from your own sent message.'),
+      + '\n\nOpen your dashboard, click this request and copy the full link next to the signer. It is kept only in the browser you sent the request from. If it is no longer there, withdraw the request and send a new one.'),
     html: tweetaligHtml('nl',
       `<p>${escHtml(who)} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.</p>`
-      + '<p>Stuur de ondertekenaar de volledige link opnieuw, uit uw dashboard of uit uw eigen verzonden bericht.</p>'
+      + '<p>Open uw dashboard, klik op dit verzoek en kopieer bij de ondertekenaar de volledige link. Die staat alleen in de browser waarmee u het verzoek verstuurde. Staat hij daar niet meer, trek het verzoek dan in en stuur een nieuw verzoek.</p>'
       + '<p><a href="' + base + '/dashboard">Naar uw dashboard</a></p>',
       `<p>${escHtml(whoEn)} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.</p>`
-      + '<p>Send the signer the full link again, from your dashboard or from your own sent message.</p>'),
+      + '<p>Open your dashboard, click this request and copy the full link next to the signer. It is kept only in the browser you sent the request from. If it is no longer there, withdraw the request and send a new one.</p>'),
   });
   log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);
@@ -2525,7 +2542,22 @@ const invManifests = new Map();
 const invRejections = new Map(); // inv id -> expires (ms)
 const INV_MANIFEST_TTL_MS = 60 * 60 * 1000;
 const INV_MANIFEST_MAX = 5000;
-setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) invManifests.delete(k); }, 60000).unref();
+// Memory bounds (review #555, M5): 5000 manifests of 100 000 tokens each, from
+// any free key, was a few GB of heap with nothing in front of an OOM. Now a
+// manifest lists at most 20 000 blocks (90 GB at 4.5 MB a block), an account
+// holds at most 5 live hand-overs, and all manifests together hold at most
+// 200 000 tokens.
+const INV_TOTAL_CHUNKS_MAX = 20000;
+const INV_MANIFESTS_PER_ACCOUNT = 5;
+const INV_TOKENS_TOTAL_MAX = 200000;
+let invTokenCount = 0;
+function _invDrop(k) {
+  const m = invManifests.get(k);
+  if (!m) return;
+  invTokenCount = Math.max(0, invTokenCount - m.tokens.size);
+  invManifests.delete(k);
+}
+setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) _invDrop(k); }, 60000).unref();
 
 // Eviction sweep for the limiter maps that lacked one (the other limiters already
 // self-evict). Without this they grow unbounded — slow memory/audit creep,
@@ -3203,7 +3235,8 @@ function grantParasignOnPaidPlan(accountId) {
 }
 
 // ── Billing ledger: every settled Mollie payment id, durable ──────────────
-const { BillingLedger } = require('./lib/billing-ledger');
+const { BillingLedger, backfillLedger } = require('./lib/billing-ledger');
+const webhookSign = require('./lib/webhook-sign');
 const BILLING_LEDGER_FILE = process.env.BILLING_LEDGER_FILE
   || nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'billing-processed.jsonl');
 const billingLedger = new BillingLedger(BILLING_LEDGER_FILE, log).load();
@@ -3954,6 +3987,23 @@ function _persistParaSignScope(key, { parasign, plan } = {}) {
   return { ok: true };
 }
 
+// Where sign_url and the receipt's relay_pubkey_url point when the operator
+// set no PARASIGN_PUBLIC_ORIGIN (P10 API-16-N). It used to be paramant.app on
+// every relay, so a self-host without the variable handed its signers links to
+// the hosted service and told verifiers to fetch the hosted relay's key. The
+// next operator-set value is this relay's own public URL (RELAY_SELF_URL,
+// never a request header, so it cannot be spoofed); paramant.app is left only
+// for a relay that names neither, and that relay says so once at start.
+function parasignFallbackOrigin() {
+  // A paramant.app RELAY_SELF_URL is the hosted fleet (or compose's default for
+  // an unset variable): that keeps https://paramant.app, exactly as before.
+  if (RELAY_SELF_URL && /^https:\/\/[^/\s]+/i.test(RELAY_SELF_URL)
+      && !/^https:\/\/([a-z0-9-]+\.)*paramant\.app(\/|:|$)/i.test(RELAY_SELF_URL)) {
+    return RELAY_SELF_URL.replace(/\/+$/, '');
+  }
+  return 'https://paramant.app';
+}
+
 // -- ParaSign /v1 key issuance -- THE single generator -------------------------
 // Used by BOTH /v2/user/parasign-keys (self-serve) and /v2/admin/keys/mint-parasign
 // (admin), so there is exactly one psk_ format + one storage path (no drift).
@@ -4041,7 +4091,9 @@ function mintParasignKey(accountId, opts = {}) {
   // The same pass the pgp_ mint runs. Without it a psk_ key was invisible to
   // over_limit until the next reload-users, which is only ever manual.
   applyKeyLimitEnforcement();
-  return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+  // plan is the legacy unified plan; plan_parasign is the ParaSign tier this
+  // key works under, which is what a ParaSign key page shows (P10 API-05-A).
+  return { key, kid, account_id: accountId, plan: record.plan, plan_parasign: record.plan_parasign || null, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
 }
 
 // A mint refused by a cap is a 402 with the numbers, not a 400 or a 500. Shared
@@ -4055,24 +4107,41 @@ function keyCapReject(err, res) {
 
 // ── One-time setup token (first-run wizard) ──────────────────────────────
 // /v2/setup/apply used to be open to anyone while the relay had no keys. The
-// token is made once, printed in the relay log and written next to users.json
-// (mode 0600), so only someone with the logs or the volume can finish setup.
-// PARAMANT_SETUP_TOKEN pins it from the environment instead.
+// token is made from fresh random bytes on every start of a relay that still
+// needs setup and written next to users.json (mode 0600), so only someone with
+// the volume can finish setup. PARAMANT_SETUP_TOKEN pins it from the
+// environment instead.
+//
+// An existing setup-token file is NEVER read: a file that was already there
+// may come from a git checkout (one was committed once, review #555 B3) or
+// from anyone else who could write the directory. It is replaced, atomically,
+// and the log says only that the file exists, never the token.
 const SETUP_TOKEN_FILE = nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'setup-token');
 let _setupTokenValue = null;
 function _setupToken() { return process.env.PARAMANT_SETUP_TOKEN || _setupTokenValue; }
+function _writeSetupTokenFile(value) {
+  const tmp = SETUP_TOKEN_FILE + '.' + process.pid + '.' + crypto.randomBytes(4).toString('hex') + '.tmp';
+  try {
+    fs.writeFileSync(tmp, value + '\n', { mode: 0o600, flag: 'wx' });
+    fs.chmodSync(tmp, 0o600);
+    fs.renameSync(tmp, SETUP_TOKEN_FILE);
+    return true;
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}
+    log('warn', 'setup_token_file_not_written', { err: e.message, file: SETUP_TOKEN_FILE });
+    return false;
+  }
+}
 function _initSetupToken() {
   if (process.env.PARAMANT_SETUP_TOKEN) return;
   if (apiKeys.size > 0 && process.env.SETUP_MODE !== 'true') return;
-  try { _setupTokenValue = fs.readFileSync(SETUP_TOKEN_FILE, 'utf8').trim() || null; } catch {}
-  if (!_setupTokenValue) {
-    _setupTokenValue = 'pst_' + crypto.randomBytes(24).toString('hex');
-    try { fs.writeFileSync(SETUP_TOKEN_FILE, _setupTokenValue + '\n', { mode: 0o600 }); }
-    catch (e) { log('warn', 'setup_token_file_not_written', { err: e.message, file: SETUP_TOKEN_FILE }); }
-  }
-  log('info', 'setup_token', {
-    token: _setupTokenValue, file: SETUP_TOKEN_FILE,
-    hint: 'First-run setup: open /setup and paste this token. It stops working once setup is done.',
+  _setupTokenValue = 'pst_' + crypto.randomBytes(24).toString('hex');
+  const written = _writeSetupTokenFile(_setupTokenValue);
+  log('info', 'setup_token_ready', {
+    file: written ? SETUP_TOKEN_FILE : null,
+    hint: written
+      ? 'First-run setup: open /setup and paste the token from this file (mode 0600). It stops working once setup is done.'
+      : 'First-run setup: the token file could not be written; set PARAMANT_SETUP_TOKEN or fix the data directory and restart.',
   });
 }
 function _setupTokenConsumed() {
@@ -4250,16 +4319,57 @@ async function safeHttpsRequest(urlStr, opts = {}) {
 // lost on every restart and not shared between the sector relays, so a
 // registration silently stopped working after a deploy. Memory is the cache.
 const _webhookRedisKey = (k) => 'paramant:webhooks:' + crypto.createHash('sha256').update(k).digest('hex').slice(0, 40);
+// Bounded on every axis (review #555, H3): redis runs with noeviction, so an
+// unbounded registration list was a way for one key to fill it and turn every
+// write of every customer into an error. Per device: a short list. Per
+// account: a cap on device ids. In total: a cap over all accounts. And every
+// registration expires unless it is registered again.
+const WEBHOOK_URL_MAX = 512;
+const WEBHOOK_DEVICE_ID_MAX = 128;
+const WEBHOOK_PER_DEVICE = Math.max(1, parseInt(process.env.WEBHOOK_PER_DEVICE || '5', 10));
+const WEBHOOK_DEVICES_PER_ACCOUNT = Math.max(1, parseInt(process.env.WEBHOOK_DEVICES_PER_ACCOUNT || '20', 10));
+const WEBHOOK_TOTAL_MAX = Math.max(1, parseInt(process.env.WEBHOOK_TOTAL_MAX || '20000', 10));
+const WEBHOOK_TTL_S = Math.max(60, parseInt(process.env.WEBHOOK_TTL_S || String(90 * 86400), 10));
+const _webhookAcctKey = (acct) => 'paramant:webhooks:acct:' + crypto.createHash('sha256').update(String(acct)).digest('hex').slice(0, 40);
+const WEBHOOK_ALL_KEY = 'paramant:webhooks:all';
+// KEYS: account zset, global zset, device list. ARGV: now ms, expiry ms,
+// device member, per-account cap, total cap, entry json, per-device cap, ttl s.
+// Returns 1 stored, -1 account cap, -2 total cap.
+const WEBHOOK_REGISTER_LUA = `
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
+local gm = KEYS[1] .. '|' .. ARGV[3]
+if not redis.call('ZSCORE', KEYS[1], ARGV[3]) then
+  if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[4]) then return -1 end
+  if redis.call('ZCARD', KEYS[2]) >= tonumber(ARGV[5]) then return -2 end
+end
+redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
+redis.call('ZADD', KEYS[2], ARGV[2], gm)
+redis.call('RPUSH', KEYS[3], ARGV[6])
+redis.call('LTRIM', KEYS[3], -tonumber(ARGV[7]), -1)
+redis.call('EXPIRE', KEYS[3], ARGV[8])
+redis.call('EXPIRE', KEYS[1], ARGV[8])
+return 1`;
+// The in-memory cache obeys the same caps, for a relay without redis.
+function _webhookMemAllowed(k, acct) {
+  if (webhooks.has(k)) return 0;
+  if (webhooks.size >= WEBHOOK_TOTAL_MAX) return -2;
+  let n = 0;
+  const suffix = ':' + acct;
+  for (const key of webhooks.keys()) if (key.endsWith(suffix) && ++n >= WEBHOOK_DEVICES_PER_ACCOUNT) return -1;
+  return 0;
+}
 async function _webhooksFor(k) {
-  const mem = webhooks.get(k);
-  if (mem && mem.length) return mem;
-  if (!redisClient || !redisClient.isReady) return mem || [];
-  try {
-    const raw = await redisClient.lRange(_webhookRedisKey(k), 0, 19);
-    const list = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((h) => h && typeof h.url === 'string');
-    if (list.length) webhooks.set(k, list);
-    return list;
-  } catch { return mem || []; }
+  // Redis is the store when there is one (its TTLs and caps hold); the
+  // in-memory map is only for a relay without redis.
+  if (redisClient && redisClient.isReady) {
+    try {
+      const raw = await redisClient.lRange(_webhookRedisKey(k), -WEBHOOK_PER_DEVICE, -1);
+      const list = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((h) => h && typeof h.url === 'string');
+      if (list.length) return list;
+    } catch { /* fall back to memory */ }
+  }
+  return webhooks.get(k) || [];
 }
 async function pushWebhooks(apiKey, deviceId, event, data) {
   const hooks = await _webhooksFor(`${deviceId}:${acctOf(apiKey)}`);
@@ -4277,7 +4387,8 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
         method:  'POST',
         timeout: 5000,
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
-                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, 'User-Agent': `paramant-relay/${VERSION}` },
+                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, ...webhookSign.signatureHeaders(hook.secret, payload),
+                   'User-Agent': `paramant-relay/${VERSION}` },
         body: payload,
       });
       stats.webhooks_sent++;
@@ -4715,7 +4826,7 @@ async function handleRelayRequest(req, res) {
     const _host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
     const _hostOk = /^([a-z0-9-]+\.)*paramant\.app$/i.test(_host);
     const _publicOrigin = process.env.PARASIGN_PUBLIC_ORIGIN
-      || (_hostOk ? `https://${_host}` : 'https://paramant.app');
+      || (_hostOk ? `https://${_host}` : parasignFallbackOrigin());
     return parasignOpenApi.route({
       req, res, method: req.method, path, query, clientIp,
       authHeader: req.headers['authorization'] || '',
@@ -4969,7 +5080,7 @@ async function handleRelayRequest(req, res) {
     // printed in its log and wrote next to users.json, or with ADMIN_TOKEN.
     if (!_setupAuthorized(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'setup_token_required', detail: 'Send the setup token from the relay log (or the file ' + nodePath.basename(SETUP_TOKEN_FILE) + ' next to users.json) in the X-Setup-Token header.' }));
+      return res.end(J({ error: 'setup_token_required', detail: 'Send the setup token from the file ' + nodePath.basename(SETUP_TOKEN_FILE) + ' next to users.json in the X-Setup-Token header.' }));
     }
     try {
       const body = JSON.parse((await readBody(req, 16384)).toString());
@@ -5154,7 +5265,12 @@ async function handleRelayRequest(req, res) {
       } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
     } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
 
-    let tlsStatus = 'yellow', tlsDetail = 'TLS terminated at the edge (not on this relay)';
+    // A relay behind a proxy that holds the certificate is the normal setup
+    // (install.sh, docker-compose), and a new install has no API keys yet.
+    // Neither is a warning about this relay, so both report 'info': shown,
+    // never counted in the verdict. A fresh install used to read "Actief, met
+    // waarschuwingen" forever and never "Alles werkt" (fase 2 SITE-13-A).
+    let tlsStatus = 'info', tlsDetail = 'TLS terminated at the edge (not checked on this relay)';
     try {
       const certFile = process.env.TLS_CERT_FILE || nodePath.join(process.cwd(), 'deploy/certs/cert.pem');
       if (fs.existsSync(certFile) && typeof crypto.X509Certificate === 'function') {
@@ -5166,7 +5282,8 @@ async function handleRelayRequest(req, res) {
     } catch (e) { tlsDetail = 'cert unreadable: ' + (e.code || e.message); }
     add('tls', tlsStatus, tlsDetail);
 
-    add('users', apiKeys.size > 0 ? 'green' : 'yellow', apiKeys.size + ' API key(s) loaded');
+    add('users', apiKeys.size > 0 ? 'green' : 'info',
+      apiKeys.size > 0 ? apiKeys.size + ' API key(s) loaded' : 'no API keys yet (normal on a new install)');
     add('audit', 'green', 'Merkle hash chain active');
 
     // The store, said out loud. Until now nothing in either health route
@@ -5188,7 +5305,7 @@ async function handleRelayRequest(req, res) {
       }
     }
 
-    const rank = { green: 0, yellow: 1, red: 2 };
+    const rank = { info: 0, green: 0, yellow: 1, red: 2 };
     const overall = checks.reduce((m, c) => (rank[c.status] > rank[m] ? c.status : m), 'green');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ overall, version: VERSION, sector: SECTOR, checks }));
@@ -5330,8 +5447,18 @@ async function handleRelayRequest(req, res) {
   if (req.method === "POST" && path === "/v2/user/verify-totp") {
     if (!_internalOk()) return _internalReject();
     try {
-      const { user_id, totp, throttled_upstream } = JSON.parse((await readBody(req, 4096)).toString());
+      const { user_id, totp, throttled_upstream, fresh_factor } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      // fresh_factor: the admin asks for a TOTP as a fresh second factor from
+      // someone who already holds this account's session (delete account,
+      // passkey, signing key, backup codes). That caller can only aim at its
+      // own account, so a hard per-account lockout is safe here, and it shares
+      // the counter of the signing-key routes (review #555, H2). The login
+      // path does not send it: a lockout there would let anyone lock anyone out.
+      if (fresh_factor === true) {
+        const lockedMs = await totpAccountLocked(user_id);
+        if (lockedMs) return totpLockedReply(res, lockedMs);
+      }
       // Throttle, never refuse: see userMfaDelayMs.
       //
       // WHY throttled_upstream EXISTS. This sleep is charged to an account, and
@@ -5378,9 +5505,16 @@ async function handleRelayRequest(req, res) {
         res.writeHead(503, { "Content-Type": "application/json" });
         return res.end(J({ error: "replay_store_unavailable" }));
       }
-      if (!result || !result.valid) userMfaNoteFailure(user_id);
+      if (!result || !result.valid) {
+        userMfaNoteFailure(user_id);
+        if (fresh_factor === true) {
+          const lockMs = await totpAccountFailed(user_id);
+          if (lockMs) return totpLockedReply(res, lockMs);
+        }
+      }
       if (result && result.valid) {
         userMfaAttemptReset(user_id);
+        if (fresh_factor === true) await totpAccountOk(user_id);
         // Dual-verify accepted this code. If it validated under SHA-1, record a
         // structured, countable event (never the code or the secret) so SHA-1-app
         // usage is measurable in the logs. This is the login/verify path.
@@ -5710,6 +5844,15 @@ async function handleRelayRequest(req, res) {
           return res.end(J({ error: 'send_store_full', retry_after_s: 900,
             message: 'Too many large sends are open right now. Nothing was sent; try again later or send a smaller file.',
             message_nl: 'Er staan nu te veel grote verzendingen open. Er is niets verstuurd; probeer het later opnieuw of verstuur een kleiner bestand.' }));
+        }
+        if (made.reason === 'account_store_full') {
+          // This account's own open sends fill its share of the store (review
+          // #555, M6). His sends free it as they expire or are opened.
+          log('warn', 'send_refused', { reason: 'account_store_full', limit_mb: made.limit });
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '900' });
+          return res.end(J({ error: 'send_account_store_full', limit_mb: made.limit, retry_after_s: 900,
+            message: 'Your open sends together have reached what one account may hold at once. Nothing was sent; try again when earlier sends have been collected or have expired.',
+            message_nl: 'Uw openstaande verzendingen samen hebben bereikt wat een account tegelijk mag hebben staan. Er is niets verstuurd; probeer het opnieuw als eerdere verzendingen zijn opgehaald of verlopen.' }));
         }
         const _dim = made.dimension
           || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
@@ -6570,7 +6713,7 @@ async function handleRelayRequest(req, res) {
       const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
       log("info", "parasign_key_self_minted", { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode });
       res.writeHead(201, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, plan_parasign: out.plan_parasign, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
@@ -6591,6 +6734,15 @@ async function handleRelayRequest(req, res) {
         .map(k => [k, apiKeys.get(k)])
         .filter(([k, v]) => v && (v.scope === "parasign" || v.product === "parasign" || /^psk_/.test(k)))
         .map(([k, v]) => ({ kid: v.kid || keysTable.computeKid(k), key_masked: maskKey(k), mode: /^psk_test_/.test(k) ? "test" : "live", plan: v.plan, label: v.label || "", active: v.active !== false, created: v.created || null }));
+      // The same question as POST (P10 API-11-A). An account without the
+      // ParaSign API got 200 and an empty list, so /account showed it a key
+      // block whose only button answered 403. Without the right AND without a
+      // key it is the same 403; an account that lost the right but still holds
+      // keys keeps seeing them, so it can revoke what it has.
+      if (keys.length === 0 && !parasignApiEntitled(accountId)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten." }));
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, account_id: accountId, count: keys.length, keys }));
     } catch (err) {
@@ -6802,33 +6954,17 @@ async function handleRelayRequest(req, res) {
       const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: maskIp(getClientIp(req)) });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
-      // Send countersigned DPA email
+      // Send countersigned DPA email, in the language the page was signed in.
       if (mailer.gereed()) {
-        const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
-          <p style="color:#888;margin-bottom:24px">This email confirms that a Data Processing Agreement (GDPR Art. 28) has been signed on behalf of <strong style="color:#ededed">${escHtml(org)}</strong>.</p>
-          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px;font-size:13px">
-            <div style="color:#555;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Agreement details</div>
-            <table style="width:100%;border-collapse:collapse">
-              <tr><td style="color:#555;padding:4px 0;width:40%">Reference</td><td style="color:#ededed">${ref}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${escHtml(version)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
-            </table>
-          </div>
-          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
-          <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
-        </div>`;
+        const { subject: dpaSubject, html } = dpaMail.dpaConfirmation({
+          name, title, org, ref, signed_at, version, lang: d.lang === 'nl' ? 'nl' : 'en' });
         // Through the one door, like every other message. A DPA confirmation
         // that talks about EU jurisdiction should not be carried out of it.
         mailer.stuur({
           from: 'PARAMANT <privacy@paramant.app>',
           to: email,
           cc: 'privacy@paramant.app',
-          subject: `DPA signed — ${org} (${ref})`,
+          subject: dpaSubject,
           html,
         }).then(r => {
           if (r.ok) log('info', 'dpa_email_sent', { ref, email: maskEmail(email), provider: r.provider });
@@ -7338,8 +7474,13 @@ async function handleRelayRequest(req, res) {
   // proxy in front of us", never "arrived", so a burn on 'finish' cost the
   // receiver the file on every slow or broken line, and a wrong key burned it
   // before it was ever tried. See DL_MAX_FETCHES for the bound on retries.
+  // The confirm page never links here with a plain href any more (review
+  // #555, LAAG): a crawler or link checker that followed the "Download &
+  // Burn" link burned the file. The button is a script that claims and acks;
+  // without script it is a POST form, which crawlers do not submit. A GET
+  // without a claim stays for the SDKs and CLIs in the field.
   const dlgm = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/get$/);
-  if (dlgm && req.method === 'GET') {
+  if (dlgm && (req.method === 'GET' || req.method === 'POST')) {
     const token = dlgm[1];
     const ua = req.headers['user-agent'] || '';
     const claim = typeof query.claim === 'string' && DL_CLAIM_RE.test(query.claim) ? query.claim : null;
@@ -7678,7 +7819,12 @@ async function handleRelayRequest(req, res) {
 
     // Refuse to wipe a populated Map with an empty load — defends against the
     // 2026-05-08 race where a concurrent write left the file readable but empty.
-    if (candidate.size === 0 && prevCount > 0) {
+    // A file whose keys are all there and all revoked (active:false, the mark
+    // paramant-admin.py revoke writes) is not that race: it is the operator
+    // revoking the last key. Refused, that key stayed valid (SELF-11-A), so it
+    // goes through; only a file with no entries at all is still refused.
+    const allRevoked = parsed.api_keys.length > 0 && parsed.api_keys.every((k) => k && typeof k.key === 'string' && k.active === false);
+    if (candidate.size === 0 && prevCount > 0 && !allRevoked) {
       log('warn', 'reload_users_rejected', { prev: prevCount, candidate: 0, reason: 'refusing_to_wipe_populated_map' });
       res.writeHead(409); return res.end(J({ ok: false, error: 'sanity_check_failed', prev: prevCount, candidate: 0 }));
     }
@@ -7848,9 +7994,20 @@ async function handleRelayRequest(req, res) {
   const invRejm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/reject$/);
   if (invRejm && req.method === 'POST') {
     if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    // Only the account that owns the running hand-over may stop it (review
+    // #555, M5): any key could reject any inv_ id and wipe the sender's
+    // manifest. Before the first block there is no owner yet, and the
+    // rejection is the sender's own first word on the inv_ id.
+    const _rm = invManifests.get(invRejm[1]);
+    if (_rm && Date.now() <= _rm.expires && _rm.owner !== acctOf(apiKey)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'This hand-over belongs to a different account' }));
+    }
     if (invRejections.size >= INV_MANIFEST_MAX) for (const [k, t] of invRejections) if (Date.now() > t) invRejections.delete(k);
+    // Hard cap: the oldest rejection goes first, the map never grows past it.
+    while (invRejections.size >= INV_MANIFEST_MAX) invRejections.delete(invRejections.keys().next().value);
     invRejections.set(invRejm[1], Date.now() + INV_MANIFEST_TTL_MS);
-    invManifests.delete(invRejm[1]);
+    _invDrop(invRejm[1]);
     log('info', 'handover_rejected', { inv: invRejm[1].slice(0, 8) });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, rejected: true }));
@@ -7874,20 +8031,28 @@ async function handleRelayRequest(req, res) {
     const idx = Number(d.index); const total = Number(d.total_chunks);
     const token = typeof d.token === 'string' ? d.token : '';
     if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
-    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > INV_TOTAL_CHUNKS_MAX) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer of at most ' + INV_TOTAL_CHUNKS_MAX })); }
     if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
     const owner = acctOf(apiKey);
     let m = invManifests.get(invMfm[1]);
-    if (m && Date.now() > m.expires) { invManifests.delete(invMfm[1]); m = null; }
+    if (m && Date.now() > m.expires) { _invDrop(invMfm[1]); m = null; }
     if (!m) {
       if (invManifests.size >= INV_MANIFEST_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      let _mine = 0;
+      const _now = Date.now();
+      for (const x of invManifests.values()) if (x.owner === owner && _now <= x.expires) _mine++;
+      if (_mine >= INV_MANIFESTS_PER_ACCOUNT) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'too_many_handovers', max: INV_MANIFESTS_PER_ACCOUNT })); }
       m = { owner, total, tokens: new Map(), meta: null, expires: Date.now() + INV_MANIFEST_TTL_MS };
       invManifests.set(invMfm[1], m);
     }
     if (m.owner !== owner) { res.writeHead(403); return res.end(J({ error: 'This hand-over belongs to a different account' })); }
     if (m.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
-    if (!m.tokens.has(idx)) m.tokens.set(idx, token);
+    if (!m.tokens.has(idx)) {
+      if (invTokenCount >= INV_TOKENS_TOTAL_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      m.tokens.set(idx, token);
+      invTokenCount++;
+    }
     if (typeof d.meta === 'string' && d.meta.length <= 2048 && !m.meta) m.meta = d.meta;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, have: m.tokens.size, total }));
@@ -8459,7 +8624,7 @@ async function handleRelayRequest(req, res) {
     const total = Number(d.total_chunks);
     const token = typeof d.token === 'string' ? d.token : '';
     if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
-    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > INV_TOTAL_CHUNKS_MAX) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer of at most ' + INV_TOTAL_CHUNKS_MAX })); }
     if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
     if (!sess.manifest) sess.manifest = { total, tokens: new Map(), meta: null };
@@ -8972,12 +9137,21 @@ async function handleRelayRequest(req, res) {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
-      const k = `${d.device_id}:${acctOf(apiKey)}`;
-      if (!webhooks.has(k)) webhooks.set(k, []);
+      if (typeof d.url !== 'string' || d.url.length > WEBHOOK_URL_MAX) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'url too long', max: WEBHOOK_URL_MAX })); }
+      if (String(d.device_id).length > WEBHOOK_DEVICE_ID_MAX) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'device_id too long', max: WEBHOOK_DEVICE_ID_MAX })); }
+      const _acct = acctOf(apiKey);
+      const k = `${d.device_id}:${_acct}`;
+      const _capReply = (code) => {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        return res.end(J(code === -1
+          ? { error: 'webhook_device_limit', max_devices: WEBHOOK_DEVICES_PER_ACCOUNT }
+          : { error: 'webhook_store_full' }));
+      };
       // Every webhook is signed. Without a secret X-Paramant-Sig went out
       // empty and the receiver could not tell our call from anyone's. One is
       // made when the caller sends none, and handed back once, here.
       const _given = d.secret == null ? '' : String(d.secret);
+      if (_given.length > 256) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'secret too long', max: 256 })); }
       const _secret = _given || ('whsec_' + crypto.randomBytes(24).toString('hex'));
       // String(), want `|| ''` vangt alleen falsy. Een number, object of array
       // overleefde en kwam later in crypto.createHmac terecht, dat op een
@@ -8987,13 +9161,28 @@ async function handleRelayRequest(req, res) {
       // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
       // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
       // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
-      webhooks.get(k).push({ url: d.url, secret: _secret });
+      const _entry = { url: d.url, secret: _secret };
       if (redisClient && redisClient.isReady) {
+        let rr;
         try {
-          const rk = _webhookRedisKey(k);
-          await redisClient.rPush(rk, JSON.stringify({ url: d.url, secret: _secret }));
-          await redisClient.lTrim(rk, -20, -1);
-        } catch (we) { log('warn', 'webhook_persist_failed', { err: we.message }); }
+          rr = await redisClient.eval(WEBHOOK_REGISTER_LUA, {
+            keys: [_webhookAcctKey(_acct), WEBHOOK_ALL_KEY, _webhookRedisKey(k)],
+            arguments: [String(Date.now()), String(Date.now() + WEBHOOK_TTL_S * 1000), crypto.createHash('sha256').update(String(d.device_id)).digest('hex').slice(0, 32),
+              String(WEBHOOK_DEVICES_PER_ACCOUNT), String(WEBHOOK_TOTAL_MAX), JSON.stringify(_entry), String(WEBHOOK_PER_DEVICE), String(WEBHOOK_TTL_S)],
+          });
+        } catch (we) {
+          log('warn', 'webhook_persist_failed', { err: we.message });
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'webhook_store_unavailable' }));
+        }
+        if (Number(rr) < 0) return _capReply(Number(rr));
+      } else {
+        const memOk = _webhookMemAllowed(k, _acct);
+        if (memOk < 0) return _capReply(memOk);
+        if (!webhooks.has(k)) webhooks.set(k, []);
+        const _list = webhooks.get(k);
+        _list.push(_entry);
+        if (_list.length > WEBHOOK_PER_DEVICE) _list.splice(0, _list.length - WEBHOOK_PER_DEVICE);
       }
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -9080,7 +9269,7 @@ async function handleRelayRequest(req, res) {
       sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
       relayIdentity,
       canonicalJSON: parasign.canonicalJSON,
-      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app',
+      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
     });
   }
 
@@ -10205,7 +10394,7 @@ async function handleRelayRequest(req, res) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
     if (!redisClient || !redisClient.isReady) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     let body;
     try { body = JSON.parse((await readBody(req, 512)).toString() || '{}'); }
@@ -10221,7 +10410,7 @@ async function handleRelayRequest(req, res) {
       if (redisOutage503(e, res)) return;
       log('warn', 'coupon_claim_failed', { account: String(accountId).slice(0, 12), err: e.message });
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     if (!claim.ok) {
       // 409 for a code that exists and cannot be spent (run out, already used,
@@ -10231,7 +10420,7 @@ async function handleRelayRequest(req, res) {
       const status = claim.error === 'unknown' || claim.error === 'bad_code' ? 404 : 409;
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: claim.error });
       res.writeHead(status, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error) }));
+      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error), message_nl: coupon.messageForNl(claim.error) }));
     }
 
     // Rule 3 (lib/coupon.js): the gift is ADDED to a term that is still
@@ -10280,7 +10469,7 @@ async function handleRelayRequest(req, res) {
       await coupon.release(redisClient, claim.code, accountId);
       log('error', 'coupon_grant_failed', { account: String(accountId).slice(0, 12), code: claim.code, reason: failure });
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed }));
+      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed, message_nl: coupon.MESSAGES_NL.grant_failed }));
     }
     if (granted.length === 0) {
       // Nothing to add anywhere. The seat goes back, so the code is not spent
@@ -10289,7 +10478,7 @@ async function handleRelayRequest(req, res) {
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: 'nothing_to_add',
         kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') });
       res.writeHead(409, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept) }));
+      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept), message_nl: coupon.nothingToAddMessageNl(kept) }));
     }
 
     // The line on /account. Written after the term is really on the account, so
@@ -10300,6 +10489,7 @@ async function handleRelayRequest(req, res) {
     await billingHistory.recordGift(redisClient, accountId, {
       code: claim.code,
       label: coupon.historyLabel(claim.code, granted),
+      label_nl: coupon.historyLabelNl(claim.code, granted),
       grants: granted,
       redeemed_at: redeemedAt,
     });
@@ -10333,6 +10523,7 @@ async function handleRelayRequest(req, res) {
       // The sentence the page prints. Built here so the mail, the history line
       // and the page all name the same plans and the same dates.
       message: coupon.successMessage(granted, kept),
+      message_nl: coupon.successMessageNl(granted, kept),
     }));
   }
 
@@ -10650,7 +10841,7 @@ async function handleRelayRequest(req, res) {
       const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
       try { auditAppend(out.key, 'admin_parasign_key_minted', { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode, plan: out.plan }); } catch {}
       res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, plan_parasign: out.plan_parasign, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
     } catch(e) { if (keyCapReject(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
@@ -11618,7 +11809,9 @@ async function handleRelayRequest(req, res) {
             plan: _signEnt.tier, limit: _signIncluded, used: _g.used,
             reset_date: quota.nextResetDate() }));
         }
-        _signReserved = _g.counted;
+        // A reference on a unit: counted it here, or rides the pending hold of
+        // an earlier request for this slot (quota.GATE_SIGN_LUA, review #555 H4).
+        _signReserved = _g.counted || _g.ref === true;
         if (Number.isFinite(_g.used)) _signUsed = _g.used;
       }
 
@@ -11658,11 +11851,15 @@ async function handleRelayRequest(req, res) {
       // left here is the retry case: an 'idem' answer means this signature was
       // already counted the first time round, and the slot this request reserved
       // has to go back or a client that retries pays twice for one signature.
+      // The release takes this request's reference off the slot's hold; the
+      // unit only goes back when no other request is still on it and nothing
+      // landed on it (review #555, H4).
       if (out.code !== 'new' && _signReserved) {
-        const _rel = await quota.releaseSign(redisClient, meterAccountId, log);
+        const _rel = await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
         if (Number.isFinite(_rel.used)) _signUsed = _rel.used;
         _signReserved = false;
       }
+      if (out.code === 'new' && Number.isFinite(_signIncluded)) await quota.finalizeSign(redisClient, _holdKey, log);
       // A path that reserved a slot and neither released it nor signed would
       // leak a unit a month. There is no such path: every return between the
       // gate and here releases first, and the only remaining exits are this
@@ -11813,6 +12010,9 @@ async function handleRelayRequest(req, res) {
         burn_confirmed: receiptObj.burn_confirmed,
         tree_size:      proof.tree_size,
         leaf_index:     proof.leaf_index,
+        // The log size the receipt itself names, as docs/api.md promises
+        // (P10 API-29-N). Signed inside the receipt; repeated here unchanged.
+        tree_size_at_retrieval: Number.isFinite(receiptObj.tree_size_at_retrieval) ? receiptObj.tree_size_at_retrieval : null,
       }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
@@ -12106,6 +12306,16 @@ if (!RELAY_SELF_URL) {
         + 'until then signed heads and receipts name a paramant.app host.',
   });
 }
+// The same, for ParaSign links and receipts (P10 API-16-N). Without
+// PARASIGN_PUBLIC_ORIGIN they fall back to RELAY_SELF_URL, and only when that
+// is unset too to paramant.app: say which, once, at boot.
+if (!process.env.PARASIGN_PUBLIC_ORIGIN) {
+  log('warn', 'parasign_public_origin_unset', {
+    using: parasignFallbackOrigin(),
+    hint: 'Set PARASIGN_PUBLIC_ORIGIN to the site your signers open (https://your-host); '
+        + 'sign_url and the receipt\'s relay_pubkey_url are built from it.',
+  });
+}
 loadUsers();
 _initSetupToken();
 loadTrialKeys();
@@ -12215,6 +12425,21 @@ if (redisClient && RELAY_REDIS_URL) {
     }))
     .then(() => log('info', 'shared_grant_subscriber_ready', { channel: sharedGrants.CHANNEL }))
     .catch(e => log('warn', 'shared_grant_subscriber_failed', { err: e.message }));
+}
+
+// ── Billing ledger backfill ──────────────────────────────────────────────────
+// Every payment id this relay already knows as settled (paid_by_<product> on
+// the accounts, paramant:billing:done:* in redis) goes into the durable ledger
+// once at boot, so an old tr_ id cannot be granted again after its redis
+// marker expires (review #555, M3). Idempotent, so every boot may run it.
+// BILLING_LEDGER_BACKFILL_DELAY_MS moves it, for a test.
+{
+  const _bfDelay = parseInt(process.env.BILLING_LEDGER_BACKFILL_DELAY_MS || '', 10);
+  setTimeout(() => {
+    const records = [...apiKeys.values(), ...accounts.values()];
+    backfillLedger(billingLedger, { redis: redisClient, records, products: entitlements.PRODUCTS, log })
+      .catch((e) => log('warn', 'billing_ledger_backfill_failed', { err: e.message }));
+  }, Number.isFinite(_bfDelay) ? _bfDelay : 5000).unref?.();
 }
 
 // ── The party worklist migration ─────────────────────────────────────────────

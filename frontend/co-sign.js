@@ -1138,7 +1138,7 @@ async function renderPdfPage(wrap) {
 async function renderPdfPreview(bytes, host) {
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(bytes);   // pdf.js detaches the buffer it is handed
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
   __previewPdf = pdf;
   host.innerHTML = '';
   const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
@@ -1582,41 +1582,38 @@ async function renderPdfWithRecords(records) {
       }
     }
   }
-  // Mark this file as Paramant's reading copy of THIS envelope and THIS
-  // original, in a plain (uncompressed) Info entry: /verify only explains a
-  // hash mismatch as "the stamped copy" when it finds exactly this marker
-  // (hertest r2 R1). The .psign and the original are untouched.
+  // Label this file as Paramant's reading copy of THIS envelope and THIS
+  // original, in a plain (uncompressed) Info entry. It is a label, not
+  // evidence: no signature covers it, so /verify ignores it and treats this
+  // file like any other file that is not the signed one (review #555, B1).
+  // The .psign and the original are untouched.
   try {
     const { PDFName, PDFString } = window.PDFLib;
     pdf.getInfoDict().set(PDFName.of('ParamantStampedCopy'),
       PDFString.of('env=' + String(__envelope.id) + ';doc=' + String(__envelope.doc_hash)));
-  } catch { /* no marker: /verify then says plainly INVALID, never "copy" */ }
+  } catch { /* no label: nothing changes for /verify */ }
   return new Uint8Array(await pdf.save({ useObjectStreams: false }));
 }
 
 // The whole document key K the sender kept on this device when the request
-// was sent (sign-flow.js), as { f, exp }. It is kept only while needed: a
-// voided, declined or expired request drops it, a complete one keeps it seven
-// more days for the result page, an expired entry is gone (security review r2
-// a3). Older bare values are still read once.
-function ownerKeyFragment(envId, state, env) {
+// was sent (sign-flow.js), as { f, exp }. It is kept only while needed and at
+// most 24 hours: a voided, declined or expired request drops it, a complete
+// one is used for this page view and dropped from storage, an expired entry
+// is gone (security review r2 a3, review #555 M4). Older bare values are
+// still read once.
+function ownerKeyFragment(envId, state) {
   const k = 'paramant.cosign.key.v1:' + envId;
   let raw = '';
   try { raw = localStorage.getItem(k) || ''; } catch { return ''; }
   if (!raw) return '';
   let rec;
   try { rec = JSON.parse(raw); } catch { rec = null; }
-  if (!rec || typeof rec !== 'object') rec = { f: raw, exp: Date.now() + 7 * 864e5 };
+  if (!rec || typeof rec !== 'object') rec = { f: raw, exp: Date.now() + 864e5 };
   const now = Date.now();
   const drop = () => { try { localStorage.removeItem(k); } catch { /* storage off */ } };
   if (!(now < Number(rec.exp))) { drop(); return ''; }
   if (state === 'cancelled' || state === 'declined' || state === 'expired') { drop(); return ''; }
-  if (state === 'complete') {
-    const done = Date.parse((env && env.completed_at) || '') || now;
-    const until = Math.min(Number(rec.exp), done + 7 * 864e5);
-    if (!(now < until)) { drop(); return ''; }
-    if (until !== Number(rec.exp)) { try { localStorage.setItem(k, JSON.stringify({ f: rec.f, exp: until })); } catch { /* storage off */ } }
-  }
+  if (state === 'complete') drop();
   return String(rec.f || '');
 }
 
@@ -1678,7 +1675,9 @@ function wireResultCard({ proofUrl }) {
   if (note) {
     note.hidden = false;
     note.textContent = complete
-      ? L('Het bewijs (.psign) toont aan wie waar heeft getekend. Controleer het op /verify samen met het originele document: de pdf met handtekeningen is een leesbare kopie daarvan.', 'The proof (.psign) shows who signed where. Check it on /verify together with the original document: the pdf with signatures is a readable copy of it.')
+      ? L('Het bewijs (.psign) toont aan wie waar heeft getekend. Controleer het op /verify samen met het bestand dat iedereen tekende: ', 'The proof (.psign) shows who signed where. Check it on /verify together with the file everyone signed: ') +
+        String(__envelope.original_filename || L('het originele document', 'the original document')) +
+        L(' (de knop voor het origineel hierboven). De pdf met alle handtekeningen is een leesbare kopie daarvan en geeft op /verify rood.', ' (the button for the original above). The pdf with every signature is a readable copy of it and shows red on /verify.')
       : L('Het bewijs komt beschikbaar zodra iedereen heeft getekend.', 'The proof becomes available once everyone has signed.');
   }
 }
@@ -1727,7 +1726,7 @@ async function initOwner(resultRef, ownerId) {
     }
     // The whole key was kept on this device when the request was sent. On
     // another device the sender opens their own original file instead.
-    const fragment = ownerKeyFragment(envId, state, __envelope);
+    const fragment = ownerKeyFragment(envId, state);
     if (fragment && parseDocumentKeyFragment(fragment)) {
       try {
         const r = await fetch('/api/user/envelopes/' + encodeURIComponent(envId) + '/owner-document', { credentials: 'include', cache: 'no-store' });

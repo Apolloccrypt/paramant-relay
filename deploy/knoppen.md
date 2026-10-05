@@ -295,7 +295,7 @@ deze regels doorbreken.
 | `deploy/nginx/addin.paramant.app.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/addin.paramant.app.conf` | `client_body_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `client_max_body_size` | `afwezig` |
-| `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_req_zone` | `$binary_remote_addr zone=relay_auth:10m rate=10r/m / $user_session_key zone=user_session:10m rate=300r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=relay_inbound:10m rate=5r/m / $binary_remote_addr zone=relay_outbound:10m rate=60r/m / $binary_remote_addr zone=relay_trial:1m rate=3r/m` |
+| `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_req_zone` | `$binary_remote_addr zone=relay_auth:10m rate=10r/m / $binary_remote_addr zone=user_session:10m rate=1200r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=relay_inbound:10m rate=5r/m / $binary_remote_addr zone=relay_outbound:10m rate=60r/m / $binary_remote_addr zone=relay_trial:1m rate=3r/m` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `client_body_timeout` | `afwezig` |

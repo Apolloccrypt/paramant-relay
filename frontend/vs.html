@@ -388,21 +388,21 @@
 
     <p>In juni 2025 is Zivver overgenomen door Kiteworks, een bedrijf uit Californië dat $610M ophaalde, vooral bij Amerikaanse investeerders. Het hoofdkantoor van Zivver blijft in Amsterdam, maar het beleid voor gegevensverwerking valt nu onder een Amerikaans moederbedrijf. Daardoor speelt de CLOUD Act een rol die er vóór de overname niet was.</p>
 
-    <p class="dim mono" style="font-size:11px">Bronnen (niet gelinkt, terug te vinden onder deze titels): persbericht Kiteworks 17 juni 2025; bedrijfsblog Zivver; profiel van Kiteworks op PitchBook.</p>
+    <p class="dim mono" style="font-size:11px">Bronnen: <a href="https://www.kiteworks.com/company/press-releases/kiteworks-acquires-zivver-expanding-private-data-network-with-zero-knowledge-encryption/" rel="noopener" style="color:inherit">persbericht Kiteworks 17 juni 2025</a>; <a href="https://www.zivver.com/blog/press-release-zivver-joins-kiteworks-group" rel="noopener" style="color:inherit">bedrijfsblog Zivver</a>. Niet gelinkt (alleen met een abonnement te openen): profiel van Kiteworks op PitchBook.</p>
 
     <h3>Tresorit</h3>
     <p>Tresorit is een volwassen zero-knowledge-platform voor cloudopslag en samenwerking. Onafhankelijk geaudit door Ernst and Young en Computest. Gecertificeerd voor ISO 27001 en EAL4+. Sterke functies voor grote organisaties, waaronder fijnmazig rechtenbeheer en een keuze uit 12 regio's in de EU en Zwitserland voor de opslag van gegevens.</p>
 
     <p>Tresorit is sinds 2021 voor het grootste deel in handen van Swiss Post (de Zwitserse staatspost). Het valt onder Zwitsers recht, niet onder de Amerikaanse CLOUD Act. Tresorit werkt als cloudopslag met blijvende bestanden, niet als relay die bestanden na lezen wist. Post-quantumcryptografie staat op hun aangekondigde roadmap, maar hoe ver de invoering is, was in april 2026 niet openbaar.</p>
 
-    <p class="dim mono" style="font-size:11px">Bronnen (niet gelinkt, terug te vinden onder deze titels): persbericht Swiss Post juli 2021; transparantierapport Tresorit; blogpost van Tresorit over PQC, november 2025.</p>
+    <p class="dim mono" style="font-size:11px">Bronnen: <a href="https://www.post.ch/en/about-us/media/press-releases/2021/swiss-post-acquires-majority-stake-in-tresorit" rel="noopener" style="color:inherit">persbericht Swiss Post juli 2021</a>; <a href="https://tresorit.com/transparency-report" rel="noopener" style="color:inherit">transparantierapport Tresorit</a>; <a href="https://tresorit.com/blog/post-quantum-cryptography.-the-future-of-encryption-has-begun" rel="noopener" style="color:inherit">blogpost van Tresorit over PQC, november 2025</a>.</p>
 
     <h3>WeTransfer</h3>
     <p>WeTransfer is dé standaard voor het delen van bestanden, voor dagelijks en creatief gebruik. Gratis kunt u 3 GB per overdracht versturen, 10 overdrachten per maand. Pro en Ultimate bieden overdrachten tot 300 GB en onbeperkte opslag. Uitstekend voor het beoordelen van video, het afleveren van mediabestanden aan klanten en losse verzendingen waarbij beveiliging niet voorop staat.</p>
 
     <p>WeTransfer gebruikt TLS tijdens verzending en AES-256 bij opslag, maar biedt geen end-to-end-versleuteling. WeTransfer beheert de sleutels, dus het bedrijf kan technisch bij de inhoud van bestanden. In 2024 overgenomen door het Italiaanse Bending Spoons. Hoofdkantoor in Amsterdam, Italiaanse eigenaar. Via het eigendom geen blootstelling aan de CLOUD Act. Niet geschikt voor gegevens uit gereguleerde sectoren die een zero-knowledge-architectuur vereisen.</p>
 
-    <p class="dim mono" style="font-size:11px">Bronnen (niet gelinkt, terug te vinden onder deze titels): supportdocumentatie WeTransfer; beveiligingsreview van onerep.com uit 2026; aankondiging van de overname door Bending Spoons.</p>
+    <p class="dim mono" style="font-size:11px">Bronnen: <a href="https://wetransfer.com/help-center/security-privacy/how-do-we-protect-your-files" rel="noopener" style="color:inherit">supportdocumentatie WeTransfer</a>; <a href="https://onerep.com/blog/is-wetransfer-safe" rel="noopener" style="color:inherit">beveiligingsreview van onerep.com uit 2026</a>. Niet gelinkt (de persberichtensite weigert een controle zonder browser): aankondiging van de overname door Bending Spoons, 31 juli 2024.</p>
 
     <h3>SFTP / SCP</h3>
     <p>SFTP over SSH is een volwassen protocol voor bestandsoverdracht tussen servers, dat overal wordt ondersteund. Beheert u uw eigen infrastructuur en beide kanten van de overdracht, dan werkt SFTP goed en is het gratis. Beschikbaar op elk Unix-systeem.</p>
@@ -451,7 +451,7 @@
         <tr>
           <td class="strong">Gereguleerde sector met Europese datasoevereiniteit</td>
           <td class="cobalt-text">Paramant</td>
-          <td>Geen Amerikaanse eigenaar, geen CLOUD Act, post-quantum, alleen in RAM</td>
+          <td>Geen Amerikaanse eigenaar, geen CLOUD Act, post-quantum bij de live overdracht en bij het ondertekenen, alleen in RAM</td>
         </tr>
         <tr>
           <td class="strong">Industriële OT / SCADA / IEC 62443</td>
@@ -459,7 +459,7 @@
           <td>Enige aanbieder die zich specifiek op OT richt</td>
         </tr>
         <tr>
-          <td class="strong">Post-quantumversleuteling, nu al</td>
+          <td class="strong">Post-quantumversleuteling bij de live overdracht, nu al</td>
           <td class="cobalt-text">Paramant</td>
           <td>ML-KEM-768 Level 3, hybride met ECDH P-256, bij de live overdracht en de SDK; ondertekenen met ML-DSA-65</td>
         </tr>
@@ -491,9 +491,9 @@
       <div class="tag" style="color:rgba(255, 255, 255, .72)">architectuur<br/>telt</div>
     </div>
 
-    <p style="color:var(--invert-ink);max-width:720px">Paramant heeft een duidelijke plek. Het is een relay voor post-quantumversleutelde bestanden en een dienst voor het ondertekenen van documenten, met opslag alleen in RAM, bestanden die na lezen worden gewist en openbare cryptografische transparantie. Het is geen cloudopslag, geen e-mailplug-in en geen DLP-platform.</p>
+    <p style="color:var(--invert-ink);max-width:720px">Paramant heeft een duidelijke plek. Het is een relay voor versleutelde bestanden (post-quantum bij de live overdracht en de SDK, niet bij een eenmalige link) en een dienst voor het ondertekenen van documenten met post-quantumhandtekeningen, met opslag alleen in RAM, bestanden die na lezen worden gewist en openbare cryptografische transparantie. Het is geen cloudopslag, geen e-mailplug-in en geen DLP-platform.</p>
 
-    <p style="color:var(--invert-ink);max-width:720px;margin-top:16px">Voor organisaties die de combinatie nodig hebben van Europese datasoevereiniteit (zonder Amerikaanse eigenaar), post-quantumcryptografie (nu al, niet op de roadmap), versleuteling in de browser waarbij een eenmalige link de sleutel nooit langs ons stuurt en de mogelijkheid om zelf te hosten, is Paramant op dit moment de enige optie in deze categorie.</p>
+    <p style="color:var(--invert-ink);max-width:720px;margin-top:16px">Voor organisaties die de combinatie nodig hebben van Europese datasoevereiniteit (zonder Amerikaanse eigenaar), post-quantumcryptografie (nu al bij het ondertekenen, de live overdracht en de SDK, niet op de roadmap), versleuteling in de browser waarbij een eenmalige link de sleutel nooit langs ons stuurt en de mogelijkheid om zelf te hosten, is Paramant op dit moment de enige optie in deze categorie.</p>
 
     <p style="color:var(--invert-ink);max-width:720px;margin-top:16px">Voor elk ander gebruik past een van de alternatieven hierboven waarschijnlijk beter. Die eerlijkheid is precies de bedoeling.</p>
 
@@ -506,7 +506,7 @@
 </section>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 
 </main>
 <footer>

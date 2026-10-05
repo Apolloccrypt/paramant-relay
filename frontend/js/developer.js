@@ -63,7 +63,21 @@
     byId('sign-cap').textContent = cap == null ? 'van --' : 'van ' + cap;
     var percent = cap == null ? 0 : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
     var bar = byId('sign-bar'); bar.style.width = percent + '%'; bar.className = percent >= 80 ? 'warn' : '';
-    byId('usage-note').textContent = cap == null ? 'Uw maandtegoed voor ondertekenen kon nu niet worden gelezen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
+    var note = byId('usage-note');
+    note.textContent = cap == null ? 'Uw maandtegoed voor ondertekenen kon nu niet worden gelezen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
+    // At 80% the bar turns orange, and an orange bar alone tells nobody what
+    // to do about it. The warning names the way up. It lived in dead code on
+    // /dashboard and was never shown (fase 1, DASH-27-N).
+    if (cap != null && percent >= 80) {
+      note.appendChild(document.createTextNode(percent >= 100
+        ? ' Uw tegoed is op. Meer nodig? '
+        : ' Bijna op. Meer nodig? '));
+      var up = document.createElement('a');
+      up.href = '/pricing';
+      up.id = 'usage-upgrade';
+      up.textContent = 'Bekijk een groter plan';
+      note.appendChild(up);
+    }
     renderActivity((data.audit || []).filter(isSignEvent));
   }
 
@@ -87,6 +101,11 @@
 
   function loadKeys() {
     return json(API).then(function (data) { renderKeys(data.keys || []); }).catch(function (error) {
+      // 403 is an answer, not a failure: this account has no ParaSign API.
+      if (error && error.status === 403) {
+        byId('psk-keys').innerHTML = '<div class="empty">Uw account heeft geen toegang tot de API voor Ondertekenen. Die hoort bij een betaald ParaSign-abonnement.</div>';
+        return;
+      }
       byId('psk-keys').innerHTML = '<div class="empty">De API-sleutels konden niet worden geladen. ' + esc(error.message) + '</div>';
     });
   }
@@ -117,11 +136,12 @@
     button.disabled = true; button.textContent = 'Bezig met maken'; error.hidden = true;
     json(API, { method:'POST', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ label:label }) }).then(function (data) {
       byId('psk-secret').textContent = data.key || '';
-      // The key's own plan when the relay named one, otherwise the account's
-      // ParaSign tier from the snapshot. Not the unified plan: this is a
-      // ParaSign key, so the tier beside it is the ParaSign one.
+      // The key's ParaSign tier as the relay minted it (plan_parasign), else
+      // the account's ParaSign tier from the snapshot. Never data.plan: that is
+      // the unified legacy plan, which read "community" beside a Pro key
+      // (P10 API-05-A).
       var snapTier = snapshot && snapshot.tiers && snapshot.tiers.parasign;
-      byId('psk-meta').textContent = 'Sleutel ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · abonnement ' + (data.plan || snapTier || '--');
+      byId('psk-meta').textContent = 'Sleutel ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · abonnement ' + (data.plan_parasign || snapTier || '--');
       showView('secret'); loadKeys();
     }).catch(function (failure) {
       error.textContent = failure.status === 403 ? 'Uw account heeft geen toegang tot de API voor Ondertekenen. Controleer uw abonnement of vraag een beheerder om toegang.' : 'De sleutel kon niet worden gemaakt. ' + failure.message;

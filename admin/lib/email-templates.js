@@ -486,10 +486,32 @@ https://paramant.app`;
 }
 
 // ── 5. BILLING CANCELLATION ───────────────────────────────────────────────────
-function billingCancellationEmail({ planName, cancelDate }) {
-  const preheader = `Your ${planName} plan ends on ${cancelDate}.`;
+// Dutch first, English below, like the account mails (bilingualMail). The
+// cancel button sits on the Dutch /account as much as on /en/account, and the
+// mail was English only (fase 1, PLAN-25). `cancelDateNl` is the same day in
+// Dutch; a caller that does not pass it gets the English date in both halves.
+function billingCancellationEmail({ planName, cancelDate, cancelDateNl }) {
+  const dateNl = cancelDateNl || cancelDate;
+  const preheader = `Uw ${planName}-plan stopt op ${dateNl}.`;
 
-  const text = `Hi,
+  const nlText = `Hallo,
+
+We hebben de opzegging van uw Paramant ${planName}-plan ingepland.
+
+Stopt op: ${dateNl}
+
+Tot die datum houdt u ${planName}. Daarna gaat uw account terug naar het
+Community-plan.
+
+Uw API-sleutel blijft werken. Bestanden die u al verstuurd heeft, blijven
+zoals ze zijn. De toegang per sector gaat naar de grenzen van Community.
+
+Bedacht? Beantwoord deze mail voor de einddatum, dan zetten we het terug.
+
+Paramant
+https://paramant.app`;
+
+  const enText = `Hi,
 
 We have scheduled the cancellation of your Paramant ${planName} plan.
 
@@ -506,13 +528,30 @@ Changed your mind? Reply to this email before the end date to reactivate.
 Paramant
 https://paramant.app`;
 
-  const html = htmlShell(preheader, `
+  const box = (label, value) => `
+    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:16px 20px;margin:0 0 24px 0;">
+      <p style="margin:0 0 6px 0;font-family:monospace;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">${label}</p>
+      <p style="margin:0;font-size:16px;font-weight:500;color:#0B3A6A;">${value}</p>
+    </div>`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Opzegging gepland</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">We hebben de opzegging van uw Paramant ${planName}-plan ingepland.</p>
+    ${box('Stopt op', dateNl)}
+    <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
+      <li>Tot die datum houdt u <strong>${planName}</strong></li>
+      <li>Daarna gaat uw account terug naar het <strong>Community</strong>-plan</li>
+      <li>Uw API-sleutel blijft werken</li>
+      <li>Bestanden die u al verstuurd heeft, blijven zoals ze zijn</li>
+      <li>De toegang per sector gaat naar de grenzen van Community</li>
+    </ul>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Bedacht? Beantwoord deze mail voor de einddatum, dan zetten we het terug.</p>
+  `;
+
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Cancellation scheduled</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">We have scheduled the cancellation of your Paramant ${planName} plan.</p>
-    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:16px 20px;margin:0 0 24px 0;">
-      <p style="margin:0 0 6px 0;font-family:monospace;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">Ends on</p>
-      <p style="margin:0;font-size:16px;font-weight:500;color:#0B3A6A;">${cancelDate}</p>
-    </div>
+    ${box('Ends on', cancelDate)}
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>You keep <strong>${planName}</strong> access until that date</li>
       <li>After that, your account reverts to the <strong>Community</strong> plan</li>
@@ -521,12 +560,13 @@ https://paramant.app`;
       <li>Sector access adjusts to Community tier limits</li>
     </ul>
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Changed your mind? Reply to this email before the end date to reactivate.</p>
-  `);
+  `;
 
-  return {
-    ...wrap(text, html, { refId: 'cancel-' + Date.now() }),
-    subject: 'Your Paramant plan cancellation is scheduled',
-  };
+  return bilingualMail({
+    subject: 'Opzegging van uw Paramant-plan gepland / Your Paramant plan cancellation is scheduled',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'cancel-' + Date.now(),
+  });
 }
 
 // ── 5b. KEY DISABLED ──────────────────────────────────────────────────────────

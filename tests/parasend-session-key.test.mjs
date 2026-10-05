@@ -361,7 +361,7 @@ test('the key banner leads with signing in again, and says who the manual key is
   const bannerAt = PS_HTML.indexOf('id="ps-key-error"');
   assert.ok(bannerAt > 0, 'the banner markup must still be findable by its id');
   const banner = PS_HTML.slice(bannerAt, bannerAt + 900);
-  assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Sign in again</,
+  assert.match(banner, /class="ps-alert-primary" href="\/en\/auth\/login">Sign in again</,
     'signing in again is the action that works on the hosted relay, so it is the primary');
   assert.match(banner, /data-click="expandApiKeyCard">Use a key by hand</,
     'the manual card must stay reachable for a self-host with no /api/user/account/key');
@@ -373,7 +373,7 @@ test('the key banner leads with signing in again, and says who the manual key is
   const actionsAt = banner.indexOf('class="ps-alert-actions"');
   assert.ok(actionsAt > 0, 'the banner must group its actions, so their order is a fact and not an accident of wrapping');
   const actions = banner.slice(actionsAt);
-  assert.ok(actions.indexOf('href="/auth/login"') < actions.indexOf('data-click="expandApiKeyCard"'),
+  assert.ok(actions.indexOf('href="/en/auth/login"') < actions.indexOf('data-click="expandApiKeyCard"'),
     'the primary action must come first in the markup, which is the order a screen reader and a phone both follow');
 });
 
