@@ -197,12 +197,20 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
    below the fold). The extra tools fold behind one button; the paraaf choice
    stays in view. */
 .ds-more-tools{display:none;margin-bottom:10px}
+.ds-seal-short{display:none}
 @media (max-width:640px){
   .ds-more-tools{display:inline-flex}
   .ds-more-tools[hidden]{display:none}
   #step-place:not(.tools-open) #ds-edit-tools,
-  #step-place:not(.tools-open) .ds-seal-choice,
   #step-place:not(.tools-open) #ds-seal-tip{display:none !important}
+  /* Acceptance r5, D: the choice of a separate signature sheet sat behind
+     "Tekst, datum en meer". It stays in view next to the paraaf choice, with
+     short labels in one row so the document still starts on the first screen. */
+  .ds-seal-choice{gap:6px}
+  .ds-seal-choice .ds-seal-check{flex:1 1 auto;padding:4px 8px;font-size:13px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .ds-seal-choice .ds-seal-check input{flex:0 0 auto;margin:0}
+  .ds-seal-choice .ds-seal-long{display:none}
+  .ds-seal-choice .ds-seal-short{display:inline}
 }
 .ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
 .ds-edit-btn{font:inherit;font-size:12.5px;min-height:34px;padding:6px 13px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-1);border-radius:var(--r-1);cursor:pointer;line-height:1.4;font-weight:500}
@@ -720,9 +728,9 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     </div>
     <div class="ds-seal-tools" id="ds-seal-tools" hidden>
       <div class="ds-seal-choice" role="radiogroup" aria-label="Plaats van de handtekening">
-        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-inline" value="inline" checked> Zet de stempel in het document</label>
-        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> Voeg een apart handtekeningblad toe</label>
-        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-both" value="both"> Zet de stempel en voeg het blad toe</label>
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-inline" value="inline" checked> <span class="ds-seal-long">Zet de stempel in het document</span><span class="ds-seal-short">In het document</span></label>
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> <span class="ds-seal-long">Voeg een apart handtekeningblad toe</span><span class="ds-seal-short">Apart blad</span></label>
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-both" value="both"> <span class="ds-seal-long">Zet de stempel en voeg het blad toe</span><span class="ds-seal-short">Allebei</span></label>
       </div>
       <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Onderteken elke pagina met deze handtekening (paraaf)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Opgeslagen positie gebruiken</button>
