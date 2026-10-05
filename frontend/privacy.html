@@ -221,7 +221,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>Hoe versturen werkt (de webapp Versturen)</h2>
 <p>Bestanden die u via de webapp verstuurt, worden <strong>aan de clientzijde in uw browser</strong> versleuteld met post-kwantumcryptografie (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256), voordat ze onze servers bereiken. Op die route ziet de relay nooit plaintext. De enige plek waar dat wel gebeurt, is de gehoste ondertekenprocedure via de <code>/v1</code>-API: daar wordt het document naar ons gestuurd, zodat wij de procedure kunnen uitvoeren. Wij bewaren het, in rust verzegeld onder onze eigen sleutel, tot die envelop afloopt.</p>
-<p>Bestanden worden opgesplitst in versleutelde blokken van 5 MB. Elk blok bestaat alleen in het RAM-geheugen van onze relayserver. Op het Community-plan wordt het na de eerste download permanent en onherroepelijk vernietigd (<strong>burn-on-read</strong>); een betaald plan geeft via de API meer leesbeurten per link vóór diezelfde vernietiging, tot 10 op Firm en 100 op Enterprise. Versleutelde payloaddata wordt nooit naar schijf geschreven. Van een <em>overdracht</em> wordt alleen dit op schijf bewaard: cryptografische hashes in het openbare Certificate Transparency-log. Geen bestandsinhoud, geen sleutels, geen plaintext. (Accountgegevens, hieronder vermeld, worden apart opgeslagen om uw account te beheren.)</p>
+<p>Bestanden gaan versleuteld over in blokken van hoogstens 5 MB: bij de live overdracht in blokken die tot precies 5 MB worden opgevuld, bij een eenmalige link of een verzending op naam zonder opvulling, op de versleutelde grootte. Elk blok bestaat alleen in het RAM-geheugen van onze relayserver. Op het Community-plan wordt het na de eerste download permanent en onherroepelijk vernietigd (<strong>burn-on-read</strong>); een betaald plan geeft via de API meer leesbeurten per link vóór diezelfde vernietiging, tot 10 op Firm en 100 op Enterprise. Versleutelde payloaddata wordt nooit naar schijf geschreven. Van een <em>overdracht</em> wordt alleen dit op schijf bewaard: cryptografische hashes in het openbare Certificate Transparency-log. Geen bestandsinhoud, geen sleutels, geen plaintext. (Accountgegevens, hieronder vermeld, worden apart opgeslagen om uw account te beheren.)</p>
 <p>Blobs op het Community-plan verlopen na maximaal 1 uur. Firm-blobs na 24 uur. Enterprise-blobs na 7 dagen. Alle blobs worden eerder vernietigd zodra de laatste leesbeurt van de link is gebruikt.</p>
 
 <h2>Hoe documenten bij Ondertekenen worden bezorgd</h2>
@@ -233,7 +233,7 @@ footer a{color:var(--ink);text-decoration:none}
 <table>
 <thead><tr><th>Gegevens</th><th>Doel</th><th>Opslag</th><th>Gedeeld met</th></tr></thead>
 <tbody>
-<tr><td>Versleutelde blob (opgevulde blokken van 5 MB)</td><td>Eenmalige beveiligde overdracht</td><td>Alleen RAM &middot; burn-on-read</td><td>Nooit</td></tr>
+<tr><td>Versleutelde blob (blokken tot 5 MB; alleen bij de live overdracht opgevuld)</td><td>Eenmalige beveiligde overdracht</td><td>Alleen RAM &middot; burn-on-read</td><td>Nooit</td></tr>
 <tr><td>Versleutelde documentcapsule van Ondertekenen</td><td>Het document bezorgen bij een ondertekenverzoek</td><td>Redis &middot; verloopt met de envelop</td><td>Hostingprovider slaat alleen ciphertext op</td></tr>
 <tr><td>Persoonlijke uitnodigingslink van Ondertekenen</td><td>Eén ontvanger koppelen aan één versleuteld document en één ondertekenplek</td><td>Verwerkt tijdens de bezorging; niet in applicatielogs geschreven</td><td>Resend (Verenigde Staten), alleen als u kiest voor bezorging per e-mail</td></tr>
 <tr><td>SHA-256-hash van de blob</td><td>Routering en bevestiging van bezorging</td><td>Alleen RAM &middot; verwijderd na de laatste leesbeurt</td><td>Nooit</td></tr>
@@ -371,6 +371,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=14" defer></script>
+<script src="/js/nav-auth.js?v=15" defer></script>
 </body>
 </html>

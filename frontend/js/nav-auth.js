@@ -88,9 +88,9 @@
     ['Prijzen', '/pricing']
   ] : [
     // The English bar points at the English pages (apply-nav.py
-    // to_english_links); /gereedschap has no English page and keeps its route.
+    // to_english_links), /en/gereedschap included since fase 2 SITE-03-A.
     ['Product', '/en#products'],
-    ['Tools', '/gereedschap'],
+    ['Tools', '/en/gereedschap'],
     ['Security', '/en/security'],
     ['Pricing', '/en/pricing'],
     ['Docs', '/en/docs']

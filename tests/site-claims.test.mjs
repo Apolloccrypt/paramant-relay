@@ -622,7 +622,7 @@ test('the SLA figures are consistent across pages and the measurement described 
   assert.match(nl, /gemeten vanuit uw (eigen )?browser/);
 });
 
-// 8b ── TLS. /dpa row: "TLS 1.3 minimum on all relay endpoints", in an article
+// 44 ── TLS. /dpa row: "TLS 1.3 minimum on all relay endpoints", in an article
 // 28 agreement customers sign electronically. Until 5 September 2026 every
 // nginx config in the repository allowed TLS 1.2 as well, and the Outlook
 // add-in vhost named no protocols at all and so inherited the host default,
@@ -2859,7 +2859,7 @@ test('every page that promises burn-on-read says which client and which plan it 
   assert.deepEqual(driftedNl, [], `\n  ${driftedNl.join('\n  ')}\n`);
 });
 
-// 36 ── The account key and the browser. /privacy now has a section that names
+// 45 ── The account key and the browser. /privacy now has a section that names
 // which pages hold the API key in memory and which do not, and the list is a
 // claim about code: /parashare runs on a fifteen-minute session token, /account
 // reveals on purpose, /pricing and /dashboard still authenticate with the key
@@ -2981,7 +2981,7 @@ test('the ParaSend credential /privacy describes is the credential the code impl
     'privacy (nl): the self-host exception must be stated');
 });
 
-// 37 ── The two legal facts, and the sentence that keeps them honest.
+// 46 ── The two legal facts, and the sentence that keeps them honest.
 //
 // Verified against the primary sources on 2026-09-03 (vault: "Verificatie -
 // twee juridische argumenten voor Paramant"). Both are true and both are one
@@ -3224,7 +3224,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   }
 });
 
-// 39 ── The plans ParaSend actually has, and the reads they actually buy.
+// 47 ── The plans ParaSend actually has, and the reads they actually buy.
 //
 // Found by a writer reading the live site on 4 September 2026: /pricing and
 // /parasend offered "up to 10 reads on Pro, 25 on Business and 100 on
@@ -3314,7 +3314,7 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });
 
-// 40 ── The plans a ParaSend link lifetime may name, and the durations tiers.js
+// 48 ── The plans a ParaSend link lifetime may name, and the durations tiers.js
 // sets for them.
 //
 // The sequel to block 39, the same family of untruth one claim over. /terms and
@@ -3430,7 +3430,7 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
   assert.deepEqual(named, [], `\n  ${named.join('\n  ')}\n`);
 });
 
-// ── /gereedschap: the page that says what works without an account ──────────
+// 49 ── /gereedschap: the page that says what works without an account ──────────
 //
 // This page is written in Dutch and every sweep above matches English, so none
 // of them can read it. That is exactly why it needs its own block: its whole
@@ -3767,7 +3767,7 @@ test('the recipients per send on the site are the max_recipients tiers.js sets',
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });
 
-// The sign-in and account pages are Dutch on their own path and English under
+// 50 ── The sign-in and account pages are Dutch on their own path and English under
 // /en/ since 23 September 2026, the way /, /pricing, /about and /security went
 // first. Each pair has to say its language, point search engines at both, and
 // give the reader a visible way across and back. The token pages carry the
@@ -3808,7 +3808,7 @@ test('the sign-in and account pages exist in both languages and link each other'
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
 
-// ── Co-signing: no fixed order, initials on every page for every signer ──────
+// 43 ── Co-signing: no fixed order, initials on every page for every signer ──────
 // /parasign promised "Medeondertekenaars in een vaste volgorde" and the English
 // page "Co-signing with routing order", while the relay never checked it:
 // sign() in relay/envelope.js fills any party slot at any time, and the

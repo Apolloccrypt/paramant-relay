@@ -329,7 +329,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h3 id="core-principle">Uitgangspunt</h3>
   <div class="card">
-    <p style="margin:0;line-height:1.8">De relay is een <strong>tussenpersoon die niet vertrouwd hoeft te worden</strong>. Voor overdrachten en voor ondertekenverzoeken die in een browser zijn gemaakt, bewaart hij alleen versleutelde gegevens en heeft hij geen toegang tot sleutels of leesbare inhoud. Ook een volledig overgenomen relay kan daarvan niets lezen, vervalsen of achteraf terughalen. Dat is geen beleid, het is een cryptografische garantie. Die garantie geldt niet voor de gehoste ondertekenprocedure op de <code>/v1</code>-API. Daar krijgt de relay het document om de procedure uit te voeren, en daar is de bescherming beleid. Dat zeggen we liever dan de garantie te laten gelden waar ze niet kan gelden.</p>
+    <p style="margin:0;line-height:1.8">De relay is een <strong>tussenpersoon die niet vertrouwd hoeft te worden</strong>. Voor overdrachten en voor ondertekenverzoeken die in een browser zijn gemaakt, bewaart hij alleen versleutelde gegevens en heeft hij geen toegang tot sleutels of leesbare inhoud. Ook een volledig overgenomen relay kan daarvan niets lezen, vervalsen of achteraf terughalen. Dat is geen beleid, het is een cryptografische garantie. Die garantie geldt niet voor de gehoste ondertekenprocedure op de <code>/v1</code>-API, niet voor versturen naar ontvangers op naam en niet voor uploads via de extensies. Bij de <code>/v1</code>-API krijgt de relay het document om de procedure uit te voeren. Bij versturen naar ontvangers op naam gaat het token dat de sleutel opent één keer langs de relay, om in de uitnodiging te worden gemaild. En uploads via de extensies voor Chromium en Outlook worden nu nog op de server versleuteld (zie het kader hieronder). Op die drie plekken is de bescherming beleid. Dat zeggen we liever dan de garantie te laten gelden waar ze niet kan gelden.</p>
   </div>
 
   <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
@@ -540,6 +540,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=14" defer></script>
+<script src="/js/nav-auth.js?v=15" defer></script>
 </body>
 </html>
