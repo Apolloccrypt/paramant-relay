@@ -638,7 +638,6 @@ test('every TLS-terminating server block in the repository is TLS 1.3 only', () 
   const CONFS = [
     'deploy/nginx-paramant-public.conf',
     'deploy/nginx-selfhost.conf',
-    'nginx-selfhost.conf',
     'deploy/nginx/addin.paramant.app.conf',
   ];
   const problems = [];

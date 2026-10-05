@@ -91,9 +91,33 @@ test('SELF-10 the docs export line works on an .env made from .env.example', () 
   assert.strictEqual(src.stdout, 'PARAMANT <noreply@paramant.app>', src.stderr);
 });
 
+test('SELF-10 every export line in the self-host docs works on an .env made from .env.example', () => {
+  // "First User Setup" still had export $(grep -v '^#' .env | xargs), which
+  // splits MAIL_FROM on its space and stops with "not a valid identifier".
+  const lines = docs.split('\n').filter((l) => /^export /.test(l));
+  assert.ok(lines.length >= 2, 'the export lines');
+  for (const line of lines) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'export-'));
+    fs.writeFileSync(path.join(dir, '.env'), example.replace(/^ADMIN_TOKEN=.*$/m, 'ADMIN_TOKEN=tok123'));
+    const r = spawnSync('bash', ['-c', `set -e; ${line}; printf %s "$ADMIN_TOKEN"`], { cwd: dir, encoding: 'utf8' });
+    fs.rmSync(dir, { recursive: true, force: true });
+    assert.strictEqual(r.status, 0, `${line}: ${r.stderr}`);
+    assert.strictEqual(r.stderr, '', `${line} complained: ${r.stderr}`);
+    assert.strictEqual(r.stdout, 'tok123', line);
+  }
+});
+
 test('SELF-14 the docs point at the nginx template that is tested', () => {
   const refs = [...docs.matchAll(/`((?:deploy\/)?nginx-selfhost\.conf)` in the repo for a hardened/g)].map((m) => m[1]);
   assert.deepStrictEqual(refs, ['deploy/nginx-selfhost.conf']);
+});
+
+test('SELF-14-N there is one self-host nginx template, and the docs name only that one', () => {
+  // The root copy had drifted (no body limit, client X-Forwarded-Proto) and the
+  // docs had to warn against it. deploy/de-server.md, step 8: it goes.
+  assert.equal(fs.existsSync(path.join(ROOT, 'nginx-selfhost.conf')), false, 'the root nginx-selfhost.conf is back');
+  assert.doesNotMatch(docs, /repo root is an older copy/);
+  for (const m of docs.matchAll(/`([A-Za-z0-9/._-]*nginx-selfhost\.conf)`/g)) assert.equal(m[1], 'deploy/nginx-selfhost.conf');
 });
 
 test('SELF-19 .env.example sets RELAY_SELF_URL_* to a placeholder, not left to the paramant.app default', () => {

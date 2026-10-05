@@ -899,14 +899,13 @@ Additional fixes applied 2026-04-13:
 `/dpa` promises, in the article 28 agreement customers sign electronically:
 "TLS 1.3 minimum on all relay endpoints". Every nginx config in this repository
 allowed TLS 1.2 as well, and `deploy/nginx/addin.paramant.app.conf` named no
-protocols at all and so inherited whatever the host default was. All nine
+protocols at all and so inherited whatever the host default was. All eight
 TLS-terminating server blocks now carry `ssl_protocols TLSv1.3;`:
 
 | File | Server blocks |
 |------|---------------|
 | `deploy/nginx-paramant-public.conf` | 6 (paramant.app + the five sector relays) |
 | `deploy/nginx-selfhost.conf` | 1 |
-| `nginx-selfhost.conf` | 1 |
 | `deploy/nginx/addin.paramant.app.conf` | 1 (was inheriting the default) |
 
 `deploy/nginx-paramant-live.conf` is not in that list and does not terminate

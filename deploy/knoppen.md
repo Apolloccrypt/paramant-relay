@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **200 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **195 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -72,7 +72,6 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | 5 MB | `MAX_BLOB` `relay/relay.js:105` | `BLOB_SIZE_MB` `:1339`, `ANON_MAX` `:5360`, `TRIAL_MAX_SIZE` `:5545`, `tiers.js:47,56,65`, `parashare.page.js:829`, `paramant-core.js:30` | acht kopieen, een instelbaar |
 | sector naar poort | `admin/server.js:39-45` (alle vijf 3000) | `docker-compose.yml:311-315` (alle vijf 3000) | nee, gepind door `tests/sector-fallback-ports.test.mjs` |
 | `RELAY_HEALTH` | `admin/server.js:41` → `:3000` | de compose-listener staat op 3000 | nee, rechtgezet; stond op `:3005`, een poort die nergens in de repo bestaat |
-| `nginx-selfhost.conf` | de kopie in de wortel: geen bodygrens, `inbound` 10r/m | `deploy/nginx-selfhost.conf`: 35M, `inbound` 5r/m | **ja, twee bestanden met dezelfde naam** |
 | `install.sh` | de kopie in de wortel, 535 regels | `frontend/install.sh`, 466 regels, dit is de kopie die op paramant.app staat | **ja, 111 regels verschil** |
 | admin-paneel JS | `admin/public/app.js`, 895 regels | `frontend/js/admin.page.js`, 742 regels | **ja, 343 regels verschil** |
 | versie | `deploy/deploy-3.1.sh:121` `3.1.0` | `install.sh:24` `v3.1.0`, `deploy/.env.example` `v3.1.0` | nee (frontend/install.sh en install-pi.sh nog wel) |
@@ -305,11 +304,6 @@ deze regels doorbreken.
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `client_body_timeout` | `afwezig` |
-| `nginx-selfhost.conf` | `client_max_body_size` | `afwezig` |
-| `nginx-selfhost.conf` | `limit_req_zone` | `$binary_remote_addr zone=inbound:10m rate=10r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=health:10m rate=6r/m` |
-| `nginx-selfhost.conf` | `limit_conn` | `conn 20` |
-| `nginx-selfhost.conf` | `proxy_read_timeout` | `10s / 3600s / 3600s` |
-| `nginx-selfhost.conf` | `client_body_timeout` | `afwezig` |
 
 ## Constanten die instellingen zijn
 
