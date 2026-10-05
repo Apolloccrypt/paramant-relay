@@ -1321,6 +1321,10 @@ api.get("/user/signup/verify/:token", async (req, res) => {
       `paramant:user:meta:${keyVal}`,
       JSON.stringify({ email, created_at: createdAt })
     ).catch(() => {});
+    // De aanmelding in het beheerlog (acceptatie 3.1.1: het log kende alleen
+    // ondertekeningen). Geen adres, geen IP, geen token: wie het is, leest het
+    // paneel uit de accountlijst.
+    try { await logAuditEvent(keyVal, "account_created", { via: "signup" }); } catch {}
 
     try {
       await sendSetupEmail(email, setupToken);
@@ -1399,6 +1403,7 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
     { user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", ...sessionKeyFields(user_id) }, 3600);
 
   setUserCookie(res, sessionToken);
+  try { await logAuditEvent(user_id, "account_activated", { via: "totp" }); } catch {}
 
   res.json({ success: true, email, backup_codes });
 });
@@ -1604,6 +1609,10 @@ api.post("/user/login", async (req, res) => {
     { user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
+  // Only the sign-in that got in is written down: a failed attempt is written
+  // nowhere per account, on purpose, because that would make an address with an
+  // account do more work than one without. Inside the floor below.
+  try { await logAuditEvent(user.key, "user_login", { via: "totp" }); } catch {}
 
   // The success answer is floored too. A sign-in that came back faster than
   // every refusal would be its own oracle: the 200 is visible, but so is the
@@ -1682,6 +1691,7 @@ api.post("/user/login-with-backup", async (req, res) => {
     { user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
+  try { await logAuditEvent(user.key, "user_login", { via: "backup_code" }); } catch {}
   return backupAnswer(200, { success: true, email: user.email });
 });
 
@@ -2587,7 +2597,7 @@ api.post("/user/envelopes/:id/decline", authUser, async (req, res) => {
     const body = await r.json().catch(() => ({}));
     if (r.status !== 200) return res.status(r.status === 403 ? 403 : r.status === 404 ? 404 : 409).json({ error: body.error || "decline_failed" });
     if (!body.idempotent) {
-      signNotify.afterDecline({ client: redis(), envelopeId: id, sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureDeclinedEmail })
+      signNotify.afterDecline({ client: redis(), envelopeId: id, sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureDeclinedEmail, partyTemplate: emailTemplates.requestStoppedPartyEmail, declinerEmail: req.userSession.email })
         .then((out) => { if (out === "failed") console.warn("[envelopes/decline] sender notification failed"); });
     }
     try { await logAuditEvent(req.userSession.user_id, "parasign_doc_declined", { envelope: id.slice(0, 10) + "…", party: partyIndex }); } catch {}
@@ -3038,12 +3048,28 @@ api.get("/user/me", authUser, async (req, res) => {
     const backupCount = await redis()
       .sCard(`paramant:user:backup_codes:${user_id}`)
       .catch(() => 0);
+    // Whether a collection stands behind the plan. Health cannot say (the
+    // Mollie pointers are written on relay-main, see /user/billing/status), so
+    // without this the dashboard printed "nothing renews automatically" to a
+    // customer whose subscription renews (acceptatie 3.1.1, taal 31). Asked
+    // only when something is paid for, best effort: a main that cannot answer
+    // leaves it at what health knows.
+    const fields = productPlanFields(user);
+    let autoRenews = !!user?.auto_renews;
+    if (termEndOf(fields)) {
+      try {
+        const mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+        const mainKey = (mainRes.body?.keys || []).find(k => k.key === user_id);
+        if (mainKey) autoRenews = !!mainKey.auto_renews;
+      } catch (err) { console.error("[user/me] main read failed:", err.message); }
+    }
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.json({
       email,
       label: user?.label || null,
       plan: (user && user.plan) || "standard",
-      ...productPlanFields(user),
+      ...fields,
+      auto_renews: autoRenews,
       // The relay calls it `created`; created_at only exists on older
       // records. Reading only created_at gave null for everyone (ACCT-25).
       created_at: user?.created_at || user?.created || null,
@@ -3642,6 +3668,12 @@ api.post("/user/documents/:id/cancel", authUser, async (req, res) => {
       signal: AbortSignal.timeout(10000),
     });
     const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    // Withdrawn: the invited parties hear it once (lib/sign-notify.js,
+    // acceptatie 3.1.1 taal #42). Not awaited, like every mail in that family.
+    if (rr.status === 200 && body && body.status === "void") {
+      signNotify.afterWithdraw({ client: redis(), envelopeId: id, sendEmail: emailTemplates.sendEmail, partyTemplate: emailTemplates.requestStoppedPartyEmail })
+        .then((out) => { if (out === "failed") console.warn("[user/documents cancel] party notification failed"); });
+    }
     return res.status(rr.status).json(body);
   } catch (err) {
     console.error("[user/documents cancel]", err.message);
@@ -5093,7 +5125,7 @@ api.get("/admin/relay-info/:sector", authMiddleware, async (req, res) => {
       error: h ? null : (hRes.body && hRes.body.error) || ('HTTP ' + hRes.status),
       health: h,
       metrics,
-      deep: dRes.status === 200 && dRes.body && dRes.body.overall ? { overall: dRes.body.overall, checks: dRes.body.checks || [] } : null,
+      deep: dRes.status === 200 && dRes.body && dRes.body.overall ? { overall: dRes.body.overall, checks: (dRes.body.checks || []).map(beheer.deepCheckNL) } : null,
       ct,
     });
   } catch (err) { console.error("[admin/relay-info]", err.message); res.status(500).json({ error: "internal" }); }
@@ -5445,7 +5477,7 @@ api.post('/admin/disable-key', authMiddleware, async (req, res) => {
     const meta = await getAdminKeyMeta(key);
     await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
     if (notify && meta.email) {
-      emailTemplates.sendEmail(meta.email, emailTemplates.keyDisabledEmail({ disabledAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }) })).catch(e => console.error('[admin/disable-key] email:', e.message));
+      emailTemplates.sendEmail(meta.email, emailTemplates.keyDisabledEmail({ disabledAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }), disabledAtNl: new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }) })).catch(e => console.error('[admin/disable-key] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_key_disabled', { reason, notify: !!(notify && meta.email), admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.json({ ok: true, reason, email_sent: !!(notify && meta.email) });
