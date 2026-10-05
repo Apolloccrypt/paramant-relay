@@ -2547,14 +2547,33 @@ const INV_MANIFEST_MAX = 5000;
 // manifest lists at most 20 000 blocks (90 GB at 4.5 MB a block), an account
 // holds at most 5 live hand-overs, and all manifests together hold at most
 // 200 000 tokens.
+//
+// Fairness (herreview #560, M5): the 200 000 was one shared bucket, and three
+// free accounts filled it in seconds, after which every hand-over answered
+// 503 for up to an hour. Now an account has its own cap on live tokens (a free
+// account far less than a paid one), and free accounts together hold at most
+// half of the total, so paid hand-overs always find room. The env names exist
+// for the tests and deploy/.env.example; production runs on the defaults.
+const _invEnvInt = (raw, def) => { const n = parseInt(raw || '', 10); return Number.isFinite(n) && n > 0 ? n : def; };
 const INV_TOTAL_CHUNKS_MAX = 20000;
 const INV_MANIFESTS_PER_ACCOUNT = 5;
-const INV_TOKENS_TOTAL_MAX = 200000;
+const INV_TOKENS_TOTAL_MAX = _invEnvInt(process.env.INV_TOKENS_TOTAL_MAX, 200000);
+const INV_TOKENS_ACCOUNT_MAX = _invEnvInt(process.env.INV_TOKENS_ACCOUNT_MAX, INV_TOTAL_CHUNKS_MAX);
+const INV_TOKENS_FREE_ACCOUNT_MAX = _invEnvInt(process.env.INV_TOKENS_FREE_ACCOUNT_MAX, 2000);
+const INV_TOKENS_FREE_POOL_MAX = Math.floor(INV_TOKENS_TOTAL_MAX / 2);
 let invTokenCount = 0;
+let invFreeTokenCount = 0;
+const invTokensByOwner = new Map(); // owner -> live tokens over all its manifests
+function _invCountAdd(m, n) {
+  invTokenCount = Math.max(0, invTokenCount + n);
+  if (m.free) invFreeTokenCount = Math.max(0, invFreeTokenCount + n);
+  const left = (invTokensByOwner.get(m.owner) || 0) + n;
+  if (left > 0) invTokensByOwner.set(m.owner, left); else invTokensByOwner.delete(m.owner);
+}
 function _invDrop(k) {
   const m = invManifests.get(k);
   if (!m) return;
-  invTokenCount = Math.max(0, invTokenCount - m.tokens.size);
+  _invCountAdd(m, -m.tokens.size);
   invManifests.delete(k);
 }
 setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) _invDrop(k); }, 60000).unref();
@@ -8050,15 +8069,18 @@ async function handleRelayRequest(req, res) {
       const _now = Date.now();
       for (const x of invManifests.values()) if (x.owner === owner && _now <= x.expires) _mine++;
       if (_mine >= INV_MANIFESTS_PER_ACCOUNT) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'too_many_handovers', max: INV_MANIFESTS_PER_ACCOUNT })); }
-      m = { owner, total, tokens: new Map(), meta: null, expires: Date.now() + INV_MANIFEST_TTL_MS };
+      const free = tiers.normalisePlan(keyData.plan) === 'community';
+      m = { owner, total, free, tokens: new Map(), meta: null, expires: Date.now() + INV_MANIFEST_TTL_MS };
       invManifests.set(invMfm[1], m);
     }
     if (m.owner !== owner) { res.writeHead(403); return res.end(J({ error: 'This hand-over belongs to a different account' })); }
     if (m.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
     if (!m.tokens.has(idx)) {
-      if (invTokenCount >= INV_TOKENS_TOTAL_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      const acctMax = m.free ? INV_TOKENS_FREE_ACCOUNT_MAX : INV_TOKENS_ACCOUNT_MAX;
+      if ((invTokensByOwner.get(owner) || 0) >= acctMax) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'too_many_handover_blocks', max: acctMax })); }
+      if (invTokenCount >= INV_TOKENS_TOTAL_MAX || (m.free && invFreeTokenCount >= INV_TOKENS_FREE_POOL_MAX)) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
       m.tokens.set(idx, token);
-      invTokenCount++;
+      _invCountAdd(m, 1);
     }
     if (typeof d.meta === 'string' && d.meta.length <= 2048 && !m.meta) m.meta = d.meta;
     res.writeHead(200, { 'Content-Type': 'application/json' });
