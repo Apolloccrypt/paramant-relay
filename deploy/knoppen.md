@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **193 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **199 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -142,6 +142,10 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `NODE_DEBUG` | `frontend/vendor/fontkit/fontkit.umd.min.js` | leeg | omgevingsherkenning in de gevendorde fontkit (Unicode-font voor /sign), geen Paramant-knop; in de browser bestaat hij niet |
 | `PARAMANT_API_KEY` | `scripts/prod-groep-proef.mjs` | geen | de API-sleutel waarmee de proef op de echte server een groepsverzending doet; zonder hem stopt het script meteen |
 | `PARAMANT_BASE_URL` | `scripts/heartbeat/lib.mjs`, `tests/links.test.mjs` en 1 meer | `'https://paramant.app'` | welke site de heartbeat en de linkcontrole meten |
+| `PARAMANT_CORE_NODE` | `tests/conformance/config.mjs`, `tests/conformance/adapters/core-adapter.mjs` | `node_modules` of `relay/node_modules/@paramant/core/index.node` | de @paramant/core-binding voor de conformance-suite; ontbreekt hij, dan faalt de suite luid |
+| `PARAMANT_NOBLE_DIR` | `tests/conformance/config.mjs`, `tests/conformance/adapters/noble-adapter.mjs` | `sdk-js/node_modules` of `node_modules/@noble/post-quantum` | de sdk-js-crypto voor de conformance-suite; ontbreekt hij, dan faalt de suite luid |
+| `PARAMANT_RELAY_WIRE` | `tests/conformance/config.mjs`, `tests/conformance/adapters/core-adapter.mjs` | `relay/crypto/wire-format.js` | de relay-wire-encoder in de conformance-suite; afwezig betekent overslaan met melding |
+| `PARAMANT_SDK_JS_WIRE` | `tests/conformance/config.mjs`, `tests/conformance/adapters/noble-adapter.mjs` | `sdk-js/src/wire-format.js` | de sdk-js-wire-encoder voor de conformance-suite; de SDK staat sinds 5d27e051 in Apolloccrypt/paramant-sdk |
 | `PARAMANT_COSIGN_SCREENSHOT_PATH` | `tests/cosign-document-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH` | `tests/user-dashboard-documents.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_DASHBOARD_SCREENSHOT_PATH` | `tests/user-dashboard-documents.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
@@ -165,6 +169,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `PLAYWRIGHT_CHROMIUM_PATH` | `scripts/shot-dashboard.mjs`, `scripts/ui-contrast-sweep.mjs` en 35 meer | geen | pad naar de browser voor elke Playwright-test |
 | `RECEIPT_SHOTS_DIR` | `tests/receipt-verify.test.mjs` | `''` | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `RELAY_URL` | `scripts/dev-local-proxy.js` | `'http://127.0.0.1:3001'` | waar de dev-proxy de relay zoekt |
+| `ROF_JSON` | `tests/responsive-overflow.test.mjs` | geen | pad waar de overloopmeting elke bevinding als JSON neerzet, voor een telling voor en na; leeg betekent geen bestand |
+| `ROF_POOL` | `tests/responsive-overflow.test.mjs` | `6` | hoeveel pagina's de overloopmeting tegelijk open heeft |
 | `SHOT_LABEL` | `scripts/shot-dashboard.mjs` | geen | label onder een schermafdruk |
 | `TMPDIR` | `tests/parasend-send-a-link.test.mjs` | `'/tmp'` | werkdir voor een tijdelijk bestand in de test |
 
