@@ -423,13 +423,15 @@ gp = GhostPipe(
     device  = "device-001",
     sector  = "health",     <span class="cm"># routes to health.paramant.app</span>
 )
+gp.receive_setup()          <span class="cm"># register this device's keys first (once per device)</span>
 
-<span class="cm"># Send: returns blob hash</span>
-hash_ = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
+<span class="cm"># Send: returns (blob hash, inclusion proof)</span>
+hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
 
-<span class="cm"># Receive: burn-on-read, returns plaintext bytes</span>
-data = gp.receive(hash_)</pre>
+<span class="cm"># Receive: burn-on-read, returns (plaintext bytes, receipt or None)</span>
+data, receipt = gp.receive(hash_)</pre>
     </div>
+    <p>Dit is <code>paramant-sdk</code> 3.0.0 van PyPI. <code>send</code> en <code>receive</code> geven elk een paar terug. Een apparaat dat iets ontvangt, registreert eerst zijn sleutels met <code>receive_setup()</code>; zonder dat weigert <code>send</code> met "No pubkeys for this device". Het ontvangstbewijs (<code>receipt</code>) is in 3.0.0 meestal <code>None</code>: de SDK leest het alleen uit de oude header <code>X-Paramant-Receipt</code>, die de relay sinds september 2026 standaard niet meer stuurt. Haal het bewijs op met <code>GET /v2/transfers/:receipt_id/receipt</code> (zie <a href="/docs/api.md">docs/api.md</a>).</p>
 
     <!-- ── Use cases ──────────────────────────────────────────── -->
     <h2 id="usecases">Toepassingen</h2>
@@ -595,11 +597,21 @@ curl -X POST https://paramant.app/v1/envelopes \
         "signers": [ { "name": "A. Jansen", "email": "a@example.org" } ]
       }'
 
-<span class="cm"># On completion, pull the offline-verifiable proof.</span>
-curl https://paramant.app/v1/envelopes/env_.../receipt \
+<span class="cm"># On completion, pull the offline-verifiable proof (id from the 201 above).</span>
+curl https://paramant.app/v1/envelopes/&lt;id&gt;/receipt \
   -H "Authorization: Bearer psk_live_..." --output quote-8842.psign</pre>
-    <p>Limiet: 50 nieuwe envelopes per sleutel per uur. Een envelope wordt standaard 30 dagen bewaard (in te stellen met <code>ttl_days</code>, maximaal 365). Zolang hij bestaat, bewaart de relay ook de pdf zelf, versleuteld in redis, omdat de ondertekenaars hem moeten kunnen openen en de gestempelde pdf eruit wordt gemaakt. Na het verlopen is hij weg. Webhooks: stel <code>webhook_url</code> in, dan komen <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> en <code>envelope.voided</code> binnen, ondertekend met HMAC-SHA256 in de header <code>X-Paramant-Sig</code>. Er is één afleverpoging zonder herhaling, dus controleer de status ook zelf met <code>GET /v1/envelopes/:id</code>. Bewijzen zijn offline te controleren tegen de openbare CT-log; zie <a href="/verify">/verify</a>.</p>
-    <p>Veilig opnieuw proberen: stuur bij <code>POST /v1/envelopes</code> een header <code>Idempotency-Key</code> mee (8 tot 128 tekens uit <code>A-Z a-z 0-9 _ . : -</code>). Komt dezelfde sleutel binnen 24 uur opnieuw van dezelfde API-sleutel, dan krijgt u het eerste <code>201</code>-antwoord terug met <code>Idempotent-Replay: true</code>, zonder tweede envelope en zonder quotum te verbruiken. Alleen een geslaagde <code>201</code> wordt bewaard. De relay controleert de body vóór het uurquotum: <code>400 ambiguous_document</code> (zowel <code>content_base64</code> als <code>url</code>), <code>400 invalid_binding_mode</code> (niet <code>email</code> of <code>open</code>), <code>400 invalid_signer_email</code> (bij <code>email</code>-binding heeft elke ondertekenaar een geldig adres nodig; <code>signer_index</code> noemt de eerste foute) en <code>400 invalid_idempotency_key</code> kosten dus geen aanmaak. Een <code>429 rate_limited</code> draagt <code>Retry-After</code> met de seconden tot het einde van het lopende uur.</p>
+    <pre><span class="cm">201 (shortened):</span>
+{
+  "id": "Us4rFoLj35sU_4cOlPJcs3eMZlw4xjMp",
+  "status": "sent",
+  "signers": [
+    { "index": 0, "name": "A. Jansen", "status": "pending",
+      "sign_url": "https://paramant.app/co-sign?env=...&amp;p=0&amp;t=..." }
+  ]
+}</pre>
+    <p>Het <code>id</code> is een willekeurige reeks van 20 tot 64 tekens zonder voorvoegsel. Elke ondertekenaar krijgt een eigen <code>sign_url</code> naar de gehoste pagina <code>/co-sign</code>. Een ondertekenaar staat op <code>pending</code> tot hij getekend heeft en daarna op <code>signed</code>, in het antwoord op het aanmaken en in <code>GET /v1/envelopes/:id</code> hetzelfde woord.</p>
+    <p>Limiet: 50 nieuwe envelopes per sleutel per klokuur. De teller begint op elk heel uur opnieuw (UTC), dus rond de uurgrens kunnen er kort na elkaar tot 100 bij komen. Een envelope wordt standaard 30 dagen bewaard (in te stellen met <code>ttl_days</code>, maximaal 365). Zolang hij bestaat, bewaart de relay ook de pdf zelf, versleuteld in redis, omdat de ondertekenaars hem moeten kunnen openen en de gestempelde pdf eruit wordt gemaakt. Na het verlopen is hij weg. Webhooks: stel <code>webhook_url</code> in, dan komen <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> en <code>envelope.voided</code> binnen, ondertekend met HMAC-SHA256 in de header <code>X-Paramant-Sig</code>. Een aflevering die mislukt (geen verbinding, of een 5xx of 429 van uw kant) probeert de relay opnieuw na 2 en na 10 seconden, drie pogingen in totaal, met dezelfde body en dezelfde <code>X-Paramant-Delivery</code>, zodat u een herhaling op die id herkent; <code>X-Paramant-Attempt</code> zegt welke poging het is. De events van één envelope gaan in volgorde, één voor één, en elke body draagt een oplopend <code>seq</code> (<code>envelope.sent</code> 1, <code>signer.completed</code> 1 plus het aantal handtekeningen, <code>envelope.completed</code> en <code>envelope.voided</code> het aantal ondertekenaars plus 2). Na drie mislukte pogingen geeft de relay het op, dus controleer de status ook zelf met <code>GET /v1/envelopes/:id</code>. Bewijzen zijn offline te controleren tegen de openbare CT-log; zie <a href="/verify">/verify</a>.</p>
+    <p>Veilig opnieuw proberen: stuur bij <code>POST /v1/envelopes</code> een header <code>Idempotency-Key</code> mee (8 tot 128 tekens uit <code>A-Z a-z 0-9 _ . : -</code>). Komt dezelfde sleutel binnen 24 uur opnieuw van dezelfde API-sleutel, dan krijgt u het eerste <code>201</code>-antwoord terug met <code>Idempotent-Replay: true</code>, zonder tweede envelope en zonder quotum te verbruiken. Alleen een geslaagde <code>201</code> wordt bewaard. De relay controleert de body vóór het uurquotum: <code>400 ambiguous_document</code> (zowel <code>content_base64</code> als <code>url</code>), <code>400 invalid_binding_mode</code> (niet <code>email</code> of <code>open</code>), <code>400 invalid_signer_email</code> (bij <code>email</code>-binding heeft elke ondertekenaar een geldig adres nodig; <code>signer_index</code> noemt de eerste foute) <code>400 invalid_metadata</code> (<code>metadata</code> is geen object) en <code>400 invalid_idempotency_key</code> kosten dus geen aanmaak. Verder: <code>400 missing_signers</code>, <code>400 missing_document</code> (geen <code>content_base64</code> en geen <code>url</code>), <code>400 empty_document</code> (lege <code>content_base64</code>), <code>400 too_many_signers</code> (meer namen dan uw abonnement op één document toelaat; <code>max_signers</code> zegt hoeveel), <code>413 document_too_large</code>, <code>422 not_a_pdf</code> en <code>422 document_unfetchable</code>. Een <code>429 rate_limited</code> draagt <code>Retry-After</code> met de seconden tot het einde van het lopende klokuur. Is het maandquotum handtekeningen van uw abonnement op, dan antwoordt de relay <code>402 monthly_sign_quota_reached</code> met <code>plan</code>, <code>limit</code>, <code>used</code>, <code>reset_date</code> en <code>Retry-After: 86400</code>; er wordt dan niets aangemaakt. Een fout op <code>/v1</code> heeft altijd de vorm <code>{"error": "&lt;code&gt;", "message": "&lt;zin&gt;"}</code>.</p>
 
     <!-- ── Account & billing API ────────────────────────────────── -->
     <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
@@ -867,20 +879,22 @@ docker compose up -d --build
     </div>
 
     <h2 id="client-cli">CLI-referentie</h2>
+    <p>Er is geen installeerbare CLI: <code>pip install paramant-sdk</code> en <code>npm install paramant-sdk</code> leveren alleen de bibliotheek, geen commando's. Wat er wel is, zijn scripts in de repository van de relay, die u vanuit een clone draait:</p>
     <table>
-      <tr><th>Commando</th><th>Omschrijving</th></tr>
-      <tr><td>paramant-send</td><td>Een bestand of stdin versleutelen en uploaden</td></tr>
-      <tr><td>paramant-receive</td><td>Op hash downloaden en ontsleutelen</td></tr>
-      <tr><td>paramant-watch</td><td>Een map in de gaten houden en nieuwe bestanden automatisch versturen</td></tr>
-      <tr><td>paramant-stream</td><td>Via WebSocket luisteren naar binnenkomende blobs</td></tr>
-      <tr><td>paramant-admin</td><td>Gebruikers, sleutels en relayconfiguratie beheren</td></tr>
-      <tr><td>paramant-scan</td><td>Relaynodes op het netwerk vinden</td></tr>
+      <tr><th>Script</th><th>Omschrijving</th></tr>
+      <tr><td>scripts/paramant-sender.py</td><td>Een bestand, stdin of tekst versleutelen en uploaden; met <code>--watch DIR</code> een map in de gaten houden</td></tr>
+      <tr><td>scripts/paramant-receiver.py</td><td>Op hash ophalen en ontsleutelen; met <code>--listen</code> blijven luisteren</td></tr>
+      <tr><td>scripts/paramant-verify-sth</td><td>De ondertekende boomkop (STH) van een relay controleren</td></tr>
+      <tr><td>scripts/paramant-verify-peers</td><td>De gespiegelde boomkoppen van andere relays controleren</td></tr>
+      <tr><td>scripts/paramant-scan.sh</td><td>Relaynodes vinden via het register</td></tr>
+      <tr><td>deploy/paramant-admin.py</td><td>Gebruikers en sleutels op uw eigen relay beheren</td></tr>
     </table>
-    <pre><span class="cm"># Example: send a file and wait for ACK</span>
-paramant-send --key pgp_xxx --sector health --ack scan.dcm
+    <p>De twee Python-scripts kiezen met <code>--relay</code> alleen uit de gehoste sectoren (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>); voor een eigen relay gebruikt u de SDK of de HTTP-API. Ze versleutelen met een eigen transfergeheim (<code>--secret</code> of <code>PARAMANT_TRANSFER_SECRET</code>), nooit met de API-sleutel.</p>
+    <pre><span class="cm"># Example: send a file (the transfer secret is printed once; give it to the receiver)</span>
+python3 scripts/paramant-sender.py --key pgp_xxx --relay health --file scan.dcm
 
-<span class="cm"># Example: stream mode (process persists, receives all blobs)</span>
-paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/api</pre>
+<span class="cm"># Example: receive by hash with that secret</span>
+python3 scripts/paramant-receiver.py --key pgp_xxx --relay health --hash &lt;hash&gt; --secret &lt;secret&gt;</pre>
 
     <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Cryptografie</h2>
@@ -1090,7 +1104,7 @@ python3 deploy/paramant-admin.py sync</pre>
   </div>
 </div>
 
-<script src="/js/docs.inline1.js?v=1"></script>
+<script src="/js/docs.inline1.js?v=2"></script>
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=15" defer></script>
 </main>

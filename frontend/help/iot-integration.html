@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bestanden versturen vanaf IoT-apparaten · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met voorbeelden in curl en MicroPython.">
+<meta name="twitter:description" content="Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met een Python-voorbeeld.">
 <meta name="twitter:title" content="Bestanden versturen vanaf IoT-apparaten · Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:title" content="Bestanden versturen vanaf IoT-apparaten · Paramant">
-<meta property="og:description" content="Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met voorbeelden in curl en MicroPython.">
+<meta property="og:description" content="Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met een Python-voorbeeld.">
 <meta property="og:url" content="https://paramant.app/help/iot-integration">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
@@ -20,7 +20,7 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/help/iot-integration">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/help/iot-integration">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/help/iot-integration">
-<meta name="description" content="Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met voorbeelden in curl en MicroPython.">
+<meta name="description" content="Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met een Python-voorbeeld.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -155,7 +155,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met voorbeelden in curl en MicroPython."
+      "description": "Zo verstuurt een Raspberry Pi, ESP32 of OT-gateway bestanden via de Paramant API, met alleen een vaste API-sleutel. Met een Python-voorbeeld."
     },
     {
       "@type": "BreadcrumbList",
@@ -276,53 +276,51 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="device-grid">
     <div class="device-card">
       <h4>Raspberry Pi Zero / Zero 2</h4>
-      <p>Volledige Linux-omgeving. Gebruik de Python-SDK of rechtstreeks curl. TLS 1.3 werkt meteen.</p>
+      <p>Volledige Linux-omgeving. Gebruik het Python-voorbeeld hieronder of de Python-SDK (<code>pip install paramant-sdk</code>). TLS 1.3 werkt meteen.</p>
     </div>
     <div class="device-card">
       <h4>ESP32 / ESP8266</h4>
-      <p>Gebruik de REST-API via HTTPS. De HTTP-clients van Arduino en ESP-IDF ondersteunen allebei de benodigde headers.</p>
+      <p>Kan, als de firmware AES-256-GCM en HTTPS heeft: mbedTLS in ESP-IDF heeft beide. MicroPython heeft geen AES-GCM; daarvoor hebben wij geen kant-en-klaar voorbeeld. Laat zo'n apparaat via een gateway of een Pi versturen.</p>
     </div>
     <div class="device-card">
       <h4>OT-gateways</h4>
-      <p>Elke gateway die uitgaande HTTPS-verbindingen kan maken, zoals Tosibox, HMS Anybus of Ewon Flexy, kan bestanden via de API versturen.</p>
+      <p>Een gateway die uitgaande HTTPS-verbindingen maakt en een script kan draaien (Python 3 met <code>cryptography</code>), kan het voorbeeld hieronder gebruiken.</p>
     </div>
   </div>
 
   <h2>Een bestand versturen vanaf een Linux-apparaat</h2>
 
-  <p>Met curl (aanwezig op alle images voor de Pi en voor gateways):</p>
+  <p>Er is geen route die een leesbaar bestand aanneemt: de relay krijgt alleen versleutelde bytes. Het apparaat versleutelt dus zelf, uploadt de versleutelde blob naar <code>POST /v2/inbound</code> en krijgt een <code>download_token</code> terug. Daarvan maakt het een link naar <code>/get</code>, met de sleutel achter het <code>#</code>, zodat de relay hem nooit ziet. Python 3 met het pakket <code>cryptography</code>:</p>
 
-  <div class="code-block">curl -X POST https://api.paramant.app/v1/upload \
-  -H "X-Api-Key: pgp_YOUR_API_KEY" \
-  -F "file=@/path/to/sensor-log.csv" \
-  -F "recipient=recipient@example.com" \
-  -F "ttl=3600"</div>
+  <div class="code-block">import os, json, base64, hashlib, struct, urllib.request
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-  <p>Het antwoord bevat een download-URL die na het lezen vervalt. Die kunt u via elk kanaal aan de ontvanger geven:</p>
+API_KEY = os.environ["PARAMANT_API_KEY"]   # pgp_...
+RELAY   = "https://health.paramant.app"    # the sector your key belongs to
+SECTOR  = "health"
+PATH    = "/var/log/sensor-log.csv"        # one block: at most about 5 MB
 
-  <div class="code-block">{"id":"abc123","url":"https://paramant.app/get/abc123","expires_at":"..."}</div>
+# 1. Seal the file on the device: [uint32-LE name length][name][bytes]
+name  = os.path.basename(PATH).encode()
+plain = struct.pack("&lt;I", len(name)) + name + open(PATH, "rb").read()
+key, iv = AESGCM.generate_key(bit_length=256), os.urandom(12)
+sealed  = AESGCM(key).encrypt(iv, plain, None)
 
-  <h2>Een bestand versturen vanuit MicroPython (ESP32)</h2>
+# 2. Upload the ciphertext with its SHA-256
+body = json.dumps({"hash": hashlib.sha256(sealed).hexdigest(),
+                   "payload": base64.b64encode(sealed).decode(),
+                   "ttl_ms": 3600000}).encode()
+req = urllib.request.Request(RELAY + "/v2/inbound", data=body, method="POST",
+      headers={"X-Api-Key": API_KEY, "Content-Type": "application/json"})
+token = json.load(urllib.request.urlopen(req))["download_token"]
 
-  <div class="code-block">import urequests, uos
+# 3. The link: the key travels after the #, the relay never sees it
+frag = base64.urlsafe_b64encode(key + iv).rstrip(b"=").decode()
+print(f"https://paramant.app/get?t={token}&amp;r={SECTOR}#{frag}")</div>
 
-API_KEY = "pgp_YOUR_API_KEY"
-FILE_PATH = "/sd/reading.bin"
+  <p>Geef de link via elk kanaal aan de ontvanger. Die opent hem in de browser; de pagina ontsleutelt het bestand en pas dan wordt het op de relay gewist. De link werkt één keer en vervalt na de <code>ttl_ms</code> die de relay terugmeldt (maximaal 1 uur op Community, 24 uur op Firm). Eén upload is één blok van hoogstens 5 MB; een groter bestand gaat in meerdere blokken, en dat doet de SDK voor u. Hoe het formaat in elkaar zit, staat in <a href="/docs/api.md">docs/api.md</a> onder "The share link".</p>
 
-with open(FILE_PATH, "rb") as f:
-    data = f.read()
-
-resp = urequests.post(
-    "https://api.paramant.app/v1/upload",
-    headers={"X-Api-Key": API_KEY,
-             "Content-Type": "application/octet-stream",
-             "X-Filename": "reading.bin",
-             "X-Recipient": "ops@example.com"},
-    data=data
-)
-print(resp.json()["url"])</div>
-
-  <div class="tip"><p>Bewaar de API-sleutel in het flashgeheugen, niet ingebakken in de firmware. Gebruik op de ESP32 NVS (Non-Volatile Storage) of een aparte partitie voor inloggegevens. Dan kunt u de sleutel vervangen zonder opnieuw te flashen.</p></div>
+  <div class="tip"><p>Bewaar de API-sleutel in het flashgeheugen of in een omgevingsvariabele, niet ingebakken in de firmware. Gebruik op de ESP32 NVS (Non-Volatile Storage) of een aparte partitie voor inloggegevens. Dan kunt u de sleutel vervangen zonder opnieuw te flashen.</p></div>
 
   <h2>Sleutels vervangen op apparaten in gebruik</h2>
 
