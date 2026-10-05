@@ -1558,6 +1558,12 @@ api.post("/user/login", async (req, res) => {
   // this address's name stop counting right here. Without this the owner keeps
   // paying for the guesser's score for the rest of the window.
   await loginRate.clearEmailFailures(redis(), email);
+  // And the IP gets its attempt back (herreview #560, N3). The per-IP cap of
+  // five per fifteen minutes is the brake on guessing; counting sign-ins that
+  // succeeded made it a cap on an office behind one NAT address, where the
+  // sixth colleague at 9:00 got 429. Now it counts what a guesser produces:
+  // attempts that did not get in.
+  await loginRate.refundIp(redis(), ip);
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await userSessions.remember(redis(), user.key, sessionToken,

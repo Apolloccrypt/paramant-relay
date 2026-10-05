@@ -77,22 +77,43 @@ function apiCallsOf(page) {
   return [...calls];
 }
 
+// The two sign-in doors. Herreview #560, N3: at relay_auth's 10 a minute an
+// office of thirty behind one NAT address got 429 at 9:00. They get their own
+// zone; guessing is braked behind nginx per IP on failures and per account.
+const SIGN_IN_DOORS = [
+  '/api/user/login', '/api/user/login-with-backup',
+  '/api/user/auth/webauthn/login/options', '/api/user/auth/webauthn/login/discoverable/options',
+  '/api/user/auth/webauthn/login/verify',
+];
 const LOGIN_DOORS = [
-  '/api/user/login', '/api/user/login-with-backup', '/api/user/signup',
+  '/api/user/signup',
   '/api/user/signup/verify/abc', '/api/user/setup/tok', '/api/user/setup/tok/confirm',
-  '/api/user/auth/webauthn/login/options', '/api/user/auth/webauthn/login/verify',
   '/api/user/auth/request-totp-reset', '/api/user/auth/reset-confirm',
+  '/api/user/auth/webauthn/register/options',
   '/api/user/account/totp/reset', '/api/user/account/backup-codes/regenerate',
 ];
 
-test('every login, signup, setup and TOTP door keeps the brute-force zone', () => {
+test('every signup, setup and TOTP door keeps the brute-force zone', () => {
   for (const uri of LOGIN_DOORS) {
     const loc = resolve(LIVE, uri);
     assert.ok(loc, `${uri} reaches no location`);
-    assert.equal(loc.zone, 'relay_auth', `${uri} lands in ${loc.path} (zone ${loc.zone}); a login door must stay in relay_auth`);
+    assert.equal(loc.zone, 'relay_auth', `${uri} lands in ${loc.path} (zone ${loc.zone}); a credential door must stay in relay_auth`);
     assert.ok(loc.burst <= 5, `${uri}: burst ${loc.burst} is not a brake`);
   }
-  assert.equal(SNIPPET.relay_auth.perMin, 10, 'relay_auth is the 10-a-minute login brake');
+  assert.equal(SNIPPET.relay_auth.perMin, 10, 'relay_auth is the 10-a-minute brake');
+});
+
+test('the sign-in doors let an office behind one NAT address in at 9:00, and stay bounded', () => {
+  for (const uri of SIGN_IN_DOORS) {
+    const loc = resolve(LIVE, uri);
+    assert.ok(loc, `${uri} reaches no location`);
+    assert.equal(loc.zone, 'relay_login', `${uri} lands in ${loc.path} (zone ${loc.zone})`);
+    // Thirty colleagues in the same instant: burst + 1 >= 30.
+    assert.ok(loc.burst + 1 >= 30 && loc.burst <= 60, `${uri}: burst ${loc.burst}`);
+  }
+  assert.ok(SNIPPET.relay_login, 'relay_login is defined in the tracked snippet');
+  assert.ok(SNIPPET.relay_login.perMin >= 30 && SNIPPET.relay_login.perMin <= 60, `relay_login refills at ${SNIPPET.relay_login.perMin} a minute`);
+  assert.equal(SNIPPET.relay_login.key, '$binary_remote_addr');
 });
 
 test('an ordinary signed-in page load stays under the /api/user/ limit', () => {
@@ -109,7 +130,7 @@ test('an ordinary signed-in page load stays under the /api/user/ limit', () => {
       if (/(^|\n)\s*internal;/.test(loc.body)) continue;
       // A door the page opens on a click (enrolling a passkey, a TOTP reset)
       // is a credential action and keeps the brake on purpose.
-      if (uri.startsWith('/api/user/auth/') || LOGIN_DOORS.some((d) => uri === d || uri.startsWith(d))) continue;
+      if (uri.startsWith('/api/user/auth/') || [...SIGN_IN_DOORS, ...LOGIN_DOORS].some((d) => uri === d || uri.startsWith(d))) continue;
       assert.equal(loc.zone, 'user_session', `${uri} (from /${page}) lands in ${loc.path}, zone ${loc.zone}`);
       seen.push(uri);
     }
@@ -148,7 +169,7 @@ test('the self-host conf splits /admin/ the same way', () => {
   assert.ok(zones.session && zones.session.perMin >= 120, 'the self-host conf defines a session zone');
   assert.equal(resolve(locs, '/admin/api/user/account').zone, 'session');
   assert.equal(resolve(locs, '/admin/app.js').zone, 'session');
-  for (const uri of ['/admin/api/auth/login', ...LOGIN_DOORS.map((d) => d.replace('/api/user/', '/admin/api/user/'))]) {
+  for (const uri of ['/admin/api/auth/login', ...[...SIGN_IN_DOORS, ...LOGIN_DOORS].map((d) => d.replace('/api/user/', '/admin/api/user/'))]) {
     assert.equal(resolve(locs, uri).zone, 'auth', `${uri} must stay in the self-host auth zone`);
   }
 });

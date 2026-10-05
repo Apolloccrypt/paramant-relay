@@ -187,6 +187,30 @@ test('the per-IP refusal still works, and follows the caller and not the address
   httpDid();
 });
 
+// Herreview #560, N3: an office behind one NAT address. Successful sign-ins
+// used to spend the per-IP budget, so the sixth colleague at 9:00 got 429. A
+// sign-in that gets in now hands its attempt back; failures still count.
+test('successful sign-ins from one address do not use up its budget; failures still do', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  const ip = nextIp();
+  for (let i = 0; i < HTTP_IP_LIMIT + 5; i++) {
+    const email = freshEmail();
+    await withAccount(email, `pgp_nat_${i}_${crypto.randomBytes(5).toString('hex')}`);
+    const r = await httpSrv.login({ email, totp: HTTP_SECRET, ip });
+    assert.equal(r.status, 200, `colleague ${i + 1} behind one address signs in: ${r.status} ${r.text}`);
+  }
+  httpDid();
+  const email = freshEmail();
+  await withAccount(email, `pgp_natbad_${crypto.randomBytes(5).toString('hex')}`);
+  for (let i = 0; i < HTTP_IP_LIMIT; i++) {
+    const r = await httpSrv.login({ email, totp: '000000', ip });
+    assert.equal(r.status, 401, `failure ${i + 1} is evaluated`);
+  }
+  const over = await httpSrv.login({ email, totp: '000000', ip });
+  assert.equal(over.status, 429, 'the guessing brake per address still bites');
+  httpDid();
+});
+
 test('a priced attempt hands the IP its try back, so a quote costs nothing', async (t) => {
   if (!ready()) return t.skip('no redis');
   const email = freshEmail();
