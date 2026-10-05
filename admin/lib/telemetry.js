@@ -83,6 +83,14 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       totp_required_at: meta.totp_required_at || null,
       usage_purpose: k.usage_purpose || null,
       usage_purpose_at: k.usage_purpose_at || null,
+      // Tot wanneer het plan per product betaald is, en of er een incasso
+      // achter staat. De relay geeft dit al mee; het viel hier weg.
+      paid_until_parasign: k.paid_until_parasign || null,
+      paid_until_parasend: k.paid_until_parasend || null,
+      auto_renews: k.auto_renews === true,
+      // Server-intern, net als _full: het account waar de sleutel bij hoort.
+      // Kan zelf een volle sleutel zijn, dus gaat nooit de deur uit.
+      _account: k.account_id || k.key,
     };
   }));
   return users.filter(Boolean);

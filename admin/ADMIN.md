@@ -18,13 +18,40 @@ Sessions are stored in Redis under `paramant:admin:session:{sid}` with a 12-hour
 
 ## Tabs
 
+The panel speaks Dutch since 2026-10-05 and is built for one owner on a phone
+as much as on a desktop: sentence case, touch targets of at least 44 px, tables
+that turn into cards below 760 px. Every number is a button to its details.
+
 | Tab | Description |
 |-----|-------------|
-| **Overview** | Signups today, active sessions, pro upgrades, MRR, recent audit events, plan distribution |
-| **Users** | Paginated user list with per-user action menu |
-| **Audit** | Full audit log, filterable by user |
-| **Billing** | Active subscriptions and MRR breakdown |
-| **Relay** | Live health + uptime + metrics for all 5 sector relays, auto-refreshes every 10s |
+| **Overview** (Overzicht) | One screen: health of the 5 relays (version, uptime), customers and paying customers, revenue this month and MRR (computed from the issued invoices), open problems (failed mails, 429 peaks, transparency-log growth, redis memory), latest signups and payments, latest audit events |
+| **Users** (Klanten) | Search by email or label (client-side on the page, server-side `?q=` across pages), plan per product with paid-until date, last activity, usage this month, actions with confirmation; the customer name opens the customer info page |
+| **Audit** | Time (local, relative), event in plain Dutch, who (email or label, key masked and folded away), one-line summary, details unfolded as a list. Filters on the events that really occur, a period, and a search on email. CSV export (semicolon, UTF-8 BOM) with every column filled |
+| **Billing** (Betalingen) | Payments and invoices, credit notes, running paid terms and automatic renewals, failed collections, each with a status in plain language; gift codes |
+| **Relay** (Relays) | Live health per relay, auto-refreshes every 10s; a relay opens its info page (health, metrics, deep check, transparency log) |
+
+### Customer info page
+
+`GET /admin/user-details/:key` (`:key` is the kid) returns everything about one
+customer in one answer: account, plans per product with paid-until date, keys
+(masked), usage this month, signing requests (status and counts, no file
+names), payments and that customer's audit, translated. The panel shows it as
+one sheet with the actions underneath.
+
+### What the panel counts itself
+
+Two counters live in redis under `paramant:admin:tel:*`, per hour, kept three
+days, written by `admin/server.js` and read by `lib/beheer.js`: every 429 this
+service answers, and every mail it could not send. The last twenty of each are
+kept with their time and reason, never an address or a token. The
+transparency-log size per relay is sampled once an hour on the same prefix, so
+growth over 24 hours can be shown. These cover the admin/account side; mail the
+relay sends itself (billing mails) is not in the count.
+
+**No full key reaches the browser.** Audit rows, user rows, billing rows and
+the customer page carry the kid as handle and the key masked; `lib/beheer.js
+scrubKeys()` masks any `pgp_`/`psk_` inside event details too
+(`admin/test/beheer.test.js` calls every panel route and fails on a full key).
 
 ## De standpagina (`/admin/stand`)
 
@@ -101,11 +128,13 @@ All endpoints are mounted at `/admin/api/`. Authentication: `X-Session: <session
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/admin/overview` | Stats, recent audit events, plan distribution |
+| `GET` | `/admin/overview` | Relays, customers, revenue and MRR, problems, latest signups/payments/audit (old `stats`/`plan_distribution` fields kept) |
+| `GET` | `/admin/overview/failures` | The last failed mails and 429 answers behind the overview numbers |
+| `GET` | `/admin/relay-info/:sector` | One relay: health, metrics, deep check, transparency log |
 | `GET` | `/admin/users` | Paginated user list with TOTP status. Query: `?page=1&page_size=25&status=active&plan=pro` |
 | `GET` | `/admin/user-details/:key` | Full user detail: meta, sessions, audit trail |
-| `GET` | `/admin/audit` | Global audit log. Query: `?limit=50&user_id=pgp_...` |
-| `GET` | `/admin/billing` | Active subscriptions + MRR |
+| `GET` | `/admin/audit` | Global audit log, translated rows. Query: `?limit=100&event=&since=&until=&q=` (`q` searches who, summary and details; `user` still matches a key or email server-side) |
+| `GET` | `/admin/billing` | Revenue this/last month, MRR, payments, credit notes, running terms, renewals, failed collections |
 | `GET` | `/admin/relay-detail` | Per-sector health + uptime + metrics |
 
 ### User actions

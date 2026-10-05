@@ -15,10 +15,13 @@ assert.match(account, /werkt de API-sleutel niet meer/i);
 assert.match(account, /sessies en de koppeling met uw authenticator-app worden verwijderd/i);
 assert.match(account, /accountrecord blijft bewaard/i);
 assert.doesNotMatch(account, /Stub mode|No real payments are charged|Mollie integration pending/i);
-assert.match(adminHtml, /blocks the account key and removes active sessions and TOTP/i);
-assert.match(adminHtml, /Type DEACTIVATE to confirm/);
-assert.match(adminJs, /Account deactivated/);
-// frontend/admin.html is Dutch only; admin/public stays English.
+// Both admin screens speak Dutch since 2026-10-05 (admin/public was English).
+// Each one on its own must say what deactivation does, so they are read apart.
+const adminMainHtml = read('admin/public/index.html');
+const adminMainJs = read('admin/public/app.js');
+assert.match(adminMainHtml, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
+assert.match(adminMainHtml, /Typ DEACTIVATE om te bevestigen/);
+assert.match(adminMainJs, /Account gedeactiveerd/);
 const adminNl = read('frontend/admin.html');
 const adminNlJs = read('frontend/js/admin.page.js');
 assert.match(adminNl, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
