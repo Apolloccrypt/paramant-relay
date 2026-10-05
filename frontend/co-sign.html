@@ -216,27 +216,27 @@ body.needs-login #sign-intro{display:none}
 <main id="main-content">
 
 <div class="step" id="step-loading">
-  <h1>Verzoek openen</h1>
-  <p class="sub">De gegevens van het verzoek worden opgehaald bij de relay. Die heeft het document zelf niet, alleen de SHA3-256-hash ervan en de plek waar u tekent.</p>
+  <h1>Document openen</h1>
+  <p class="sub">We halen het verzoek op. Onze server heeft het document zelf niet, alleen een vingerafdruk ervan en de plek waar u tekent.</p>
   <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Laden...</div></div></div>
 </div>
 
 <div class="step" id="step-error">
-  <h1>Het verzoek kan niet worden geopend</h1>
-  <p class="sub">De link is ongeldig of verlopen, of de relay gaf het verzoek niet vrij.</p>
+  <h1>Dit document opent niet</h1>
+  <p class="sub">De link klopt niet of is verlopen, of onze server gaf het document niet vrij.</p>
   <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Onbekende fout.</div></div></div>
   <a href="/" class="btn btn-outline">Terug naar de startpagina</a>
 </div>
 
 <div class="step" id="step-cosign">
   <h1>Document medeondertekenen</h1>
-  <p class="sub">Bekijk het document dat u is gestuurd en zet uw handtekening.</p>
+  <p class="sub">Lees het document en zet uw handtekening.</p>
 
   <details class="how">
     <summary>HOE DIT WERKT</summary>
     <div class="how-body">
-      <p>Het ontsleutelen en ondertekenen gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
-      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een post-quantum cryptografische handtekening (ML-DSA-65). Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de hash hieronder met die van het bestand dat u los ontving.</p>
+      <p>Openen en ondertekenen gebeurt op uw eigen apparaat. Onze server krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
+      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een post-quantum cryptografische handtekening (ML-DSA-65). Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de vingerafdruk hieronder met die van het bestand dat u los ontving.</p>
     </div>
   </details>
 
@@ -272,10 +272,10 @@ body.needs-login #sign-intro{display:none}
       <details class="how">
         <summary>WAAR HET DOCUMENT VANDAAN KOMT</summary>
         <div class="how-body">
-          <p>Het versleutelde document wordt in deze browser ontsleuteld. U kunt pas ondertekenen als de SHA3-256-hash overeenkomt met het verzoek. De sleutel van het document en de leesbare inhoud krijgt de relay niet.</p>
+          <p>Uw browser opent het versleutelde document. U kunt pas tekenen als de vingerafdruk klopt met het verzoek. Onze server krijgt de sleutel en de leesbare inhoud niet.</p>
         </div>
       </details>
-      <div class="banner" id="document-delivery-status">Het versleutelde document wordt geladen...</div>
+      <div class="banner" id="document-delivery-status">Het document wordt geladen...</div>
       <label class="file-cta" for="verify-file" id="verify-file-cta" hidden>Kies het document zelf als het niet vanzelf laadt</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
@@ -300,7 +300,7 @@ body.needs-login #sign-intro{display:none}
         <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Paraaf op elke pagina (naast uw handtekening)</label>
         <p class="appearance-help" id="appearance-allpages-required" hidden>De afzender vraagt een paraaf op elke pagina. Die staat al klaar.</p>
         <p class="appearance-help">Uw paraaf komt in de marge van elke pagina, naast die van de andere ondertekenaars. Niemand tekent op uw plek.</p>
-        <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Deze plekken vallen onder uw cryptografische handtekening.</p>
+        <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Ook deze plekken vallen onder uw handtekening.</p>
       </div>
     </div>
   </div>
@@ -321,7 +321,7 @@ body.needs-login #sign-intro{display:none}
       <details class="how" id="sign-intro">
         <summary>WAARMEE U TEKENT</summary>
         <div class="how-body">
-          <p>U tekent met een ondertekensleutel op uw eigen apparaat. Heeft u een passkey, dan bevestigt u met Face ID, Touch ID of een beveiligingssleutel. Zonder passkey bevestigt u met de code van 6 cijfers uit uw authenticator-app. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
+          <p>U tekent met een ondertekensleutel op uw eigen apparaat. Heeft u een passkey, dan bevestigt u met Face ID, Touch ID of een beveiligingssleutel. Zonder passkey bevestigt u met de code van 6 cijfers uit uw authenticator-app. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waar deze uitnodiging naartoe ging.</p>
         </div>
       </details>
       <div class="banner" id="sign-status" hidden></div>
@@ -384,7 +384,7 @@ body.needs-login #sign-intro{display:none}
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
-<script src="/js/quota-upgrade.js?v=8" defer></script>
-<script type="module" src="/co-sign.js?v=41"></script>
+<script src="/js/quota-upgrade.js?v=9" defer></script>
+<script type="module" src="/co-sign.js?v=42"></script>
 </body>
 </html>

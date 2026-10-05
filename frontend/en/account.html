@@ -207,7 +207,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section id="state-busy" class="section-lg hidden">
-  <p class="lede" id="acct-busy-text">Your account could not be loaded just now: too many requests came in at once. You are still signed in. <a href="/en/account">Try again in a minute</a>.</p>
+  <p class="lede" id="acct-busy-text">Your account will not load just now: too many requests came in at once. You are still signed in. <a href="/en/account">Try again in a minute</a>.</p>
 </section>
 
 <section id="state-unauth" class="section-lg hidden">
@@ -231,7 +231,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </header>
 
 <details class="acct-card acct-advanced" id="acct-advanced">
-  <summary><strong>Advanced account key</strong><span>For legacy SDK, script and IoT access. Normal document use does not need this.</span></summary>
+  <summary><strong>Advanced account key</strong><span>For older SDKs, scripts and IoT access. You do not need it for normal work with documents.</span></summary>
   <div class="acct-advanced-body">
   <div class="info-row">
     <div class="info-label">Key</div>
@@ -274,8 +274,8 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-kicker">Passkey sign-in &middot; WebAuthn, device-bound</div>
   <h2>Passkey sign-in.</h2>
   <p class="acct-lead">
-    Sign in with Face ID, Touch ID, Windows Hello or a security key. No code to type.
-    Adding a passkey is a security change, so it needs your current 6-digit TOTP code.
+    Sign in with Face ID, Touch ID, Windows Hello or a security key, without typing a code.
+    A passkey changes your security. So we first ask for your current 6-digit code.
   </p>
   <div class="acct-block">
     <h3>Your passkeys</h3>
@@ -284,7 +284,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   </div>
   <div class="acct-inline">
     <input type="text" id="account-passkey-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-           placeholder="TOTP code" autocomplete="one-time-code" style="max-width:150px">
+           placeholder="6-digit code" autocomplete="one-time-code" style="max-width:150px">
     <button type="button" class="btn btn-secondary btn-small" id="account-passkey-btn">Activate passkey</button>
   </div>
   <p id="account-passkey-status" class="small" aria-live="polite" style="margin-top:8px"></p>
@@ -294,19 +294,19 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-kicker">Signing identity &middot; persistent</div>
   <h2>Signing identity.</h2>
   <p class="acct-lead">
-    Your signing key signs documents, separate from signing in. Public keys are bound to your
-    account so verifiers can attribute signatures; private keys never leave your browser.
+    You sign documents with your signing key. That is separate from signing in. Your public keys belong to your
+    account, so others can check that a signature is yours. Your private keys never leave your browser.
   </p>
   <div class="acct-grid2">
     <div class="acct-block">
-      <h3>Enrolled keys</h3>
+      <h3>Registered keys</h3>
       <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
       <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:6px">
-        <p class="small" style="margin:0 0 8px">Enter your 6-digit authenticator code to revoke this signing key.</p>
+        <p class="small" style="margin:0 0 8px">Enter the 6-digit code from your authenticator app. That revokes this key.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="text" id="revoke-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" style="max-width:140px">
-          <button type="button" class="btn btn-small" id="revoke-totp-confirm">Confirm revoke</button>
+          <button type="button" class="btn btn-small" id="revoke-totp-confirm">Confirm and revoke</button>
           <button type="button" class="btn btn-small btn-secondary" id="revoke-totp-cancel">Cancel</button>
         </div>
       </div>
@@ -321,10 +321,10 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-block">
     <h3>Set up your signing key</h3>
     <p class="small">
-      Your signing key is created here, in this browser, and
-      only you hold it. You set it up, and open it each time you sign, with the same
-      passkey you sign in with (Face ID, Touch ID, or a security key). No passphrase, no extra
-      code: your sign-in passkey is your signing key. If this browser has no passkey, you can still
+      We create your signing key here, in this browser.
+      Only you hold it. You set it up, and open it each time you sign, with the same
+      passkey you sign in with (Face ID, Touch ID, or a security key). So you need no passphrase and no extra
+      code. No passkey in this browser? You can still
       sign at <a href="/en/sign">/sign</a> with your authenticator code instead.
     </p>
     <div class="acct-field">
@@ -379,15 +379,15 @@ main.acct input::placeholder { color: var(--ink-3); }
          business plans pay for it, and one link is the whole upgrade path. -->
     <div class="acct-plan-band free" id="billing-community" hidden>
       <p class="acct-plan-kicker">Community &middot; &euro;0</p>
-      <p class="acct-plan-lede">You are on the Community plan and it stays free. The business plans pay for the servers and keep it that way.</p>
-      <p class="acct-plan-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
+      <p class="acct-plan-lede">You are on the Community plan and it stays free. The business plans pay for the servers, so it stays free.</p>
+      <p class="acct-plan-adds">With a business plan you get 100 or 1,000 signatures a month instead of 2. Links stay open longer and you keep a record of what you sent. You get a named contact for support and an audit trail you can export and hand over.</p>
       <a class="acct-plan-cta" href="/en/pricing">See the business plans &rarr;</a>
     </div>
     <!-- Shown on a paid plan. No link to a higher tier: a customer who pays is
          reading his own subscription, not an offer. -->
     <div class="acct-plan-band paid" id="billing-paid" hidden>
       <p class="acct-plan-kicker">Your plan &middot; active</p>
-      <p class="acct-plan-lede">Thank you. What you pay is what keeps the Community plan free for everyone else. Your plan and the day the term you bought runs out are below.</p>
+      <p class="acct-plan-lede">Thank you. What you pay is what keeps the Community plan free for everyone else. Below are your plan and the day your term runs out.</p>
     </div>
     <!-- Shown by js/account.inline1.js from seven days before the bought term
          runs out. One-off payments mean there is nothing to cancel and nothing
@@ -416,7 +416,7 @@ main.acct input::placeholder { color: var(--ink-3); }
       <div class="info-label">Access until</div>
       <div class="info-value" id="billing-next">-</div>
     </div>
-    <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">This is a one-off payment for the term you bought. Nothing is collected again by itself. Buy another term before this date to keep the plan running.</p>
+    <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">This is a one-off payment for the term you bought. Nothing is collected again by itself. Want to keep the plan? Buy another term before this date.</p>
     <div class="info-row" id="billing-cancel-row" style="display:none">
       <div class="info-label">Cancellation</div>
       <div class="info-value" id="billing-cancel-date" style="color:var(--warn-ink)">-</div>
@@ -434,7 +434,7 @@ main.acct input::placeholder { color: var(--ink-3); }
          the plan and the date above. See relay/lib/coupon.js. -->
     <form data-redeem-form class="acct-form" style="margin-top:var(--space-4)">
       <p class="acct-plan-kicker" style="margin:0 0 8px">Have a code?</p>
-      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">A code gives you a term as a gift. It is not a discount and not a payment: nothing is charged, now or later, and there is nothing to cancel. If you already have a paid term running, the gift is added after it.</p>
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">A code gives you a term as a gift. It is not a discount and not a payment: nothing is charged, now or later, and there is nothing to cancel. Already have a paid term running? Then the gift comes after it.</p>
       <label class="acct-field">
         <span class="acct-field-label">Your code</span>
         <input type="text" name="code" data-redeem-input maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false">
@@ -454,7 +454,7 @@ main.acct input::placeholder { color: var(--ink-3); }
          is shown once and never stored here. -->
     <div id="parasign-api-block" hidden>
       <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">ParaSign API keys</h3>
-      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Your plan includes the ParaSign API, so signing can run inside your own software. A key is shown once, here, and cannot be read again; make a new one if you lose it. <a href="/en/docs#parasign-api" style="color:var(--cobalt)">Read the documentation</a>.</p>
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">With your plan you can sign from your own software through the ParaSign API. You see a key only once, here. Lost it? Make a new one. <a href="/en/docs#parasign-api" style="color:var(--cobalt)">Read the documentation</a>.</p>
       <div id="parasign-api-list" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading&hellip;</div>
       <div class="acct-actions">
         <button id="parasign-api-new" class="btn btn-secondary btn-small">Create a key</button>
@@ -476,7 +476,7 @@ main.acct input::placeholder { color: var(--ink-3); }
          document is still issued to the email address on this account. -->
     <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Company details for invoices</h3>
     <p class="acct-note" style="font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-3)">
-      Optional. Fill these in and they appear on every invoice issued from now on. Invoices already issued keep the details they were issued with.
+      Optional. What you fill in here goes on every new invoice. Invoices already issued stay as they are.
     </p>
     <form id="billing-profile-form" class="acct-form">
       <label class="acct-field">
@@ -507,7 +507,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section class="acct-card danger">
-  <div class="acct-kicker">Deactivate account &middot; blocks future access</div>
+  <div class="acct-kicker">Deactivate account &middot; no access after this</div>
   <h2>Deactivate account.</h2>
   <p class="acct-lead">
     This deactivates your account and its API key stops working. We remove your sessions and your authenticator setup. The account record is retained.
@@ -521,14 +521,14 @@ main.acct input::placeholder { color: var(--ink-3); }
 
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
-<script src="/js/account-api-keys.js?v=3" defer></script>
-<script src="/js/account.inline1.js?v=14"></script>
+<script src="/js/account-api-keys.js?v=4" defer></script>
+<script src="/js/account.inline1.js?v=15"></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/redeem-code.js?v=4" defer></script>
+<script src="/js/redeem-code.js?v=5" defer></script>
 
-<script type="module" src="/js/account.inline2.js?v=8"></script>
-<script type="module" src="/js/passkey.js?v=9"></script>
-<script type="module" src="/js/signing-enrol.js?v=19"></script>
+<script type="module" src="/js/account.inline2.js?v=9"></script>
+<script type="module" src="/js/passkey.js?v=10"></script>
+<script type="module" src="/js/signing-enrol.js?v=20"></script>
 <script src="/js/account-theme.js?v=4" defer></script>
 <footer class="legal-strip">
   <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a><span class="legal-sep">&middot;</span><a href="/en/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/account" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></span>

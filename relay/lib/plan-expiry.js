@@ -280,9 +280,9 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal, 
   const text = [
     `Your ${plan} ends on ${date}.`,
     '',
-    `Renew for another month or year, or let it fall back to ${FLOOR_NAME}; nothing is charged automatically.`,
+    `You can renew for a month or a year. If you do nothing, your account goes back to ${FLOOR_NAME}, and nothing is charged automatically.`,
     '',
-    `Your plans and prices are here: ${pricing}`,
+    `Plans and prices are here: ${pricing}`,
     '',
     'Paramant',
   ].join('\n');

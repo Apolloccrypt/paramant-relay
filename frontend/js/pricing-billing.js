@@ -164,7 +164,7 @@
   function refusalText(body) {
     if (body.error !== 'other_plan_running') {
       return NL
-        ? 'Dit plan kan nu niet worden afgerekend. Er is niets afgeschreven. Wilt u van plan wisselen, mail dan privacy@paramant.app.'
+        ? 'U kunt dit plan nu niet kopen. Er is niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
         : (body.message || 'This plan cannot be bought right now. Nothing has been charged. To change plans, mail privacy@paramant.app.');
     }
     if (!NL && body.message) return body.message;
@@ -179,7 +179,7 @@
       }
     }
     return NL
-      ? 'U heeft al ' + plan.trim() + until + '. Dit plan zou ernaast lopen en dan betaalt u dezelfde weken twee keer, dus er is geen betaling gestart en niets afgeschreven. Wilt u van plan wisselen, mail dan privacy@paramant.app.'
+      ? 'U heeft al ' + plan.trim() + until + '. Dit plan zou ernaast lopen, en dan betaalt u dezelfde weken twee keer. Daarom is er geen betaling gestart en niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
       : 'You already have ' + plan.trim() + until + '. This plan would run alongside it and you would pay twice for the same weeks, so no payment was started. To change plans, mail privacy@paramant.app.';
   }
 
@@ -216,7 +216,7 @@
           return;
         }
         showError(btn, NL
-          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw, of mail privacy@paramant.app, dan lossen we het op.'
+          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw. Lukt het weer niet? Mail privacy@paramant.app, dan lossen we het op.'
           : 'Could not start checkout. Nothing has been charged. ' +
             'Please try again, or mail privacy@paramant.app and we will sort it out.');
       });

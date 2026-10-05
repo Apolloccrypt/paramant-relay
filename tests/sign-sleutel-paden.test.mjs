@@ -134,7 +134,7 @@ test('een sleutel wordt pas bewaard als de koppeling aan het account gelukt is',
       getClientExtensionResults: () => ({ prf: { results: { first: buf(32, 9) } } }),
     }) } });
     const vault = await import('/vendor/vault.js?v=5');
-    const signer = await import('/js/parasign-signer.js?v=22');
+    const signer = await import('/js/parasign-signer.js?v=23');
     const before = (await vault.vaultList()).length;
     let err = null;
     try { await signer.ensureSigningKey({ rpId: location.hostname, label: 'proef' }); } catch (e) { err = String(e && (e.message || e)); }

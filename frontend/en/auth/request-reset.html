@@ -72,10 +72,7 @@
   <div class="eyebrow"><span class="bar"></span>authenticator reset</div>
   <h1>Reset your <em>authenticator</em>.</h1>
   <p class="lede mt-3">
-    Enter your account email and one of your back-up codes. If they match, we send a
-    link that confirms the request. A second email then brings the link to connect a
-    new authenticator app. The mailbox alone is not enough: without a back-up code only
-    support can restore access. Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+    Enter your account email and one of your backup codes. If they match, we first send an email to confirm the request. A second email brings the link to connect a new authenticator app. Access to your mailbox alone is not enough. No backup code left? Then only support can restore access. Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
     from your account address.
   </p>
 </section>
@@ -85,7 +82,7 @@
     <label for="email">Email address</label>
     <input type="email" id="email" name="email" required autocomplete="username" autofocus>
 
-    <label for="backup-code" class="mt-3">Back-up code</label>
+    <label for="backup-code" class="mt-3">Backup code</label>
     <input type="text" id="backup-code" name="backup_code" required autocomplete="one-time-code" placeholder="XXXX-XXXX-XXXX" spellcheck="false" autocapitalize="characters">
 
     <button type="submit" class="btn btn-primary mt-3" id="submit-btn">
@@ -100,7 +97,7 @@
   <div id="success" class="success" style="display:none"></div>
 
   <p class="footer-text mt-4">
-    Still have a backup code? <a href="/en/auth/backup">Use it instead</a><br>
+    Still have a backup code? <a href="/en/auth/backup">Sign in with it</a><br>
     Back to <a href="/en/auth/login">sign in</a>
   </p>
 
@@ -114,7 +111,7 @@
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
-<script src="/js/auth-request-reset.js?v=4"></script>
+<script src="/js/auth-request-reset.js?v=5"></script>
 <footer class="legal-strip">
   <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a><span class="legal-sep">&middot;</span><a href="/en/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/auth/request-reset" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></span>
 </footer>

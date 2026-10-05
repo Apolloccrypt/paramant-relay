@@ -11,7 +11,7 @@ import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultAddPrfWrap, vaultCreatePrfOnl
 // namespace off the global. Side-effect import, then read it, the same way
 // js/parasign-pdf-ops.js is reached. It owns the one sentence a customer sees
 // when we have no better answer than "not your fault, here is who to mail".
-import '/js/error-message.js?v=2';
+import '/js/error-message.js?v=3';
 const paramantErrors = self.paramantErrors;
 
 // One file, both languages. Every sentence a customer can see from this module

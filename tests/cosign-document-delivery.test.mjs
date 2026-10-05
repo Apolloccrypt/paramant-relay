@@ -81,7 +81,8 @@ async function waitForDeliveryResult(target = page) {
   await target.waitForFunction(() => {
     const step = document.querySelector('.step.active')?.id;
     const text = document.querySelector('#document-delivery-status')?.textContent || '';
-    return step === 'step-cosign' && text && !/wordt (geladen|gedownload)/i.test(text);
+    // Mick 05-10: taalronde ("wordt opgehaald" is ook een tussenstand)
+    return step === 'step-cosign' && text && !/wordt (geladen|gedownload|opgehaald)/i.test(text);
   }, null, { timeout: 15000 });
 }
 

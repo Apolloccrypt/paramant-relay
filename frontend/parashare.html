@@ -554,12 +554,12 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <div class="ps-alert" id="ps-key-error" role="alert">
-    <p>Uw accountsessie kon niet starten. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+    <p>We konden u niet aanmelden. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     <div class="ps-alert-actions">
       <a class="ps-alert-primary" href="/auth/login">Opnieuw inloggen</a>
       <span class="ps-alert-secondary">
         <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Een sleutel met de hand invoeren</button>
-        <span class="ps-alert-note">voor een eigen relay</span>
+        <span class="ps-alert-note">voor een eigen server</span>
       </span>
     </div>
   </div>
@@ -574,7 +574,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <div class="card" id="ps-earlier" hidden>
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Uw links van deze sessie</div></div>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Links die u net maakte</div></div>
     <div class="card-body">
       <ul class="ps-links" id="ps-earlier-list"></ul>
       <button type="button" class="ps-copy" id="ps-earlier-refresh" data-click="refreshSentLinks">Opnieuw kijken</button>
@@ -595,7 +595,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <input type="file" id="file-input" class="ps-sr" multiple data-change="onFileSelect" aria-describedby="file-status ps-drop-hint">
       <svg class="ps-drop-icon" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" focusable="false"><path d="M8 3.5h11l6 6v19H8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 3.5v6h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path class="ps-drop-mark" d="M12.5 19.5l3 3 5.5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="ps-drop-btn" id="ps-drop-btn">Kies een bestand</span>
-      <span class="ps-drop-hint" id="ps-drop-hint">of sleep het hierheen. Kiest u er meer dan één, dan wordt elk bestand apart verzegeld en krijgt elk een eigen link.</span>
+      <span class="ps-drop-hint" id="ps-drop-hint">of sleep het hierheen. Kiest u er meer dan één, dan gaat elk bestand apart op slot en krijgt elk een eigen link.</span>
     </label>
     <div class="status-line" id="file-status" aria-live="polite">Nog geen bestand gekozen</div>
     <div id="vault-list" style="margin-top:8px;display:none"></div>
@@ -656,7 +656,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <p>Bij meerdere mensen krijgt iedereen een eigen link per e-mail. Voordat het bestand opent, bevestigt de ontvanger het eigen e-mailadres met een code. In uw dashboard ziet u wie het heeft geopend.</p>
       <p>Bij Extra veilig maakt de browser van de ontvanger een eigen slot. U leest samen een korte code voor, bijvoorbeeld door te bellen. Staat op beide schermen dezelfde code, dan heeft niemand onderweg iets verwisseld.</p>
       <p>Voor wie de technische namen wil: Extra veilig is een <strong>hybride</strong> sleuteluitwisseling. ML-KEM-768 en ECDH P-256 werken naast elkaar en beide gedeelde geheimen gaan via HKDF-SHA256 naar één AES-256-GCM-sleutel. Wie er één van de twee breekt, heeft dus nog niets. Een link doet geen sleuteluitwisseling: uw browser maakt een nieuwe AES-256-GCM-sleutel en zet die achter de <code>#</code> in de link. De link <em>is</em> dus de sleutel.</p>
-      <p>Geen van beide ondertekent het bestand. De enige handtekeningen hier zet de relay zelf: op het openbare logboek en op het bewijs dat hij afgeeft. Een document ondertekenen met ML-DSA-65 doet u met ParaSign, niet met versturen. Het bestand op slot wordt bewaard met een vervaldatum en wordt vernietigd als de link verloopt of als het is opgehaald.</p>
+      <p>Geen van beide ondertekent het bestand. De enige handtekeningen hier zet onze server zelf: op het openbare logboek en op het bewijs dat hij afgeeft. Een document ondertekenen met ML-DSA-65 doet u met ParaSign, niet met versturen. Het bestand op slot wordt bewaard met een vervaldatum en wordt vernietigd als de link verloopt of als het is opgehaald.</p>
       <p>Gebruikt u een eigen server? <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Voer een sleutel in</button></p>
     </div>
   </details>
@@ -674,7 +674,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <div class="ps-alert" id="ps-link-error" role="alert">
     <p id="ps-link-error-text">De verbinding viel weg voordat de ontvanger er was. Er is niets geüpload en uw bestand staat nog hier in deze browser.</p>
     <div class="ps-alert-actions">
-      <button type="button" class="ps-alert-primary" data-click="reopenSession">Sessie opnieuw openen</button>
+      <button type="button" class="ps-alert-primary" data-click="reopenSession">Opnieuw verbinden</button>
       <span class="ps-alert-note">dit maakt een nieuwe link</span>
     </div>
   </div>
@@ -696,7 +696,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Vergelijk deze controlecode samen</div></div>
     <div class="card-body">
       <p class="status-line" style="margin-bottom:6px">Neem via een <strong>ander kanaal</strong> contact op met de ontvanger (telefoon, Signal) en lees de code hieronder aan elkaar voor. Beide schermen moeten dezelfde code tonen.</p>
-      <p class="ps-caution">Zijn de codes verschillend, stop dan hier. Een gemanipuleerde relay kan u een verkeerde sleutel geven. Vergelijkt u de code via een kanaal dat niet van ons is, dan merkt u dat.</p>
+      <p class="ps-caution">Zijn de codes verschillend, stop dan hier. Een gehackte server kan u een verkeerde sleutel geven. Vergelijkt u de code via een kanaal dat niet van ons is, dan merkt u dat.</p>
       <div class="fingerprint" id="fp-display">-</div>
       <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Dezelfde code als de vorige keer dat u naar deze ontvanger verstuurde</div>
       <div id="fp-new-device" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center">◈ Eerste keer met deze ontvanger. Vergelijk extra zorgvuldig.</div>
@@ -723,12 +723,12 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
        read, and it used to spend that attention on ML-KEM-768 and ECDH P-256.
        Somebody sending a patient file wants one sentence, not a cipher suite.
        The names are still here, one click down, for the reader who wants them. -->
-  <p class="sub">Uw bestand wordt op dit apparaat verzegeld. Wij ontvangen alleen de verzegelde versie, nooit het bestand zelf en nooit de sleutel.</p>
+  <p class="sub">Uw bestand gaat op dit apparaat op slot. Wij ontvangen alleen de versie op slot, nooit het bestand zelf en nooit de sleutel.</p>
   <details class="ps-how">
     <summary>De technische details</summary>
     <p>Dit gebeurt allemaal in uw browser. ML-KEM-768 en ECDH P-256 verpakken samen
        een nieuwe AES-256-GCM-sleutel voor de ontvanger. Daarna gaat alleen
-       versleutelde data naar de relay. De relay ondertekent de regel die hij in
+       versleutelde data naar onze server. Die ondertekent de regel die hij in
        het openbare logboek zet. Het bestand zelf heeft geen handtekening.</p>
   </details>
 
@@ -757,7 +757,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <div class="progress-bar-wrap" style="margin-top:12px"><div class="progress-bar" id="tb-dl-bar"></div></div>
       <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
         <span class="tag green">AES-256-GCM</span>
-        <span class="tag green">Sleutel in het URL-fragment, de relay zag hem nooit</span>
+        <span class="tag green">Sleutel achter de # in de link, onze server zag hem nooit</span>
         <span class="tag green">Wist zich na ophalen</span>
       </div>
     </div>
@@ -803,7 +803,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <div class="done-state">
     <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
     <h2 class="done-title">Uw link staat klaar.</h2>
-    <p class="done-line" id="ps-link-line">Verstuur hem op de manier die u wilt. Wij bewaren het verzegelde bestand voor u en kunnen het niet openen.</p>
+    <p class="done-line" id="ps-link-line">Verstuur hem op de manier die u wilt. Wij bewaren het bestand op slot en kunnen het niet openen.</p>
 
     <div class="done-payload">
       <ul class="ps-links" id="ps-link-list"></ul>
@@ -818,10 +818,10 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <details class="done-details">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
-        <p>Uw browser verzegelde het bestand voordat het dit apparaat verliet, met een sleutel die hier is gemaakt en nergens anders (<code>AES-256-GCM</code>). De sleutel staat in de link achter de <code>#</code>, en een browser verstuurt dat deel nooit. Wij bewaren dus gegevens die wij op geen enkele manier kunnen openen.</p>
+        <p>Uw browser zette het bestand op slot voordat het dit apparaat verliet, met een sleutel die hier is gemaakt en nergens anders (<code>AES-256-GCM</code>). De sleutel staat in de link achter de <code>#</code>, en een browser verstuurt dat deel nooit. Wij bewaren dus gegevens die wij op geen enkele manier kunnen openen.</p>
         <p>De link werkt één keer. De eerste voltooide download wist het bestand van onze server. Komt niemand het ophalen, dan wordt het vernietigd als de link verloopt.</p>
-        <p><strong>Bewijs bewaren</strong> slaat de regel op die dit bestand in ons openbare logboek maakte. Iedereen kan die controleren in <a href="/ct-log">het logboek</a>: de regel, de plek in de boom en de ondertekende boomkop. Het bewijst dat wij het verzegelde bestand hebben ontvangen, niet dat iemand het heeft opgehaald.</p>
-        <p id="ps-link-receipt-note">Voor een download via een link bestaat geen ondertekend ontvangstbewijs. De relay ondertekent dat alleen bij een download via de API. Deze pagina leest de status bij elke link hierboven uit de link zelf en rekent met de klok van die link.</p>
+        <p><strong>Bewijs bewaren</strong> slaat de regel op die dit bestand in ons openbare logboek maakte. Iedereen kan die controleren in <a href="/ct-log">het logboek</a>: de regel, de plek in de boom en de ondertekende boomkop. Het bewijst dat wij het bestand op slot hebben ontvangen, niet dat iemand het heeft opgehaald.</p>
+        <p id="ps-link-receipt-note">Voor een download via een link bestaat geen ondertekend ontvangstbewijs. Onze server ondertekent dat alleen bij een download via de API. Deze pagina leest de status bij elke link hierboven uit de link zelf en rekent met de klok van die link.</p>
       </div>
     </details>
   </div>
@@ -843,9 +843,9 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <details class="done-details" id="done-details-live">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
-        <p>Het slot is in uw browser gemaakt, niet op onze server. Uw bestand werd verzegeld voor de eigen sleutel van de ontvanger voordat het dit apparaat verliet: een hybride sleuteluitwisseling, <code>ML-KEM-768</code> naast <code>ECDH P-256</code>, met beide gedeelde geheimen samengevoegd tot één <code>AES-256-GCM</code>-sleutel. Wie er één van de twee breekt, heeft nog niets. Daarom zit de klassieke helft er nog in.</p>
+        <p>Het slot is in uw browser gemaakt, niet op onze server. Uw bestand ging op slot met de eigen sleutel van de ontvanger voordat het dit apparaat verliet: een hybride sleuteluitwisseling, <code>ML-KEM-768</code> naast <code>ECDH P-256</code>, met beide gedeelde geheimen samengevoegd tot één <code>AES-256-GCM</code>-sleutel. Wie er één van de twee breekt, heeft nog niets. Daarom zit de klassieke helft er nog in.</p>
         <p>De controlecode die u aan elkaar voorlas, berekenen beide browsers zelf uit de openbare sleutels van de ontvanger. Tonen beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld. Daarom vragen we u hem te vergelijken via een kanaal dat niet van ons is.</p>
-        <p>Wij bewaren een verzegelde kopie. De sleutel hebben wij nooit gehad, dus wij kunnen die kopie niet openen. Hij wordt gewist zodra de ontvanger hem ophaalt. Haalt niemand hem op, dan wordt hij vernietigd als de tijd om is.</p>
+        <p>Wij bewaren een kopie op slot. De sleutel hebben wij nooit gehad, dus wij kunnen die kopie niet openen. Hij wordt gewist zodra de ontvanger hem ophaalt. Haalt niemand hem op, dan wordt hij vernietigd als de tijd om is.</p>
         <p><strong>Bewijs bewaren</strong> slaat de regel op die deze verzending in ons openbare logboek maakte. Iedereen kan die controleren in <a href="/ct-log">het logboek</a>: de regel, de plek in de boom en de ondertekende boomkop.</p>
       </div>
     </details>
@@ -856,9 +856,9 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <details class="done-details" id="done-details-named" hidden>
       <summary>Hoe dit beveiligd is</summary>
       <div class="done-details-body">
-        <p>Uw browser heeft het bestand verzegeld voordat het dit apparaat verliet (<code>AES-256-GCM</code>). De sleutel is per ontvanger verpakt met een eigen link.</p>
+        <p>Uw browser heeft het bestand op slot gezet voordat het dit apparaat verliet (<code>AES-256-GCM</code>). De sleutel is per ontvanger verpakt met een eigen link.</p>
         <p>Die link zit in de uitnodiging die onze server aan de ontvanger mailt. Op het moment van versturen kan onze server dus bij de sleutel. Dit is daarom geen zero-knowledge, anders dan de live-overdracht met een controlecode. Wilt u dat wij nooit bij de sleutel kunnen, gebruik dan de live-overdracht.</p>
-        <p>De ontvanger bevestigt eerst het eigen e-mailadres met een code die naar hetzelfde adres gaat. Wie alleen de link heeft, komt er zo niet in. Wij bewaren de verzegelde kopie tot de ontvanger hem ophaalt of de tijd om is.</p>
+        <p>De ontvanger bevestigt eerst het eigen e-mailadres met een code die naar hetzelfde adres gaat. Wie alleen de link heeft, komt er zo niet in. Wij bewaren de kopie op slot tot de ontvanger hem ophaalt of de tijd om is.</p>
       </div>
     </details>
   </div>
@@ -918,10 +918,10 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/vendor/qrcode.min.js?v=1"></script>
 <script type="module" src="/js/parashare.inline1.js?v=4"></script>
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/quota-upgrade.js?v=8" defer></script>
+<script src="/js/quota-upgrade.js?v=9" defer></script>
 <!-- One sentence for "we broke it, here is what to do", shared with the signer.
      Plain script, above the page code that reads window.paramantErrors. -->
-<script src="/js/error-message.js?v=2" defer></script>
+<script src="/js/error-message.js?v=3" defer></script>
 <!-- v5, not v4. #396 shipped a v4 of this file and so did the commit below it;
      two different contents under one immutable url is exactly what the ?v= is
      there to prevent, and check-cache-bust cannot see it because both sides
@@ -933,7 +933,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
 <script src="/js/send-wrap.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=24" defer></script>
+<script src="/js/parashare.page.js?v=25" defer></script>
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
 <footer>

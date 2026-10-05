@@ -60,7 +60,7 @@ test('credit-note mail: chargeback and partial refund', () => {
   const refund = billingMail.creditNoteMail({ ...cn, reason: 'refund', partial: true,
     title: 'Refund receipt', note: 'Credit note with VAT number follows.' });
   assert.strictEqual(refund.subject, 'Terugbetalingsbewijs CN-2026-0001 - Paramant / Refund receipt CN-2026-0001 - Paramant');
-  assert.ok(refund.text.startsWith('Uw betaling is aan u terugbetaald.'), refund.text);
+  assert.ok(refund.text.startsWith('Wij hebben uw betaling terugbetaald.'), refund.text);
   assert.ok(refund.text.includes('Dit is een gedeeltelijke creditering.'), refund.text);
   assert.ok(refund.text.includes('Creditnota met btw-nummer volgt.'), refund.text);
   assert.ok(refund.text.includes('Your payment has been refunded'), refund.text);

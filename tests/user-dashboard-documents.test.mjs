@@ -274,8 +274,9 @@ ok('a Community account sees the give-back band', freePlan.badge === 'Community'
 // one action that fills the list now sits in it as a real button.
 const emptyCta = await planPage.locator('.dh-empty a').first();
 const emptyCtaBox = await emptyCta.boundingBox();
+// Mick 05-10: taalronde
 ok('the empty document list offers the action that fills it',
-  await planPage.locator('.dh-empty strong').innerText() === 'No open requests' &&
+  await planPage.locator('.dh-empty strong').innerText() === 'Nothing open right now' &&
   (await emptyCta.getAttribute('href')).startsWith('/sign') &&
   emptyCtaBox.height >= 44, JSON.stringify({ href: await emptyCta.getAttribute('href'), height: emptyCtaBox && Math.round(emptyCtaBox.height) }));
 

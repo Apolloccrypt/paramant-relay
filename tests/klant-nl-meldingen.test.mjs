@@ -138,7 +138,7 @@ async function redeemSays(slug, body, status) {
   await page.click('[data-redeem-form] [data-redeem-submit]');
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-redeem-form] [data-redeem-message]');
-    return el && !el.hidden && el.textContent && !/Checking your code|Uw code wordt gecontroleerd/.test(el.textContent);
+    return el && !el.hidden && el.textContent && !/Checking your code|We controleren uw code/.test(el.textContent);
   }, null, { timeout: 10000 });
   const text = (await page.textContent('[data-redeem-form] [data-redeem-message]')).trim();
   await page.close();

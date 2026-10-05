@@ -64,7 +64,7 @@ function paSecondFactorError(status, body) {
   if (code === 'second_factor_required') return nlEn('Vul eerst de code van 6 cijfers of een back-upcode in. Er is niets veranderd.', 'Enter the 6-digit code or a back-up code first. Nothing changed.');
   if (status === 429) return nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.');
   if (status === 401) return nlEn('Uw sessie is verlopen. Log opnieuw in en probeer het nog eens. Er is niets veranderd.', 'Your session has expired. Sign in again and retry. Nothing changed.');
-  if (status >= 500) return nlEn('Dit lukte nu niet door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work right now because of a fault on our side. Nothing changed. Please try again shortly.');
+  if (status >= 500) return nlEn('Er is een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Something went wrong on our side. Nothing changed. Please try again shortly.');
   return nlEn('Dit is niet gelukt. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work. Nothing changed. Please try again shortly.');
 }
 window.paSecondFactorError = paSecondFactorError;
@@ -166,7 +166,7 @@ window.paSecondFactorError = paSecondFactorError;
         show('state-busy');
         if (res.status !== 429) {
           var bt = document.getElementById('acct-busy-text');
-          if (bt) bt.firstChild.textContent = nlEn('Uw account kon even niet worden geladen door een storing bij ons. U bent nog ingelogd. ', 'Your account could not be loaded just now because of a fault on our side. You are still signed in. ');
+          if (bt) bt.firstChild.textContent = nlEn('Door een storing bij ons laadt uw account even niet. U bent nog ingelogd. ', 'Your account will not load just now because of a fault on our side. You are still signed in. ');
         }
         return;
       }
@@ -388,7 +388,7 @@ window.paSecondFactorError = paSecondFactorError;
       if (st === 401) { show('state-unauth'); return; }
       alert(st === 429
         ? nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.')
-        : nlEn('Dit lukte nu niet door een storing bij ons. De andere sessies zijn nog actief en u bent nog ingelogd. Probeer het zo opnieuw.', 'This did not work right now because of a fault on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
+        : nlEn('Er is een storing bij ons. De andere sessies zijn nog actief en u bent nog ingelogd. Probeer het zo opnieuw.', 'Something went wrong on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
       return;
     }
     alert(nlEn('De andere sessies zijn uitgelogd.', 'Other sessions signed out.'));
@@ -396,14 +396,14 @@ window.paSecondFactorError = paSecondFactorError;
   });
 
   document.getElementById('delete-account').addEventListener('click', async function() {
-    const answer = prompt(nlEn('Typ DEACTIVEREN om het deactiveren van uw account te bevestigen:', 'Type DEACTIVATE to confirm account deactivation:'));
+    const answer = prompt(nlEn('Weet u het zeker? Typ DEACTIVEREN om uw account te deactiveren:', 'Are you sure? Type DEACTIVATE to deactivate your account:'));
     if (answer !== nlEn('DEACTIVEREN', 'DEACTIVATE')) return;
     var data = await accountAction(this, '/api/user/account', 'DELETE',
       nlEn('Laatste stap: bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Last step: confirm with the 6-digit code from your authenticator app, or a back-up code.'),
       nlEn('Account deactiveren', 'Deactivate account'));
     if (data) {
       try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
-      alert(nlEn('Account gedeactiveerd. De sleutel werkt niet meer.', 'Account deactivated. Its key can no longer be used.'));
+      alert(nlEn('Account gedeactiveerd. De sleutel werkt niet meer.', 'Account deactivated. Its key no longer works.'));
       window.location = '/';
     }
   });
@@ -512,7 +512,7 @@ window.paSecondFactorError = paSecondFactorError;
         document.getElementById('billing-cancel-btn').classList.add('hidden');
       }
     } catch(err) {
-      document.getElementById('billing-loading').textContent = nlEn('Betaalstatus kon niet worden geladen.', 'Could not load billing.');
+      document.getElementById('billing-loading').textContent = nlEn('We konden uw betaalstatus niet laden.', 'Could not load your billing status.');
     }
   }
 
@@ -589,7 +589,7 @@ window.paSecondFactorError = paSecondFactorError;
       histEl.textContent = '';
       rows.forEach(function(e) { histEl.appendChild(historyRow(e)); });
     } catch(err) {
-      histEl.textContent = nlEn('Betaalgeschiedenis kon niet worden geladen.', 'Could not load billing history.');
+      histEl.textContent = nlEn('We konden uw betaalgeschiedenis niet laden.', 'Could not load your billing history.');
     }
   }
 
@@ -653,7 +653,7 @@ window.paSecondFactorError = paSecondFactorError;
         el.appendChild(row);
       });
     } catch (err) {
-      el.textContent = nlEn('Facturen konden niet worden geladen.', 'Could not load invoices.');
+      el.textContent = nlEn('We konden uw facturen niet laden.', 'Could not load your invoices.');
     }
   }
 

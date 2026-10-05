@@ -40,21 +40,23 @@ async function open(status) {
   return out;
 }
 
-test('429: de kop zegt "even te druk", niet "ongeldig of verlopen"', async () => {
+test('429: de kop zegt "even te druk", niet "klopt niet of is verlopen"', async () => {
   const r = await open(429);
   assert.match(r.h1, /Even te druk/);
-  assert.doesNotMatch(r.sub, /ongeldig of verlopen/);
-  assert.match(r.msg, /Te veel verzoeken/);
+  assert.doesNotMatch(r.sub, /klopt niet of is verlopen/);
+  // Mick 05-10: taalronde
+  assert.match(r.msg, /Even te veel tegelijk/);
 });
 
 test('5xx: de kop zegt dat het aan ons ligt', async () => {
   const r = await open(503);
   assert.match(r.h1, /storing/);
-  assert.doesNotMatch(r.sub, /ongeldig of verlopen/);
+  assert.doesNotMatch(r.sub, /klopt niet of is verlopen/);
 });
 
 test('404: de kop over de link blijft', async () => {
   const r = await open(404);
-  assert.match(r.h1, /kan niet worden geopend/);
-  assert.match(r.sub, /ongeldig of verlopen/);
+  // Mick 05-10: taalronde
+  assert.match(r.h1, /opent niet/);
+  assert.match(r.sub, /klopt niet of is verlopen/);
 });

@@ -26,7 +26,7 @@
 // The manifest itself did not change: type, page and coordinates, hashed byte
 // for byte as before (relay/envelope.js normaliseAppearance).
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=22';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=23';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
@@ -344,8 +344,8 @@ async function init() {
     const partyQuery = '?p=' + encodeURIComponent(partyIndex);
     const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery, { headers: inviteHeaders() });
     if (r.status === 404) return showError(L('Dit verzoek bestaat niet, is verlopen of is al gebruikt.', 'This request does not exist, has expired, or was already used.'));
-    if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too many requests from this address. Try again in a minute.'), 'busy');
-    if (!r.ok) return showError(L('Het verzoek kon nu niet worden opgehaald door een storing bij ons. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'The request could not be fetched right now because of a fault on our side. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
+    if (r.status === 429) return showError(L('Even te veel tegelijk vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too much at once from this address. Try again in a minute.'), 'busy');
+    if (!r.ok) return showError(L('Door een storing bij ons lukt het ophalen nu niet. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'A fault on our side stops us from fetching it right now. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
     const data = await r.json();
     __envelope = withPlainLabels(data.envelope);
     if (__partyIndex >= __envelope.party_count) return showError(L('Deze link verwijst naar een ondertekenaar die niet in dit verzoek staat.', 'This link points to a signer who is not part of this request.'));
@@ -376,7 +376,7 @@ async function init() {
     }
     await prepareSigning();
     if (__session) await loadDeliveredDocument(envId, partyIndex);
-    else setDeliveryStatus('warn', L('Log in met het uitgenodigde e-mailadres om dit versleutelde document te openen.', 'Sign in with the invited email address to open this encrypted document.'));
+    else setDeliveryStatus('warn', L('Log in met het e-mailadres van deze uitnodiging. Dan opent het document.', 'Sign in with the email address this invitation went to. Then the document opens.'));
   } catch (e) {
     showError(e.message || L('Er is geen verbinding. Controleer uw internet en probeer het opnieuw.', 'No connection. Check your internet and try again.'));
   }
@@ -645,7 +645,7 @@ function loginCtaHtml() {
   try { store = window.sessionStorage; } catch { store = null; }
   const ret = encodeURIComponent(store ? stashReturn(store, location) : location.pathname);
   return '<a class="btn" href="/auth/login?return=' + ret + '">' + L('Inloggen om verder te gaan', 'Sign in to continue') + '</a>'
-    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link" target="_blank" rel="noopener">Maak er gratis een</a> met het e-mailadres waarop u deze uitnodiging kreeg. Daarna komt u vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link" target="_blank" rel="noopener">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
+    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link" target="_blank" rel="noopener">Maak er gratis een</a> met het e-mailadres van deze uitnodiging. Daarna komt u vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link" target="_blank" rel="noopener">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
 }
 
 // "Maak er gratis een": which request and party this is waits in this browser
@@ -675,7 +675,7 @@ async function prepareSigning() {
     // button and the authenticator panel, so signing in is the only thing on
     // screen. It comes off the moment a session resolves.
     document.body.classList.add('needs-login');
-    setStatus('warn', L('Log in als de ontvanger aan wie deze uitnodiging is gestuurd. Kom daarna hier terug om te tekenen.', 'Sign in as the recipient this invite was sent to, then return here to sign.'));
+    setStatus('warn', L('Log in met het e-mailadres van deze uitnodiging. Daarna kunt u hier tekenen.', 'Sign in with the email address this invitation went to. Then you can sign here.'));
     showCta(loginCtaHtml());
     // Back in this tab after making an account or signing in elsewhere: the
     // link here still has the token and the key, so this tab just reloads.
@@ -788,10 +788,10 @@ async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
     if (code === 'recipient_mismatch' || code === 'not_authorized') throw new Error(L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het uitgenodigde adres.', 'This invitation belongs to a different email address. Sign in with the invited address.'));
     throw new Error(L('Het document kon niet worden geopend met deze link. Open de link uit de uitnodigingsmail opnieuw.', 'The document could not be opened with this link. Open the link from the invitation email again.'));
   }
-  if (r.status === 404) throw new Error(L('Het versleutelde document is niet beschikbaar. Misschien is het een ouder verzoek, of is de link onvolledig.', 'The encrypted document is unavailable. It may be an older request or the link may be incomplete.'));
+  if (r.status === 404) throw new Error(L('Het document is niet beschikbaar. Misschien is het een ouder verzoek, of is de link onvolledig.', 'The document is unavailable. It may be an older request or the link may be incomplete.'));
   if (r.status === 410) throw new Error(L('Dit verzoek of het document is verlopen. Vraag de afzender om een nieuw verzoek.', 'This signing request or its document has expired. Ask the sender for a new request.'));
   if (r.status === 429) throw new Error(L('Het is even te druk. Probeer het over een minuut opnieuw.', 'It is busy right now. Try again in a minute.'));
-  if (!r.ok) throw new Error(L('Het versleutelde document kon nu niet worden opgehaald door een storing bij ons. Probeer het over een paar minuten opnieuw.', 'The encrypted document could not be fetched right now because of a fault on our side. Please try again in a few minutes.'));
+  if (!r.ok) throw new Error(L('Door een storing bij ons lukt het ophalen van het document nu niet. Probeer het over een paar minuten opnieuw.', 'A fault on our side stops us from fetching the document right now. Please try again in a few minutes.'));
   let docKey;
   if (key.whole) docKey = key.whole;
   else {
@@ -815,7 +815,7 @@ async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
 }
 
 async function loadDeliveredDocument(envId, partyIndex) {
-  setDeliveryStatus('', L('Het versleutelde document wordt gedownload...', 'Downloading the encrypted document...'));
+  setDeliveryStatus('', L('Het document wordt opgehaald...', 'Fetching the document...'));
   try {
     const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex);
     const delivered = await fetchAndOpenCapsule(url, envId, partyIndex, inviteHeaders());
@@ -1955,7 +1955,7 @@ async function doSign() {
     return;
   }
   if (__documentBytes && isPdfBytes(__documentBytes) && __visualCopy.ok && Number(__envelope.recipe_version) >= 5 && __appearance.fields.length === 0) {
-    if (!confirm(L('Ondertekenen zonder zichtbare handtekening in het document? Uw cryptografische handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your cryptographic signature will still be recorded.'))) return;
+    if (!confirm(L('Ondertekenen zonder zichtbare handtekening in het document? Uw handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your signature is still recorded.'))) return;
   }
   $('sign-confirm').disabled = true;
   $('sign-cta').hidden = true;
@@ -2075,7 +2075,7 @@ async function doSign() {
     if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, Inloggen met passkey) en open daarna deze link opnieuw. De passkey waarmee u inlogt wordt dan uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link. Your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of duurde te lang. Tik op Ondertekenen om het opnieuw te proberen.', 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.');
-    else if (e && e.status === 401) msg = L('Uw sessie is verlopen. Log opnieuw in als de uitgenodigde ontvanger en probeer het nog eens.', 'Your session expired. Sign in again as the invited recipient, then retry.');
+    else if (e && e.status === 401) msg = L('U bent uitgelogd. Log opnieuw in met het uitgenodigde e-mailadres en probeer het nog eens.', 'You were signed out. Sign in again with the invited email address and try again.');
     else if (e && e.status === 429) {
       const wait = Number(e.data && (e.data.retry_after || e.data.retryAfter)) || 0;
       msg = wait > 0

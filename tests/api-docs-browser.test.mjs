@@ -97,7 +97,7 @@ for (const pth of ['/docs', '/en/docs']) {
   await p2.route('**/api/user/developer/parasign-keys', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'parasign_not_entitled', message: 'This account is not entitled to the ParaSign API.' }) }));
   await p2.goto(ORIGIN + '/developer', { waitUntil: 'networkidle' });
   const list = await p2.locator('#psk-keys').innerText();
-  ok('a 403 on the key list is said in words', /geen toegang tot de API voor Ondertekenen/.test(list) && !/konden niet worden geladen/.test(list), list);
+  ok('a 403 on the key list is said in words', /geen toegang tot de API voor Ondertekenen/.test(list) && !/konden de API-sleutels niet ophalen/.test(list), list);
   await p2.close();
 }
 

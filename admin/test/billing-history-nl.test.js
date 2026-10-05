@@ -72,7 +72,7 @@ test('audit rows carry a Dutch label for the Dutch /account', () => {
 test('the cancellation mail is Dutch first, English below, with the date in both', () => {
   const tpl = require('../lib/email-templates');
   const msg = tpl.billingCancellationEmail({ planName: 'Firm', cancelDate: '5 December 2026', cancelDateNl: '5 december 2026' });
-  assert.match(msg.subject, /^Opzegging van uw Paramant-plan gepland \/ Your Paramant plan cancellation is scheduled$/);
+  assert.match(msg.subject, /^Uw Paramant-plan is opgezegd \/ Your Paramant plan has been cancelled$/);
   const nlAt = msg.text.indexOf('Stopt op: 5 december 2026');
   const enAt = msg.text.indexOf('Ends on: 5 December 2026');
   assert.ok(nlAt >= 0, 'the Dutch half names the Dutch date');

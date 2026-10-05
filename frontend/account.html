@@ -207,7 +207,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section id="state-busy" class="section-lg hidden">
-  <p class="lede" id="acct-busy-text">Uw account kon even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. U bent nog ingelogd. <a href="/account">Probeer het over een minuut opnieuw</a>.</p>
+  <p class="lede" id="acct-busy-text">Uw account laadt even niet: er kwamen te veel verzoeken tegelijk binnen. U bent nog ingelogd. <a href="/account">Probeer het over een minuut opnieuw</a>.</p>
 </section>
 
 <section id="state-unauth" class="section-lg hidden">
@@ -303,7 +303,7 @@ main.acct input::placeholder { color: var(--ink-3); }
       <p style="margin:0 0 12px" id="signing-empty" class="small">Uw account wordt gecontroleerd...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
       <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:6px">
-        <p class="small" style="margin:0 0 8px">Vul de code van 6 cijfers uit uw authenticator-app in om deze ondertekensleutel in te trekken.</p>
+        <p class="small" style="margin:0 0 8px">Vul de code van 6 cijfers uit uw authenticator-app in. Daarmee trekt u deze sleutel in.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="text" id="revoke-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Code van 6 cijfers" aria-label="Code van 6 cijfers" style="max-width:140px">
           <button type="button" class="btn btn-small" id="revoke-totp-confirm">Intrekken bevestigen</button>
@@ -321,7 +321,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-block">
     <h3>Uw ondertekensleutel instellen</h3>
     <p class="small">
-      Uw ondertekensleutel wordt hier in deze browser gemaakt.
+      We maken uw ondertekensleutel hier, in deze browser.
       Alleen u hebt hem. U stelt hem in en opent hem bij elke handtekening met dezelfde
       passkey waarmee u inlogt (Face ID, Touch ID of een beveiligingssleutel). U hebt dus geen
       wachtwoordzin of extra code nodig. Geen passkey in deze browser? Dan kunt u nog steeds
@@ -379,15 +379,15 @@ main.acct input::placeholder { color: var(--ink-3); }
          business plans pay for it, and one link is the whole upgrade path. -->
     <div class="acct-plan-band free" id="billing-community" hidden>
       <p class="acct-plan-kicker">Community &middot; &euro;0</p>
-      <p class="acct-plan-lede">U gebruikt het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers, zodat dat zo blijft.</p>
-      <p class="acct-plan-adds">Met een zakelijk plan krijgt u 100 of 1.000 handtekeningen per maand in plaats van 2. Links blijven langer open, u houdt een overzicht van wat u verstuurde, u krijgt ondersteuning van een vaste contactpersoon en een audittrail die u kunt exporteren en overdragen.</p>
+      <p class="acct-plan-lede">U gebruikt het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers. Zo blijft het gratis.</p>
+      <p class="acct-plan-adds">Met een zakelijk plan krijgt u 100 of 1.000 handtekeningen per maand in plaats van 2. Links blijven langer open en u houdt een overzicht van wat u verstuurde. U krijgt een vaste contactpersoon voor ondersteuning en een audittrail die u kunt exporteren en overdragen.</p>
       <a class="acct-plan-cta" href="/pricing">Bekijk de zakelijke plannen &rarr;</a>
     </div>
     <!-- Shown on a paid plan. No link to a higher tier: a customer who pays is
          reading his own subscription, not an offer. -->
     <div class="acct-plan-band paid" id="billing-paid" hidden>
       <p class="acct-plan-kicker">Uw plan &middot; actief</p>
-      <p class="acct-plan-lede">Dank u. Wat u betaalt, houdt het Community-plan gratis voor iedereen. Uw plan en de dag waarop de gekochte periode afloopt, staan hieronder.</p>
+      <p class="acct-plan-lede">Dank u. Wat u betaalt, houdt het Community-plan gratis voor iedereen. Hieronder ziet u uw plan en de dag waarop uw periode afloopt.</p>
     </div>
     <!-- Shown by js/account.inline1.js from seven days before the bought term
          runs out. One-off payments mean there is nothing to cancel and nothing
@@ -416,7 +416,7 @@ main.acct input::placeholder { color: var(--ink-3); }
       <div class="info-label">Toegang tot</div>
       <div class="info-value" id="billing-next">-</div>
     </div>
-    <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">Dit is een eenmalige betaling voor de periode die u kocht. Er wordt niets vanzelf opnieuw afgeschreven. Koop voor deze datum een nieuwe periode om het plan door te laten lopen.</p>
+    <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">Dit is een eenmalige betaling voor de periode die u kocht. Er wordt niets vanzelf opnieuw afgeschreven. Wilt u het plan houden? Koop dan voor deze datum een nieuwe periode.</p>
     <div class="info-row" id="billing-cancel-row" style="display:none">
       <div class="info-label">Opzegging</div>
       <div class="info-value" id="billing-cancel-date" style="color:var(--warn-ink)">-</div>
@@ -434,7 +434,7 @@ main.acct input::placeholder { color: var(--ink-3); }
          the plan and the date above. See relay/lib/coupon.js. -->
     <form data-redeem-form class="acct-form" style="margin-top:var(--space-4)">
       <p class="acct-plan-kicker" style="margin:0 0 8px">Hebt u een code?</p>
-      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Een code geeft u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er is niets om op te zeggen. Loopt er al een betaalde periode, dan komt het cadeau daarna.</p>
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Met een code krijgt u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er is niets om op te zeggen. Loopt er al een betaalde periode? Dan komt het cadeau daarachter.</p>
       <label class="acct-field">
         <span class="acct-field-label">Uw code</span>
         <input type="text" name="code" data-redeem-input maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false">
@@ -454,7 +454,7 @@ main.acct input::placeholder { color: var(--ink-3); }
          is shown once and never stored here. -->
     <div id="parasign-api-block" hidden>
       <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">API-sleutels voor ParaSign</h3>
-      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Uw plan bevat de ParaSign-API, zodat ondertekenen in uw eigen software kan draaien. Een sleutel ziet u één keer, hier, en daarna niet meer. Kwijt? Maak dan een nieuwe. <a href="/docs#parasign-api" style="color:var(--cobalt)">Lees de documentatie</a>.</p>
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Met uw plan kunt u via de ParaSign-API ondertekenen vanuit uw eigen software. U ziet een sleutel maar één keer, hier. Kwijt? Maak dan een nieuwe. <a href="/docs#parasign-api" style="color:var(--cobalt)">Lees de documentatie</a>.</p>
       <div id="parasign-api-list" style="font-size:var(--text-sm);color:var(--ink-dim)">Laden&hellip;</div>
       <div class="acct-actions">
         <button id="parasign-api-new" class="btn btn-secondary btn-small">Sleutel maken</button>
@@ -476,7 +476,7 @@ main.acct input::placeholder { color: var(--ink-3); }
          document is still issued to the email address on this account. -->
     <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Bedrijfsgegevens voor facturen</h3>
     <p class="acct-note" style="font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-3)">
-      Optioneel. Vult u deze in, dan staan ze op elke factuur die vanaf nu wordt gemaakt. Facturen die er al zijn, houden de gegevens waarmee ze zijn gemaakt.
+      Niet verplicht. Wat u hier invult, komt op elke nieuwe factuur. Facturen die er al zijn, blijven zoals ze zijn.
     </p>
     <form id="billing-profile-form" class="acct-form">
       <label class="acct-field">
@@ -507,7 +507,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section class="acct-card danger">
-  <div class="acct-kicker">Account deactiveren &middot; blokkeert toegang voortaan</div>
+  <div class="acct-kicker">Account deactiveren &middot; daarna geen toegang meer</div>
   <h2>Account deactiveren.</h2>
   <p class="acct-lead">
     Hiermee deactiveert u uw account en werkt de API-sleutel niet meer. Uw sessies en de koppeling met uw authenticator-app worden verwijderd. Het accountrecord blijft bewaard.
@@ -521,14 +521,14 @@ main.acct input::placeholder { color: var(--ink-3); }
 
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
-<script src="/js/account-api-keys.js?v=3" defer></script>
-<script src="/js/account.inline1.js?v=14"></script>
+<script src="/js/account-api-keys.js?v=4" defer></script>
+<script src="/js/account.inline1.js?v=15"></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/redeem-code.js?v=4" defer></script>
+<script src="/js/redeem-code.js?v=5" defer></script>
 
-<script type="module" src="/js/account.inline2.js?v=8"></script>
-<script type="module" src="/js/passkey.js?v=9"></script>
-<script type="module" src="/js/signing-enrol.js?v=19"></script>
+<script type="module" src="/js/account.inline2.js?v=9"></script>
+<script type="module" src="/js/passkey.js?v=10"></script>
+<script type="module" src="/js/signing-enrol.js?v=20"></script>
 <script src="/js/account-theme.js?v=4" defer></script>
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/en/account" hreflang="en" lang="en">This page in English</a></span>

@@ -37,8 +37,8 @@ assert.ok(!everything.includes('#doc='), 'no part of the mail carries a key frag
 assert.ok(!everything.includes('opzegging-huurcontract'), 'no part of the mail carries the filename');
 assert.ok(mail.text.includes(base), 'plain text carries the link to the request itself');
 assert.ok(mail.html.includes(base), 'HTML action carries the link to the request itself');
-assert.ok(/It does not open the document/.test(mail.text), 'the mail says what the link cannot do');
-assert.ok(mail.text.includes('Sign in with this invited email address'), 'identity requirement is explicit');
+assert.ok(/but not the document/.test(mail.text), 'the mail says what the link cannot do');
+assert.ok(mail.text.includes('Sign in with the email address this invitation went to'), 'identity requirement is explicit');
 assert.ok(!mail.html.includes('<Signer Demo>'), 'recipient label is HTML escaped');
 assert.ok(!mail.html.includes('<review before signing>'), 'message is HTML escaped');
 assert.ok(!mail.headers['X-Entity-Ref-ID'].includes(token), 'mail header does not expose invite token');
@@ -55,15 +55,15 @@ assert.equal(noSubject.subject, 'Verzoek om te ondertekenen / Signature requeste
 assert.ok(!noSubject.text.includes(key) && !noSubject.html.includes(key), 'and still carries no key');
 
 // Dutch first, English underneath, unless the caller names one language.
-assert.ok(mail.text.indexOf('Log in met het e-mailadres waarop u bent uitgenodigd') < mail.text.indexOf('Sign in with this invited email address'), 'Dutch comes before English');
-assert.ok(/Hij opent het document niet/.test(mail.text), 'the Dutch text says what the link cannot do');
+assert.ok(mail.text.indexOf('Log in met het e-mailadres waarop u bent uitgenodigd') < mail.text.indexOf('Sign in with the email address this invitation went to'), 'Dutch comes before English');
+assert.ok(/maar niet het document/.test(mail.text), 'the Dutch text says what the link cannot do');
 assert.ok(/<html lang="nl">/.test(mail.html), 'the bilingual mail is marked Dutch first');
 const onlyEn = signingInviteEmail({ inviteUrl: withKey, envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0, lang: 'en' });
 assert.equal(onlyEn.subject, 'Signature requested', 'lang en keeps the English default subject');
-assert.ok(!/Hij opent het document niet/.test(onlyEn.text) && /It does not open the document/.test(onlyEn.text), 'lang en is English only');
+assert.ok(!/maar niet het document/.test(onlyEn.text) && /but not the document/.test(onlyEn.text), 'lang en is English only');
 const onlyNl = signingInviteEmail({ inviteUrl: withKey, envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0, lang: 'nl' });
 assert.equal(onlyNl.subject, 'Verzoek om te ondertekenen', 'lang nl has the Dutch default subject');
-assert.ok(!/It does not open the document/.test(onlyNl.text) && !onlyNl.text.includes(key) && !onlyNl.html.includes(key), 'lang nl is Dutch only and carries no key');
+assert.ok(!/but not the document/.test(onlyNl.text) && !onlyNl.text.includes(key) && !onlyNl.html.includes(key), 'lang nl is Dutch only and carries no key');
 
 console.log('signing-invite-email: 22 checks passed');
 
@@ -74,11 +74,11 @@ console.log('signing-invite-email: 22 checks passed');
   const share = 's'.repeat(43);
   const shareMail = signingInviteEmail({ inviteUrl: `${base}#ks=v1.${share}`, senderLabel: 'sender@example.com', envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0 });
   assert.ok(shareMail.text.includes(`${base}#ks=v1.${share}`), 'the key share rides in the link');
-  assert.ok(/opens the document in your browser once you have signed in/.test(shareMail.text), 'and the mail says the link opens the document');
-  assert.ok(/opent het document in uw browser zodra u bent ingelogd/.test(shareMail.text), 'in Dutch too');
+  assert.ok(/Sign in and the link opens the document in your browser/.test(shareMail.text), 'and the mail says the link opens the document');
+  assert.ok(/Log in, dan opent de link het document in uw browser/.test(shareMail.text), 'in Dutch too');
   const sneaky = signingInviteEmail({ inviteUrl: `${base}#ks=v1.${share}&doc=v1.${key}`, senderLabel: 'x', envelopeId: 'e', partyIndex: 0 });
   assert.ok(!(sneaky.text + sneaky.html).includes(key), 'a whole key smuggled next to a share is cut off');
-  assert.ok(/It does not open the document/.test(sneaky.text), 'and that mail falls back to the notice');
+  assert.ok(/but not the document/.test(sneaky.text), 'and that mail falls back to the notice');
 }
 
 // Retest 04-10: the mail promised "zet uw paraaf" also when the sender asked

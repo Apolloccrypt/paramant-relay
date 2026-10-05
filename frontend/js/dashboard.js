@@ -71,8 +71,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var says = kind === 'busy'
       ? nlEn('Even te veel verzoeken tegelijk. Probeer het over een minuut opnieuw. U bent nog ingelogd.', 'Too many requests at once. Try again in a minute. You are still signed in.')
       : kind === 'server'
-        ? nlEn('Uw overzicht kon niet worden geladen door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Your overview could not be loaded because of a fault on our side. Nothing changed. Try again shortly.')
-        : nlEn('Uw overzicht kon niet worden geladen. Controleer uw verbinding en probeer het opnieuw.', 'Your overview could not be loaded. Check your connection and try again.');
+        ? nlEn('Uw overzicht laadt niet door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Your overview did not load because of a fault on our side. Nothing changed. Try again shortly.')
+        : nlEn('We konden uw overzicht niet laden. Controleer uw verbinding en probeer het opnieuw.', 'We could not load your overview. Check your connection and try again.');
     if (text) text.textContent = says;
     if (errMsg) errMsg.textContent = '';
     if (login) login.hidden = true;
@@ -238,7 +238,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     }
     if (tries > 0) {
       if (kicker) kicker.textContent = nlEn('Uw betaling wordt bevestigd', 'Confirming your payment');
-      if (lede) lede.textContent = nlEn('Uw bank heeft u teruggestuurd. We wachten op de bevestiging van de betaling, meestal duurt dat een paar seconden. Deze pagina werkt zichzelf bij.', 'Your bank has sent you back. We are waiting for the payment to be confirmed, which usually takes a few seconds. This page updates by itself.');
+      if (lede) lede.textContent = nlEn('U bent terug van uw bank. We wachten nog op de bevestiging van de betaling. Dat duurt meestal een paar seconden. Deze pagina werkt zichzelf bij.', 'You are back from your bank. We are waiting for the payment to be confirmed. That usually takes a few seconds. This page updates by itself.');
       window.setTimeout(function () { refreshAccount(tries - 1); }, RETURN_DELAY_MS);
       return;
     }
@@ -371,7 +371,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       show(section);
       if (list) {
         list.innerHTML = '<div class="dh-rowsay" role="status">'
-          + nlEn('Uw verzendingen konden nu niet worden gelezen. Er is niets veranderd. ', 'Your sends could not be read just now. Nothing has changed; ')
+          + nlEn('We konden uw verzendingen nu niet laden. Er is niets veranderd. ', 'We could not load your sends just now. Nothing has changed; ')
           + nlEn('Kies Vernieuwen om het opnieuw te proberen.</div>', 'use Refresh to try again.</div>');
       }
     }).then(function () {
@@ -430,7 +430,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (!host.hidden && !note) { host.hidden = true; return; }
     host.hidden = false;
     var head = note ? '<div class="dh-rowsay done" role="status">' + esc(note) + '</div>' : '';
-    host.innerHTML = head + nlEn('<span class="dh-rowsay">Ophalers worden gelezen...</span>', '<span class="dh-rowsay">Reading who has been...</span>');
+    host.innerHTML = head + nlEn('<span class="dh-rowsay">Even kijken wie het heeft opgehaald...</span>', '<span class="dh-rowsay">Checking who has collected it...</span>');
     fetch('/api/user/sends/' + encodeURIComponent(id), {
       credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
     }).then(function (r) { return r.json(); }).then(function (body) {
@@ -456,7 +456,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         '</div>';
       }).join('');
     }).catch(function () {
-      host.innerHTML = nlEn('<span class="dh-rowsay fail">Deze verzending kon niet worden gelezen. Probeer het opnieuw.</span>', '<span class="dh-rowsay fail">Could not read this send. Try again.</span>');
+      host.innerHTML = nlEn('<span class="dh-rowsay fail">We konden deze verzending niet laden. Probeer het opnieuw.</span>', '<span class="dh-rowsay fail">We could not load this send. Try again.</span>');
     });
   }
 
@@ -500,7 +500,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
             : err.message === 'reminder_limit'
               ? nlEn('Er zijn al drie herinneringen gestuurd. Verstuur het bestand liever opnieuw.', 'They have had three reminders. Send the file again instead.')
             : err.message === 'reminder_not_sent'
-              ? nlEn('De mail is niet bij ons weggegaan. Er is niets veranderd. Probeer het over een minuut opnieuw.', 'The mail did not leave our side. Nothing changed; try again in a minute.')
+              ? nlEn('De mail is niet verstuurd. Er is niets veranderd. Probeer het over een minuut opnieuw.', 'The email did not go out. Nothing changed; try again in a minute.')
             : nlEn('Dat is niet gelukt. Er is niets veranderd.', 'That did not go through. Nothing changed.')) + '</span>';
       }
       // Leave a way back rather than a dead row with an error in it.
@@ -688,14 +688,14 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var visible = documents.filter(function (doc) { return documentMatches(doc, documentFilter); });
     if (!visible.length) {
       var empty = documentFilter === 'open'
-        ? [nlEn('Geen lopende verzoeken', 'No open requests'), nlEn('Start een ondertekenverzoek als iemand een document moet tekenen.', 'Start a signing request when you need someone to sign a document.')]
+        ? [nlEn('Er loopt nu niets', 'Nothing open right now'), nlEn('Moet iemand een document tekenen? Stuur het van hier.', 'Need someone to sign a document? Send it from here.')]
         : [nlEn('Hier staat nog niets', 'Nothing here yet'), nlEn('Documenten met deze status verschijnen hier vanzelf.', 'Documents in this state will appear here automatically.')];
       // An empty state that only describes the way out is a dead end. The one
       // action that fills this list is a signing request, so it gets a button
       // to the page that starts one. Send is deliberately not offered here:
       // this list counts signing requests, not deliveries.
       list.innerHTML = '<div class="dh-empty"><strong>' + empty[0] + '</strong><span>' + empty[1] + '</span>' +
-        nlEn('<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Ondertekenverzoek starten</a></div>', '<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Start a signing request</a></div>');
+        nlEn('<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Document laten tekenen</a></div>', '<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Get a document signed</a></div>');
       return;
     }
     list.innerHTML = visible.map(function (doc) {
@@ -749,7 +749,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var open = Math.max(0, total - signed);
     if (open === 1) return nlEn('Wacht op één persoon.', 'Waiting for one person.');
     if (open > 1) return nlEn('Wacht op ', 'Waiting for ') + open + nlEn(' mensen.', ' people.');
-    return nlEn('Wacht op bevestiging van de relay.', 'Waiting for the relay to confirm.');
+    return nlEn('Wacht op bevestiging van onze server.', 'Waiting for our server to confirm.');
   }
 
   // The controls that belong to a row's state. Withdraw sits here rather than
@@ -829,14 +829,14 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return esc(p.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? nlEn('getekend', 'signed') : p.status === 'declined' ? nlEn('geweigerd', 'declined') : p.status === 'viewed' ? nlEn('geopend', 'opened') : nlEn('wacht', 'waiting'));
     }).join('<br>') : signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed');
     var help = state === 'completed'
-      ? nlEn('De relay bewaart het cryptografische bewijs, geen leesbare kopie van uw document. De complete pdf met alle handtekeningen maakt deze browser: op het apparaat waarmee u verstuurde opent hij meteen, elders kiest u uw originele bestand. Controleren doet u later met het .psign-bewijs en de complete pdf (daarin zit het origineel ingebed) of het originele document.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the .psign proof with the complete PDF (the original is embedded in it) or the original document.')
+      ? nlEn('Wij bewaren het bewijs, geen leesbare kopie van uw document. De pdf met alle handtekeningen maakt uw browser. Op het apparaat waarmee u verstuurde, opent hij meteen. Elders kiest u eerst uw originele bestand. Controleren doet u later met het .psign-bewijs en de complete pdf (daarin zit het origineel ingebed), of met het originele document.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the .psign proof with the complete PDF (the original is embedded in it) or the original document.')
       : state === 'cancelled' && declinedBy(doc)
         ? nlEn('Een ondertekenaar heeft geweigerd te tekenen. Daarmee is dit verzoek gestopt; niemand kan er nog op tekenen. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', 'A signer declined to sign, so this request has stopped and nobody can sign it any more. To try again, send a new request.')
       : state === 'expired'
         ? nlEn('Dit verzoek is verlopen. Niemand kan er nog op tekenen; gezette handtekeningen blijven in het auditlog. Stuur zo nodig een nieuw verzoek.', 'This request has expired. Nobody can sign it any more; signatures already given stay in the audit record. Send a new request if you still need one.')
       : state === 'cancelled'
         ? nlEn('Dit verzoek is gesloten. Gezette handtekeningen blijven in het auditlog, maar niemand kan nog tekenen.', 'This request is closed. Existing signatures remain in the audit record, but nobody can add another signature.')
-        : nlEn('Dit verzoek loopt nog. Paramant bewaart het afgeleverde document versleuteld. Het leesbare document en de sleutel zijn niet terug te halen via het relay-overzicht.', 'This request is still open. Paramant stores the delivered document encrypted. The plaintext document and its key are not recoverable from the relay dashboard.');
+        : nlEn('Dit verzoek loopt nog. Paramant bewaart het afgeleverde document versleuteld. Het leesbare document en de sleutel zijn via dit overzicht niet terug te halen.', 'This request is still open. Paramant stores the delivered document encrypted. The plaintext document and its key are not recoverable from the relay dashboard.');
     var actions = '';
     // The complete PDF next to the proof: the result page builds it in this
     // browser from the encrypted document (acceptance test 2026-10-04).
@@ -986,7 +986,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       documents = Array.isArray(body.documents) ? body.documents : [];
       renderDocuments();
     }).catch(function () {
-      list.innerHTML = nlEn('<div class="dh-empty"><strong>De documentstatus is niet beschikbaar</strong><span>Uw documenten zijn niet veranderd. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Opnieuw proberen</button></span></div>', '<div class="dh-empty"><strong>Document status is unavailable</strong><span>Your documents are unchanged. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>');
+      list.innerHTML = nlEn('<div class="dh-empty"><strong>We konden uw documenten nu niet laden</strong><span>Er is niets veranderd. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Opnieuw proberen</button></span></div>', '<div class="dh-empty"><strong>We could not load your documents just now</strong><span>Nothing has changed. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>');
     }).finally(function () {
       if (refresh) { refresh.disabled = false; refresh.textContent = nlEn('Vernieuwen', 'Refresh'); }
     });

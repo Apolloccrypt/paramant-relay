@@ -508,7 +508,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
        the real thing arrives. Lighthouse measured CLS 0.236 with the old
        centred spinner. -->
   <div id="dh-loading" class="pa-loading" aria-busy="true">
-    <p class="pa-sr-only">Checking your session.</p>
+    <p class="pa-sr-only">Checking that you are signed in.</p>
     <div class="dh-skel-page" aria-hidden="true">
       <div class="dh-skel-hero">
         <div>
@@ -549,14 +549,14 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
         <span class="dh-start-kicker">ParaSign</span>
         <h2>Request signatures</h2>
-        <p>Send a secure document, invite the right people and follow every signature. They sign with the link from that email, after signing in to the account it was addressed to.</p>
-        <span class="dh-start-link">Start a request &rarr;</span>
+        <p>Send a document to the people who need to sign and see who has signed. Everyone gets an email with a link. They sign after signing in with the address it went to.</p>
+        <span class="dh-start-link">Get it signed &rarr;</span>
       </a>
       <a class="dh-start-card" href="/en/parashare" aria-label="Send a file securely">
         <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
         <span class="dh-start-kicker">ParaSend</span>
         <h2>Send a file that disappears</h2>
-        <p>The file is encrypted in your browser before it leaves. The recipient gets one link, and the web app deletes the file after the first read. No signature workflow attached.</p>
+        <p>Your browser encrypts the file before it leaves. The recipient gets one link. The web app deletes the file after the first read. No signature involved.</p>
         <span class="dh-start-link">Send a file &rarr;</span>
       </a>
       <a class="dh-start-card" href="/en/sign?mode=alone" aria-label="Sign a document yourself">
@@ -564,7 +564,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <span class="dh-start-kicker">ParaSign</span>
         <h2>Sign it yourself</h2>
         <p>Add your signature and download the result immediately.</p>
-        <span class="dh-start-link">Open signing &rarr;</span>
+        <span class="dh-start-link">Sign it now &rarr;</span>
       </a>
     </section>
 
@@ -575,8 +575,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-community" id="dh-community" aria-label="Your plan" hidden>
       <div>
         <p class="dh-community-kicker">Community &middot; &euro;0</p>
-        <p class="dh-community-lede">You are on the Community plan and it stays free. The business plans pay for the servers and keep it that way.</p>
-        <p class="dh-community-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
+        <p class="dh-community-lede">You are on the Community plan, and it stays free. That works because the business plans pay for the servers.</p>
+        <p class="dh-community-adds">A business plan gives you 100 or 1,000 signatures a month instead of 2. Links stay open longer and you can see what you sent. You get a named contact and an audit trail you can export and hand over.</p>
       </div>
       <a class="dh-community-cta" href="/en/pricing">See the business plans &rarr;</a>
     </aside>
@@ -651,7 +651,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-inbox-title">Waiting for your signature</h2>
-          <p>Documents other people sent you. Each one opens from the personal link in its invitation email.</p>
+          <p>Documents other people sent you. Open each one with the link in your invitation email.</p>
         </div>
         <button class="dh-refresh" type="button" id="dh-inbox-refresh" data-pa-action="inbox-refresh">Refresh</button>
       </div>
@@ -667,7 +667,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-sends-title">Files you sent</h2>
-          <p>Who has collected, and who has not yet.</p>
+          <p>Who has collected it, and who has not.</p>
         </div>
         <button class="dh-refresh" type="button" id="dh-sends-refresh" data-pa-action="sends-refresh">Refresh</button>
       </div>
@@ -678,7 +678,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-documents-title">Open documents</h2>
-          <p>Every signing request you started, and exactly how far each one is.</p>
+          <p>Documents you sent for signing, and how far each one is.</p>
         </div>
         <button class="dh-refresh" type="button" id="dh-documents-refresh" data-pa-action="documents-refresh">Refresh</button>
       </div>
@@ -692,14 +692,14 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <!-- Loading state. Three rows in the shape of a register row, so the
              list does not jump when the real data lands. The screen reader
              hears the sentence, not the placeholder. -->
-        <p class="pa-sr-only">Loading your documents. Reading status from your account.</p>
+        <p class="pa-sr-only">Loading your documents.</p>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
       </div>
       <div class="dh-invites">
         <span class="dh-invites-icon" aria-hidden="true">&#9993;</span>
-        <div><strong>Looking for a request sent to you?</strong><span>Requests waiting for your signature are listed above. Each one opens from the personal link in its invitation email, and your account is checked before the encrypted document opens.</span></div>
+        <div><strong>Need to sign something yourself?</strong><span>Open the link in your invitation email. The document opens once you sign in.</span></div>
       </div>
     </section>
 
@@ -721,7 +721,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-records-title">History and audit export</h2>
-          <p>Your send history (Firm and up) and the signing trail as a file (Business and up).</p>
+          <p>What you sent (Firm and up) and the signing trail as a file (Business and up).</p>
         </div>
       </div>
       <div class="dh-records-row">
@@ -737,7 +737,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     </section>
 
     <section class="dh-ask" aria-labelledby="dh-ask-title">
-      <h2 id="dh-ask-title">Questions people ask before they trust this</h2>
+      <h2 id="dh-ask-title">Common questions</h2>
       <dl class="dh-ask-list">
         <div class="dh-ask-item">
           <dt>What does it cost?</dt>
@@ -751,11 +751,11 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         </div>
         <div class="dh-ask-item">
           <dt>Who can read what I send?</dt>
-          <dd>Files are encrypted in your browser, and the relay runs on Hetzner in Nuremberg, Germany. <a href="/en/security">Read how</a></dd>
+          <dd>Your browser encrypts every file. Our server runs at Hetzner in Nuremberg, Germany. <a href="/en/security">Read how</a></dd>
         </div>
         <div class="dh-ask-item">
           <dt>Can the other side check a signature?</dt>
-          <dd>Signed documents verify without an account. Older proof files are still checked on our server. <a href="/en/verify">Try the verifier</a></dd>
+          <dd>Signed documents verify without an account. Our server checks older proof files. <a href="/en/verify">Try the verifier</a></dd>
         </div>
       </dl>
       <p class="dh-ask-foot">Anything else is answered in the <a href="/en/help">help centre</a>.</p>
@@ -779,7 +779,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Email</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Member since</div><div class="dh-acct-val" data-dh="created">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Backup codes left</div><div class="dh-acct-val" data-dh="backup">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Session expires</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Signed in for</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
         </div>
         <div class="dh-acct-actions">
           <a class="dh-btn" href="/en/account">Account &amp; security</a>
@@ -793,7 +793,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   </div>
 
   <div id="dh-error" class="pa-loading" hidden role="alert">
-    <span id="dh-error-text">Your overview could not be loaded.</span>
+    <span id="dh-error-text">We could not load your overview.</span>
     <button type="button" class="dh-btn" id="dh-error-retry">Try again</button>
     <a class="pa-err-link" id="dh-error-login" href="/en/auth/login?next=%2Fdashboard" hidden>Sign in again</a>
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
@@ -806,7 +806,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   <div class="dh-modal-card">
     <img class="dh-modal-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="72" height="72">
     <h2 id="dh-pm-title">Finish setting up your account</h2>
-    <p class="dh-modal-sub">A couple of one-time steps make signing in faster and let you sign documents.</p>
+    <p class="dh-modal-sub">A few steps, once. Then you sign in faster and can sign documents.</p>
     <div id="dh-pm-items"></div>
     <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Maybe later</button>
   </div>
@@ -845,7 +845,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=19" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/dashboard-history.js?v=2" defer></script>
-<script src="/js/dashboard.js?v=29" defer></script>
+<script src="/js/dashboard-history.js?v=3" defer></script>
+<script src="/js/dashboard.js?v=30" defer></script>
 </body>
 </html>

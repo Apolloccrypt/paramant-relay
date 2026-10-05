@@ -135,7 +135,7 @@ test('the sender signing last: result link to the sender, one mail per party, no
   assert.equal(await signNotify.resolveResult(rc, ref[1], SENDER.user_id), id);
   const toA = mail.sent.find((m) => m.to === A).msg;
   assert.match(toA.subject, /^Iedereen heeft getekend \/ Everyone has signed$/);
-  assert.match(toA.text, /Open de link uit uw uitnodigingsmail/);
+  assert.match(toA.text, /Open de link uit uw uitnodiging/);
   for (const part of [toA.subject, toA.text, toA.html]) assert.ok(!part.includes(id), 'no envelope id in the party mail');
   assert.doesNotMatch(toA.text, /result=/, 'the result link is the sender\'s alone');
   assert.equal(await rc.get(signNotify.PARTIES_PREFIX + id), null, 'the invited addresses are gone on completion');
@@ -177,7 +177,7 @@ test('the mail carries a count and a link, never a file name, a party name or th
   const msg = emailTemplates.signatureReceivedEmail({ signedCount: 2, partyCount: 2, complete: true, envelopeId: id });
   for (const part of [msg.subject, msg.text, msg.html]) assert.ok(!part.includes(id), 'envelope id must not be in the mail');
   assert.match(msg.text, /\/dashboard/);
-  assert.match(msg.text, /Uw document is ondertekend door alle 2 ondertekenaars/);
+  assert.match(msg.text, /Alle 2 ondertekenaars hebben uw document getekend/);
   assert.match(msg.html, /lang="nl"/);
   const two = emailTemplates.signatureReceivedEmail({ signedCount: 2, partyCount: 3, complete: false, envelopeId: id });
   assert.match(two.text, /2 van de 3 ondertekenaars hebben nu getekend/);
@@ -187,8 +187,8 @@ test('the mail carries a count and a link, never a file name, a party name or th
 test('one signer is one signer: no "alle 1 ondertekenaars" (hertest r2 K2)', () => {
   const one = emailTemplates.signatureReceivedEmail({ signedCount: 1, partyCount: 1, complete: true, envelopeId: 'X' });
   assert.doesNotMatch(one.text, /alle 1 ondertekenaars|all 1 signers/);
-  assert.match(one.text, /Uw document is ondertekend door de ondertekenaar\./);
-  assert.match(one.text, /Your document has been signed by the signer\./);
+  assert.match(one.text, /De ondertekenaar heeft uw document getekend\./);
+  assert.match(one.text, /The signer has signed your document\./);
 });
 
 test('server.js remembers the sender on create and tells them after a submit, without awaiting the mail', () => {

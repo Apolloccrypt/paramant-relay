@@ -216,27 +216,27 @@ body.needs-login #sign-intro{display:none}
 <main id="main-content">
 
 <div class="step" id="step-loading">
-  <h1>Opening envelope</h1>
-  <p class="sub">Fetching the envelope details from the relay. The relay does not have the document itself, only its SHA3-256 hash and your signature slot.</p>
+  <h1>Opening the document</h1>
+  <p class="sub">Fetching the request. Our server does not have the document itself, only a fingerprint of it and the place where you sign.</p>
   <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Loading...</div></div></div>
 </div>
 
 <div class="step" id="step-error">
-  <h1>Could not open envelope</h1>
-  <p class="sub">The link is invalid or has expired, or the relay refused to serve it.</p>
+  <h1>This document does not open</h1>
+  <p class="sub">The link is wrong or has expired, or our server would not release the document.</p>
   <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Unknown error.</div></div></div>
   <a href="/en" class="btn btn-outline">Back to the homepage</a>
 </div>
 
 <div class="step" id="step-cosign">
   <h1>Co-sign envelope</h1>
-  <p class="sub">Review the delivered document and add your signature.</p>
+  <p class="sub">Read the document and add your signature.</p>
 
   <details class="how">
     <summary>HOW THIS WORKS</summary>
     <div class="how-body">
-      <p>Decryption and signing happen on your own device. The relay receives ciphertext, your public key, the resulting signature and signed field coordinates, never document plaintext or your private key.</p>
-      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): a post-quantum cryptographic signature (ML-DSA-65), not a notarised legal signature under eIDAS or any qualified-trust regime (QES). Verify the document hash below against the file you received separately.</p>
+      <p>Opening and signing happen on your own device. Our server receives encrypted data, your public key, the signature and the position of your fields. It never receives the readable document or your private key.</p>
+      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): a post-quantum cryptographic signature (ML-DSA-65), not a notarised legal signature under eIDAS or any qualified-trust regime (QES). Compare the fingerprint below with the file you received separately.</p>
     </div>
   </details>
 
@@ -272,10 +272,10 @@ body.needs-login #sign-intro{display:none}
       <details class="how">
         <summary>WHERE THE DOCUMENT COMES FROM</summary>
         <div class="how-body">
-          <p>The encrypted document is decrypted in this browser. Its SHA3-256 hash must match the signing request before signing is enabled. The relay does not receive the document key or plaintext.</p>
+          <p>Your browser opens the encrypted document. You can sign only once its fingerprint matches the request. Our server never receives the key or the readable document.</p>
         </div>
       </details>
-      <div class="banner" id="document-delivery-status">Loading the encrypted document...</div>
+      <div class="banner" id="document-delivery-status">Loading the document...</div>
       <label class="file-cta" for="verify-file" id="verify-file-cta" hidden>Choose the document manually if automatic loading fails</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
@@ -300,7 +300,7 @@ body.needs-login #sign-intro{display:none}
         <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Initials on every page (next to your signature)</label>
         <p class="appearance-help" id="appearance-allpages-required" hidden>The sender asks for initials on every page. They are already in place.</p>
         <p class="appearance-help">Your initials go in the margin of every page, next to the other signers. Nobody signs on your spot.</p>
-        <p class="appearance-help" id="appearance-help">Choose a field, then click the page where it should appear. These positions are covered by your cryptographic signature.</p>
+        <p class="appearance-help" id="appearance-help">Choose a field, then click the page where it should appear. Your signature covers these positions too.</p>
       </div>
     </div>
   </div>
@@ -384,7 +384,7 @@ body.needs-login #sign-intro{display:none}
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
-<script src="/js/quota-upgrade.js?v=8" defer></script>
-<script type="module" src="/co-sign.js?v=41"></script>
+<script src="/js/quota-upgrade.js?v=9" defer></script>
+<script type="module" src="/co-sign.js?v=42"></script>
 </body>
 </html>
