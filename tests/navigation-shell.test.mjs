@@ -43,11 +43,12 @@ const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').a
 // reads the same in both languages, so the bar stays English on the 42 English
 // pages that also carry it.
 ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Tools','Security','Pricing','Docs']), publicDesktop.join(', '));
-// The signed-out hero now offers ONE primary action and one secondary, not
-// three. Three equal buttons is three decisions before the visitor knows what
-// the product is; ParaSend keeps its own call to action further down the page,
-// where it is next to the three lines that explain it.
-ok('public homepage leads with one primary action and one secondary', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/en/parashare','/en/sign']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+// Signed out, the visitor lands in the demo dashboard (Mick, 5 October 2026),
+// and its head carries ONE primary action and one secondary, not three: make
+// an account, or try it yourself. Both sit inside the dashboard, and there is
+// no hero above it; the dashboard is the first thing in <main>.
+ok('public homepage leads with one primary action and one secondary, inside the demo dashboard', JSON.stringify(await publicPage.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((node) => [node.getAttribute('href'), node.className, node.textContent.trim()]))) === JSON.stringify([['/en/signup','hp-btn hp-btn-fill','Create account'],['/en/sign?mode=invite','hp-btn hp-btn-line','Try it yourself']]), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+ok('public homepage opens on the demo dashboard, with nothing above it', await publicPage.evaluate(() => { const out = document.querySelector('[data-home="out"]'); return !!out && out.firstElementChild === document.querySelector('.wp-demo-top') && !!document.querySelector('.wp-demo-top h1'); }), 'the first child of [data-home="out"] must be .wp-demo-top, holding the h1');
 // Both product PAGES have to be reachable from the homepage, not just the two
 // apps. /parasend shipped with no inbound link anywhere on the site and
 // /parasign had exactly one, from /sign: a product page nothing links to is a
@@ -60,8 +61,8 @@ await (async () => {
   ok('the homepage still routes to ParaSend from its own section', ctas.includes('/en/parashare'), await publicPage.locator('#products').innerText());
 })();
 // The Dutch homepage: the same bar in Dutch, with the two outward product
-// names, re-rendered identically by js/nav-auth.js after the session check; one
-// primary action (versturen) and one secondary (laten tekenen).
+// names, re-rendered identically by js/nav-auth.js after the session check;
+// and in the demo dashboard one primary action (Account maken) and one secondary (Probeer het zelf).
 await (async () => {
   const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
   await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
@@ -71,8 +72,8 @@ await (async () => {
   ok('the Dutch homepage names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
   const authText = await nl.locator('#nav-auth').evaluate((n) => n.textContent);
   ok('the Dutch bar says Hulp, Inloggen and Account maken after the session check', /Hulp/.test(authText) && /Inloggen/.test(authText) && /Account maken/.test(authText), authText);
-  const actions = await nl.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className]));
-  ok('the Dutch homepage leads with one primary action to versturen and one secondary', JSON.stringify(actions) === JSON.stringify([['/parashare','hp-btn hp-btn-fill'],['/sign','hp-btn hp-btn-line']]), JSON.stringify(actions));
+  const actions = await nl.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className, n.textContent.trim()]));
+  ok('the Dutch homepage leads with Account maken and Probeer het zelf, inside the demo dashboard', JSON.stringify(actions) === JSON.stringify([['/signup','hp-btn hp-btn-fill','Account maken'],['/sign?mode=invite','hp-btn hp-btn-line','Probeer het zelf']]), JSON.stringify(actions));
   const ctas = await nl.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
   ok('the Dutch homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/parasend','/parasign']), JSON.stringify(ctas));
   await nl.close();

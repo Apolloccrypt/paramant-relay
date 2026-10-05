@@ -423,6 +423,12 @@ main > .hp-sec{padding:0}
 main > .hp-sec + .hp-sec{border-top:0}
 main > .hp-sec:last-of-type{padding-bottom:48px}
 main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
+.home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
+.home-hero{padding-top:12px}
+@media (min-width:900px){
+  .home-hero{padding:20px 0 40px}
+  .home-hero .hp-wrap{width:min(100% - 2*var(--pad), 1120px)}
+}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -538,27 +544,27 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <section class="home-hero">
   <div class="hp-wrap">
     <div class="home-state" data-home="out">
-      <h1>Get documents signed and send files safely, from your browser.</h1>
-      <p class="lede">Made for <strong>small professional firms</strong> in the EU: legal, finance, health. A contract signed, or a file that deletes itself after its last read.</p>
-      <div class="home-actions">
-        <a class="hp-btn hp-btn-fill" href="/en/parashare">Send securely</a>
-        <a class="hp-btn hp-btn-line" href="/en/sign">Sign a document</a>
-      </div>
-      <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;29 a month.</p>
-      <p class="hp-proof">When the file is gone, the proof stays. Anyone can check it without us.</p>
-
-      <!-- The dashboard a signed-in customer gets, in a demo state. The same
-           register rows /dashboard renders (dh-document, dh-send, dh-status,
-           dh-progress), filled with example data that is marked as such on
-           the frame and on every row. Each tile plays a short mini-flow of
-           what the tool does and ends on one button into the real tool.
-           js/home-demo.js drives it; without script every tile is a plain
-           link into that tool. -->
-      <div class="wp-demo" role="region" aria-labelledby="wp-demo-h" data-wp-demo>
+      <!-- Mick, 5 October 2026: the visitor lands in the dashboard itself, not
+           under a hero. Same head, same rows as /dashboard, in a demo state
+           marked "Example" on the frame and on every row. See the Dutch page. -->
+      <div class="wp-demo wp-demo-top" role="region" aria-labelledby="home-h1" data-wp-demo>
         <div class="wp-demo-bar">
           <span class="wp-sign" aria-hidden="true">Example</span>
-          <h2 id="wp-demo-h" class="wp-demo-h">This is what your overview looks like. <span>Tap a row and watch what happens.</span></h2>
+          <p class="wp-demo-h" id="wp-demo-h">This is what your overview looks like. <span>Tap a row and watch what happens.</span></p>
+          <ul class="wp-appnav" aria-hidden="true">
+            <li class="on">Documents</li><li>Send</li><li>Sign</li><li>Verify</li>
+          </ul>
         </div>
+        <header class="wp-demo-hero">
+          <div class="wp-demo-title">
+            <h1 id="home-h1">Send files safely and get documents signed, for small professional firms.</h1>
+            <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;29 a month.</p>
+          </div>
+          <div class="home-actions">
+            <a class="hp-btn hp-btn-fill" href="/en/signup">Create account</a>
+            <a class="hp-btn hp-btn-line" href="/en/sign?mode=invite">Try it yourself</a>
+          </div>
+        </header>
         <div class="wp-demo-head">
           <p class="wp-demo-hi">Your documents <span class="wp-demo-tag">example</span></p>
           <span class="dh-plan wp-plan"><strong>Community</strong><span>plan</span></span>
