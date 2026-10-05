@@ -139,7 +139,7 @@ module.exports = {
   MAIL_PROVIDER: {
     type: 'string', ui: 'input', group: 'Secrets', default: 'mailjet',
     class: 'relay-restart',
-    description: 'Who carries outbound mail: mailjet, scaleway, resend or dryrun. '
+    description: 'Who carries outbound mail: lettermint, mailjet, scaleway, resend or dryrun. '
       + 'A misspelled value delivers NOTHING; the relay logs mail_misconfigured at boot.',
   },
   MAIL_FALLBACK_PROVIDER: {
@@ -147,6 +147,11 @@ module.exports = {
     class: 'relay-restart',
     description: 'A second carrier, on a different company, used only when the first '
       + 'refuses. Guards against an account suspension taking all mail down.',
+  },
+  LETTERMINT_API_TOKEN: {
+    type: 'string', ui: 'input', group: 'Secrets', default: '',
+    class: 'relay-restart', secret: true,
+    description: 'Lettermint project token (Netherlands, EU) for outbound mail. Masked; replace-only.',
   },
   MAILJET_API_KEY: {
     type: 'string', ui: 'input', group: 'Secrets', default: '',

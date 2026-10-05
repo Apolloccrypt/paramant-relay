@@ -376,3 +376,96 @@ test('zonder MAIL_PROVIDER kiest de relay een drager waarvan de sleutels er zijn
   assert.equal(leeg.provider, 'dryrun');
   assert.equal(leeg.stil, true, 'geen enkele sleutel: stil, en diagnose zegt waarom');
 });
+
+// ── Lettermint ───────────────────────────────────────────────────────────
+
+function lmFetch(antwoorden) {
+  const calls = [];
+  const rij = [].concat(antwoorden);
+  const fn = async (url, init) => {
+    calls.push({ url, init, body: init && init.body ? JSON.parse(init.body) : null });
+    const a = rij.length > 1 ? rij.shift() : rij[0];
+    return {
+      ok: a.status >= 200 && a.status < 300,
+      status: a.status,
+      text: async () => a.text || '',
+      json: async () => a.json || {},
+    };
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+const lmEnv = { MAIL_PROVIDER: 'lettermint', LETTERMINT_API_TOKEN: 'lm_test' };
+
+test('lettermint: 202 is a send, one call per address, in its own shape', async () => {
+  const f = lmFetch({ status: 202, json: { message_id: 'msg_1', status: 'pending' } });
+  const r = await mail.stuur(
+    { to: ['anna@example.org', 'bob@example.org'], subject: 'Signed', html: '<p>Done</p>',
+      replyTo: 'klant@example.org', attachments: [{ filename: 'f.pdf', content: 'QUJD', type: 'application/pdf' }] },
+    { fetch: f, env: { ...lmEnv, LETTERMINT_ROUTE: 'transactional' } });
+  assert.equal(r.ok, true);
+  assert.equal(r.provider, 'lettermint');
+  assert.equal(r.count, 2);
+  assert.deepEqual(r.message_ids, ['msg_1', 'msg_1']);
+  assert.equal(f.calls.length, 2, 'recipients never see each other');
+  assert.equal(f.calls[0].url, 'https://api.lettermint.co/v1/send');
+  assert.equal(f.calls[0].init.headers['x-lettermint-token'], 'lm_test');
+  assert.deepEqual(f.calls[1].body.to, ['bob@example.org']);
+  assert.deepEqual(f.calls[0].body.reply_to, ['klant@example.org']);
+  assert.equal(f.calls[0].body.route, 'transactional');
+  assert.equal(f.calls[0].body.text, 'Done', 'a text part is always there');
+  assert.deepEqual(f.calls[0].body.attachments,
+    [{ filename: 'f.pdf', content: 'QUJD', content_type: 'application/pdf' }]);
+});
+
+test('lettermint: a 4xx is a refusal with the reason, not a throw', async () => {
+  const f = lmFetch({ status: 422, text: '{"message":"The from field is invalid."}' });
+  const r = await mail.stuur(bericht, { fetch: f, env: lmEnv });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'http_422');
+  assert.match(r.detail, /from field/);
+  assert.equal(r.count, 0);
+});
+
+test('lettermint: a 5xx falls through to a configured fallback', async () => {
+  const f = lmFetch([{ status: 503, text: 'down' }, { status: 200 }]);
+  const r = await mail.stuur(bericht, { fetch: f,
+    env: { ...lmEnv, MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 're_x' } });
+  assert.equal(r.ok, true);
+  assert.equal(r.provider, 'resend');
+  assert.equal(r.fallback_used, true);
+  assert.equal(r.primary, 'lettermint');
+  assert.equal(r.primary_reason, 'http_503');
+});
+
+test('lettermint: a refusal halfway is a partial delivery, and nobody gets it twice', async () => {
+  const f = lmFetch([{ status: 202, json: { message_id: 'a', status: 'pending' } },
+                     { status: 202, json: { message_id: 'b', status: 'suppressed' } }]);
+  const r = await mail.stuur({ to: ['a@example.org', 'b@example.org'], subject: 'S', text: 'Hallo' },
+    { fetch: f, env: { ...lmEnv, MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 're_x' } });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'rejected');
+  assert.equal(r.count, 1);
+  assert.equal(r.fallback, 'skipped_partial_delivery');
+  assert.equal(f.calls.length, 2);
+});
+
+test('lettermint: no token means not_configured, and the default skips it', async () => {
+  const f = lmFetch({ status: 202 });
+  const r = await mail.stuur(bericht, { fetch: f, env: { MAIL_PROVIDER: 'lettermint' } });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'not_configured');
+  assert.equal(f.calls.length, 0);
+  assert.equal(mail.diagnose({ MAIL_PROVIDER: 'lettermint' }).gereed, false);
+  assert.match(mail.diagnose({ MAIL_PROVIDER: 'lettermint' }).waarschuwing, /credentials are missing/);
+});
+
+test('lettermint heads the preference when its token is there', () => {
+  assert.equal(mail.config({ LETTERMINT_API_TOKEN: 'lm', RESEND_API_KEY: 're' }).provider, 'lettermint');
+  assert.equal(mail.config({ RESEND_API_KEY: 're' }).provider, 'resend', 'without it, production stays on Resend');
+  const d = mail.diagnose({ LETTERMINT_API_TOKEN: 'lm', MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 're' });
+  assert.equal(d.provider, 'lettermint');
+  assert.equal(d.reserve_gereed, true);
+  assert.equal(d.waarschuwing, null);
+});
