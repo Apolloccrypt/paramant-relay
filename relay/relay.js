@@ -2540,7 +2540,22 @@ const invManifests = new Map();
 const invRejections = new Map(); // inv id -> expires (ms)
 const INV_MANIFEST_TTL_MS = 60 * 60 * 1000;
 const INV_MANIFEST_MAX = 5000;
-setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) invManifests.delete(k); }, 60000).unref();
+// Memory bounds (review #555, M5): 5000 manifests of 100 000 tokens each, from
+// any free key, was a few GB of heap with nothing in front of an OOM. Now a
+// manifest lists at most 20 000 blocks (90 GB at 4.5 MB a block), an account
+// holds at most 5 live hand-overs, and all manifests together hold at most
+// 200 000 tokens.
+const INV_TOTAL_CHUNKS_MAX = 20000;
+const INV_MANIFESTS_PER_ACCOUNT = 5;
+const INV_TOKENS_TOTAL_MAX = 200000;
+let invTokenCount = 0;
+function _invDrop(k) {
+  const m = invManifests.get(k);
+  if (!m) return;
+  invTokenCount = Math.max(0, invTokenCount - m.tokens.size);
+  invManifests.delete(k);
+}
+setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) _invDrop(k); }, 60000).unref();
 
 // Eviction sweep for the limiter maps that lacked one (the other limiters already
 // self-evict). Without this they grow unbounded — slow memory/audit creep,
@@ -7924,9 +7939,20 @@ async function handleRelayRequest(req, res) {
   const invRejm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/reject$/);
   if (invRejm && req.method === 'POST') {
     if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    // Only the account that owns the running hand-over may stop it (review
+    // #555, M5): any key could reject any inv_ id and wipe the sender's
+    // manifest. Before the first block there is no owner yet, and the
+    // rejection is the sender's own first word on the inv_ id.
+    const _rm = invManifests.get(invRejm[1]);
+    if (_rm && Date.now() <= _rm.expires && _rm.owner !== acctOf(apiKey)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'This hand-over belongs to a different account' }));
+    }
     if (invRejections.size >= INV_MANIFEST_MAX) for (const [k, t] of invRejections) if (Date.now() > t) invRejections.delete(k);
+    // Hard cap: the oldest rejection goes first, the map never grows past it.
+    while (invRejections.size >= INV_MANIFEST_MAX) invRejections.delete(invRejections.keys().next().value);
     invRejections.set(invRejm[1], Date.now() + INV_MANIFEST_TTL_MS);
-    invManifests.delete(invRejm[1]);
+    _invDrop(invRejm[1]);
     log('info', 'handover_rejected', { inv: invRejm[1].slice(0, 8) });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, rejected: true }));
@@ -7950,20 +7976,28 @@ async function handleRelayRequest(req, res) {
     const idx = Number(d.index); const total = Number(d.total_chunks);
     const token = typeof d.token === 'string' ? d.token : '';
     if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
-    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > INV_TOTAL_CHUNKS_MAX) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer of at most ' + INV_TOTAL_CHUNKS_MAX })); }
     if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
     const owner = acctOf(apiKey);
     let m = invManifests.get(invMfm[1]);
-    if (m && Date.now() > m.expires) { invManifests.delete(invMfm[1]); m = null; }
+    if (m && Date.now() > m.expires) { _invDrop(invMfm[1]); m = null; }
     if (!m) {
       if (invManifests.size >= INV_MANIFEST_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      let _mine = 0;
+      const _now = Date.now();
+      for (const x of invManifests.values()) if (x.owner === owner && _now <= x.expires) _mine++;
+      if (_mine >= INV_MANIFESTS_PER_ACCOUNT) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'too_many_handovers', max: INV_MANIFESTS_PER_ACCOUNT })); }
       m = { owner, total, tokens: new Map(), meta: null, expires: Date.now() + INV_MANIFEST_TTL_MS };
       invManifests.set(invMfm[1], m);
     }
     if (m.owner !== owner) { res.writeHead(403); return res.end(J({ error: 'This hand-over belongs to a different account' })); }
     if (m.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
-    if (!m.tokens.has(idx)) m.tokens.set(idx, token);
+    if (!m.tokens.has(idx)) {
+      if (invTokenCount >= INV_TOKENS_TOTAL_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      m.tokens.set(idx, token);
+      invTokenCount++;
+    }
     if (typeof d.meta === 'string' && d.meta.length <= 2048 && !m.meta) m.meta = d.meta;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, have: m.tokens.size, total }));
@@ -8535,7 +8569,7 @@ async function handleRelayRequest(req, res) {
     const total = Number(d.total_chunks);
     const token = typeof d.token === 'string' ? d.token : '';
     if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
-    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > INV_TOTAL_CHUNKS_MAX) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer of at most ' + INV_TOTAL_CHUNKS_MAX })); }
     if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
     if (!sess.manifest) sess.manifest = { total, tokens: new Map(), meta: null };
