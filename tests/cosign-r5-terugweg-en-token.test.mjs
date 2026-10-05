@@ -132,21 +132,9 @@ function harUrls(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8')).log.entries.map((e) => e.request.url);
 }
 
-test('A: na "Maak er gratis een" en het instellen staat de nieuwe gebruiker vanzelf weer op het document', async () => {
-  const state = { account: 401, status: 'sent' };
-  const { ctx, reqs, link, fx } = await context('A', state);
-  const page = await ctx.newPage();
-  await page.goto(link, { waitUntil: 'domcontentloaded' });
-  const signup = page.locator('#cs-signup-link');
-  await signup.waitFor({ state: 'visible', timeout: 30000 });
-  assert.match(await page.locator('#sign-cta').innerText(), /vanzelf hier terug/, 'de notitie belooft geen "open de link opnieuw" meer');
-  await signup.click();
-  await page.waitForURL(/\/signup$/, { timeout: 15000 });
-  const stash = await page.evaluate(() => JSON.parse(localStorage.getItem('paramant:signup-return') || 'null'));
-  assert.ok(stash && stash.url.includes('t=' + TOKEN) && stash.url.includes(fx.fragment), 'het volledige adres wacht in deze browser');
-
-  // The setup link comes from a mail: a new tab, without this tab's sessionStorage.
-  await page.close();
+// The setup link comes from a mail: a new tab, without the sessionStorage of
+// the tab with the invitation.
+async function setupInNewTab(ctx) {
   const tab = await ctx.newPage();
   await tab.goto(`${ORIGIN}/auth/setup/${SETUP}`, { waitUntil: 'domcontentloaded' });
   const start = tab.locator('#start-btn');
@@ -159,12 +147,66 @@ test('A: na "Maak er gratis een" en het instellen staat de nieuwe gebruiker vanz
   await tab.locator('#welcome-doc-return:not([hidden])').waitFor({ timeout: 5000 });
   assert.match(await tab.locator('#state-welcome').innerText(), /Alles staat klaar/);
   await tab.waitForURL((u) => u.pathname === '/co-sign', { timeout: 15000 });
+  return tab;
+}
+
+// "Maak er gratis een" opens /signup in a new tab; the invitation stays.
+async function clickSignup(ctx, page) {
+  const signup = page.locator('#cs-signup-link');
+  await signup.waitFor({ state: 'visible', timeout: 30000 });
+  assert.match(await page.locator('#sign-cta').innerText(), /vanzelf hier terug/, 'de notitie belooft geen "open de link opnieuw" meer');
+  const [popup] = await Promise.all([ctx.waitForEvent('page'), signup.click()]);
+  await popup.waitForURL(/\/signup$/, { timeout: 15000 });
+  assert.equal(page.url().split('#')[0], (await page.evaluate(() => location.href)).split('#')[0]);
+  return popup;
+}
+
+test('A: na "Maak er gratis een" en het instellen staat de nieuwe gebruiker vanzelf weer op het document', async () => {
+  const state = { account: 401, status: 'sent' };
+  const { ctx, reqs, link, fx } = await context('A', state);
+  const page = await ctx.newPage();
+  await page.goto(link, { waitUntil: 'domcontentloaded' });
+  const popup = await clickSignup(ctx, page);
+  // Review #566: only which request and party, with an expiry; no token, no key.
+  const raw = await page.evaluate(() => localStorage.getItem('paramant:signup-return'));
+  const stash = JSON.parse(raw || 'null');
+  assert.ok(stash, 'de terugweg wacht in deze browser');
+  assert.deepEqual(Object.keys(stash).sort(), ['env', 'exp', 'p', 'path']);
+  assert.equal(stash.env, ENV_ID); assert.equal(stash.p, 1); assert.equal(stash.path, '/co-sign');
+  assert.ok(stash.exp > Date.now() && stash.exp <= Date.now() + 24 * 3600e3, 'vervalt binnen 24 uur');
+  assert.ok(!raw.includes(TOKEN) && !raw.includes(fx.fragment.slice(4, 30)), 'geen token en geen sleutel in localStorage');
+  await popup.close();
+
+  const tab = await setupInNewTab(ctx);
   await tab.locator('#document-delivery-status').filter({ hasText: /geopend/ }).waitFor({ timeout: 30000 });
-  assert.equal(tab.url(), link, 'terug op precies het document uit de uitnodiging');
-  assert.equal(await tab.evaluate(() => localStorage.getItem('paramant:signup-return')), null, 'het bewaarde adres is na gebruik weg');
+  assert.equal(tab.url(), link, 'terug op precies het document uit de uitnodiging (van het tabblad met de uitnodiging)');
+  assert.equal(await tab.evaluate(() => localStorage.getItem('paramant:signup-return')), null, 'de terugweg is na gebruik weg');
   await ctx.close();
   const leaked = tokenUrls(reqs.map((r) => r.url), link);
   assert.deepEqual(leaked, [], 'het token stond in geen enkele request-URL, ook niet in /signup of de terugweg');
+});
+
+test('A: is het tabblad met de uitnodiging dicht, dan zegt de pagina eerlijk dat de maillink het document opent', async () => {
+  const state = { account: 401, status: 'sent' };
+  const { ctx, reqs, link } = await context('A-dicht', state);
+  const page = await ctx.newPage();
+  await page.goto(link, { waitUntil: 'domcontentloaded' });
+  const popup = await clickSignup(ctx, page);
+  await popup.close();
+  await page.close();
+  const tab = await setupInNewTab(ctx);
+  await tab.locator('#step-error.active').waitFor({ timeout: 15000 });
+  const text = (await tab.locator('#step-error').innerText()).replace(/\s+/g, ' ');
+  assert.match(text, /Uw account staat klaar/);
+  assert.match(text, /Open de link uit de uitnodigingsmail nog een keer/);
+  const u = new URL(tab.url());
+  assert.equal(u.searchParams.get('env'), ENV_ID);
+  assert.equal(u.searchParams.get('p'), '1');
+  assert.equal(u.searchParams.get('t'), null);
+  assert.equal(u.hash, '');
+  assert.equal(await tab.evaluate(() => localStorage.getItem('paramant:signup-return')), null);
+  await ctx.close();
+  assert.deepEqual(tokenUrls(reqs.map((r) => r.url), link), []);
 });
 
 test('A: ook na een passkey brengt "Verder" de nieuwe gebruiker naar het document, niet naar het dashboard', async () => {
@@ -172,21 +214,56 @@ test('A: ook na een passkey brengt "Verder" de nieuwe gebruiker naar het documen
   const { ctx, link } = await context('A-passkey', state);
   const page = await ctx.newPage();
   await page.goto(link, { waitUntil: 'domcontentloaded' });
-  await page.locator('#cs-signup-link').click();
-  await page.waitForURL(/\/signup$/, { timeout: 15000 });
-  await page.goto(`${ORIGIN}/auth/setup/${SETUP}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(500);
+  const popup = await clickSignup(ctx, page);
+  await popup.goto(`${ORIGIN}/auth/setup/${SETUP}`, { waitUntil: 'domcontentloaded' });
+  await popup.waitForTimeout(500);
   state.account = 200;
   // The passkey route's own success screen, as passkey.js shows it.
-  await page.evaluate(() => {
+  await popup.evaluate(() => {
     document.querySelectorAll('section[id^="state-"]').forEach((s) => s.classList.add('hidden'));
     document.getElementById('state-passkey-success').classList.remove('hidden');
   });
-  assert.match(await page.locator('#passkey-finish-btn').innerText(), /document/);
-  await page.click('#passkey-finish-btn');
-  await page.locator('#welcome-doc-return:not([hidden])').waitFor({ timeout: 5000 });
-  await page.waitForURL((u) => u.pathname === '/co-sign', { timeout: 15000 });
-  assert.equal(page.url(), link);
+  assert.match(await popup.locator('#passkey-finish-btn').innerText(), /document/);
+  await popup.click('#passkey-finish-btn');
+  await popup.locator('#welcome-doc-return:not([hidden])').waitFor({ timeout: 5000 });
+  await popup.waitForURL((u) => u.pathname === '/co-sign' && u.searchParams.get('t') !== null, { timeout: 15000 });
+  assert.equal(popup.url(), link);
+  await ctx.close();
+});
+
+// Review #566: the record expires, is checked on every page and goes on sign-out.
+test('A: de terugweg vervalt, een oud record met de link verdwijnt bij de eerstvolgende pagina, uitloggen wist hem', async () => {
+  const lr = await import(path.join(ROOT, 'js', 'login-return.js'));
+  const mem = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m }; };
+  const loc = { pathname: '/co-sign', search: `?env=${ENV_ID}&p=1&t=${TOKEN}`, hash: '#ks=v1.secret' };
+  const st = mem();
+  const now = Date.parse('2026-10-05T12:00:00Z');
+  assert.equal(lr.stashSignupReturn(st, loc, now), true);
+  const rec = JSON.parse(st.getItem(lr.SIGNUP_KEY));
+  assert.deepEqual(rec, { path: '/co-sign', env: ENV_ID, p: 1, exp: now + lr.SIGNUP_MAX_AGE_MS });
+  assert.equal(lr.signupReturnPath(st, now + 1000), `/co-sign?env=${ENV_ID}&p=1&resume=1`);
+  assert.equal(lr.signupReturnPath(st, now + lr.SIGNUP_MAX_AGE_MS + 1), null, 'na 24 uur niet meer');
+  assert.equal(st.getItem(lr.SIGNUP_KEY), null, 'en weg');
+  assert.equal(lr.stashSignupReturn(st, { pathname: '/elders', search: '?env=x', hash: '' }, now), false, 'alleen vanaf /co-sign met een verzoek');
+  st.setItem(lr.SIGNUP_KEY, JSON.stringify({ path: '/co-sign', url: '/co-sign?env=' + ENV_ID + '&p=1&t=' + TOKEN, at: now }));
+  assert.equal(lr.signupReturnPath(st, now), null, 'een oud record met de link telt niet');
+  assert.equal(st.getItem(lr.SIGNUP_KEY), null);
+
+  const state = { account: 200, status: 'sent' };
+  const { ctx } = await context('A-sweep', state);
+  const page = await ctx.newPage();
+  await page.goto(`${ORIGIN}/signup`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(({ e, t }) => localStorage.setItem('paramant:signup-return', JSON.stringify({ path: '/co-sign', url: `/co-sign?env=${e}&p=1&t=${t}#ks=v1.x`, at: Date.now() })), { e: ENV_ID, t: TOKEN });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => localStorage.getItem('paramant:signup-return')), null, 'een oud record met token en sleutel gaat bij de volgende pagina');
+  await page.evaluate(({ e }) => localStorage.setItem('paramant:signup-return', JSON.stringify({ path: '/co-sign', env: e, p: 1, exp: Date.now() - 1 })), { e: ENV_ID });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => localStorage.getItem('paramant:signup-return')), null, 'een verlopen record gaat bij de volgende pagina');
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'nav-auth.js'), 'utf8');
+  const signout = src.slice(src.indexOf("signout.addEventListener('click'"), src.indexOf("signout.addEventListener('click'") + 600);
+  assert.match(signout, /localStorage\.removeItem\(SIGNUP_RETURN\)/, 'uitloggen wist de terugweg');
   await ctx.close();
 });
 

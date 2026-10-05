@@ -28,6 +28,11 @@
     try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_SHARE) === 0) out.push(k); } } catch (e) { /* storage off */ }
     return out;
   }
+  // Which request a reader came from before making an account
+  // (login-return.js): path, envelope id, party index and expiry only. It
+  // goes on sign-out and when it expires, not on an account switch: making
+  // that account IS the switch.
+  var SIGNUP_RETURN = 'paramant:signup-return';
   function wipeLocal() {
     wipeDraft();
     cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
@@ -53,6 +58,14 @@
     cosignLinks().concat(cosignShares()).forEach(function(k) {
       try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || !(now < Number(r.exp))) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
     });
+    // An older record also held the invite link itself (url): it goes.
+    try {
+      var sr = localStorage.getItem(SIGNUP_RETURN);
+      if (sr !== null) {
+        var r = null; try { r = JSON.parse(sr); } catch (e) { r = null; }
+        if (!r || r.url !== undefined || !(now < Number(r.exp)) || Number(r.exp) > now + 864e5) localStorage.removeItem(SIGNUP_RETURN);
+      }
+    } catch (e) { /* storage off */ }
     cosignKeys().forEach(function(k) {
       try {
         var raw = localStorage.getItem(k) || '';
@@ -276,6 +289,7 @@
         await fetch('/api/user/logout', { method: 'POST', credentials: 'include' });
       } catch (err) {}
       wipeLocal();
+      try { localStorage.removeItem(SIGNUP_RETURN); } catch (err) {}
       try { localStorage.removeItem('paramant_api_key'); } catch (err) {} // legacy: /parashare no longer writes it, clear an old one
       if (location.pathname === '/account' || location.pathname.startsWith('/auth/')) {
         location.href = '/';
