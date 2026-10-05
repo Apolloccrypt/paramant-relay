@@ -108,7 +108,7 @@ test('neither invitation mail can carry the document key, and both say so', () =
     const all = mail.text + mail.html + mail.subject;
     assert.ok(!all.includes(KEY), `${label} carries no document key`);
     assert.ok(!all.includes('Engagement letter'), `${label} carries no filename`);
-    assert.match(mail.text, /It does not open the document/,
+    assert.match(mail.text, /opens the request, but not the document/,
       `${label} says the link opens the request and not the document`);
   }
   assert.equal(resent.subject, original.subject, 'both are the same mail about the same request');
