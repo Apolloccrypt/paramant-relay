@@ -9,6 +9,11 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.1] - unreleased
+
+Tagged `v3.1.1` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+
 ### Added
 - **A gate that counts the work that never landed.** `fix/sector-port-drift` was
   ready on 10 June 2026 and fixes four fallback ports in `admin/server.js` that

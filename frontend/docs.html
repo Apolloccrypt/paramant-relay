@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="description" content="Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <meta property="og:title" content="API-documentatie en zelf hosten · Paramant">
-<meta property="og:description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta property="og:description" content="Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <meta property="og:url" content="https://paramant.app/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="API-documentatie en zelf hosten · Paramant">
-<meta name="twitter:description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="twitter:description" content="Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <link rel="canonical" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
+      "description": "Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
     },
     {
       "@type": "Organization",
@@ -259,7 +259,7 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">NASLAG</span>
     <h1>Documentatie</h1>
     <p class="docs-buyer">Overweegt u Paramant? Uw IT kan hier alles controleren. Abonnementen en prijzen staan op <a href="/pricing">Prijzen</a>.</p>
-    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.1.0. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
+    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.1.1. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Snel starten</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">Bekijk abonnementen en prijzen</a>
@@ -758,7 +758,7 @@ docker compose up -d
 
 <span class="cm"># 4. Verify</span>
 curl http://localhost:3000/health
-<span class="cm"># → {"ok":true,"version":"3.1.0","sector":"relay"}</span></pre>
+<span class="cm"># → {"ok":true,"version":"3.1.1","sector":"relay"}</span></pre>
     </div>
 
     <h3>Poorten per container</h3>
@@ -862,8 +862,8 @@ paramant upgrade
 
 <span class="cm"># Met de hand: de clone staat vast op een tag, git pull verplaatst hem niet</span>
 cd /opt/paramant
-git fetch --depth 1 origin tag v3.1.0
-git checkout v3.1.0
+git fetch --depth 1 origin tag v3.1.1
+git checkout v3.1.1
 docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>

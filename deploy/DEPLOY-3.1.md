@@ -656,6 +656,30 @@ for c in health finance legal admin; do wait_healthy paramant-relay-$c || exit 1
 
 ## Step 5: frontend and nginx (server)
 
+### First: tag v3.1.1 on the merge commit
+
+`frontend/install.sh` is what `curl -fsSL https://paramant.app/install.sh | bash`
+runs, and from 3.1.1 on it clones `v3.1.1` (`RELAY_VERSION` default; the same
+pin is in `install.sh` and `frontend/install-pi.sh`). The rsync below puts that
+installer live. Without the tag the one-line install stops at
+`git clone --branch v3.1.1` on every new machine. So the tag goes on the merge
+commit of the 3.1.1 PR on `main` **before** step 5, not afterwards in step 7:
+
+```bash
+# [admin], from a checkout of the repo
+git fetch origin main --tags
+C=<merge commit of the 3.1.1 PR on main>
+git merge-base --is-ancestor "$C" origin/main && echo "on main"
+git show "$C:package.json" | grep '"version": "3.1.1"'   # the tag is v plus this version
+git tag -a v3.1.1 -m "Release 3.1.1" "$C"
+git push origin v3.1.1
+git ls-remote --tags origin v3.1.1             # must print the tag before step 5
+```
+
+The tag push also starts `docker-publish.yml` (images `3.1.1`). If the server
+checkout is not on `$C` after step 3, stop: the tag would name a commit other
+than the one that is deployed.
+
 The docroot is a copy, not the checkout. Without `--delete`, on purpose:
 `dist/`, `paramant-mark.svg`, `developer.js` and the investor brief live only
 on the server (`scripts/check-prod-drift.sh`).
@@ -1135,24 +1159,19 @@ passing on an empty search.
    server against `127.0.0.1:3000`.
 3. **Drift guard** from the NUC: `scripts/check-prod-drift.sh origin/main` must
    print `OK`.
-4. Tag it, on the commit that is live (the merge commit on `main` that
-   `/home/paramant/backups/deployed-head` names), and put the live date in
-   `CHANGELOG.md`. Until this tag exists the one-line installer stops at
-   `git clone --branch v3.1.0` and `paramant upgrade` finds nothing newer than
-   v3.0.0 (matrix SELF-01-A, SELF-12-A, SELF-13-A):
+4. Check the tag from step 5 names the commit that is live, and put the live
+   date in `CHANGELOG.md`. `v3.1.1` was set on the merge commit before the
+   frontend went out (step 5, "First: tag v3.1.1 on the merge commit"); here
+   it is compared with `/home/paramant/backups/deployed-head`:
    ```bash
    # [admin]
-   git fetch origin main
-   C=$(ssh <server> cat /home/paramant/backups/deployed-head)   # or the merge commit of the PR
-   git merge-base --is-ancestor "$C" origin/main && echo "on main"
-   git tag -a v3.1.0 -m "Paramant 3.1.0" "$C"
-   git push origin v3.1.0
-   git ls-remote --tags origin v3.1.0          # must print the tag
+   C=$(ssh <server> cat /home/paramant/backups/deployed-head)
+   [ "$(git rev-parse 'v3.1.1^{commit}')" = "$C" ] && echo "tag is live commit"
    ```
-   The tag push also starts `docker-publish.yml` (images `3.1.0`). Then check
-   the installer and upgrade path once from a clean machine:
-   `curl -fsSL https://paramant.app/install.sh | bash` reaches "Stack healthy",
-   and on a v3.0.0 install `paramant upgrade` moves HEAD to the tag.
+   Then check the installer and upgrade path once from a clean machine (matrix
+   SELF-01-A, SELF-12-A, SELF-13-A): `curl -fsSL https://paramant.app/install.sh | bash`
+   reaches "Stack healthy" on `v3.1.1`, and on a v3.1.0 install
+   `paramant upgrade` moves HEAD to the newest tag.
 5. Write the deploy down in the vault (`Sessies/2026-09/`), with the
    `billing_config` line as it was logged.
 

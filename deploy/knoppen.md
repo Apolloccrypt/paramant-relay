@@ -74,7 +74,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `RELAY_HEALTH` | `admin/server.js:41` → `:3000` | de compose-listener staat op 3000 | nee, rechtgezet; stond op `:3005`, een poort die nergens in de repo bestaat |
 | `install.sh` | de kopie in de wortel, 535 regels | `frontend/install.sh`, 466 regels, dit is de kopie die op paramant.app staat | **ja, 111 regels verschil** |
 | admin-paneel JS | `admin/public/app.js`, 895 regels | `frontend/js/admin.page.js`, 742 regels | **ja, 343 regels verschil** |
-| versie | `deploy/deploy-3.1.sh:121` `3.1.0` | `install.sh:24` `v3.1.0`, `deploy/.env.example` `v3.1.0` | nee (frontend/install.sh en install-pi.sh nog wel) |
+| versie | `deploy/deploy-3.1.sh:121` `3.1.1` | `install.sh:24` `v3.1.1`, `deploy/.env.example` `v3.1.1` | nee, ook `frontend/install.sh` en `frontend/install-pi.sh` op `v3.1.1` |
 | standaardwaarden | `admin/lib/config-schema.js` (25 sleutels) | `deploy/.env.example` | **ja, drie**, zie de tabel afwijkingen |
 | MFA-vertraging 10 / 300000 | `relay/lib/auth-throttle.js:24,26` | `admin/lib/login-ratelimit.js:150-152` | nee, gepind door `tests/redis-deadline-parity.test.mjs` |
 | tarieftabel | `relay/lib/tiers.js` | `frontend/js/quota-upgrade.js:54-57` | nee, gepind door `relay/test/quota-upgrade-render.test.js` |
@@ -355,9 +355,9 @@ controle valt om.
 | `admin/lib/audit.js` | `AUDIT_RETENTION_DAYS` | `400` | bewaartermijn van het auditlog; ongecontroleerde parseInt, 0 wist het log |
 | `admin/server.js` | `RELAY_HEALTH` | `3000` | terugvalpoort voor de health-relay; de container-interne listener, gepind aan docker-compose.yml |
 | `frontend/crypto-bridge.js` | `WASM_SHA256` | `30f1ae35` | integriteitspin op de wasm-module; verandert bij elke herbouw |
-| `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.0` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
+| `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.1` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
 | `deploy/deploy-3.1.sh` | `EXPECT_PROD_COMMIT` | `41501bb` | de startcommit uit het draaiboek |
-| `install.sh` | `PARAMANT_VERSION` | `v3.1.0` | welke tag de zelf-installateur kloont; gelijk met de deploy (de tag v3.1.0 moet bij de release bestaan) |
+| `install.sh` | `PARAMANT_VERSION` | `v3.1.1` | welke tag de zelf-installateur kloont; gelijk met de deploy (de tag v3.1.1 moet bij de release bestaan) |
 
 ## Afwijkingen die mogen blijven staan
 

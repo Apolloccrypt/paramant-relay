@@ -240,7 +240,7 @@ check_has "$FULL" 'checkout_head = 41501bb'                      "falls back to 
 check_has "$FULL" 'services seen = 6'                            "asserts all six services were seen"
 check_has "$FULL" '"recurring":false'                            "asserts billing_config recurring:false"
 check_has "$FULL" '"mode_source":"inferred"'                     "asserts billing_config mode_source:inferred"
-check_has "$FULL" '"version":"3\.1\.0"'                          "asserts relay_started version 3.1.0"
+check_has "$FULL" '"version":"3\.1\.1"'                          "asserts relay_started version 3.1.1"
 check_has "$FULL" 'after manifest lines = 6'                     "asserts the manifest has six lines"
 check_has "$FULL" 'after tags for this TS = 6'                   "asserts six rollback IMAGES exist, not six lines of text"
 check_has "$FULL" 'after \.env backup bytes >= 1'                "asserts the .env backup has real bytes"
