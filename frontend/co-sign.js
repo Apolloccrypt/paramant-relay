@@ -1582,15 +1582,16 @@ async function renderPdfWithRecords(records) {
       }
     }
   }
-  // Mark this file as Paramant's reading copy of THIS envelope and THIS
-  // original, in a plain (uncompressed) Info entry: /verify only explains a
-  // hash mismatch as "the stamped copy" when it finds exactly this marker
-  // (hertest r2 R1). The .psign and the original are untouched.
+  // Label this file as Paramant's reading copy of THIS envelope and THIS
+  // original, in a plain (uncompressed) Info entry. It is a label, not
+  // evidence: no signature covers it, so /verify ignores it and treats this
+  // file like any other file that is not the signed one (review #555, B1).
+  // The .psign and the original are untouched.
   try {
     const { PDFName, PDFString } = window.PDFLib;
     pdf.getInfoDict().set(PDFName.of('ParamantStampedCopy'),
       PDFString.of('env=' + String(__envelope.id) + ';doc=' + String(__envelope.doc_hash)));
-  } catch { /* no marker: /verify then says plainly INVALID, never "copy" */ }
+  } catch { /* no label: nothing changes for /verify */ }
   return new Uint8Array(await pdf.save({ useObjectStreams: false }));
 }
 

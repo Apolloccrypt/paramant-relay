@@ -119,13 +119,17 @@ for (const run of runs) {
   outcomes.push({ run, kind:'forged', ...(await runOnce({ ...run, receipt:fixture.receipt, trustRelay:false })) });
   outcomes.push({ run, kind:'sandbox', ...(await runOnce({ ...run, receipt:fixture.sandboxReceipt, trustRelay:true })) });
   outcomes.push({ run, kind:'qes', ...(await runOnce({ ...run, receipt:fixture.qesReceipt, trustRelay:true })) });
-  // The reading copy co-sign.js writes carries a marker with THIS envelope
-  // and THIS original. Only that file gets the orange "check with the
-  // original"; any other wrong file is INVALID (hertest r2 R1: M7/M8 were orange).
+  // The marker co-sign.js writes into the reading copy is under no signature:
+  // anyone can paste it into a forged contract (review #555, B1). A file with
+  // a matching marker is just another wrong file: red, no names, no QES.
   const docHash = fixture.receipt.document_hash;
   const mark = (env, doc) => Buffer.from('\n%stamped copy\n<< /ParamantStampedCopy (env=' + env + ';doc=' + doc + ') >>\n');
+  const forgedContract = [...Buffer.from('%PDF-1.4\nFORGED CONTRACT: Party B owes Party A EUR 1.000.000\n'), ...mark(fixture.receipt.envelope_id, docHash)];
+  outcomes.push({ run, kind:'forgedmarker', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:forgedContract, trustRelay:true })) });
+  const forgedQes = [...Buffer.from('%PDF-1.4\nFORGED CONTRACT\n'), ...mark(fixture.qesReceipt.envelope_id, fixture.qesReceipt.document_hash)];
+  outcomes.push({ run, kind:'forgedmarker', ...(await runOnce({ ...run, receipt:fixture.qesReceipt, doc:forgedQes, trustRelay:true })) });
   const stamped = [...fixture.source, ...mark(fixture.receipt.envelope_id, docHash)];
-  outcomes.push({ run, kind:'stamped', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:stamped, trustRelay:true })) });
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:stamped, trustRelay:true })) });
   const oneByte = fixture.source.slice(); oneByte[3] ^= 1;
   outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:oneByte, trustRelay:true })) });
   const otherEnv = [...fixture.source, ...mark('env_some_other_envelope', docHash)];
@@ -175,13 +179,12 @@ for (const o of outcomes) {
   if (kind === 'qes') {
     if (!run.valid.test(result) || !run.qes.test(result)) throw new Error(where + 'qualified-signature pointer not shown: ' + result);
   }
-  if (kind === 'stamped') {
-    // Every signature holds and only the file differs: an orange "check with
-    // the original", not a red INVALID, naming the mark the copy really carries
-    // (retest A8/T5-7: the old text named a footer the co-sign copy does not have).
-    if (run.invalid.test(result)) throw new Error(where + 'stamped copy still called INVALID: ' + result);
-    if (!run.stampedHead.test(result) || !run.stampedHint.test(result) || !run.stampedMark.test(result)) throw new Error(where + 'stamped copy not explained: ' + result);
-    if (!/\bwarn\b/.test(banner) || /\b(ok|err)\b/.test(banner)) throw new Error(where + 'stamped copy banner should be orange: ' + banner);
+  if (kind === 'forgedmarker' || kind === 'wrongdoc') {
+    // No party names, no QES pointer and no orange next to a file that is not
+    // the signed one: nothing on the page may read as a reassurance.
+    if (/Signer Demo/.test(result) || /Cleverbase/.test(result)) throw new Error(where + 'party names or QES shown next to a wrong file: ' + result);
+    if (/\bwarn\b/.test(banner)) throw new Error(where + 'wrong file got an orange banner: ' + banner);
+    if (!run.wrongFile.test(result) || !/\berr\b/.test(banner)) throw new Error(where + 'forged marker not red: ' + banner + ' ' + result);
   }
 }
-console.log('parasign-multi-verify: recipe 5 receipt verifies offline against a pinned relay key; a self-signed relay key, a sandbox receipt and a stamped copy are each called what they are, in Chromium');
+console.log('parasign-multi-verify: recipe 5 receipt verifies offline against a pinned relay key; a self-signed relay key and a sandbox receipt are called what they are, and a file with a pasted reading-copy marker is red, in Chromium');
