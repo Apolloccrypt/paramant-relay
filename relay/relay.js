@@ -4055,24 +4055,41 @@ function keyCapReject(err, res) {
 
 // ── One-time setup token (first-run wizard) ──────────────────────────────
 // /v2/setup/apply used to be open to anyone while the relay had no keys. The
-// token is made once, printed in the relay log and written next to users.json
-// (mode 0600), so only someone with the logs or the volume can finish setup.
-// PARAMANT_SETUP_TOKEN pins it from the environment instead.
+// token is made from fresh random bytes on every start of a relay that still
+// needs setup and written next to users.json (mode 0600), so only someone with
+// the volume can finish setup. PARAMANT_SETUP_TOKEN pins it from the
+// environment instead.
+//
+// An existing setup-token file is NEVER read: a file that was already there
+// may come from a git checkout (one was committed once, review #555 B3) or
+// from anyone else who could write the directory. It is replaced, atomically,
+// and the log says only that the file exists, never the token.
 const SETUP_TOKEN_FILE = nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'setup-token');
 let _setupTokenValue = null;
 function _setupToken() { return process.env.PARAMANT_SETUP_TOKEN || _setupTokenValue; }
+function _writeSetupTokenFile(value) {
+  const tmp = SETUP_TOKEN_FILE + '.' + process.pid + '.' + crypto.randomBytes(4).toString('hex') + '.tmp';
+  try {
+    fs.writeFileSync(tmp, value + '\n', { mode: 0o600, flag: 'wx' });
+    fs.chmodSync(tmp, 0o600);
+    fs.renameSync(tmp, SETUP_TOKEN_FILE);
+    return true;
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}
+    log('warn', 'setup_token_file_not_written', { err: e.message, file: SETUP_TOKEN_FILE });
+    return false;
+  }
+}
 function _initSetupToken() {
   if (process.env.PARAMANT_SETUP_TOKEN) return;
   if (apiKeys.size > 0 && process.env.SETUP_MODE !== 'true') return;
-  try { _setupTokenValue = fs.readFileSync(SETUP_TOKEN_FILE, 'utf8').trim() || null; } catch {}
-  if (!_setupTokenValue) {
-    _setupTokenValue = 'pst_' + crypto.randomBytes(24).toString('hex');
-    try { fs.writeFileSync(SETUP_TOKEN_FILE, _setupTokenValue + '\n', { mode: 0o600 }); }
-    catch (e) { log('warn', 'setup_token_file_not_written', { err: e.message, file: SETUP_TOKEN_FILE }); }
-  }
-  log('info', 'setup_token', {
-    token: _setupTokenValue, file: SETUP_TOKEN_FILE,
-    hint: 'First-run setup: open /setup and paste this token. It stops working once setup is done.',
+  _setupTokenValue = 'pst_' + crypto.randomBytes(24).toString('hex');
+  const written = _writeSetupTokenFile(_setupTokenValue);
+  log('info', 'setup_token_ready', {
+    file: written ? SETUP_TOKEN_FILE : null,
+    hint: written
+      ? 'First-run setup: open /setup and paste the token from this file (mode 0600). It stops working once setup is done.'
+      : 'First-run setup: the token file could not be written; set PARAMANT_SETUP_TOKEN or fix the data directory and restart.',
   });
 }
 function _setupTokenConsumed() {
@@ -4969,7 +4986,7 @@ async function handleRelayRequest(req, res) {
     // printed in its log and wrote next to users.json, or with ADMIN_TOKEN.
     if (!_setupAuthorized(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'setup_token_required', detail: 'Send the setup token from the relay log (or the file ' + nodePath.basename(SETUP_TOKEN_FILE) + ' next to users.json) in the X-Setup-Token header.' }));
+      return res.end(J({ error: 'setup_token_required', detail: 'Send the setup token from the file ' + nodePath.basename(SETUP_TOKEN_FILE) + ' next to users.json in the X-Setup-Token header.' }));
     }
     try {
       const body = JSON.parse((await readBody(req, 16384)).toString());
