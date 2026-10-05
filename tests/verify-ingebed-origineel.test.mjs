@@ -52,7 +52,7 @@ for (const [kind, browser] of browsers) {
     const fx = await page.evaluate(async () => {
       const { PDFDocument, StandardFonts } = window.PDFLib;
       const pqc = await import('/vendor/paramant-pqc.js');
-      const signer = await import('/js/parasign-signer.js?v=22');
+      const signer = await import('/js/parasign-signer.js?v=23');
       const enc = new TextEncoder();
       const hex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
       const b64 = (b) => { let v = ''; for (const x of b) v += String.fromCharCode(x); return btoa(v); };
