@@ -606,6 +606,15 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
          paid_until_*, which the relay has emitted since the betaalpad fixes. -->
     <p class="plan-term-line" id="dh-term-line" hidden>--</p>
 
+    <!-- Shown by dashboard.js to every account, free or paid, from 80 percent
+         of a monthly quota (signatures or transfers). It reads the same
+         overview endpoint as /developer, without the developer gate
+         (DASH-27-N). -->
+    <div class="plan-term-warn" id="dh-usage-warn" role="status" aria-label="Verbruik" hidden>
+      <p class="plan-term-warn-text" data-dh="usage-warn">--</p>
+      <a class="plan-term-warn-cta" id="dh-usage-upgrade" href="/pricing">Bekijk een groter plan</a>
+    </div>
+
     <!-- What a paying customer bought, in the words /pricing sells it in. Shown
          by dashboard.js only on Firm, Business or Enterprise, and it carries no
          link to a higher tier: someone who already pays is not a lead. -->
@@ -836,6 +845,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 <script src="/js/nav-auth.js?v=18" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
 <script src="/js/dashboard-history.js?v=2" defer></script>
-<script src="/js/dashboard.js?v=25" defer></script>
+<script src="/js/dashboard.js?v=26" defer></script>
 </body>
 </html>

@@ -1236,6 +1236,52 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // promised in code was shown to nobody (fase 1, DASH-27-N). The usage bar
   // and the warning live on /developer, which reads the same snapshot once;
   // /dashboard stays without a polling usage feed (DASH-27-A).
+  //
+  // /developer sits behind an operator allowlist, so an ordinary customer never
+  // reached that warning either (eindmatrix DASH-27-N). The overview endpoint
+  // is open to every logged-in account and carries the same quota, so the
+  // dashboard reads it once per page load and shows one band from 80% of a
+  // monthly quota, with the way up. Below 80%, or when the relay cannot say,
+  // nothing is shown: no guessed numbers.
+  var usageAsked = false;
+  function usageWarning(quota) {
+    var caps = (quota && quota.caps) || {};
+    var rows = [
+      { used: Number(quota && quota.signs || 0), cap: caps.signs,
+        nl: 'handtekeningen', en: 'signatures' },
+      { used: Number(quota && quota.transfers || 0), cap: caps.transfers,
+        nl: 'verzendingen', en: 'transfers' },
+    ];
+    var worst = null;
+    rows.forEach(function (r) {
+      if (typeof r.cap !== 'number' || !isFinite(r.cap) || r.cap <= 0) return;
+      r.pct = Math.min(100, Math.round((r.used / r.cap) * 100));
+      if (r.pct >= 80 && (!worst || r.pct > worst.pct)) worst = r;
+    });
+    if (!worst) return null;
+    var left = Math.max(0, worst.cap - worst.used);
+    if (worst.pct >= 100) {
+      return nlEn('Uw tegoed van ' + worst.cap + ' ' + worst.nl + ' is op voor deze maand. Meer nodig?',
+                  'Your ' + worst.cap + ' ' + worst.en + ' for this month are used up. Need more?');
+    }
+    return nlEn('U heeft ' + worst.used + ' van uw ' + worst.cap + ' ' + worst.nl + ' deze maand gebruikt, nog ' + left + ' over. Bijna op. Meer nodig?',
+                'You have used ' + worst.used + ' of your ' + worst.cap + ' ' + worst.en + ' this month, ' + left + ' left. Almost used up. Need more?');
+  }
+  function loadUsage() {
+    if (usageAsked) return;
+    usageAsked = true;
+    var band = root && root.querySelector('#dh-usage-warn');
+    if (!band) return;
+    fetch('/api/user/dashboard/overview', { credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var text = data && usageWarning(data.quota);
+        if (!text) { band.hidden = true; return; }
+        band.querySelector('[data-dh="usage-warn"]').textContent = text;
+        band.hidden = false;
+      })
+      .catch(function () { band.hidden = true; });
+  }
 
   // Listeners go on once. start() runs again for every poll round after a
   // payment (refreshAccount), and each round used to add another set: one click
@@ -1275,7 +1321,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         return r.json();
       })
       .then(function (data) {
-        if (data) render(data);
+        if (data) { render(data); loadUsage(); }
         // Only after render, so lastAccountIsPaid reflects this answer.
         if (isBillingReturn()) showBillingReturn(typeof tries === 'number' ? tries : RETURN_TRIES);
       })
