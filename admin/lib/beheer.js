@@ -18,7 +18,9 @@
 //   - Geen getal zonder meting. Een meting die niet lukte heet 'niet gemeten',
 //     zoals op de standpagina, en wordt nooit een 0.
 
-const KEY_RE = /\b(pgp|psk)_[0-9a-f]{8,}\b/gi;
+// psk-sleutels van de open API hebben een soort ertussen: psk_live_<hex> en
+// psk_test_<hex> (relay/lib/keys-table.js).
+const KEY_RE = /\b(pgp|psk)_(?:live_|test_)?[0-9a-f]{8,}\b/gi;
 
 function maskKey(k) {
   const s = String(k || '');
@@ -26,7 +28,7 @@ function maskKey(k) {
 }
 
 function isKey(s) {
-  return typeof s === 'string' && /^(pgp|psk)_[0-9a-f]{8,}$/i.test(s);
+  return typeof s === 'string' && /^(pgp|psk)_(?:live_|test_)?[0-9a-f]{8,}$/i.test(s);
 }
 
 // Een kopie waarin elke sleutel gemaskeerd is, in waarden en in namen.

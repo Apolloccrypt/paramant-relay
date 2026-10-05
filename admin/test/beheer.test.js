@@ -29,6 +29,15 @@ test('maskKey en scrubKeys laten geen volle sleutel over, ook niet diep', () => 
   assert.strictEqual(out.n, 3);
 });
 
+test('scrubKeys en isKey kennen ook psk_live_ en psk_test_ (review 573 L2)', () => {
+  for (const soort of ['live', 'test']) {
+    const k = `psk_${soort}_` + 'b'.repeat(64);
+    assert.strictEqual(beheer.isKey(k), true, k.slice(0, 12));
+    const out = JSON.stringify(beheer.scrubKeys({ note: `sleutel ${k} hier`, nested: [{ [k]: k }] }));
+    assert.ok(!out.includes('b'.repeat(13)), `volle psk_${soort}_ sleutel lekt: ${out}`);
+  }
+});
+
 test('auditRow: wie is het e-mailadres, de sleutel alleen gemaskeerd', () => {
   const k = 'pgp_' + crypto.randomBytes(32).toString('hex');
   const who = beheer.buildWhoMap([{ _full: k, email: 'jan@bakkerij.test', key_id: 'k_abc123' }]);
