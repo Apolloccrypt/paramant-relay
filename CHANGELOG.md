@@ -14,6 +14,15 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Tagged `v3.1.1` on the merge commit before the frontend rollout
 (`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
 
+**In short.** The screens and the mails now say the same thing. An invitation
+to sign tells you plainly that you need a free account on the invited address,
+the paid plan is called Firm everywhere, and nothing that is paid once is called
+a subscription. English buyers get their invoice, payment description and PDF in
+English, Dutch buyers in Dutch. Visitors who are not signed in get an
+explanation on the send page instead of an error, an old tab picks up a sign-in
+from another tab by itself, and the admin log now shows sign-ups and logins.
+Every changed sentence is listed in `docs/acceptatie-3.1.1-oud-nieuw.md`.
+
 ### Added
 - **A gate that counts the work that never landed.** `fix/sector-port-drift` was
   ready on 10 June 2026 and fixes four fallback ports in `admin/server.js` that
