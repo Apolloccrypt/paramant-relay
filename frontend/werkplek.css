@@ -352,3 +352,14 @@ details.ps-info.wp-fold[open] { padding-bottom: 12px; }
   .wp-steps li { font-size: 14px; padding: 4px 0; }
   .wp-stage .dh-doc-dialog-head h2 { font-size: 16px; }
 }
+
+/* /dashboard: the work comes up. A smaller heading and shorter start cards,
+   so the register rows are on the first screen and not under a hero. */
+.pa-main .dh-hero { padding-bottom: 18px; margin-bottom: 24px; }
+.pa-main .dh-hero h1 { font-size: clamp(24px, 2.4vw, 32px); max-width: none; }
+.pa-main .dh-mission { font-size: 15px; }
+.pa-main .dh-start { margin-bottom: 28px; }
+.pa-main .dh-start-card { min-height: 0; padding: 18px 20px; }
+.pa-main .dh-start-kicker { margin-top: 12px; }
+.pa-main .dh-start-card p { font-size: 13.5px; }
+.pa-main .dh-start-link { margin-top: 12px; }
