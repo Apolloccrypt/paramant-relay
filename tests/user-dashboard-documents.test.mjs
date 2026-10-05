@@ -215,9 +215,12 @@ ok('the inbox offers the one thing it can do and pretends no way in',
   inbox.openers === 0 && inbox.acts.every((t) => t === 'Send me the link again'), JSON.stringify(inbox.acts));
 
 await page.locator('.dh-inbox-act').first().click();
-await page.waitForFunction(() => /Sent/.test(document.querySelector('.dh-inbox-act').textContent));
-ok('send me the link again asks once and says which address it went to',
-  resendRequests === 1 && (await page.locator('.dh-inbox-act').first().textContent()).trim() === 'Sent to demo@example.com',
+await page.waitForFunction(() => /Asked the sender/.test(document.querySelector('.dh-inbox-act').textContent));
+// COSIGN-46-A (2026-10-05): only the sender's browser holds the link that
+// opens the document, so the sender is asked to send the invitation again.
+ok('send me the link again asks once and says the sender was asked',
+  resendRequests === 1 && (await page.locator('.dh-inbox-act').first().textContent()).trim() === 'Asked the sender'
+  && /We have asked the sender to send you the invitation again/.test(await page.locator('.dh-inbox-note').first().textContent()),
   `${resendRequests} requests :: ${await page.locator('.dh-inbox-act').first().textContent()}`);
 
 await page.setViewportSize({ width:1280, height:900 });
