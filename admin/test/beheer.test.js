@@ -106,6 +106,59 @@ test('een meting die ontbreekt heet niet gemeten, nooit goed', () => {
   assert.strictEqual(forked.find((x) => x.id === 'ctlog').level, beheer.KAPOT);
 });
 
+// Acceptatie 3.1.1: "alleen in geheugen op main. groei wordt gemeten" had een
+// kleine letter na de punt.
+test('de logboekzin begint elke zin met een hoofdletter', () => {
+  const p = beheer.problems({ relays: [], mails: null, http429: null, ct: [{ sector: 'main', size: 1, forked: false, persisted: false, growth_24h: null }], redisMem: null });
+  const text = p.find((x) => x.id === 'ctlog').text;
+  assert.strictEqual(text, 'Alleen in geheugen op main. Groei wordt gemeten vanaf nu, over 24 uur staat hier een getal.');
+});
+
+// Acceptatie 3.1.1: Diepe controle stond in het Engels in een Nederlands paneel.
+// Elke zin die relay.js in /v2/health/deep schrijft, zoals hij hem schrijft.
+test('de diepe controle van een relay staat in het Nederlands', () => {
+  const relaySrc = fs.readFileSync(path.join(__dirname, '..', '..', 'relay', 'relay.js'), 'utf8');
+  const samples = [
+    ['relay', 'relay 3.1.1 (health) up', 'Relay', 'relay 3.1.1 (health) draait'],
+    ['crypto', 'ML-DSA-65 loaded, mode=core', 'Cryptografie', 'ML-DSA-65 geladen, modus core'],
+    ['crypto', 'ML-DSA-65 unavailable (build @paramant/core), mode=none', 'Cryptografie', 'ML-DSA-65 niet beschikbaar (bouw @paramant/core), modus none'],
+    ['storage', 'data dir writable (/data)', 'Opslagmap', 'map is beschrijfbaar (/data)'],
+    ['storage', 'not writable (/data): EROFS', 'Opslagmap', 'map is niet beschrijfbaar (/data): EROFS'],
+    ['memory', '99MB rss / 512MB limit', 'Geheugen', '99 MB in gebruik van 512 MB'],
+    ['disk', '12.0GB free on /data', 'Schijfruimte', '12,0 GB vrij op /data'],
+    ['disk', 'statfs unavailable on this Node', 'Schijfruimte', 'vrije ruimte niet te meten op deze Node-versie'],
+    ['tls', 'TLS terminated at the edge (not checked on this relay)', 'Certificaat (TLS)', 'het certificaat zit op de proxy ervoor, niet op deze relay'],
+    ['tls', '30 days until expiry', 'Certificaat (TLS)', 'verloopt over 30 dagen'],
+    ['users', '5 API key(s) loaded', 'Sleutels', '5 sleutels geladen'],
+    ['users', 'no API keys yet (normal on a new install)', 'Sleutels', 'nog geen sleutels (normaal bij een nieuwe installatie)'],
+    ['audit', 'Merkle hash chain active', 'Auditketen', 'hashketen (Merkle) actief'],
+    ['redis', 'reachable', 'Opslag (redis)', 'bereikbaar'],
+    ['redis', 'unreachable', 'Opslag (redis)', 'niet bereikbaar'],
+    ['redis', 'not configured (REDIS_URL empty)', 'Opslag (redis)', 'niet ingesteld (REDIS_URL is leeg)'],
+  ];
+  for (const [name, detail, nlName, nlDetail] of samples) {
+    const out = beheer.deepCheckNL({ name, status: 'green', detail });
+    assert.strictEqual(out.name, nlName, name);
+    assert.strictEqual(out.detail, nlDetail, detail);
+    assert.strictEqual(out.status, 'green');
+  }
+  // Elke controle die relay.js toevoegt heeft een Nederlandse naam.
+  const names = [...relaySrc.matchAll(/\badd\('([a-z]+)',/g)].map((m) => m[1]);
+  assert.ok(names.length >= 9, 'de controles zijn gevonden in relay.js');
+  for (const n of new Set(names)) assert.notStrictEqual(beheer.deepCheckNL({ name: n }).name, n, `controle ${n} heeft geen Nederlandse naam`);
+  // Een onbekende zin blijft staan: liever Engels dan verzonnen.
+  assert.strictEqual(beheer.deepCheckNL({ name: 'x', detail: 'something new' }).detail, 'something new');
+});
+
+test('het paneel noemt het gratis plan overal Community, en zegt het meervoud goed', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  assert.doesNotMatch(app, /'Gratis'/, 'ParaSign gratis heet Community, net als ParaSend');
+  assert.match(app, /free:'Community'/);
+  assert.doesNotMatch(app, /betaald plan'\+\(running\.length===1\?'':'nen'\)/, '"6 betaald plannen loopt nu"');
+  assert.match(app, /' betaald plan loopt nu':' betaalde plannen lopen nu'/);
+  assert.doesNotMatch(app, /oude plannaam/);
+});
+
 test('parseMetrics en parseRedisInfo lezen wat relay en redis teruggeven', () => {
   const m = beheer.parseMetrics('# TYPE paramant_ct_log gauge\nparamant_ct_log{sector="main"} 42\nparamant_uptime_s{sector="main"} 3600\n');
   assert.strictEqual(m.ct_log, 42);

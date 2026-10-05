@@ -61,13 +61,13 @@ function whenCell(ms){return '<div class="when"><b>'+esc(absTime(ms))+'</b><span
 function euro(c){if(c==null||!Number.isFinite(Number(c)))return 'niet gemeten';c=Math.round(Number(c));const neg=c<0;const a=Math.abs(c);return (neg?'-':'')+'€ '+String(Math.floor(a/100)).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+String(a%100).padStart(2,'0');}
 function amount(v,cur){if(v==null||v==='')return '-';const n=Number(v);if(!Number.isFinite(n))return esc(v);return euro(Math.round(n*100))+(cur&&cur!=='EUR'?' '+cur:'');}
 function upTime(s){if(!Number.isFinite(s))return 'looptijd onbekend';const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+' d ':'')+(d||h?h+' u ':'')+m+' min in de lucht';}
-const TIER_NL={free:'Gratis',community:'Community',pro:'Pro',business:'Business',enterprise:'Enterprise',trial:'Proef'};
+const TIER_NL={free:'Community',community:'Community',pro:'Firm',business:'Business',enterprise:'Enterprise',trial:'Proef'};
 function tierNL(t){return TIER_NL[t]||t||'-';}
 function isPaidTier(t){return !!t&&!['free','community'].includes(t);}
 function planLine(name,tier,until){const ms=toMs(until);let tail='';if(ms){tail=ms>Date.now()?' <span>tot '+esc(absDate(ms))+'</span>':' <span>afgelopen '+esc(absDate(ms))+'</span>';}
   return '<div class="plan-line">'+name+': <b>'+esc(tierNL(tier))+'</b>'+tail+'</div>';}
 function sectorNL(s){return {main:'Main',health:'Health',legal:'Legal',finance:'Finance',iot:'IoT'}[s]||s;}
-const LEVEL_NL={goed:'In orde',let_op:'Let op',kapot:'Kapot',niet_gemeten:'Niet gemeten'};
+const LEVEL_NL={goed:'In orde',let_op:'Let op',kapot:'Kapot',niet_gemeten:'Niet gemeten',info:'Ter info'};
 function stTag(level){return '<span class="st '+esc(level)+'">'+esc(LEVEL_NL[level]||level)+'</span>';}
 const KEY_NL={admin_ip:'IP-adres beheerder (ingekort)',ip:'IP-adres (ingekort)',email:'E-mail',from:'Van',to:'Naar',product:'Product',tier:'Plan',reason:'Reden',notify:'Klant gemaild',count:'Aantal',mode:'Manier',before:'Was verplicht',after:'Nu verplicht',code:'Code',max:'Maximaal',via:'Via',envelope:'Ondertekenverzoek',party:'Ondertekenaar',cancel_at:'Stopt op',plan:'Plan',age_sec:'Seconden na aanvraag',key_prefix:'Sleutel',backup_file:'Bestand',command:'Opdracht',args:'Invoer',error:'Fout',admin_id:'Door',stored:'Teller was',presented:'Teller kreeg',cred:'Passkey',envelopes_voided:'Verzoeken ingetrokken',ua:'Browser',ts:'Tijd',event:'Gebeurtenis',detail:'Detail',changed:'Gewijzigd'};
 function valNL(v){if(v===true)return 'ja';if(v===false)return 'nee';if(v==null||v==='')return '-';if(typeof v==='object')return JSON.stringify(v);return String(v);}
@@ -213,7 +213,7 @@ function renderOverview(el,d){
       '<div class="card"><div class="card-hdr">Laatst gebeurd <small><button class="lnk" data-click="goTo" data-tab="audit">hele audit</button></small></div>'+
         ((d.recent_activity||[]).length?'<ul class="ls">'+d.recent_activity.slice(0,8).map(a=>'<li><div><b style="font-weight:500">'+esc(a.label)+'</b><div class="mut" style="font-size:13px">'+esc(a.who)+(a.summary?' · '+esc(a.summary):'')+'</div></div><div class="r mut" style="font-size:13px">'+esc(relTime(a.ts))+'</div></li>').join('')+'</ul>':'<div class="empty">Nog niets gebeurd.</div>')+
       '</div>'+
-      '<div class="card"><div class="card-hdr">Plannen <small>actieve accounts, oude plannaam</small></div>'+planBars(d.plan_distribution||{})+'</div>'+
+      '<div class="card"><div class="card-hdr">Plannen <small>actieve accounts, per account</small></div>'+planBars(d.plan_distribution||{})+'</div>'+
     '</div>';
   // Een getal dat sinds de vorige keer veranderde licht even op: zo zie je wat er nieuw is.
   for(const [id,v] of Object.entries(vals)){if(OV_PREV[id]!==undefined&&OV_PREV[id]!==v){const c=document.getElementById(id);if(c)c.classList.add('flash');}}
@@ -268,7 +268,7 @@ function renderUsers(el){
     '<div class="fb">'+
       '<label for="u-search" class="sr-only">Zoek een klant</label>'+
       '<input id="u-search" type="search" placeholder="Zoek op e-mailadres of label" data-input="filterUsers" style="min-width:260px" value="'+esc(prev.q)+'" autocomplete="off" autocapitalize="off">'+
-      '<select id="u-plan" aria-label="Plan" data-change="filterUsers"><option value="">Elk plan</option><option value="community">Community</option><option value="pro">Pro</option><option value="business">Business</option><option value="enterprise">Enterprise</option></select>'+
+      '<select id="u-plan" aria-label="Plan" data-change="filterUsers"><option value="">Elk plan</option><option value="community">Community</option><option value="pro">Firm</option><option value="business">Business</option><option value="enterprise">Enterprise</option></select>'+
       '<select id="u-totp" aria-label="Tweestapsverificatie" data-change="filterUsers"><option value="">Tweestaps: alles</option><option value="active">Tweestaps aan</option><option value="pending">Ingesteld, niet bevestigd</option><option value="none">Tweestaps uit</option></select>'+
       '<select id="u-status" aria-label="Status" data-change="filterUsers"><option value="">Elke status</option><option value="active">Actief</option><option value="revoked">Ingetrokken</option></select>'+
     '</div>'+
@@ -438,7 +438,7 @@ function showNewKeyModal(){
   o.className='mo';o.style.display='flex';
   o.innerHTML='<div class="mb"><div class="mh"><span class="mt">Nieuwe sleutel</span><button class="close-mo" data-click="closeCreateKey" aria-label="Sluiten">&times;</button></div><div class="mbody">'+
     '<div class="mc"><label for="nk-l">Label</label><input id="nk-l" type="text" placeholder="bijvoorbeeld bakkerij-jansen"></div>'+
-    '<div class="mc"><label for="nk-p">Plan</label><select id="nk-p"><option value="community">Community</option><option value="pro" selected>Pro</option><option value="business">Business</option><option value="enterprise">Enterprise</option></select></div>'+
+    '<div class="mc"><label for="nk-p">Plan</label><select id="nk-p"><option value="community">Community</option><option value="pro" selected>Firm</option><option value="business">Business</option><option value="enterprise">Enterprise</option></select></div>'+
     '<div class="mc"><label for="nk-e">E-mailadres (mag leeg)</label><input id="nk-e" type="text" inputmode="email" autocapitalize="off" placeholder="klant@voorbeeld.nl"></div>'+
     '<div id="nk-res" style="margin-top:12px"></div></div>'+
     '<div class="mfoot"><button data-click="closeCreateKey" class="btn">Sluiten</button><button data-click="doCreateKey" class="btn pri">Sleutel maken</button></div></div>';
@@ -638,7 +638,7 @@ async function loadBilling(){
       statCard('b-omzet','Omzet '+monthName(rev&&rev.this_month&&rev.this_month.month),rev?euro(rev.this_month.net_cents):'niet gemeten',rev?(rev.this_month.documents+' document'+(rev.this_month.documents===1?'':'en')+', '+euro(rev.this_month.gross_cents)+' met btw'):'','data-tab="billing" data-focus="b-payments"')+
       statCard('b-vorige','Omzet '+monthName(rev&&rev.last_month&&rev.last_month.month),rev?euro(rev.last_month.net_cents):'niet gemeten',rev?euro(rev.last_month.gross_cents)+' met btw':'','data-tab="billing" data-focus="b-payments"')+
       statCard('b-mrr','Per maand (MRR)',rev?euro(rev.mrr_cents):'niet gemeten',rev?'netto, uit '+rev.mrr_basis+' lopende betaalde periode'+(rev.mrr_basis===1?'':'s'):'','data-tab="billing" data-focus="b-terms"')+
-      statCard('b-betalend','Betalende klanten',rev?String(rev.paying_accounts):'niet gemeten',running.length+' betaald plan'+(running.length===1?'':'nen')+' loopt nu','data-tab="billing" data-focus="b-terms"')+
+      statCard('b-betalend','Betalende klanten',rev?String(rev.paying_accounts):'niet gemeten',running.length+(running.length===1?' betaald plan loopt nu':' betaalde plannen lopen nu'),'data-tab="billing" data-focus="b-terms"')+
     '</div>'+
     '<div class="card" id="b-payments"><div class="card-hdr">Betalingen en facturen <small>nieuwste boven</small></div>'+docTable(d.payments||(d.documents===undefined?[]:null),'Nog geen betalingen ontvangen.')+'</div>'+
     '<div class="card" id="b-refunds"><div class="card-hdr">Terugboekingen <small>creditnota’s</small></div>'+docTable(d.refunds||(d.documents===undefined?[]:null),'Nog nooit iets terugbetaald.')+'</div>'+
@@ -709,7 +709,7 @@ function renderCouponsShell(){
       '<button class="btn" data-click="doCreateCoupon">Code maken</button>'+
       '<button class="btn out" data-click="fetchCoupons">Vernieuwen</button>'+
     '</div>'+
-    '<div class="mut" style="font-size:13px;margin:-6px 0 10px">Code · hoe vaak te gebruiken · dagen ParaSign Pro en ParaSend Pro · geldig tot (leeg is geen einddatum)</div>'+
+    '<div class="mut" style="font-size:13px;margin:-6px 0 10px">Code · hoe vaak te gebruiken · dagen Firm (versturen en ondertekenen) · geldig tot (leeg is geen einddatum)</div>'+
     '<div id="c-msg" role="status" style="margin-bottom:8px;font-weight:500"></div>'+
     '<div id="c-results">'+loading()+'</div>'+
   '</div>';
@@ -799,9 +799,9 @@ async function fetchRelay(){
   }).join('');
   const cards=document.getElementById('r-cards');
   if(cards)cards.innerHTML=Object.entries(sectors).map(([name,s])=>{
-    if(s.error)return '<div class="card"><div class="card-hdr"><span style="text-transform:capitalize">'+esc(name)+'</span>'+stTag('kapot')+'</div><div class="empty">Antwoordt niet: '+esc(s.error)+'</div></div>';
+    if(s.error)return '<div class="card"><div class="card-hdr"><span>'+esc(sectorNL(name))+'</span>'+stTag('kapot')+'</div><div class="empty">Antwoordt niet: '+esc(s.error)+'</div></div>';
     const st=s.stats||{},m=s.metrics||{},c=ct[name];
-    return '<div class="card"><div class="card-hdr"><button class="lnk" data-click="openRelay" data-sector="'+esc(name)+'" style="text-transform:capitalize;font-weight:700">'+esc(name)+'</button>'+stTag(c&&c.forked?'kapot':'goed')+'</div>'+
+    return '<div class="card"><div class="card-hdr"><button class="lnk" data-click="openRelay" data-sector="'+esc(name)+'" style="font-weight:700">'+esc(sectorNL(name))+'</button>'+stTag(c&&c.forked?'kapot':'goed')+'</div>'+
       '<dl class="kv">'+
         [['Versie','v'+(s.version||'?')],['In de lucht',upTime(s.uptime_s).replace(' in de lucht','')],['Bestanden onderweg',s.blobs||0],['Ontvangen sinds start',st.inbound||0],['Opgehaald en vernietigd',st.burned||0],['Webhooks verstuurd',st.webhooks_sent||0],
          ['Transparantielogboek',m.ct_log!=null?m.ct_log+' regels'+(c&&c.growth_24h!=null?', +'+c.growth_24h+' in 24 uur':''):'niet gemeten'],
@@ -838,7 +838,7 @@ async function openRelay(el){
       '</dl></div>'+
     '</div>'+
     '<div class="sec"><h3>Transparantielogboek</h3>'+(ct?'<dl class="kv"><dt>Omvang</dt><dd>'+esc(ct.size)+' regels</dd><dt>Groei laatste 24 uur</dt><dd>'+(ct.growth_24h==null?'wordt vanaf nu gemeten':'+'+esc(ct.growth_24h))+'</dd><dt>Op schijf bewaard</dt><dd>'+(ct.persisted==null?'-':ct.persisted?'ja':'nee, alleen in het geheugen')+'</dd><dt>Gesplitst</dt><dd>'+(ct.forked?'ja, de relay tekent niet meer':'nee')+'</dd></dl>':'<div class="mut">Niet gemeten.</div>')+'</div>'+
-    '<div class="sec"><h3>Diepe controle '+stTag(deepLevel)+'</h3>'+(d.deep?'<ul class="ls">'+(d.deep.checks||[]).map(c=>'<li><div><b style="font-weight:500">'+esc(c.name)+'</b><div class="mut" style="font-size:13px">'+esc(c.detail||'')+'</div></div><div class="r">'+stTag({green:'goed',yellow:'let_op',red:'kapot'}[c.status]||'niet_gemeten')+'</div></li>').join('')+'</ul>':'<div class="mut">De relay gaf geen uitslag.</div>')+'</div>';
+    '<div class="sec"><h3>Diepe controle '+stTag(deepLevel)+'</h3>'+(d.deep?'<ul class="ls">'+(d.deep.checks||[]).map(c=>'<li><div><b style="font-weight:500">'+esc(c.name)+'</b><div class="mut" style="font-size:13px">'+esc(c.detail||'')+'</div></div><div class="r">'+stTag({green:'goed',yellow:'let_op',red:'kapot',info:'info'}[c.status]||'niet_gemeten')+'</div></li>').join('')+'</ul>':'<div class="mut">De relay gaf geen uitslag.</div>')+'</div>';
 }
 
 /* ── Vensters ────────────────────────────────────────────────────────────── */

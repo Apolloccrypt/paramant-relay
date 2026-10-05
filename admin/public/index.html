@@ -262,10 +262,13 @@ details.det summary{color:var(--blue);font-size:14px;font-weight:500;min-height:
   table.tbl.cards.compact td.c-when b{font-size:13px;font-weight:400;color:var(--ink-3)}
   table.tbl.cards.compact td.c-when span{font-size:12px}
   table.tbl.cards.compact td.c-who,table.tbl.cards.compact td.c-what,table.tbl.cards.compact td.full{grid-column:1 / -1;color:var(--ink-2);font-size:15px}
-  table.tbl.cards.compact td.full details.det summary{min-height:36px}
+  table.tbl.cards.compact td.full details.det summary{min-height:44px}
   .amw,.am{position:static}
   .am{margin-top:6px}
 }
+/* Op een telefoon is elke tekstlink een vinger groot: 44 px, zoals de knoppen
+   (acceptatie 3.1.1 mat 28 px op een iPhone). */
+@media (max-width:760px),(pointer:coarse){.lnk,details.key summary,details.det summary{min-height:44px;display:inline-flex;align-items:center}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -369,7 +372,7 @@ details.det summary{color:var(--blue);font-size:14px;font-weight:500;min-height:
       <details style="margin-top:18px"><summary style="cursor:pointer;font-weight:600;min-height:var(--tap);display:flex;align-items:center">Beide producten tegelijk zetten</summary>
         <div class="mc" style="margin-top:10px"><label>Nu</label><span id="cp-current"></span></div>
         <div class="mc"><label for="cp-plan">Nieuw plan voor ParaSign en ParaSend samen</label>
-          <select id="cp-plan"><option value="community">community</option><option value="pro">pro</option><option value="enterprise">enterprise</option></select></div>
+          <select id="cp-plan"><option value="community">Community</option><option value="pro">Firm</option><option value="enterprise">Enterprise</option></select></div>
         <div class="mc" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="cp-notify" checked><label for="cp-notify" style="margin:0;font-weight:500">Klant per mail laten weten</label></div>
         <button class="btn pri" id="cp-btn" data-click="doChangePlan" style="width:100%">Beide producten opslaan</button>
       </details>

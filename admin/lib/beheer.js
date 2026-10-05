@@ -72,6 +72,8 @@ const EVENT_NL = {
   admin_totp_reset_initiated: 'Reset van de tweestapsverificatie gestart',
   admin_user_viewed: 'Klantgegevens bekeken door jou',
   admin_welcome_sent: 'Welkomstmail verstuurd',
+  account_activated: 'Account in gebruik genomen: authenticator-app gekoppeld',
+  account_created: 'Account aangemaakt: e-mailadres bevestigd',
   account_deleted_self: 'Klant heeft het account zelf opgeheven',
   account_key_revealed: 'Klant heeft de eigen sleutel bekeken',
   parasign_doc_declined: 'Ondertekenen geweigerd',
@@ -83,6 +85,7 @@ const EVENT_NL = {
   session_client_changed: 'Sessie afgebroken: inlog gebruikt vanuit een andere browser',
   totp_reset_confirmed: 'Tweestapsverificatie opnieuw ingesteld',
   totp_reset_requested: 'Reset van de tweestapsverificatie aangevraagd',
+  user_login: 'Ingelogd',
   webauthn_account_passkey_added: 'Passkey toegevoegd',
   webauthn_counter_regression: 'Waarschuwing: passkey-teller liep terug, mogelijk een gekopieerde sleutel',
   webauthn_login: 'Ingelogd met passkey',
@@ -157,6 +160,7 @@ function summarize(type, meta) {
       return m.age_sec != null ? `${Math.round(Number(m.age_sec) / 60)} min na de aanvraag` : '';
     case 'session_client_changed':
     case 'webauthn_login':
+    case 'user_login':
     case 'account_key_revealed':
       return m.via ? `via ${VIA_NL[m.via] || m.via}` : '';
     case 'webauthn_counter_regression':
@@ -181,6 +185,47 @@ function summarize(type, meta) {
       return parts.join(', ');
     }
   }
+}
+
+// ── Diepe controle in gewone taal ───────────────────────────────────────────
+// De relay schrijft /v2/health/deep in het Engels, voor scripts en monitoring.
+// Het beheerscherm is Nederlands, dus vertaalt het hier per controle. Een zin
+// die hier niet herkend wordt blijft staan zoals de relay hem gaf: liever een
+// Engelse regel dan een verzonnen Nederlandse.
+const DEEP_NAME_NL = {
+  relay: 'Relay', crypto: 'Cryptografie', storage: 'Opslagmap', memory: 'Geheugen',
+  disk: 'Schijfruimte', tls: 'Certificaat (TLS)', users: 'Sleutels', audit: 'Auditketen', redis: 'Opslag (redis)',
+};
+const DEEP_DETAIL_NL = [
+  [/^relay (\S+) \((\S+)\) up$/, (m) => `relay ${m[1]} (${m[2]}) draait`],
+  [/^ML-DSA-65 loaded, mode=(\S+)$/, (m) => `ML-DSA-65 geladen, modus ${m[1]}`],
+  [/^ML-DSA-65 unavailable \(build @paramant\/core\), mode=(\S+)$/, (m) => `ML-DSA-65 niet beschikbaar (bouw @paramant/core), modus ${m[1]}`],
+  [/^data dir writable \((.*)\)$/, (m) => `map is beschrijfbaar (${m[1]})`],
+  [/^not writable \((.*)\): (.*)$/, (m) => `map is niet beschrijfbaar (${m[1]}): ${m[2]}`],
+  [/^(\d+)MB rss \/ (\d+)MB limit$/, (m) => `${m[1]} MB in gebruik van ${m[2]} MB`],
+  [/^([\d.]+)GB free on (.*)$/, (m) => `${m[1].replace('.', ',')} GB vrij op ${m[2]}`],
+  [/^statfs unavailable on this Node$/, () => 'vrije ruimte niet te meten op deze Node-versie'],
+  [/^TLS terminated at the edge \(not checked on this relay\)$/, () => 'het certificaat zit op de proxy ervoor, niet op deze relay'],
+  [/^(-?\d+) days until expiry$/, (m) => `verloopt over ${m[1]} dag${m[1] === '1' ? '' : 'en'}`],
+  [/^cert unreadable: (.*)$/, (m) => `certificaat niet te lezen: ${m[1]}`],
+  [/^(\d+) API key\(s\) loaded$/, (m) => `${m[1]} sleutel${m[1] === '1' ? '' : 's'} geladen`],
+  [/^no API keys yet \(normal on a new install\)$/, () => 'nog geen sleutels (normaal bij een nieuwe installatie)'],
+  [/^Merkle hash chain active$/, () => 'hashketen (Merkle) actief'],
+  [/^reachable$/, () => 'bereikbaar'],
+  [/^unreachable$/, () => 'niet bereikbaar'],
+  [/^unexpected ping reply$/, () => 'onverwacht antwoord op ping'],
+  [/^not configured \(REDIS_URL empty\)$/, () => 'niet ingesteld (REDIS_URL is leeg)'],
+];
+function deepCheckNL(c) {
+  const check = (c && typeof c === 'object') ? c : {};
+  const name = String(check.name || '');
+  const detail = String(check.detail || '');
+  let nl = detail;
+  for (const [re, fn] of DEEP_DETAIL_NL) {
+    const m = detail.match(re);
+    if (m) { nl = fn(m); break; }
+  }
+  return { ...check, name: DEEP_NAME_NL[name] || name, detail: nl };
 }
 
 // ── Wie ─────────────────────────────────────────────────────────────────────
@@ -532,10 +577,13 @@ function problems({ relays, mails, http429, ct, redisMem }) {
     const groeiZin = groei.length
       ? `groei laatste 24 uur: ${groei.map((c) => `${c.sector} +${c.growth_24h}`).join(', ')}`
       : 'groei wordt gemeten vanaf nu, over 24 uur staat hier een getal';
+    // Elke zin met een hoofdletter: de tweede stond na een punt met een kleine
+    // letter (acceptatie 3.1.1).
+    const zin = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     out.push({
       id: 'ctlog', level: forked.length ? KAPOT : (ram.length ? LET_OP : GOED), tab: 'relay',
       title: 'Transparantielogboek',
-      text: (parts.length ? parts.join('; ') + '. ' : '') + groeiZin + '.',
+      text: (parts.length ? zin(parts.join('; ')) + '. ' : '') + zin(groeiZin) + '.',
     });
   } else out.push({ id: 'ctlog', level: NIET, tab: 'relay', title: 'Transparantielogboek', text: 'Geen relay gaf zijn logboekomvang.' });
   // Redis
@@ -584,7 +632,7 @@ function failureForBrowser(entry) {
 module.exports = {
   subjectFingerprint, mailFailedEntry, failureForBrowser,
   maskKey, isKey, scrubKeys, EVENT_NL, eventLabel, summarize, buildWhoMap, whoFor,
-  normalizeEvent, auditRow, eventTimeMs, cents, intervalMonths, creditsByInvoice,
+  normalizeEvent, auditRow, eventTimeMs, deepCheckNL, cents, intervalMonths, creditsByInvoice,
   documentStatus, documentRow, describeNl, monthRevenue, computeMrr, euro, ymOf, parseMetrics,
   parseRedisInfo, mb, hourKey, countHit, read24h, sampleCt, ctGrowth24h, problems,
   GOED, LET_OP, KAPOT, NIET, KIND_NL,

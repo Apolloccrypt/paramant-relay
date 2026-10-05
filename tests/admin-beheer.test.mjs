@@ -71,7 +71,7 @@ const FIX = {
       { id: 'relays', level: 'goed', tab: 'relay', title: 'Relays', text: 'Alle 5 relays antwoorden.' },
       { id: 'mails', level: 'let_op', tab: 'audit', title: 'Mislukte mails', text: '2 mails konden de laatste 24 uur niet weg vanaf de beheerkant.' },
       { id: 'http429', level: 'goed', tab: 'overview', title: 'Te veel verzoeken (429)', text: '0 keer.' },
-      { id: 'ctlog', level: 'goed', tab: 'relay', title: 'Transparantielogboek', text: 'groei laatste 24 uur: main +4.' },
+      { id: 'ctlog', level: 'goed', tab: 'relay', title: 'Transparantielogboek', text: 'Groei laatste 24 uur: main +4.' },
       { id: 'redis', level: 'goed', tab: 'relay', title: 'Geheugen van de opslag (redis)', text: '2 MB in gebruik.' },
     ],
     recent_signups: [{ name: 'jan@bakkerij-jansen.nl', kid: KID, created: new Date(NOW - 86400000).toISOString(), plan_parasign: 'business', plan_parasend: 'community', active: true }],
@@ -141,6 +141,10 @@ for (const [tag, opts] of VIEWS) {
     await shot('overzicht');
     await page.click('#ov-betalend');
     assert.strictEqual(await page.getAttribute('#tabBtn-billing', 'aria-selected'), 'true');
+    // Eén lopend plan in de fixture: enkelvoud. Was "1 betaald plan loopt nu" en
+    // bij meer "6 betaald plannen loopt nu" (acceptatie 3.1.1).
+    await page.waitForSelector('#b-betalend');
+    assert.match(await page.innerText('#b-betalend'), /1 betaald plan loopt nu/);
     await page.click('#tabBtn-overview');
     await page.click('.pr[data-id="mails"]');
     await page.waitForSelector('#mo-info-body table', { timeout: 5000 });
@@ -201,10 +205,12 @@ for (const [tag, opts] of VIEWS) {
       assert.ok(wide <= 1, `${t}: ${wide}px zijwaarts`);
       const caps = await page.$$eval('button, a', (els) => els.filter((e) => e.offsetParent && getComputedStyle(e).textTransform === 'uppercase').map((e) => e.textContent.trim()));
       assert.deepStrictEqual(caps, [], `${t}: hoofdletterknoppen`);
-    }
-    if (tag === 'iphone') {
-      const small = await page.$$eval('.tabs button, .btn, .amb, .more summary', (els) => els.filter((e) => e.offsetParent).map((e) => [e.textContent.trim(), e.getBoundingClientRect().height]).filter(([, h]) => h < 43.5));
-      assert.deepStrictEqual(small, [], 'raakvlakken kleiner dan 44 px');
+      // Op de telefoon elk tabblad, en ook de tekstlinks (.lnk): de acceptatie
+      // van 3.1.1 mat "alle klanten" en de klantnamen op 28 px.
+      if (tag === 'iphone') {
+        const small = await page.$$eval('.tabs button, .btn, .amb, .more summary, .lnk, details.det summary, details.key summary', (els) => els.filter((e) => e.offsetParent).map((e) => [e.textContent.trim(), e.getBoundingClientRect().height]).filter(([, h]) => h < 43.5));
+        assert.deepStrictEqual(small, [], `${t}: raakvlakken kleiner dan 44 px`);
+      }
     }
     assert.deepStrictEqual(errors, []);
     await ctx.close();
