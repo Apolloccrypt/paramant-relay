@@ -1138,7 +1138,7 @@ async function renderPdfPage(wrap) {
 async function renderPdfPreview(bytes, host) {
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(bytes);   // pdf.js detaches the buffer it is handed
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
   __previewPdf = pdf;
   host.innerHTML = '';
   const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);

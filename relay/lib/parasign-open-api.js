@@ -30,6 +30,7 @@
 //     never declines; a dedicated decline route would drive it).
 
 const crypto = require('crypto');
+const webhookSign = require('./webhook-sign');
 const { isSsrfSafeUrl } = require('./ssrf-guard');
 const contentDisposition = require('./content-disposition');
 const { createParaSignStore } = require('./parasign-store');
@@ -219,6 +220,7 @@ async function emitEvent(deps, id, event, extra) {
         'Content-Length': Buffer.byteLength(payload),
         'X-Paramant-Event': event,
         'X-Paramant-Sig': sig,
+        ...webhookSign.signatureHeaders(m.webhook_secret, payload),
         'X-Paramant-Delivery': delivery,
         'User-Agent': 'paramant-relay/parasign-v1',
       },
@@ -316,9 +318,11 @@ async function createEnvelope(deps, apiKey, mode, rec) {
   const store = resolveStore(deps);
 
   let d;
-  try { d = JSON.parse((await readBody(deps.req, MAX_PDF_BYTES + 1_000_000)).toString()); }
+  let rawBody;
+  try { rawBody = await readBody(deps.req, MAX_PDF_BYTES + 1_000_000); d = JSON.parse(rawBody.toString()); }
   catch (e) { return errRes(res, 400, 'bad_json', 'Body is not valid JSON.', J); }
   if (!d || typeof d !== 'object') return errRes(res, 400, 'bad_json', 'Body must be a JSON object.', J);
+  const bodyHash = crypto.createHash('sha256').update(rawBody).digest('hex');
 
   // IDEMPOTENCY-KEY (sweep-api A5). A retry after a timeout used to make a
   // second envelope with fresh sign_urls. The same key from the same API key
@@ -330,6 +334,9 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     idemKey = 'idem:' + crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 32) + ':' + idemRaw;
     try {
       const prev = store && typeof store.getMeta === 'function' ? await store.getMeta(idemKey) : null;
+      // Bound to the body (review #555, LAAG): the same key with another body
+      // is refused, not answered with the first envelope.
+      if (prev && prev.body_hash && prev.body_hash !== bodyHash) return errRes(res, 422, 'idempotency_key_reused', 'This Idempotency-Key was used for a request with a different body.', J);
       if (prev && prev.status && prev.body) return jsonRes(res, prev.status, prev.body, J, { 'Idempotent-Replay': 'true' });
     } catch (e) { /* no store: run as a first request */ }
   }
@@ -514,7 +521,7 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     _sandbox_note: sandboxNote,
   };
   if (idemKey && store && typeof store.putMeta === 'function') {
-    try { await store.putMeta(idemKey, { status: 201, body: created }, 24 * 3600 * 1000); } catch (e) { /* replay protection is best effort */ }
+    try { await store.putMeta(idemKey, { status: 201, body: created, body_hash: bodyHash }, 24 * 3600 * 1000); } catch (e) { /* replay protection is best effort */ }
   }
   return jsonRes(res, 201, created, J);
 }

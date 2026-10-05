@@ -388,7 +388,7 @@ function loadTextBoxes(bytes) {
   entry.promise = (async () => {
     try {
       const pdfjs = await waitForPdfjs();
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
       const out = [];
       // The same cap as the pages shown, and the page free between pages: a
       // pdf of 2.000 empty pages was rendered page after page (review r2 (g)).
@@ -1329,7 +1329,7 @@ async function renderPdfForPlacement() {
   applyPlaceChromeForMode();
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
   // Encrypted (an owner password, "no changes"): pdf.js can show it, but a
   // visible signature means writing into the file, which pdf-lib cannot do to
   // an encrypted PDF and which the author's lock forbids anyway. That used to
@@ -2517,7 +2517,7 @@ function stampPageInkBoxes(bytes, pageIndex) {
   const pr = (async () => {
     try {
       const pdfjs = await waitForPdfjs();
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
       try { return await inkBoxesOfPage(await pdf.getPage(pageIndex + 1)); }
       finally { try { pdf.destroy(); } catch (e) { /* best effort */ } }
     } catch (e) { return null; }
@@ -3259,7 +3259,7 @@ async function renderDocPreview() {
     pane.classList.add('has-pdf');
     const pdfjs = await waitForPdfjs();
     const copy = new Uint8Array(state.doc.bytes);
-    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
     // Let a pane that just became visible settle before it is measured.
     await nextFrame();
     if (stale()) return;
@@ -4730,7 +4730,7 @@ async function renderSignedPreview() {
   // signer sees their stamp in context without scrolling long documents.
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(r.stampedBytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
   await nextFrame();
   if (stale()) return;
   const firstPreviewPage = state.sealPlacement === 'sheet' ? pdf.numPages - 1 : state.stamp.pageIndex;

@@ -21,3 +21,15 @@ test('message: paragraphs stay, links and addresses do not', () => {
   assert.doesNotMatch(m, /phish|evil\.nl|@|\u0007/);
   assert.strictEqual(safeMessage('Gewoon tekst, geen link.'), 'Gewoon tekst, geen link.');
 });
+
+// Review #555: the recipient label goes into "Beste <label>," of the same
+// mail and was only cut to 80 characters.
+test('the invitation label gets the same scrub as subject and message', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const route = src.match(/api\.post\("\/user\/envelopes\/:id\/invitations"[\s\S]*?\n\}\);/);
+  assert.ok(route, 'the invitations route exists');
+  assert.match(route[0], /const label = inviteText\.safeSubject\(item\?\.label, 80\);/);
+  assert.strictEqual(safeSubject('Paramant support: verify at evil-example.com', 80), 'Paramant support: verify at [link]');
+});

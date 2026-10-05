@@ -70,3 +70,18 @@ test('a 429 says how long is left in the hour, not a flat 3600', async () => {
   const left = Number(d.res.headers['Retry-After']);
   assert.ok(left > 0 && left <= 3600);
 });
+
+test('the same Idempotency-Key with a different body is refused (review #555)', async () => {
+  const crypto = require('crypto');
+  const saved = new Map();
+  const store = { async getMeta(k) { return saved.get(k) || null; }, async putMeta(k, v) { saved.set(k, v); } };
+  const firstBody = JSON.stringify({ document: { content_base64: PDF }, signers: [{ email: 'a@example.org' }] });
+  saved.set('idem:' + crypto.createHash('sha256').update(KEY).digest('hex').slice(0, 32) + ':retry-0002',
+    { status: 201, body: { id: 'envFirst000000000000002' }, body_hash: crypto.createHash('sha256').update(firstBody).digest('hex') });
+  const other = deps(JSON.stringify({ document: { content_base64: PDF }, signers: [{ email: 'b@example.org' }] }), { headers: { 'idempotency-key': 'retry-0002' }, store });
+  await api.route(other);
+  assert.strictEqual(other.res.statusCode, 422, other.res._body);
+  const same = deps(firstBody, { headers: { 'idempotency-key': 'retry-0002' }, store });
+  await api.route(same);
+  assert.strictEqual(same.res.statusCode, 201);
+});

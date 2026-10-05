@@ -1822,7 +1822,8 @@ h1{font-size:1.1rem;font-weight:600;margin-bottom:8px}
     <div class="meta-row"><span class="meta-label">Expires in</span><span class="meta-val">${ttlStr}</span></div>
   </div>
   <p class="warn">This file is deleted from the server once it has arrived in full. A broken download costs nothing: try again.</p>
-  <a class="btn" href="/v2/dl/${token}/get" data-token="${token}">Download &amp; Burn</a>
+  <a class="btn" href="/v2/dl/${token}#download" data-token="${token}" rel="nofollow">Download &amp; Burn</a>
+  <noscript><form method="post" action="/v2/dl/${token}/get"><button class="btn" type="submit">Download &amp; Burn</button></form></noscript>
   <p class="sub" id="dl-state" role="status" aria-live="polite"></p>
   <script src="/v2/dl/confirm.js" defer></script>
   <p class="footer">ML-KEM-768 encrypted · Zero plaintext stored · PARAMANT</p>
@@ -3234,6 +3235,7 @@ function grantParasignOnPaidPlan(accountId) {
 
 // ── Billing ledger: every settled Mollie payment id, durable ──────────────
 const { BillingLedger, backfillLedger } = require('./lib/billing-ledger');
+const webhookSign = require('./lib/webhook-sign');
 const BILLING_LEDGER_FILE = process.env.BILLING_LEDGER_FILE
   || nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'billing-processed.jsonl');
 const billingLedger = new BillingLedger(BILLING_LEDGER_FILE, log).load();
@@ -4365,7 +4367,8 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
         method:  'POST',
         timeout: 5000,
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
-                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, 'User-Agent': `paramant-relay/${VERSION}` },
+                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, ...webhookSign.signatureHeaders(hook.secret, payload),
+                   'User-Agent': `paramant-relay/${VERSION}` },
         body: payload,
       });
       stats.webhooks_sent++;
@@ -7438,8 +7441,13 @@ async function handleRelayRequest(req, res) {
   // proxy in front of us", never "arrived", so a burn on 'finish' cost the
   // receiver the file on every slow or broken line, and a wrong key burned it
   // before it was ever tried. See DL_MAX_FETCHES for the bound on retries.
+  // The confirm page never links here with a plain href any more (review
+  // #555, LAAG): a crawler or link checker that followed the "Download &
+  // Burn" link burned the file. The button is a script that claims and acks;
+  // without script it is a POST form, which crawlers do not submit. A GET
+  // without a claim stays for the SDKs and CLIs in the field.
   const dlgm = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/get$/);
-  if (dlgm && req.method === 'GET') {
+  if (dlgm && (req.method === 'GET' || req.method === 'POST')) {
     const token = dlgm[1];
     const ua = req.headers['user-agent'] || '';
     const claim = typeof query.claim === 'string' && DL_CLAIM_RE.test(query.claim) ? query.claim : null;

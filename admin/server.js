@@ -2412,7 +2412,9 @@ api.post("/user/envelopes/:id/invitations", authUser, idempotency.middleware({ r
   const checked = [];
   for (const item of invitations) {
     const email = (item?.email || "").toString().trim().toLowerCase().slice(0, 200);
-    const label = (item?.label || "").toString().trim().slice(0, 80);
+    // The label goes into "Beste <label>," from hello@ with our DKIM: same
+    // scrub as subject and message, no link and no address (review #555).
+    const label = inviteText.safeSubject(item?.label, 80);
     const inviteUrlText = (item?.invite_url || "").toString().trim();
     const partyIndex = Number(item?.party_index);
     if (!RECIPIENT_EMAIL_RE.test(email) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || inviteUrlText.length > 2048) {
