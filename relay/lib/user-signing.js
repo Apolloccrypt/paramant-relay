@@ -115,8 +115,20 @@ async function storeSigningPk(redisClient, userId, { pk_b64, label, expiresInMs 
   // bind that succeeded while the answer was lost leaves a key nobody holds,
   // and nothing bounded how many could pile up (review r2 (c)). Revoked keys
   // stay as history and do not count, and neither do lapsed code keys (36-K).
-  if (arr.filter((e) => isActive(e, nowMs)).length >= MAX_ACTIVE_KEYS) {
-    throw new Error('too_many_active_keys');
+  //
+  // At the ceiling the OLDEST active keys lapse, they are not refused (review
+  // #555, M9): code keys bound before keys had an expiry stay active forever,
+  // so an account that signed fifty times before the deploy could not sign
+  // again. A lapsed key is not revoked: signatures it made still verify and
+  // its lookup still names the account; it only stops counting and binding.
+  const active = arr.filter((e) => isActive(e, nowMs))
+    .sort((a, b) => (Date.parse(a.enrolled_at) || 0) - (Date.parse(b.enrolled_at) || 0));
+  const retired = [];
+  while (active.length >= MAX_ACTIVE_KEYS) {
+    const old = active.shift();
+    old.expires_at = now;
+    old.expired_reason = 'key_cap';
+    retired.push(old.pk_hash_sha3);
   }
   const entry = {
     alg: ALG,
@@ -130,7 +142,7 @@ async function storeSigningPk(redisClient, userId, { pk_b64, label, expiresInMs 
   arr.push(entry);
   await _writeArray(redisClient, userId, arr);
   await redisClient.set(_indexKey(pk_hash_sha3), JSON.stringify({ userId }));
-  return { entry, reenrolled: false };
+  return { entry, reenrolled: false, ...(retired.length ? { retired } : {}) };
 }
 
 async function getSigningPks(redisClient, userId) {

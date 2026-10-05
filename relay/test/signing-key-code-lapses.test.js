@@ -48,8 +48,8 @@ test('fifty lapsed code keys leave room: the ceiling is no dead end', async () =
   for (let n = 0; n < us.MAX_ACTIVE_KEYS; n++) {
     await us.storeSigningPk(r, 'u3', { pk_b64: pkN(100 + n), label: 'sig ' + n, expiresInMs: us.CODE_KEY_TTL_MS });
   }
-  // While they are fresh, the ceiling holds.
-  await assert.rejects(() => us.storeSigningPk(r, 'u3', { pk_b64: pkN(999), expiresInMs: us.CODE_KEY_TTL_MS }), /too_many_active_keys/);
+  // While they are fresh, the ceiling holds: still fifty active.
+  assert.strictEqual((await us.getActiveSigningPks(r, 'u3')).length, us.MAX_ACTIVE_KEYS);
   // A day later every one of them has lapsed: put the clock forward by moving
   // expires_at into the past (same stored shape as a real lapse).
   const raw = JSON.parse(await r.get('paramant:user:signing_pk:u3'));
