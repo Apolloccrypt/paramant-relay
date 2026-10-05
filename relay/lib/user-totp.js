@@ -64,8 +64,12 @@ async function consumeBackupCode(redisClient, userId, providedCode) {
   const hashes = await redisClient.sMembers(key);
   for (const hash of hashes) {
     if (await argon2.verify(hash, providedCode)) {
-      await redisClient.sRem(key, hash);
-      return { valid: true };
+      // Single use under concurrency (review #555, M7): SREM is atomic and
+      // says whether THIS call removed the hash. Five parallel uses of one
+      // code all verified against the same snapshot and all answered valid;
+      // only the one that actually removed it may.
+      const removed = await redisClient.sRem(key, hash);
+      return { valid: Number(removed) === 1 };
     }
   }
   return { valid: false };
