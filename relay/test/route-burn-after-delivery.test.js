@@ -250,22 +250,34 @@ test('the retry hold on /v2/outbound cannot be chained', async () => {
   did();
 });
 
-// Broken off before the last byte costs nothing, but not without end: after
-// DL_MAX_FETCHES broken attempts the link is spent.
-test('broken-off downloads are bounded on both routes', async () => {
+// Broken off before the last byte costs nothing, but not without end: a
+// link or blob is served at most DL_MAX_FETCHES (five) times in all, broken
+// or not, on both routes. /v2/outbound used to count `> DL_MAX_FETCHES` and
+// served a sixth time, /v2/dl `>=` and stopped at five (review #573, LAAG).
+test('broken-off downloads are bounded at five on both routes', async () => {
   const b = bigBlob(16);
   const up = await upload(b);
   const token = up.json.download_token;
-  for (let i = 0; i < 5; i++) await readFirstChunkAndAbort(`/v2/dl/${token}/get`, { 'User-Agent': 'curl/8.9.1' });
+  for (let i = 0; i < 4; i++) await readFirstChunkAndAbort(`/v2/dl/${token}/get`, { 'User-Agent': 'curl/8.9.1' });
+  await sleep(300);
+  const info = await srv.get(`/v2/dl/${token}/info`);
+  assert.equal(info.status, 200, 'after four broken GETs the link is still there');
+  const fifthDl = await readFirstChunkAndAbort(`/v2/dl/${token}/get`, { 'User-Agent': 'curl/8.9.1' });
+  assert.ok(fifthDl > 0, 'the fifth GET is served');
   await sleep(300);
   const dl = await srv.get(`/v2/dl/${token}/get`, { headers: { 'User-Agent': 'curl/8.9.1' } });
   assert.equal(dl.status, 410, 'the sixth claimless GET after five broken ones');
 
   const c = bigBlob(16);
   assert.equal((await upload(c)).status, 200);
-  for (let i = 0; i < 6; i++) await readFirstChunkAndAbort(`/v2/outbound/${c.hash}`, { 'X-Api-Key': KEY });
+  for (let i = 0; i < 4; i++) await readFirstChunkAndAbort(`/v2/outbound/${c.hash}`, { 'X-Api-Key': KEY });
+  await sleep(300);
+  const st = await srv.get(`/v2/status/${c.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.equal(st.json.available, true, 'after four broken GETs the blob is still there');
+  const fifthOut = await readFirstChunkAndAbort(`/v2/outbound/${c.hash}`, { 'X-Api-Key': KEY });
+  assert.ok(fifthOut > 0, 'the fifth GET is served');
   await sleep(300);
   const out = await srv.get(`/v2/outbound/${c.hash}`, { headers: { 'X-Api-Key': KEY } });
-  assert.equal(out.status, 404, 'the seventh GET after six broken ones');
+  assert.equal(out.status, 404, 'the sixth GET after five broken ones');
   did();
 });

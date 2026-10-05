@@ -9280,11 +9280,12 @@ async function handleRelayRequest(req, res) {
         if (timer.unref) timer.unref();
         outboundRetryHold.set(outHash, { entry, key: apiKey, until: Date.now() + DELIVERY_SETTLE_MS, timer });
       },
-      // Broken off before the last byte: the read does not count, at most
-      // DL_MAX_FETCHES times per blob; after that it counts (review #565).
+      // Broken off before the last byte: the read does not count, but the
+      // blob is served at most DL_MAX_FETCHES times in all, as a /v2/dl link
+      // is (dlExhausted): the last broken read counts (review #565, #573).
       onAborted: (why) => {
         entry.aborts = (entry.aborts || 0) + 1;
-        if (entry.aborts > DL_MAX_FETCHES) {
+        if (entry.aborts >= DL_MAX_FETCHES) {
           log('warn', 'outbound_aborted_counted', { hash: outHash.slice(0,16), why, aborts: entry.aborts });
           return delivered();
         }
