@@ -186,8 +186,11 @@ for (const [where, value] of Object.entries({
 }
 
 // A moment, not a day, still says which day and which zone.
-ok('a session says the day and names the clock it is on',
-  /8:48/.test(shown.session) === false && /20:48 UTC/.test(shown.session), shown.session);
+// Dutch time since acceptatie 3.1.1 (taal 52), like the mails: 20:48 UTC on
+// 17 March is 21:48 in Amsterdam (winter time), and UTC is not named to a
+// customer.
+ok('a session says the day and the time on Dutch time, without UTC',
+  /(om|at) 21:48/.test(shown.session) && !/UTC/.test(shown.session), shown.session);
 
 // ── /dashboard ───────────────────────────────────────────────────────────────
 // "Created Aug 31, 2026" sat one card away from "Ends on 8 September". Same

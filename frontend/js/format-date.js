@@ -65,13 +65,26 @@
     return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
   }
 
-  // "8 September 2026, 20:48 UTC". For a moment rather than a day: a session
-  // last seen, a key enrolled. 24-hour clock and a named zone, because the
-  // reader is being asked to recognise the moment, not to convert it.
+  // "8 september 2026 om 22:48". For a moment rather than a day: a session
+  // last seen, a key enrolled. 24-hour clock on Dutch time (Europe/Amsterdam),
+  // the clock the mails use too, because the reader is being asked to
+  // recognise the moment, not to convert it from UTC (acceptatie 3.1.1, taal
+  // 52). A browser without the zone data falls back to UTC and says so.
   function moment(value, fallback) {
     var d = toDate(value);
     if (!d) return fallback === undefined ? '--' : fallback;
-    return day(d) + ', ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' UTC';
+    try {
+      var p = {};
+      var parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/Amsterdam', year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).formatToParts(d);
+      for (var i = 0; i < parts.length; i++) p[parts[i].type] = parts[i].value;
+      return Number(p.day) + ' ' + MONTHS[Number(p.month) - 1] + ' ' + p.year
+        + (ENGLISH ? ' at ' : ' om ') + p.hour + ':' + p.minute;
+    } catch (e) {
+      return day(d) + ', ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' UTC';
+    }
   }
 
   // "5 oktober 2026 om 18:02 (CEST)". A moment in the reader's OWN clock, with
