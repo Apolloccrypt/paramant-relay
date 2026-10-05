@@ -3522,6 +3522,15 @@ STUB
 cat > "$N5/bin/curl" <<'STUB'
 #!/bin/sh
 for a in "$@"; do last="$a"; done
+# CURL_STALE=n: the first n calls get the answer of the old workers, the way
+# they still answer for a moment after systemctl reload (review #569, B1).
+if [ -n "${CURL_STALE:-}" ]; then
+  c=$(( $(cat "$CURL_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$c" > "$CURL_COUNT"
+  if [ "$c" -le "$CURL_STALE" ]; then
+    case "$last" in */parashare*) printf '302 https://paramant.app/auth/login?next=/parashare' ;; *) printf '200 ' ;; esac
+    exit 0
+  fi
+fi
 case "$last" in
   */parashare*) printf '%s' "${CURL_SHARE:-302 https://paramant.app/get?t=deploycheck5e}" ;;
   *) printf '%s' "${CURL_HOME:-200 }" ;;
@@ -3576,7 +3585,7 @@ else
   fail "a failing nginx -t did not restore the old conf (rc $RC5E)"
 fi
 
-CURL_SHARE="302 https://paramant.app/auth/login?next=/parashare" run_5e 20260101-0502
+LB_TRIES=2 CURL_SHARE="302 https://paramant.app/auth/login?next=/parashare" run_5e 20260101-0502
 if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
    && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
   pass "/parashare?t= losing its token after the reload puts the old conf back"
@@ -3584,11 +3593,121 @@ else
   fail "a wrong /parashare answer did not restore the old conf (rc $RC5E)"
 fi
 
-CURL_HOME="502 " run_5e 20260101-0503
+LB_TRIES=2 CURL_HOME="502 " run_5e 20260101-0503
 if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf"; then
   pass "a home page that no longer answers 200 puts the old conf back"
 else
   fail "a broken home page did not restore the old conf (rc $RC5E)"
+fi
+
+# B1 (review #569): right after the reload the old workers still answer for a
+# moment. 5e waits for the new conf instead of rolling back on that.
+rm -f "$N5/curlcount"
+CURL_STALE=6 CURL_COUNT="$N5/curlcount" run_5e 20260101-0510
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && grep -q '^after loopback tries = 4$' <<< "$OUT5E" && ! grep -q '^FATAL' <<< "$OUT5E"; then
+  pass "a slow reload (old workers answer 3 rounds) is waited out, not rolled back"
+else
+  fail "a slow reload gave a false FATAL or a rollback (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -E '^(FATAL|after loopback)' | sed 's/^/        /' | head -6
+fi
+rm -f "$N5/curlcount"
+LB_TRIES=3 CURL_STALE=1000 CURL_COUNT="$N5/curlcount" run_5e 20260101-0511
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^after loopback tries = 3$' <<< "$OUT5E" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "an old answer that never goes away still rolls back, after the wait"
+else
+  fail "a lasting wrong answer after the wait did not roll back (rc $RC5E)"
+fi
+rm -f "$N5/curlcount"
+
+# B2 (review #569): a write that fails after the backups (disk full, read-only)
+# ends the block under set -e. The traps put conf and snippet back together.
+# A cat that writes half the conf and then fails, like a full disk.
+mkdir -p "$N5/halfbin"
+cat > "$N5/halfbin/cat" <<'STUB'
+#!/bin/sh
+case "${1:-}" in
+  */paramant-5e.*/conf) head -c 2000 "$1"; echo "cat: write error: No space left on device" >&2; exit 1 ;;
+esac
+exec /bin/cat "$@"
+STUB
+chmod +x "$N5/halfbin/cat"
+OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+         WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+         NGINX_T_DUMP="$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" \
+         PATH="$N5/halfbin:$N5/bin:$PATH" bash "$N5/5e.sh" 20260101-0512 "$N5/sites" "$N5/bk" \
+         "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+   && grep -q '^FATAL a command failed at line [0-9]* after the backups' <<< "$OUT5E" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "a half written conf (disk full) puts the old conf and the old snippet back together"
+else
+  fail "a write fault after the backups left a mixed state on disk (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -E '^(FATAL|restored)' | sed 's/^/        /' | head -6
+fi
+# The review's own case: the conf is read-only, the snippet is not.
+cp "$N5/old.conf" "$N5/old-ro.conf"
+run_5e_ro() {
+  cp "$N5/old-snip.conf" "$N5/snippets/paramant-security-headers.conf"
+  rm -f "$N5/available/paramant.conf"; cp "$N5/old.conf" "$N5/available/paramant.conf"; chmod 0444 "$N5/available/paramant.conf"
+  ln -sfn "$N5/available/paramant.conf" "$N5/sites/paramant.conf"
+  OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+           WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+           NGINX_T_DUMP="$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" \
+           PATH="$N5/bin:$PATH" bash "$N5/5e.sh" "$1" "$N5/sites" "$N5/bk" \
+           "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+  chmod 0644 "$N5/available/paramant.conf"
+}
+if [ "$(id -u)" -ne 0 ]; then
+  run_5e_ro 20260101-0513
+  if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+     && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+     && grep -q '^FATAL a command failed at line' <<< "$OUT5E"; then
+    pass "a read-only conf takes the already written snippet back with it"
+  else
+    fail "a read-only conf left the new snippet next to the old conf (rc $RC5E)"
+    printf '%s\n' "$OUT5E" | grep -E '^(FATAL|restored)' | sed 's/^/        /' | head -6
+  fi
+else
+  pass "read-only case skipped: root writes through 0444"
+fi
+
+# B3 (review #569): another enabled conf that proxies to 127.0.0.1:808[1-6]
+# stops 5e before a backup, read-only, unless someone accepted it.
+printf 'server {\n    # proxy_pass http://127.0.0.1:8086; (old, commented out)\n    location / { proxy_pass http://127.0.0.1:3002; }\n}\n' > "$N5/available/paramant-public.conf"
+ln -sfn "$N5/available/paramant-public.conf" "$N5/sites/paramant-public.conf"
+run_5e 20260101-0514
+if [ "$RC5E" -eq 0 ] && grep -q '^before public 808x hits = 0$' <<< "$OUT5E"; then
+  pass "a public conf that only mentions :8086 in a comment does not stop 5e"
+else
+  fail "a commented :8086 in the public conf stopped 5e (rc $RC5E)"
+fi
+printf 'server {\n    location /v2/ { proxy_pass http://127.0.0.1:8086; }\n}\n' > "$N5/available/paramant-public.conf"
+run_5e 20260101-0515
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^  public808x paramant-public.conf:2:' <<< "$OUT5E" \
+   && grep -q '^FATAL another enabled conf proxies to 127.0.0.1:808\[1-6\]' <<< "$OUT5E" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0515" ]; then
+  pass "a public conf that proxies to :8086 stops 5e before a backup or a write, with the line"
+else
+  fail "5e went ahead while the public conf proxies to :8086 (rc $RC5E)"
+fi
+PUBLIC_808X_OK=1 run_5e 20260101-0516
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && grep -q '^after public 808x = accepted' <<< "$OUT5E"; then
+  pass "PARAMANT_NGINX_PUBLIC_808X_OK=1 lets 5e go ahead after the comparison"
+else
+  fail "the 808x acceptance did not let 5e go ahead (rc $RC5E)"
+fi
+rm -f "$N5/sites/paramant-public.conf" "$N5/available/paramant-public.conf"
+if grep -qE '^ *location /v2/ \{' "$N5/rendered.conf" \
+   && ! awk '/listen 127.0.0.1:8086/ {s=1} s && /location \/v2\/ \{/ {l=1} l && /limit_req/ {f=1} l && /^    \}/ {exit} END {exit !f}' "$N5/rendered.conf"; then
+  pass ":8086 /v2/ has no limit_req, as on production (no 429 halfway an upload)"
+else
+  fail ":8086 /v2/ carries a limit_req that production does not have"
 fi
 
 # A zone the loaded config does not bind stops 5e before the first write.

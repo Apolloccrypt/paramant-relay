@@ -103,6 +103,11 @@ NGINX_REF="${PARAMANT_NGINX_REF:-}"
 # Without one a dry run cannot know what is on the server (it never connects);
 # scripts/check-prod-drift.sh is the read-only way to get the live diff.
 NGINX_LIVE_COPY="${PARAMANT_NGINX_LIVE_COPY:-}"
+# 5e stops when another enabled conf (paramant-public.conf) proxies to
+# 127.0.0.1:808[1-6]: the limits of those blocks would then meet real uploads.
+# 1 lets it go ahead after someone compared them (review PR #569, B3).
+NGINX_PUBLIC_808X_OK="${PARAMANT_NGINX_PUBLIC_808X_OK:-0}"
+case "$NGINX_PUBLIC_808X_OK" in 0|1) ;; *) echo "PARAMANT_NGINX_PUBLIC_808X_OK must be 0 or 1" >&2; exit 2 ;; esac
 # Where 5e checks the result from outside, through Caddy, as a visitor would.
 PUBLIC_SITE="${PARAMANT_PUBLIC_SITE:-https://paramant.app}"
 
@@ -2790,6 +2795,7 @@ phase_5e() {
 SNIP_B64='<the snippet, $(stat -c%s "$NGX_TMP/snip") bytes, base64>'
 WANT_CONF='<sha256 of the rendered conf>'
 WANT_SNIP='<sha256 of the snippet>'
+PUBLIC_808X_OK='$NGINX_PUBLIC_808X_OK'
 "
   else
     # The checksums travel in the payload, not as arguments: an argument is
@@ -2798,6 +2804,7 @@ WANT_SNIP='<sha256 of the snippet>'
 SNIP_B64='$(base64 -w0 < "$NGX_TMP/snip")'
 WANT_CONF='$NGX_CONF_SHA'
 WANT_SNIP='$NGX_SNIP_SHA'
+PUBLIC_808X_OK='$NGINX_PUBLIC_808X_OK'
 "
   fi
 
@@ -2841,6 +2848,33 @@ if [ -n "${missing// /}" ]; then
   exit 1
 fi
 
+# Read-only: does another enabled conf (paramant-public.conf) proxy to one of
+# the loopback ports this conf serves? The repo public conf goes straight to
+# :3000-:3004, so the limits on :8081-:8086 never meet a visitor. If the server's
+# public conf does point there, the body limits of those blocks would apply to
+# real uploads, and nobody has weighed that yet. Stop before the first write.
+hits=""
+for f in "$SITES"/*; do
+  [ -e "$f" ] || continue
+  [ "$(readlink -f "$f")" = "$CONF" ] && continue
+  h="$( { grep -nE '^[^#]*(127\.0\.0\.1|localhost):808[1-6]' "$f" || true; } | sed "s|^|$(basename "$f"):|")"
+  [ -n "$h" ] && hits="${hits:+$hits
+}$h"
+done
+echo "before public 808x hits = $(printf '%s' "$hits" | grep -c . || true)"
+if [ -n "$hits" ]; then
+  printf '%s\n' "$hits" | sed 's/^/  public808x /'
+  if [ "${PUBLIC_808X_OK:-0}" = 1 ]; then
+    echo "after public 808x = accepted by PARAMANT_NGINX_PUBLIC_808X_OK=1"
+  else
+    echo "FATAL another enabled conf proxies to 127.0.0.1:808[1-6] (lines above). The repo conf sets"
+    echo "FATAL client_max_body_size on those ports (12M on :8081/:8083-:8085, 35M on :8086 /v2/), and"
+    echo "FATAL production runs them without; uploads through that vhost could get 413. Nothing was written."
+    echo "FATAL Compare those limits with what the vhost needs, then run again with PARAMANT_NGINX_PUBLIC_808X_OK=1."
+    exit 1
+  fi
+fi
+
 # The backups first, before a single byte changes. The snippet may not exist
 # yet; then a marker says so, and a restore removes it again.
 mkdir -p "$NGBK"
@@ -2857,16 +2891,55 @@ else
   echo "after snippet backup = none, $SNIP did not exist ($BK_NOSNIP)"
 fi
 
+# restore: conf and snippet go back together, never one of the two. It tries
+# both writes even when the first fails (set +e), and only reloads when both
+# landed: a half restored pair is not handed to nginx. Runs once.
+ARMED=0
+RESTORED=0
 restore() {
+  [ "$RESTORED" = 1 ] && return 0
+  RESTORED=1
+  set +e
   cat "$BK_CONF" > "$CONF"
   if [ -f "$BK_SNIP" ]; then cat "$BK_SNIP" > "$SNIP"; else rm -f "$SNIP"; fi
+  # Judged on what is on disk, not on the exit codes: a conf that could not be
+  # written because it was never changed is back all the same.
+  if ! cmp -s "$BK_CONF" "$CONF" \
+     || { [ -f "$BK_SNIP" ] && ! cmp -s "$BK_SNIP" "$SNIP"; } || { [ ! -f "$BK_SNIP" ] && [ -e "$SNIP" ]; }; then
+    echo "FATAL could not put the backups back on disk; nothing reloaded, nginx keeps its running workers."
+    echo "FATAL by hand: cp $BK_CONF $CONF and $([ -f "$BK_SNIP" ] && echo "cp $BK_SNIP $SNIP" || echo "rm $SNIP")"
+    set -e
+    return 0
+  fi
   echo "restored $CONF and $SNIP from the pre-nginx-sync-$TS backups"
   if nginx -t > /dev/null 2>&1 && systemctl reload nginx; then
     echo "restored and reloaded the previous nginx conf"
   else
     echo "FATAL the restored conf did not test clean or did not reload; nginx keeps its running workers"
   fi
+  set -e
 }
+# Any command that fails after the backups (a write on a full or read-only disk
+# under set -e) ends the block. These traps make sure that end puts conf and
+# snippet back together, instead of leaving the new snippet next to the old
+# conf, or a half written conf for the next restart to choke on.
+on_fault() {
+  echo "FATAL a command failed at line $1 after the backups (exit $2), restoring the conf and snippet"
+  restore
+}
+on_exit() {
+  local rc=$?
+  if [ "$ARMED" = 1 ] && [ "$RESTORED" = 0 ]; then
+    echo "FATAL the 5e block ended unfinished (exit $rc) after the backups, restoring the conf and snippet"
+    restore
+    [ "$rc" -eq 0 ] && rc=1
+  fi
+  rm -rf "$WORK"
+  exit "$rc"
+}
+trap 'on_fault "$LINENO" "$?"' ERR
+trap on_exit EXIT
+ARMED=1
 
 # What will change, before anything does.
 diff -u --label "server $name" --label "repo, rendered" "$CONF" "$WORK/conf" > "$WORK/conf.diff" || true
@@ -2914,8 +2987,22 @@ echo "after conf sha256 prefix = $(sha256sum "$CONF" | cut -c1-16)"
 # Loopback, straight at the vhost: no DNS, no Caddy, so a fault here is this
 # conf and nothing else. The home page proves the site still answers.
 lb() { curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 10 -H 'Host: paramant.app' "http://127.0.0.1:8080$1" || echo 000; }
-home="$(lb /)"
-share="$(lb '/parashare?t=deploycheck5e')"
+# systemctl reload only signals the master: for a moment the old workers still
+# answer, with the old conf (measured: 27 of 100 checks right after a reload got
+# the old /parashare answer). So wait up to 10 s, every 0.5 s, for the new conf
+# to answer, and judge only then.
+WANT_SHARE="302 https://paramant.app/get?t=deploycheck5e"
+tries="${LB_TRIES:-20}"
+n=0
+while :; do
+  n=$((n + 1))
+  home="$(lb /)"
+  share="$(lb '/parashare?t=deploycheck5e')"
+  case "$home" in 200*) [ "$share" = "$WANT_SHARE" ] && break ;; esac
+  [ "$n" -ge "$tries" ] && break
+  sleep 0.5
+done
+echo "after loopback tries = $n"
 echo "after loopback home = $home"
 echo "after loopback parashare = $share"
 case "$home" in 200*) ;; *)
@@ -2923,11 +3010,12 @@ case "$home" in 200*) ;; *)
   restore
   exit 1 ;;
 esac
-if [ "$share" != "302 https://paramant.app/get?t=deploycheck5e" ]; then
+if [ "$share" != "$WANT_SHARE" ]; then
   echo "FATAL /parashare?t= answers '$share' on 127.0.0.1:8080, expected a 302 to /get with the token, restoring"
   restore
   exit 1
 fi
+ARMED=0
 EOF
   NGINX_PAYLOAD=""
 

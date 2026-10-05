@@ -885,15 +885,25 @@ The public conf (slot 1) is not touched by 5e.
    `/api/user/` on `user_session`; the `$arg_t` redirect on both `/parashare`s.
 3. **Server.** The conf and snippet travel base64 with their sha256 and are
    checked on arrival. Every zone the conf uses must be bound in `nginx -T`
-   (otherwise FATAL, nothing written). Then backups
+   (otherwise FATAL, nothing written). Read-only, also before any write: if
+   another enabled conf (`paramant-public.conf`) proxies to `127.0.0.1:808[1-6]`,
+   5e prints those lines and stops, because the body limits of those blocks
+   would then meet real uploads. After comparing, `PARAMANT_NGINX_PUBLIC_808X_OK=1`
+   lets it go ahead. `:8086 /v2/` carries no `limit_req`, as on production: the
+   `api` zone (60/min) would cut a large upload off with 429. Then backups
    (`/etc/nginx/backups/<name>.pre-nginx-sync-<TS>` and the snippet; a marker
    `...absent-nginx-sync-<TS>` when there was no snippet), the diff printed in
    full (`confdiff`, `snipdiff`), the write (through the symlink, `cat` not
    `mv`), `nginx -t`, reload. A failing `nginx -t` or reload puts both files
-   back and reloads the old config.
+   back and reloads the old config. So does any command that fails after the
+   backups (a write on a full or read-only disk): an `ERR`/`EXIT` trap puts conf
+   and snippet back together, and only reloads when both are back on disk.
 4. **Loopback on the server**, straight at `127.0.0.1:8080` with
    `Host: paramant.app`: the home page answers 200 and `/parashare?t=` answers
-   302 to `https://paramant.app/get?t=...`. On a fault: back again.
+   302 to `https://paramant.app/get?t=...`. A reload only signals nginx, so the
+   old workers answer for a moment (27 in 100 checks right after a reload); 5e
+   asks every 0.5 s for up to 10 s until the new conf answers, and judges
+   then. On a fault: back again.
 5. **From the NUC, through Caddy**: `/parashare?t=x` and `/en/parashare?t=x`
    answer 302 to `/get?t=x` and `/en/get?t=x`, and 12 parallel
    `/api/user/me` get no 429. On a fault: the backups go back and the run stops.
