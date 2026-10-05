@@ -1699,7 +1699,18 @@ release_tag_verdict() {
 release_tag_gate() {   # step label
   step "$1. the tag the installers pin exists on origin and names the deploy commit"
   local sha tag="" t f tagsha=""
-  sha="${DEPLOYED_HEAD:-$(git rev-parse "$DEPLOY_REF")}"
+  if [ -n "$DEPLOYED_HEAD" ]; then
+    sha="$DEPLOYED_HEAD"
+  elif sha="$(git rev-parse -q --verify "$DEPLOY_REF^{commit}" 2>/dev/null)"; then
+    :
+  elif [ "$DRY_RUN" -eq 1 ]; then
+    # A shallow CI checkout has no $DEPLOY_REF. Same rule as nginx_sync_prepare:
+    # the dry run reads HEAD and says so; a real run still stops.
+    note "$DEPLOY_REF does not resolve here; this dry run reads the installer pins from HEAD"
+    sha="$(git rev-parse HEAD)"
+  else
+    die "$DEPLOY_REF does not resolve here, so there is no deploy commit to check the tag against. git fetch origin"
+  fi
   for f in install.sh frontend/install.sh frontend/install-pi.sh; do
     t="$(git show "$sha:$f" 2>/dev/null | sed -n 's/^RELAY_VERSION="${PARAMANT_VERSION:-\(v[0-9][0-9.]*\)}".*/\1/p' | head -1)"
     if [ -z "$tag" ]; then tag="$t"; elif [ "$t" != "$tag" ]; then tag=""; break; fi
