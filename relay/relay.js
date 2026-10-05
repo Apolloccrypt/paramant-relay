@@ -4878,11 +4878,18 @@ async function handleRelayRequest(req, res) {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     const adminOk  = adminTok && safeEqual(adminTok, process.env.ADMIN_TOKEN || '');
     const ram = ramStatus();
+    // With redis as the store a registration lives only there (review #555,
+    // H3) and the in-memory map stays empty, so counting the map reported 0.
+    // Count the unexpired account|device entries in the global set instead.
+    let webhookCount = [...webhooks.values()].flat().length;
+    if (adminOk && redisClient && redisClient.isReady) {
+      try { webhookCount = await redisClient.zCount(WEBHOOK_ALL_KEY, Date.now(), '+inf'); } catch (_) {}
+    }
     const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION,
       max_keys: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS,
       ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at, license_issued_to: LICENSE_PAYLOAD.issued_to } : {}) };
     const full = { ...base, ...ram, pubkeys: pubkeys.size,
-      webhooks: [...webhooks.values()].flat().length, stats,
+      webhooks: webhookCount, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
       encryption: 'ML-KEM-768 + ECDH P-256 + AES-256-GCM',
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ML-DSA-65 unavailable: signing disabled',

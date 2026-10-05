@@ -20,7 +20,8 @@ test('per account: the 21st device id is refused, every key has a TTL, a long ur
   rc = await requireRedis('redis://127.0.0.1:6399');
   if (!rc) return t.skip('no redis');
   const K = key(); const acct = 'acct_whcap_' + crypto.randomBytes(4).toString('hex');
-  const srv = await boot({ tag: 'whcap', env: { REDIS_URL: rc.options.url, MAIL_PROVIDER: 'dryrun' }, users: { api_keys: [pro(K, acct)] } });
+  const ADMIN = 'adm_' + crypto.randomBytes(16).toString('hex');
+  const srv = await boot({ tag: 'whcap', env: { REDIS_URL: rc.options.url, MAIL_PROVIDER: 'dryrun', ADMIN_TOKEN: ADMIN, INTERNAL_AUTH_TOKEN: 'int_' + ADMIN }, users: { api_keys: [pro(K, acct)] } });
   const statuses = [];
   for (let i = 0; i < 25; i++) {
     const r = await srv.post('/v2/webhook', { headers: { 'X-Api-Key': K }, body: { device_id: 'd' + i, url: 'https://hooks.example.com/h' + i } });
@@ -29,6 +30,9 @@ test('per account: the 21st device id is refused, every key has a TTL, a long ur
   }
   assert.strictEqual(statuses.filter((s) => s === 200).length, 20, statuses.join(','));
   assert.ok(statuses.slice(20).every((s) => s === 429), statuses.join(','));
+  // /health (admin) counts what redis holds, not the empty in-memory cache.
+  const h = await srv.get('/health', { headers: { 'X-Admin-Token': ADMIN } });
+  assert.ok(h.json && h.json.webhooks >= 20, 'health counts the redis registrations: ' + h.text.slice(0, 200));
   // A device already registered may register again (the list stays short).
   for (let i = 0; i < 8; i++) {
     const r = await srv.post('/v2/webhook', { headers: { 'X-Api-Key': K }, body: { device_id: 'd0', url: 'https://hooks.example.com/again' + i } });
