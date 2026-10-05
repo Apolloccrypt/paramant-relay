@@ -104,7 +104,9 @@ test('T4-9, T4-11, T4-L1: a send to a person carries no file name, one file_id o
   try {
     await page.locator('#file-input').setInputFiles({ name: NAME, mimeType: 'application/pdf', buffer: Buffer.alloc(6 * 1024 * 1024, 7) });
     await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 15000 });
-    await page.fill('#recipients-input', 'ontvanger@example.com');
+    // One person: since ui/verzenden (24-09) the address goes in #recipient-one
+    // under "Naar één persoon"; #recipients-input is the group field.
+    await page.fill('#recipient-one', 'ontvanger@example.com');
     await page.locator('#btn-create-session').click();
     await page.waitForFunction(() => document.querySelector('#seal-back') && !document.querySelector('#seal-back').hidden, null, { timeout: 30000 });
 
@@ -133,6 +135,8 @@ test('L6: test mode on the relay is not shown as "sent"', async () => {
   try {
     await page.locator('#file-input').setInputFiles({ name: 'a.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(100 * 1024, 7) });
     await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 15000 });
+    // Two people is the group choice (ui/verzenden).
+    await page.locator('#ps-mode-group').click();
     await page.fill('#recipients-input', 'een@example.com, twee@example.com');
     await page.locator('#btn-create-session').click();
     await page.locator('#step-done:not([hidden])').waitFor({ timeout: 30000 });
