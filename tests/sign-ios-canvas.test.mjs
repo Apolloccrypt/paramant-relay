@@ -89,6 +89,7 @@ test('a page no size can draw says so instead of showing white', async () => {
   const pdf = await makePdf(page, { pages: [{ lines: true }] });
   await pickBytes(page, pdf, 'never.pdf');
   await page.locator('.ds-blank-note').first().waitFor({ timeout: 30000 });
-  assert.match(await page.locator('.ds-blank-note').first().textContent(), /kan deze browser niet tekenen/);
+  // Mick 05-10: taalronde
+  assert.match(await page.locator('.ds-blank-note').first().textContent(), /kan deze pagina niet tonen/);
   await page.context().close();
 });

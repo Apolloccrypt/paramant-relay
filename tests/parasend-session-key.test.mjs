@@ -284,7 +284,8 @@ test('a 500 on the session token shows the banner, hides the slim row, and offer
 
 // ── 4. The banner's words, and the default state of the markup ──────────────
 test('/parashare ships the banner copy and opens on the slim row, not the manual card', () => {
-  assert.ok(PS_HTML.includes('Your account session could not be started. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
+  // Mick 05-10: taalronde
+  assert.ok(PS_HTML.includes('We could not sign you in. Sign in again. If it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
     'the banner must name the one thing to do and the one address to write to');
   assert.match(PS_HTML, /data-click="expandApiKeyCard">Use a key by hand</, 'the banner must carry the manual way out');
   // error-message.js is a plain script and parashare.page.js reads
@@ -365,7 +366,8 @@ test('the key banner leads with signing in again, and says who the manual key is
     'signing in again is the action that works on the hosted relay, so it is the primary');
   assert.match(banner, /data-click="expandApiKeyCard">Use a key by hand</,
     'the manual card must stay reachable for a self-host with no /api/user/account/key');
-  assert.match(banner, /for self-hosted relays/,
+  // Mick 05-10: taalronde
+  assert.match(banner, /for your own server/,
     'a hosted customer must be told the manual key is not meant for them');
   // Compared inside the action row, not the whole banner: the sentence above it
   // also says "Sign in again", and matching that would pass whatever the buttons
@@ -676,13 +678,15 @@ test('a token that expires during a long session is replaced, before and after t
 // met lang="nl" Nederlandse zinnen op het scherm zet.
 test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => {
   assert.match(PS_HTML_NL, /<html lang="nl">/, 'de Nederlandse pagina moet lang="nl" dragen, anders spreekt de code Engels');
-  assert.ok(PS_HTML_NL.includes('Uw accountsessie kon niet starten. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
+  // Mick 05-10: taalronde
+  assert.ok(PS_HTML_NL.includes('We konden u niet aanmelden. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
     'de banner noemt het ene dat u kunt doen en het ene adres om te mailen');
   const bannerAt = PS_HTML_NL.indexOf('id="ps-key-error"');
   const banner = PS_HTML_NL.slice(bannerAt, bannerAt + 900);
   assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Opnieuw inloggen</, 'opnieuw inloggen is de hoofdactie');
   assert.match(banner, /data-click="expandApiKeyCard">Een sleutel met de hand invoeren</, 'de uitweg met de hand blijft bereikbaar');
-  assert.match(banner, /voor een eigen relay/, 'en zegt voor wie die uitweg is');
+  // Mick 05-10: taalronde
+  assert.match(banner, /voor een eigen server/, 'en zegt voor wie die uitweg is');
   assert.match(PS_HTML_NL, /<details class="ps-how">[\s\S]*?<summary>Hoe werkt dit\?<\/summary>/, 'de techniek staat een klik verder');
   const howPanel = /<details class="ps-how">([\s\S]*?)<\/details>/.exec(PS_HTML_NL);
   for (const name of ['ML-KEM-768', 'ML-DSA-65', 'AES-256-GCM']) {

@@ -292,7 +292,7 @@ function showBlankNote(canvas) {
   const n = document.createElement('div');
   n.className = 'ds-blank-note';
   n.setAttribute('role', 'note');
-  n.textContent = L('Deze pagina kan deze browser niet tekenen. Het document zelf is in orde en wordt volledig ondertekend; zoom uit of open de pagina op een computer om hem te zien.', 'This browser cannot draw this page. The document itself is fine and is signed in full; zoom out or open the page on a computer to see it.');
+  n.textContent = L('Deze browser kan deze pagina niet tonen. Het document zelf is in orde en wordt volledig ondertekend. Zoom uit, of open de pagina op een computer om hem te zien.', 'This browser cannot show this page. The document itself is fine and is signed in full. Zoom out, or open the page on a computer to see it.');
   host.appendChild(n);
 }
 
@@ -360,7 +360,7 @@ async function waitForPdfLib() {
     const start = Date.now();
     const tick = () => {
       if (window.PDFLib) return resolve(window.PDFLib);
-      if (Date.now() - start > 10000) return reject(new Error(L('De pdf-bibliotheek kon niet worden geladen', 'pdf-lib failed to load')));
+      if (Date.now() - start > 10000) return reject(new Error(L('De pdf-lezer laadde niet', 'The PDF reader did not load')));
       setTimeout(tick, 50);
     };
     tick();
@@ -662,13 +662,13 @@ function applyModeCopy(mode) {
     // The stepper tab says it the same way (hertest r2: it still read
     // "Medeondertekenaars" while the sender signs nothing here).
     set('.ds-stepper li[data-step="recipients"]', L('Ondertekenaars', 'Signers'));
-    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet tekenen. Ieder krijgt per e-mail een eigen uitnodiging die het document opent zodra hij of zij inlogt met precies dit e-mailadres. U hoeft daarna niets meer te sturen.', 'Add everyone who needs to sign. Each person gets an invitation by email that opens the document once they sign in with exactly this address. There is nothing more for you to send.'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet tekenen. Ieder krijgt een eigen uitnodiging per e-mail. Het document opent na inloggen met dat e-mailadres. U hoeft daarna niets meer te sturen.', 'Add everyone who needs to sign. Each person gets their own invitation by email. The document opens once they sign in with that address. There is nothing more for you to send.'));
   } else {
     set('#step-doc h2', L('Kies het document dat u wilt ondertekenen', 'Choose the document you want to sign'));
     set('#step-doc .ds-sub', L('ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.', 'ParaSign signs PDF files. Choose a PDF and put your stamp on a page of your choice. The file stays in this browser.'));
     set('#step-recipients h2', L('Medeondertekenaars toevoegen (optioneel)', 'Add co-signers (optional)'));
     set('.ds-stepper li[data-step="recipients"]', L('Medeondertekenaars', 'Co-signers'));
-    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. U tekent eerst; daarna krijgt ieder per e-mail een eigen uitnodiging die het document met uw handtekening opent zodra hij of zij inlogt met precies dit e-mailadres.', 'Add everyone who needs to co-sign. You sign first; then each person gets an invitation by email that opens the document with your signature once they sign in with exactly this address.'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. U tekent eerst. Daarna krijgt ieder een eigen uitnodiging per e-mail. Het document met uw handtekening opent na inloggen met dat e-mailadres.', 'Add everyone who needs to co-sign. You sign first. Then each person gets their own invitation by email. The document with your signature opens once they sign in with that address.'));
   }
 }
 
@@ -1214,11 +1214,11 @@ async function onDocChosen(file) {
       // into an encrypted PDF needs its password and breaks the author's lock),
       // so both get the hash route, said honestly.
       if (isPdf && e && e.name === 'PasswordException') {
-        toHashOnly(L('Deze pdf is beveiligd met een wachtwoord. Een zichtbare handtekening kan er daarom niet op: u ondertekent het bestand via de hash, het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, sla de pdf dan eerst zonder wachtwoord op (bijvoorbeeld met Afdrukken naar pdf) en kies dat bestand.', 'This PDF is protected with a password, so it cannot carry a visible signature: you sign the file by its hash, and the proof belongs to exactly this file. For a visible signature, save the PDF without a password first (for example with Print to PDF) and pick that file.'));
+        toHashOnly(L('Deze pdf is beveiligd met een wachtwoord. Een zichtbare handtekening kan er daarom niet op. U ondertekent een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, sla de pdf dan eerst zonder wachtwoord op (bijvoorbeeld met Afdrukken naar pdf) en kies dat bestand.', 'This PDF is protected with a password, so it cannot carry a visible signature. You sign a fingerprint of the file, and the proof belongs to exactly this file. For a visible signature, save the PDF without a password first (for example with Print to PDF) and pick that file.'));
       } else if (isPdf && e && e.code === 'pdf_encrypted') {
-        toHashOnly(L('Deze pdf is beveiligd: de maker heeft wijzigen geblokkeerd. Een zichtbare handtekening zou het bestand wijzigen, dus u ondertekent het via de hash; het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, vraag de afzender dan om een versie zonder beveiliging.', 'This PDF is protected: its author blocked changes. A visible signature would change the file, so you sign it by its hash; the proof belongs to exactly this file. For a visible signature, ask the sender for a version without the protection.'));
+        toHashOnly(L('Deze pdf is beveiligd: de maker heeft wijzigen geblokkeerd. Een zichtbare handtekening zou het bestand wijzigen. Daarom ondertekent u een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, vraag de afzender dan om een versie zonder beveiliging.', 'This PDF is protected: its author blocked changes. A visible signature would change the file, so you sign a fingerprint of it. The proof belongs to exactly this file. For a visible signature, ask the sender for a version without the protection.'));
       } else {
-        toHashOnly(L('Dit bestand kon niet worden geopend als ', 'This file could not be opened as a ') + kind + L(' (het lijkt beschadigd of onvolledig), dus het krijgt een bevestiging via de hash in plaats van een zichtbare handtekening.', ' (it looks corrupt or incomplete), so it gets a hash-only attestation instead of a visual signature.'));
+        toHashOnly(L('Dit bestand kon niet worden geopend als ', 'This file could not be opened as a ') + kind + L(' (het lijkt beschadigd of onvolledig). U ondertekent daarom een vingerafdruk van het bestand, zonder zichtbare handtekening.', ' (it looks corrupt or incomplete). So you sign a fingerprint of the file, without a visible signature.'));
       }
     }
   } else {
@@ -3103,7 +3103,7 @@ function fillReview() {
   $('ds-review-mode').textContent =
     state.mode === 'pdf'   ? describePdfMode() :
     state.mode === 'image' ? L('Afbeelding met ingebakken zichtbare stempel (', 'Image with visual stamp baked in (') + (state.imageType || '').toUpperCase() + ')' :
-                             L('Alleen hash (bevestiging via SHA3-256)', 'Hash-only (SHA3-256 attestation)');
+                             L('Alleen een vingerafdruk (SHA3-256)', 'Fingerprint only (SHA3-256)');
   $('ds-review-name').textContent = state.signer.name;
   $('ds-review-sig').textContent =
     state.signer.sigStyle === 'typed'  ? L('Getypte naam in de stempel', 'Typed name in the stamp') :
@@ -4269,7 +4269,7 @@ async function doSign() {
     // string, which leaked before and read as a crash to the user.
     if (e && e.status === 401) { showSessionLost($('ds-sign-status')); $('ds-sign-now').disabled = false; return; }
     let msg;
-    if (e && e.status === 401) msg = L('Log in om documenten te ondertekenen. Open /auth/login en kom dan hier terug.', 'Please sign in to sign documents. Open /auth/login, then return here.');
+    if (e && e.status === 401) msg = L('Log in om documenten te ondertekenen. Kom daarna hier terug.', 'Sign in to sign documents, then come back here.');
     else if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, inloggen met passkey) en onderteken daarna. De passkey waarmee u inlogt wordt uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then sign, your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of verlopen. Tik nogmaals op Dit document ondertekenen.', 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.');
@@ -4282,7 +4282,7 @@ async function doSign() {
     // "http_502" or a browser's TypeError text. The detail is in the console.
     else if (e && (e.code === 'service_error' || e.code === 'document_too_large')) msg = e.message;
     else if (e && e.code === 'bake_failed') msg = e.bakeKind === 'encrypted'
-      ? L('Deze pdf is beveiligd tegen wijzigen, dus er kan geen zichtbare handtekening op. Er is niets ondertekend. Kies het bestand opnieuw: ParaSign ondertekent het dan via de hash, zonder zichtbare stempel.', 'This PDF is protected against changes, so it cannot carry a visible signature. Nothing was signed. Pick the file again: ParaSign then signs it by its hash, without a visible seal.')
+      ? L('Deze pdf is beveiligd tegen wijzigen, dus er kan geen zichtbare handtekening op. Er is niets ondertekend. Kies het bestand opnieuw. U ondertekent dan een vingerafdruk van het bestand, zonder zichtbare stempel.', 'This PDF is protected against changes, so it cannot carry a visible signature. Nothing was signed. Pick the file again. You then sign a fingerprint of the file, without a visible stamp.')
       : e.bakeKind === 'image'
         ? L('Uw handtekeningafbeelding kon niet in de pdf worden gezet: het is geen geldige PNG of JPG. Er is niets ondertekend. Ga terug, kies de afbeelding opnieuw of teken uw handtekening, en onderteken daarna.', 'Your signature image could not be placed in the PDF: it is not a valid PNG or JPG. Nothing was signed. Go back, pick the image again or draw your signature, then sign.')
         : L('De zichtbare handtekening kon niet in deze pdf worden gezet. Er is niets ondertekend, en aan uw passkey ligt het niet. Kies bij Plaatsen voor een apart handtekeningblad, of sla de pdf opnieuw op met Afdrukken naar pdf en probeer het nog eens.', 'The visible signature could not be placed in this PDF. Nothing was signed, and your passkey is not the problem. At Place, choose a separate signature sheet, or save the PDF again with Print to PDF and try once more.');
@@ -4507,12 +4507,12 @@ function showDone() {
   $('ds-done-mode').textContent =
     state.mode === 'pdf'   ? describePdfMode() :
     state.mode === 'image' ? L('Afbeelding met ingebakken zichtbare stempel (', 'Image with visual stamp baked in (') + (state.imageType || '').toUpperCase() + ')' :
-                             L('Bevestiging via alleen de hash (SHA3-256)', 'Hash-only attestation (SHA3-256)');
+                             L('Alleen een vingerafdruk (SHA3-256)', 'Fingerprint only (SHA3-256)');
 
   // v3: the signature was submitted to the relay (same-origin, via the
   // per-document activation) which recorded it on the envelope and wrote it to
   // the public CT log. There is no optional "notary" step any more.
-  if ($('ds-done-notary')) $('ds-done-notary').textContent = L('Ja, vastgelegd op de relay en in het openbare CT-logboek', 'Yes - recorded on the relay and the public CT log');
+  if ($('ds-done-notary')) $('ds-done-notary').textContent = L('Ja, vastgelegd op onze server en in het openbare CT-logboek', 'Yes, recorded on our server and in the public CT log');
 
   const psignName = (state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
   $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(psignForFile(r.envelope), null, 2)), psignName, 'application/json');
@@ -4545,7 +4545,7 @@ function showDone() {
       filesList.appendChild(li1);
     } else {
       const li1 = document.createElement('li');
-      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(state.doc.name)}</span><span class="ds-usage-files-note">${L('het oorspronkelijke bestand (ongewijzigd, want bij alleen de hash blijft het zoals het was)', 'the original file (unchanged - hash-only mode does not modify it)')}</span>`;
+      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(state.doc.name)}</span><span class="ds-usage-files-note">${L('het oorspronkelijke bestand (ongewijzigd, want bij alleen een vingerafdruk blijft het zoals het was)', 'the original file (unchanged: signing only a fingerprint leaves it as it was)')}</span>`;
       filesList.appendChild(li1);
     }
     const li2 = document.createElement('li');
@@ -4554,7 +4554,7 @@ function showDone() {
   }
   const notaryLine = $('ds-usage-notary-line');
   if (notaryLine) {
-    notaryLine.textContent = L('hij is vastgelegd op onze relay en in het openbare CT-logboek, zodat de lezer een onafhankelijke getuige heeft van wanneer het gebeurde.', 'it was recorded on our relay and written to the public CT log, which gives the reader an independent witness of when this happened.');
+    notaryLine.textContent = L('hij is vastgelegd op onze server en in het openbare CT-logboek, zodat de lezer een onafhankelijke getuige heeft van wanneer het gebeurde.', 'it was recorded on our server and written to the public CT log, which gives the reader an independent witness of when this happened.');
   }
 
   // Multi-party: render share-links for the recipients (party 1..N).
@@ -4610,7 +4610,7 @@ function showDoneInvite(r) {
          : emailOk      ? L('Uitnodigingen verstuurd.', 'Invitations sent.')
          :                L('Klaar om te ondertekenen.', 'Ready for signature.'),
     line: emailPartial
-      ? L('Sommige uitnodigingen zijn niet bezorgd. Probeer het hieronder opnieuw, of geef wie geen mail kreeg de eigen link hieronder zelf.', 'Some invitations were not delivered. Retry below, or give anyone who got no mail their own link below yourself.')
+      ? L('Sommige uitnodigingen zijn niet bezorgd. Probeer het hieronder opnieuw, of stuur wie geen mail kreeg zelf de link hieronder.', 'Some invitations were not delivered. Retry below, or send anyone who got no mail their link below yourself.')
       : emailOk
         ? L('Iedereen kreeg een eigen link die het document opent na inloggen. U hoeft niets meer te sturen. U krijgt bericht bij elke handtekening en aan het eind het complete document.', 'Everyone received their own link; it opens the document after sign-in. There is nothing more to send. You hear about every signature, and get the complete document at the end.')
         : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
@@ -4928,7 +4928,7 @@ function buildRecipientRow(idx, data) {
   const n = idx + 1;
   row.innerHTML =
     `<input class="ds-input" type="text" data-field="label" maxlength="80" placeholder="${L('Naam ontvanger (verplicht)', 'Recipient name (required)')}" aria-label="${L(`Naam ontvanger ${n} (verplicht)`, `Recipient ${n} name (required)`)}" value="${escapeHtml(data.label || '')}">` +
-    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="${L('E-mailadres (verplicht)', 'Email (required)')}" aria-label="${L(`E-mailadres ontvanger ${n} (verplicht, de uitnodiging is eraan gebonden)`, `Recipient ${n} email (required, invite is bound to it)`)}" value="${escapeHtml(data.email || '')}">` +
+    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="${L('E-mailadres (verplicht)', 'Email (required)')}" aria-label="${L(`E-mailadres ontvanger ${n} (verplicht, de uitnodiging werkt alleen voor dit adres)`, `Recipient ${n} email (required, the invitation works only for this address)`)}" value="${escapeHtml(data.email || '')}">` +
     `<button class="ds-rm" type="button" data-action="remove" aria-label="${L(`Ontvanger ${n} verwijderen`, `Remove recipient ${n}`)}">${L('Verwijderen', 'Remove')}</button>`;
   row.querySelector('[data-action="remove"]').addEventListener('click', () => removeRecipientRow(idx));
   return row;
@@ -4960,7 +4960,7 @@ function validateRecipients() {
     const r = state.recipients[i] || {};
     const n = i + 1;
     if (!r.label) return L(`Ontvanger ${n} heeft een naam nodig.`, `Recipient ${n} needs a name.`);
-    if (!r.email) return L(`Ontvanger ${n} heeft een e-mailadres nodig. De uitnodiging is daar cryptografisch aan gebonden.`, `Recipient ${n} needs an email address. The invite is cryptographically bound to it.`);
+    if (!r.email) return L(`Ontvanger ${n} heeft een e-mailadres nodig. De uitnodiging werkt alleen voor dat adres.`, `Recipient ${n} needs an email address. The invitation works only for that address.`);
     if (!RECIPIENT_EMAIL_RE.test(r.email)) return L(`Ontvanger ${n}: \u201c${r.email}\u201d is geen geldig e-mailadres.`, `Recipient ${n}: \u201c${r.email}\u201d is not a valid email address.`);
   }
   return null;
@@ -5023,7 +5023,7 @@ function showSessionLost(el) {
   if (!el) return;
   el.hidden = false;
   el.className = 'ds-banner err';
-  el.textContent = L('Uw sessie is verlopen. Log opnieuw in; uw document, de plek en de ontvangers blijven in deze browser bewaard en staan daarna weer klaar. ', 'Your session has expired. Sign in again; your document, the spot and the recipients are kept in this browser and are ready again afterwards. ');
+  el.textContent = L('U bent uitgelogd. Log opnieuw in. Uw document, de plek en de ontvangers blijven in deze browser en staan daarna weer klaar. ', 'You were signed out. Sign in again. Your document, the spot and the recipients stay in this browser and are ready again afterwards. ');
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'btn btn-primary'; b.id = 'ds-signin-keep';
   b.textContent = L('Inloggen en verdergaan', 'Sign in and continue');
@@ -5199,7 +5199,7 @@ async function sendAfterAllowanceCheck() {
     showRecipientsHint(L('Uw tegoed is bijna of helemaal op: u hebt deze maand nog ', 'Your allowance is (almost) used up: you have ') + left
       + L(left === 1 ? ' handtekening over' : ' handtekeningen over', left === 1 ? ' signature left this month' : ' signatures left this month')
       + L(', en dit verzoek vraagt er ', ', and this request needs ') + need
-      + L('. Elke handtekening telt op uw tegoed, dus dit verzoek kan zo niet worden verstuurd. Verhoog uw plan op /pricing, nodig minder mensen uit, of verstuur het na het begin van de volgende maand.', '. Every signature counts on your allowance, so this request cannot be sent like this. Upgrade your plan on /pricing, invite fewer people, or send it after the start of next month.'), true);
+      + L('. Elke handtekening telt mee, dus zo kan dit verzoek niet weg. Verhoog uw plan op /pricing, nodig minder mensen uit, of verstuur het na het begin van de volgende maand.', '. Every signature counts, so this request cannot go out like this. Upgrade your plan on /pricing, invite fewer people, or send it after the start of next month.'), true);
     return;
   }
   sendForSignature();

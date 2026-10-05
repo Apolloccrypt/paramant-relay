@@ -554,12 +554,12 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <div class="ps-alert" id="ps-key-error" role="alert">
-    <p>Your account session could not be started. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+    <p>We could not sign you in. Sign in again. If it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     <div class="ps-alert-actions">
       <a class="ps-alert-primary" href="/en/auth/login">Sign in again</a>
       <span class="ps-alert-secondary">
         <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Use a key by hand</button>
-        <span class="ps-alert-note">for self-hosted relays</span>
+        <span class="ps-alert-note">for your own server</span>
       </span>
     </div>
   </div>
@@ -574,7 +574,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <div class="card" id="ps-earlier" hidden>
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Your links from this session</div></div>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Links you just made</div></div>
     <div class="card-body">
       <ul class="ps-links" id="ps-earlier-list"></ul>
       <button type="button" class="ps-copy" id="ps-earlier-refresh" data-click="refreshSentLinks">Check again</button>
@@ -595,7 +595,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <input type="file" id="file-input" class="ps-sr" multiple data-change="onFileSelect" aria-describedby="file-status ps-drop-hint">
       <svg class="ps-drop-icon" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" focusable="false"><path d="M8 3.5h11l6 6v19H8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 3.5v6h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path class="ps-drop-mark" d="M12.5 19.5l3 3 5.5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="ps-drop-btn" id="ps-drop-btn">Choose a file</span>
-      <span class="ps-drop-hint" id="ps-drop-hint">or drag it here. Pick more than one and each file is sealed on its own and gets its own link.</span>
+      <span class="ps-drop-hint" id="ps-drop-hint">or drag it here. Pick more than one and each file is locked on its own and gets its own link.</span>
     </label>
     <div class="status-line" id="file-status" aria-live="polite">No file chosen yet</div>
     <div id="vault-list" style="margin-top:8px;display:none"></div>
@@ -656,7 +656,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <p>With several people, everyone gets their own link by email. Before the file opens, each of them confirms their email address with a code. Your dashboard shows who has opened it.</p>
       <p>With Extra safe, the other person's browser makes its own lock. You read a short code to each other, for example on the phone. If both screens show the same code, nobody swapped anything along the way.</p>
       <p>For readers who want the technical names: Extra safe is a <strong>hybrid</strong> key exchange. ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. A link does no key exchange: your browser makes a fresh AES-256-GCM key and puts it after the <code>#</code> in the link. The link <em>is</em> the key.</p>
-      <p>Neither mode signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once it has been picked up.</p>
+      <p>Neither mode signs the file. The only signatures here are our server's own: on the public log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once it has been picked up.</p>
       <p>Running your own server? <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Enter a key</button></p>
     </div>
   </details>
@@ -674,7 +674,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <div class="ps-alert" id="ps-link-error" role="alert">
     <p id="ps-link-error-text">The connection dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.</p>
     <div class="ps-alert-actions">
-      <button type="button" class="ps-alert-primary" data-click="reopenSession">Open the session again</button>
+      <button type="button" class="ps-alert-primary" data-click="reopenSession">Connect again</button>
       <span class="ps-alert-note">this makes a fresh link</span>
     </div>
   </div>
@@ -696,7 +696,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Compare this code together</div></div>
     <div class="card-body">
       <p class="status-line" style="margin-bottom:6px">Call or message your receiver on a <strong>different channel</strong> (phone, Signal) and read the code below to each other. Both screens have to show the same one.</p>
-      <p class="ps-caution">If the codes differ, stop here. A tampered relay can hand you the wrong key, and comparing the code on a channel we do not run is what catches it.</p>
+      <p class="ps-caution">If the codes differ, stop here. A hacked server can hand you the wrong key. Comparing the code on a channel we do not run catches that.</p>
       <div class="fingerprint" id="fp-display">-</div>
       <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Same code as the last time you sent to this person</div>
       <div id="fp-new-device" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center">◈ First time with this receiver. Compare with extra care.</div>
@@ -727,8 +727,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <details class="ps-how">
     <summary>The technical names, for those who want them</summary>
     <p>This all happens in your browser. ML-KEM-768 and ECDH P-256 together wrap a
-       fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the
-       relay. The relay signs the entry it makes in the public log; the file
+       fresh AES-256-GCM key for the receiver. Then only encrypted data goes to
+       our server. It signs the entry it makes in the public log; the file
        itself carries no signature.</p>
   </details>
 
@@ -757,7 +757,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <div class="progress-bar-wrap" style="margin-top:12px"><div class="progress-bar" id="tb-dl-bar"></div></div>
       <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
         <span class="tag green">AES-256-GCM</span>
-        <span class="tag green">Key in URL fragment, the relay never saw it</span>
+        <span class="tag green">Key after the # in the link, our server never saw it</span>
         <span class="tag green">Burn-on-read</span>
       </div>
     </div>
@@ -803,7 +803,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <div class="done-state">
     <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
     <h2 class="done-title">Your link is ready.</h2>
-    <p class="done-line" id="ps-link-line">Send it any way you like. We are holding the sealed file for you and we cannot open it.</p>
+    <p class="done-line" id="ps-link-line">Send it any way you like. We hold the locked file for you and cannot open it.</p>
 
     <div class="done-payload">
       <ul class="ps-links" id="ps-link-list"></ul>
@@ -820,8 +820,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <div class="done-details-body">
         <p>Your browser locked the file before it left this device, under a key it made here and nowhere else (<code>AES-256-GCM</code>). The key sits in the link after the <code>#</code>, and a browser never puts that part on the wire, so we are holding bytes we have no way to open.</p>
         <p>The link works once. The first finished download wipes the file from our server, and if nobody comes it is destroyed when it runs out.</p>
-        <p><strong>Keep the receipt</strong> saves the entry this file made in our public log, which anyone can check at <a href="/en/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head. It is proof that we took the sealed file in, not proof that somebody came for it.</p>
-        <p id="ps-link-receipt-note">There is no signed delivery receipt for a link download: the relay signs one for the API download path and not for this one. The status on each link above is this page reading the link's own state against its own clock.</p>
+        <p><strong>Keep the receipt</strong> saves the entry this file made in our public log, which anyone can check at <a href="/en/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head. It proves that we received the locked file, not that somebody collected it.</p>
+        <p id="ps-link-receipt-note">There is no signed delivery receipt for a link download. Our server signs one only for a download through the API. The status on each link above is this page reading the link's own state against its own clock.</p>
       </div>
     </details>
   </div>
@@ -845,7 +845,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <div class="done-details-body">
         <p>The lock was made in your browser, not on our server. Your file was sealed for the other person's own key before it left this device: a hybrid key exchange, <code>ML-KEM-768</code> alongside <code>ECDH P-256</code>, with both shared secrets derived into one <code>AES-256-GCM</code> key. Breaking one of the two on its own gets an attacker nowhere, which is why the classical half is still in there.</p>
         <p>The short code you read out to each other is worked out by both browsers from the other side's public keys. Two screens showing the same code means nobody swapped a key in between, and that is the whole reason we ask you to compare it somewhere we do not run.</p>
-        <p>We are holding a sealed copy and never held the key, so it is not ours to open. It is wiped the moment the other side takes it, and destroyed on its own clock if that never happens.</p>
+        <p>We hold a locked copy. We never had the key, so we cannot open it. It is wiped the moment the other side takes it, and destroyed on its own clock if that never happens.</p>
         <p><strong>Keep the receipt</strong> saves the entry this transfer made in our public log, which anyone can check at <a href="/en/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head.</p>
       </div>
     </details>
@@ -858,7 +858,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <div class="done-details-body">
         <p>Your browser sealed the file before it left this device (<code>AES-256-GCM</code>). The key is wrapped for each recipient with a link of their own.</p>
         <p>That link is in the invitation our server mails to the recipient. At the moment of sending, our server can therefore reach the key. So this is not zero-knowledge, unlike the live hand-over with a check code. If we must never be able to reach the key, use the live hand-over.</p>
-        <p>The recipient first confirms their own email address with a code sent to that same address, so a link alone does not open it. We keep the sealed copy until the recipient collects it or the time runs out.</p>
+        <p>The recipient first confirms their own email address with a code sent to that same address. A link alone does not open it. We keep the locked copy until the recipient collects it or the time runs out.</p>
       </div>
     </details>
   </div>
@@ -933,7 +933,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
 <script src="/js/send-wrap.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=24" defer></script>
+<script src="/js/parashare.page.js?v=25" defer></script>
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=18" defer></script>
 <footer>
