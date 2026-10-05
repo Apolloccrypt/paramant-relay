@@ -13,8 +13,8 @@
 <meta name="description" content="Sign in to your Paramant dashboard.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
-<link rel="stylesheet" href="/design-system.css?v=32">
-<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/parapear.css?v=4">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
@@ -126,7 +126,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-send-rows { border-top: 1px solid var(--line); }
 /* A row is a container now: the top half opens the detail, the strip under it
    says what happens next and carries the control that closes the request. */
-.dh-document { border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
+.dh-document { display: block; width: 100%; border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
 .dh-send-row { border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
 .dh-document:last-child { border-bottom: 0; }
 .dh-send-row:last-child { border-bottom: 0; }
@@ -443,7 +443,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 }
 </style>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=10">
+<link rel="stylesheet" href="/app-2026.css?v=11">
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
@@ -771,8 +771,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Maybe later</button>
   </div>
 </div>
-
-<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/dashboard" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
@@ -780,6 +778,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p class="lang-switch"><a href="/dashboard" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
       </div>
       <div>
         <div class="footer-col-label">Company</div>
@@ -803,7 +802,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   </div>
 </footer>
 
-<script src="/nav.js?v=16" defer></script>
+<script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
 <script src="/js/dashboard.js?v=18" defer></script>
 </body>
