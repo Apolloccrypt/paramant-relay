@@ -18,10 +18,19 @@
 #   bash deploy/deploy-3.1.sh --seller-vat     also write BILLING_SELLER_VAT
 #                                              in step 1e: from this deploy on
 #                                              VAT invoices and reverse charge
+#   bash deploy/deploy-3.1.sh --nginx-sync     phase 5e only: put the whole repo
+#                                              site conf on the server (backup,
+#                                              nginx -t, reload, checks, and
+#                                              back to the old conf on any fault)
+#   bash deploy/deploy-3.1.sh --dry-run --nginx-sync
+#                                              show the diff 5e would write,
+#                                              write nothing (set
+#                                              PARAMANT_NGINX_LIVE_COPY to a copy
+#                                              of the server conf to diff against)
 #
 # Flags combine with --dry-run: --dry-run --preflight-only, --dry-run
-# --rollback <TS>, --dry-run --verify-only. The three run modes are mutually
-# exclusive. --seller-vat combines with a full run, --preflight-only and
+# --rollback <TS>, --dry-run --verify-only, --dry-run --nginx-sync. The four run
+# modes are mutually exclusive. --seller-vat combines with a full run, --preflight-only and
 # --verify-only, never with --rollback.
 #
 # --seller-vat is a decision, not a default. Without it step 1e writes the
@@ -72,6 +81,35 @@ NGINX_SITES=/etc/nginx/sites-enabled
 # nginx -T that the file it wrote is really loaded, and puts the previous file
 # back when it is not.
 LIMIT_REQ_DEST="${PARAMANT_LIMIT_REQ_DEST:-/etc/nginx/conf.d/paramant-limit-req.conf}"
+
+# Phase 5e: the whole site conf, not seven edits.
+#
+# 5c edits the live confs by anchor and never copied deploy/nginx-paramant-live.conf
+# over them, so every change to that file that 5c did not name stayed in git.
+# The prodtest of 2026-10-05 measured what that cost: the server conf differed
+# from the repo by about 600 lines, /api/user/ still sat on relay_auth (one
+# /account load gave 429) and /parashare?t= lost its token on the way to the
+# login page. 5e renders the repo conf (deploy/nginx-render.sh) and places it
+# whole on the live slot, together with the security-headers snippet it
+# includes. The public conf (slot 1) is not touched by 5e.
+#
+# The slot uses the same candidate syntax as NGINX_CONF_SLOTS.
+NGINX_LIVE_SLOT="${PARAMANT_NGINX_LIVE_SLOT:-paramant-live.conf|paramant.conf}"
+NGINX_SNIPPET_DIR="${PARAMANT_NGINX_SNIPPET_DIR:-/etc/nginx/snippets}"
+# The commit the conf is rendered from. Empty: the commit phase 3 left the
+# server checkout on, or DEPLOY_REF when 5e runs on its own (--nginx-sync).
+NGINX_REF="${PARAMANT_NGINX_REF:-}"
+# A local copy of the server conf, for --dry-run: the diff is shown against it.
+# Without one a dry run cannot know what is on the server (it never connects);
+# scripts/check-prod-drift.sh is the read-only way to get the live diff.
+NGINX_LIVE_COPY="${PARAMANT_NGINX_LIVE_COPY:-}"
+# 5e stops when another enabled conf (paramant-public.conf) proxies to
+# 127.0.0.1:808[1-6]: the limits of those blocks would then meet real uploads.
+# 1 lets it go ahead after someone compared them (review PR #569, B3).
+NGINX_PUBLIC_808X_OK="${PARAMANT_NGINX_PUBLIC_808X_OK:-0}"
+case "$NGINX_PUBLIC_808X_OK" in 0|1) ;; *) echo "PARAMANT_NGINX_PUBLIC_808X_OK must be 0 or 1" >&2; exit 2 ;; esac
+# Where 5e checks the result from outside, through Caddy, as a visitor would.
+PUBLIC_SITE="${PARAMANT_PUBLIC_SITE:-https://paramant.app}"
 
 # The two server confs the runbook names. Phase 5 edits these and nothing else:
 # a wildcard loop over sites-enabled would silently rewrite a conf nobody
@@ -202,6 +240,8 @@ SSH_SHOWN="ssh -i <prod-key> -o BatchMode=yes -o IdentitiesOnly=yes $PROD_HOST"
 DRY_RUN=0
 PREFLIGHT_ONLY=0
 VERIFY_ONLY=0
+NGINX_SYNC_ONLY=0
+NGINX_PAYLOAD=""
 SELLER_VAT_GO=0
 ROLLBACK_TS=""
 REMOTE_OUT=""
@@ -409,7 +449,7 @@ RESOLVER
 remote_nginx() {
   local body
   body="$(cat)"
-  remote "$@" < <(printf '%s\n%s\n' "$NGINX_RESOLVE_SNIPPET" "$body")
+  remote "$@" < <(printf '%s\n%s%s\n' "$NGINX_RESOLVE_SNIPPET" "${NGINX_PAYLOAD:-}" "$body")
 }
 
 # ------------------------------------------------------- the seller (#517) --
@@ -797,6 +837,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
     --verify-only)    VERIFY_ONLY=1; shift ;;
+    --nginx-sync)     NGINX_SYNC_ONLY=1; shift ;;
     --dry-run)        DRY_RUN=1; shift ;;
     --seller-vat)     SELLER_VAT_GO=1; shift ;;
     --rollback)       [ $# -ge 2 ] || { echo "--rollback needs a <TS>" >&2; exit 2; }
@@ -812,6 +853,10 @@ if [ -n "$ROLLBACK_TS" ] && [ "$PREFLIGHT_ONLY" -eq 1 ]; then
 fi
 if [ "$VERIFY_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ]; }; then
   echo "--verify-only is its own run; do not combine it with --rollback or --preflight-only" >&2
+  exit 2
+fi
+if [ "$NGINX_SYNC_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ] || [ "$VERIFY_ONLY" -eq 1 ] || [ "$SELLER_VAT_GO" -eq 1 ]; }; then
+  echo "--nginx-sync is its own run (phase 5e only); combine it with --dry-run and nothing else" >&2
   exit 2
 fi
 if [ -n "$ROLLBACK_TS" ] && [ "$SELLER_VAT_GO" -eq 1 ]; then
@@ -838,6 +883,7 @@ MODE="full deploy"
 [ "$PREFLIGHT_ONLY" -eq 1 ] && MODE="preflight only (phases 0 and 1, read-only)"
 [ "$VERIFY_ONLY" -eq 1 ] && MODE="verify only (phases 6 and 7 on an already deployed server)"
 [ -n "$ROLLBACK_TS" ] && MODE="rollback to $ROLLBACK_TS (phase 8)"
+[ "$NGINX_SYNC_ONLY" -eq 1 ] && MODE="nginx sync only (phase 5e: the whole repo site conf on the live slot)"
 [ "$DRY_RUN" -eq 1 ] && MODE="$MODE, DRY RUN (nothing is executed on the server)"
 
 hr
@@ -851,6 +897,7 @@ printf '  compose dir   %s\n' "$COMPOSE_DIR"
 printf '  docroot       %s\n' "$DOCROOT"
 printf '  nginx confs   %s\n' "$NGINX_CONF_SLOTS"
 printf '  limit_req     %s\n' "$LIMIT_REQ_DEST"
+printf '  live conf     %s (phase 5e places the whole repo conf here)\n' "$NGINX_LIVE_SLOT"
 printf '                %s slot(s); the first candidate present on the server wins\n' "$NGINX_SLOT_COUNT"
 printf '  deploy ref    %s\n' "$DEPLOY_REF"
 if [ -n "$EXPECTED_HEAD" ]; then
@@ -2565,6 +2612,436 @@ EOF
       ok "limit_req: $wz zone(s) written, $lz left to the config that already binds them ($(remote_field 'before duplicate zone names'))"
     fi
   fi
+
+  # After 5d on purpose: the repo conf rate limits on user_session, and 5d is
+  # what guarantees that zone is loaded.
+  phase_5e
+}
+
+# ============================================================== PHASE 5e =====
+#
+# The whole site conf from the repo, on the live slot. See NGINX_LIVE_SLOT at
+# the top for why 5c's seven edits were not enough.
+#
+# Order of trust, each step only if the one before it held:
+#   local   render the conf from the commit being deployed, and refuse it when
+#           a login door would leave its strict zone, /api/user/ would not be on
+#           user_session, or the /parashare ?t= redirect is missing
+#   server  back up the conf and the snippet, show the diff, write, nginx -t,
+#           reload; on any fault the backups go back and nginx is reloaded on them
+#   server  loopback on 127.0.0.1:8080: the home page answers 200 and
+#           /parashare?t= answers 302 to /get; on a fault, back again
+#   outside through Caddy: /parashare?t= and /en/parashare?t= keep the token,
+#           12 parallel /api/user/me get no 429; on a fault, back again
+#
+# --dry-run does the local half and prints the server half: no ssh.
+
+NGX_TMP=""
+NGINX_REF_USED=""
+
+# Each location of a conf with the limit_req zone it sets, one "path zone" per
+# line ("-" for none). Good enough for the flat blocks of this conf; the
+# docker test (tests/nginx-volledig-docker.test.mjs) proves the same thing
+# against a real nginx.
+nginx_zone_map() {
+  awk '
+    /^[[:space:]]*location[[:space:]]/ {
+      if (inloc) print loc " -"
+      loc = $0
+      sub(/^[[:space:]]*location[[:space:]]+(=|\^~|~\*?)?[[:space:]]*/, "", loc)
+      sub(/[[:space:]]*\{.*/, "", loc)
+      inloc = 1
+    }
+    inloc && /limit_req[[:space:]]+zone=/ {
+      z = $0; sub(/.*zone=/, "", z); sub(/[[:space:];].*/, "", z)
+      print loc " " z; inloc = 0
+    }
+    inloc && /^[[:space:]]*\}/ { print loc " -"; inloc = 0 }
+  ' "$1"
+}
+
+# The doors where a password, a code or a new account is tried, and the zone
+# each must stay on, plus the one zone every other /api/user/ call must be on.
+NGINX_ZONE_WANT="/api/user/login=relay_login
+/api/user/auth/webauthn/login/=relay_login
+/api/user/auth/=relay_auth
+/api/user/setup/=relay_auth
+/api/user/signup=relay_auth
+/api/user/account/totp/=relay_auth
+/api/user/account/backup-codes/=relay_auth
+/api/user/=user_session"
+
+# nginx_sync_gate <rendered conf>: dies before anything reaches the server.
+nginx_sync_gate() {
+  local f="$1" map line path zone got bad=0
+  map="$(nginx_zone_map "$f")"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path="${line%%=*}"; zone="${line#*=}"
+    got="$(printf '%s\n' "$map" | awk -v p="$path" '$1 == p { print $2; exit }')"
+    if [ "$got" = "$zone" ]; then
+      printf '  zone  %-34s %s\n' "$path" "$got"
+    else
+      printf '  ZONE  %-34s %s, expected %s\n' "$path" "${got:-no such location}" "$zone"
+      bad=$((bad + 1))
+    fi
+  done <<< "$NGINX_ZONE_WANT"
+  [ "$bad" -eq 0 ] \
+    || die "$bad /api/user/ location(s) in the rendered conf are on the wrong limit_req zone; nothing was sent to the server"
+  ok "rendered conf: login, signup, setup and TOTP doors stay on their strict zones, the rest of /api/user/ is on user_session"
+  grep -qE 'location = /parashare +\{ *if \(\$arg_t\) \{ return 302 https://\$host/get\?\$args; \}' "$f" \
+    && grep -qE 'location = /en/parashare +\{ *if \(\$arg_t\) \{ return 302 https://\$host/en/get\?\$args; \}' "$f" \
+    || die "the rendered conf has no \$arg_t redirect on /parashare and /en/parashare; nothing was sent to the server"
+  ok "rendered conf: /parashare?t= and /en/parashare?t= redirect to /get and /en/get with the token"
+}
+
+# nginx_sync_prepare: render the conf and take the snippet from the commit that
+# is being deployed, into $NGX_TMP/conf and $NGX_TMP/snip.
+nginx_sync_prepare() {
+  local ref="${NGINX_REF:-${DEPLOYED_HEAD:-$DEPLOY_REF}}"
+  NGX_TMP="$(mktemp -d "${TMPDIR:-/tmp}/paramant-5e.XXXXXX")"
+  if git -C "$ROOT" rev-parse -q --verify "$ref^{commit}" >/dev/null 2>&1 \
+     && git -C "$ROOT" cat-file -e "$ref:deploy/nginx-render.sh" 2>/dev/null; then
+    git -C "$ROOT" show "$ref:deploy/nginx-paramant-live.conf" > "$NGX_TMP/src.conf"
+    git -C "$ROOT" show "$ref:deploy/nginx-render.sh" > "$NGX_TMP/render.sh"
+    git -C "$ROOT" show "$ref:deploy/nginx/snippets/paramant-security-headers.conf" > "$NGX_TMP/snip"
+    NGINX_REF_USED="$(git -C "$ROOT" rev-parse --short "$ref^{commit}") ($ref)"
+  elif [ "$DRY_RUN" -eq 1 ]; then
+    note "$ref does not resolve here, or predates deploy/nginx-render.sh; this dry run renders the working tree"
+    cp "$ROOT/deploy/nginx-paramant-live.conf" "$NGX_TMP/src.conf"
+    cp "$ROOT/deploy/nginx-render.sh" "$NGX_TMP/render.sh"
+    cp "$ROOT/deploy/nginx/snippets/paramant-security-headers.conf" "$NGX_TMP/snip"
+    NGINX_REF_USED="the working tree"
+  else
+    die "cannot render the site conf from $ref: it does not resolve here, or predates deploy/nginx-render.sh. git fetch, or set PARAMANT_NGINX_REF"
+  fi
+  PARAMANT_DOCROOT="$DOCROOT" bash "$NGX_TMP/render.sh" "$NGX_TMP/src.conf" > "$NGX_TMP/conf" \
+    || die "deploy/nginx-render.sh refused to render the conf (see above)"
+  NGX_CONF_SHA="$(sha256sum "$NGX_TMP/conf" | cut -d' ' -f1)"
+  NGX_SNIP_SHA="$(sha256sum "$NGX_TMP/snip" | cut -d' ' -f1)"
+  printf '  rendered      %s, %s bytes, sha256 %s\n' "$NGINX_REF_USED" "$(stat -c%s "$NGX_TMP/conf")" "$(printf '%s' "$NGX_CONF_SHA" | cut -c1-16)"
+  printf '  snippet       paramant-security-headers.conf, %s bytes, sha256 %s\n' "$(stat -c%s "$NGX_TMP/snip")" "$(printf '%s' "$NGX_SNIP_SHA" | cut -c1-16)"
+}
+
+# nginx_sync_public_check: from outside, through Caddy. Prints one line per
+# check and returns non-zero when any of them fails.
+nginx_sync_public_check() {
+  local bad=0 got codes n429 pair
+  for pair in "/parashare?t=deploycheck5e /get?t=deploycheck5e" "/en/parashare?t=deploycheck5e /en/get?t=deploycheck5e"; do
+    got="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 15 "$PUBLIC_SITE${pair% *}" || echo 000)"
+    if [ "$got" = "302 $PUBLIC_SITE${pair#* }" ]; then
+      printf '  public  %-30s %s\n' "${pair% *}" "$got"
+    else
+      printf '  PUBLIC  %-30s %s, expected 302 %s\n' "${pair% *}" "$got" "$PUBLIC_SITE${pair#* }"
+      bad=$((bad + 1))
+    fi
+  done
+  codes="$(for _ in $(seq 1 12); do
+             curl -s -o /dev/null -w '%{http_code}\n' --max-time 15 "$PUBLIC_SITE/api/user/me" &
+           done; wait)"
+  n429="$(printf '%s\n' "$codes" | grep -c '^429$' || true)"
+  printf '  public  12 x /api/user/me in parallel: %s\n' "$(printf '%s\n' "$codes" | sort | uniq -c | awk '{printf "%s x %s  ", $1, $2}')"
+  if [ "$n429" -ne 0 ]; then
+    printf '  PUBLIC  %s of 12 parallel /api/user/me answered 429; /api/user/ is still on a login brake\n' "$n429"
+    bad=$((bad + 1))
+  fi
+  return "$bad"
+}
+
+# nginx_sync_restore: put back the conf and snippet 5e backed up under this TS.
+# For a fault 5e can only see from outside, after the server half finished.
+nginx_sync_restore() {
+  remote_nginx "nginx full conf restore" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_LIVE_SLOT" "$NGINX_SNIPPET_DIR" <<'EOF'
+set -euo pipefail
+TS="$1"; SITES="$2"; NGBK="$3"; SLOT="$4"; SNIPDIR="$5"
+resolve_conf_slots "$SITES" "$SLOT"
+name="$(printf '%s' "$RESOLVED_CONFS" | awk '{print $1}')"
+CONF="$(readlink -f "$SITES/$name")"
+SNIP="$SNIPDIR/paramant-security-headers.conf"
+[ -f "$NGBK/$name.pre-nginx-sync-$TS" ] || { echo "FATAL no backup $NGBK/$name.pre-nginx-sync-$TS"; exit 1; }
+cat "$NGBK/$name.pre-nginx-sync-$TS" > "$CONF"
+if [ -f "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" ]; then
+  cat "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" > "$SNIP"
+else
+  rm -f "$SNIP"
+fi
+nginx -t 2>&1 | sed 's/^/  nginxt /'
+systemctl reload nginx
+echo "restored and reloaded the previous nginx conf"
+EOF
+  expect 'restored and reloaded the previous nginx conf' "the previous nginx conf and snippet are back and reloaded"
+}
+
+phase_5e() {
+  step "5e. the whole site conf from the repo on the live slot, with the snippet it includes"
+  nginx_sync_prepare
+  nginx_sync_gate "$NGX_TMP/conf"
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    if [ -n "$NGINX_LIVE_COPY" ]; then
+      [ -r "$NGINX_LIVE_COPY" ] || die "PARAMANT_NGINX_LIVE_COPY is not readable: $NGINX_LIVE_COPY"
+      local dl
+      dl="$(diff -u --label "server copy $(basename "$NGINX_LIVE_COPY")" --label "repo, rendered" \
+              "$NGINX_LIVE_COPY" "$NGX_TMP/conf" || true)"
+      printf '%s\n' "$dl" | sed 's/^/  confdiff /'
+      printf '  [dry-run] %s line(s) would change against %s; nothing was written\n' \
+        "$(printf '%s\n' "$dl" | grep -cE '^[-+][^-+]|^[-+]$' || true)" "$NGINX_LIVE_COPY"
+    else
+      note "no PARAMANT_NGINX_LIVE_COPY: a dry run never connects, so it cannot diff against the"
+      note "server. The real run prints the diff on the server before it writes, and"
+      note "scripts/check-prod-drift.sh shows the live diff read-only."
+    fi
+    NGINX_PAYLOAD="CONF_B64='<the rendered conf, $(stat -c%s "$NGX_TMP/conf") bytes, base64>'
+SNIP_B64='<the snippet, $(stat -c%s "$NGX_TMP/snip") bytes, base64>'
+WANT_CONF='<sha256 of the rendered conf>'
+WANT_SNIP='<sha256 of the snippet>'
+PUBLIC_808X_OK='$NGINX_PUBLIC_808X_OK'
+"
+  else
+    # The checksums travel in the payload, not as arguments: an argument is
+    # printed in the ssh line, and no 32+ hex run is ever printed.
+    NGINX_PAYLOAD="CONF_B64='$(base64 -w0 < "$NGX_TMP/conf")'
+SNIP_B64='$(base64 -w0 < "$NGX_TMP/snip")'
+WANT_CONF='$NGX_CONF_SHA'
+WANT_SNIP='$NGX_SNIP_SHA'
+PUBLIC_808X_OK='$NGINX_PUBLIC_808X_OK'
+"
+  fi
+
+  remote_nginx "nginx full conf" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_LIVE_SLOT" "$NGINX_SNIPPET_DIR" <<'EOF'
+set -euo pipefail
+TS="$1"; SITES="$2"; NGBK="$3"; SLOT="$4"; SNIPDIR="$5"
+: "${WANT_CONF:?}" "${WANT_SNIP:?}"
+
+resolve_conf_slots "$SITES" "$SLOT"
+if [ "$RESOLVED_MISSING" -ne 0 ]; then
+  echo "FATAL the live conf slot has no candidate in $SITES: $SLOT"
+  exit 1
+fi
+name="$(printf '%s' "$RESOLVED_CONFS" | awk '{print $1}')"
+CONF="$(readlink -f "$SITES/$name")"
+SNIP="$SNIPDIR/paramant-security-headers.conf"
+WORK="$(mktemp -d /tmp/paramant-5e.XXXXXX)"
+trap 'rm -rf "$WORK"' EXIT
+
+printf '%s' "${CONF_B64:?}" | base64 -d > "$WORK/conf"
+printf '%s' "${SNIP_B64:?}" | base64 -d > "$WORK/snip"
+if [ "$(sha256sum "$WORK/conf" | cut -d' ' -f1)" != "$WANT_CONF" ] \
+   || [ "$(sha256sum "$WORK/snip" | cut -d' ' -f1)" != "$WANT_SNIP" ]; then
+  echo "FATAL the conf or the snippet arrived with a different checksum than was sent; nothing was written"
+  exit 1
+fi
+echo "target $name -> $CONF"
+
+# Every zone the new conf limits on must already be bound in the config nginx
+# loads. In a full deploy 5d has just made sure of that; under --nginx-sync it
+# has not run, and a missing zone is a conf nginx refuses. Asked before the
+# first write, so the answer costs nothing.
+used="$( { grep -oE 'limit_req[[:space:]]+zone=[A-Za-z0-9_]+' "$WORK/conf" || true; } | sed 's/.*zone=//' | sort -u)"
+defined="$( { nginx -T 2>/dev/null || true; } | { grep -oE '^[[:space:]]*limit_req_zone[^;]*zone=[A-Za-z0-9_]+' || true; } | sed 's/.*zone=//' | sort -u)"
+missing="$(comm -23 <(printf '%s\n' "$used") <(printf '%s\n' "$defined") | tr '\n' ' ')"
+echo "before zones used = $(printf '%s' "$used" | wc -w | tr -d ' ')"
+echo "before zones missing = $(printf '%s' "$missing" | wc -w | tr -d ' ')"
+if [ -n "${missing// /}" ]; then
+  echo "FATAL the repo conf limits on zone(s) the loaded config does not bind: $missing"
+  echo "FATAL nothing was written. Run the full deploy (step 5d places the tracked zones) first."
+  exit 1
+fi
+
+# Read-only: does another enabled conf (paramant-public.conf) proxy to one of
+# the loopback ports this conf serves? The repo public conf goes straight to
+# :3000-:3004, so the limits on :8081-:8086 never meet a visitor. If the server's
+# public conf does point there, the body limits of those blocks would apply to
+# real uploads, and nobody has weighed that yet. Stop before the first write.
+hits=""
+for f in "$SITES"/*; do
+  [ -e "$f" ] || continue
+  [ "$(readlink -f "$f")" = "$CONF" ] && continue
+  h="$( { grep -nE '^[^#]*(127\.0\.0\.1|localhost):808[1-6]' "$f" || true; } | sed "s|^|$(basename "$f"):|")"
+  [ -n "$h" ] && hits="${hits:+$hits
+}$h"
+done
+echo "before public 808x hits = $(printf '%s' "$hits" | grep -c . || true)"
+if [ -n "$hits" ]; then
+  printf '%s\n' "$hits" | sed 's/^/  public808x /'
+  if [ "${PUBLIC_808X_OK:-0}" = 1 ]; then
+    echo "after public 808x = accepted by PARAMANT_NGINX_PUBLIC_808X_OK=1"
+  else
+    echo "FATAL another enabled conf proxies to 127.0.0.1:808[1-6] (lines above). The repo conf sets"
+    echo "FATAL client_max_body_size on those ports (12M on :8081/:8083-:8085, 35M on :8086 /v2/), and"
+    echo "FATAL production runs them without; uploads through that vhost could get 413. Nothing was written."
+    echo "FATAL Compare those limits with what the vhost needs, then run again with PARAMANT_NGINX_PUBLIC_808X_OK=1."
+    exit 1
+  fi
+fi
+
+# The backups first, before a single byte changes. The snippet may not exist
+# yet; then a marker says so, and a restore removes it again.
+mkdir -p "$NGBK"
+BK_CONF="$NGBK/$name.pre-nginx-sync-$TS"
+BK_SNIP="$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS"
+BK_NOSNIP="$NGBK/paramant-security-headers.conf.absent-nginx-sync-$TS"
+cp -a "$CONF" "$BK_CONF"
+echo "after conf backup = $BK_CONF ($(stat -c%s "$BK_CONF") bytes)"
+if [ -f "$SNIP" ]; then
+  cp -a "$SNIP" "$BK_SNIP"
+  echo "after snippet backup = $BK_SNIP ($(stat -c%s "$BK_SNIP") bytes)"
+else
+  : > "$BK_NOSNIP"
+  echo "after snippet backup = none, $SNIP did not exist ($BK_NOSNIP)"
+fi
+
+# restore: conf and snippet go back together, never one of the two. It tries
+# both writes even when the first fails (set +e), and only reloads when both
+# landed: a half restored pair is not handed to nginx. Runs once.
+ARMED=0
+RESTORED=0
+restore() {
+  [ "$RESTORED" = 1 ] && return 0
+  RESTORED=1
+  set +e
+  cat "$BK_CONF" > "$CONF"
+  if [ -f "$BK_SNIP" ]; then cat "$BK_SNIP" > "$SNIP"; else rm -f "$SNIP"; fi
+  # Judged on what is on disk, not on the exit codes: a conf that could not be
+  # written because it was never changed is back all the same.
+  if ! cmp -s "$BK_CONF" "$CONF" \
+     || { [ -f "$BK_SNIP" ] && ! cmp -s "$BK_SNIP" "$SNIP"; } || { [ ! -f "$BK_SNIP" ] && [ -e "$SNIP" ]; }; then
+    echo "FATAL could not put the backups back on disk; nothing reloaded, nginx keeps its running workers."
+    echo "FATAL by hand: cp $BK_CONF $CONF and $([ -f "$BK_SNIP" ] && echo "cp $BK_SNIP $SNIP" || echo "rm $SNIP")"
+    set -e
+    return 0
+  fi
+  echo "restored $CONF and $SNIP from the pre-nginx-sync-$TS backups"
+  if nginx -t > /dev/null 2>&1 && systemctl reload nginx; then
+    echo "restored and reloaded the previous nginx conf"
+  else
+    echo "FATAL the restored conf did not test clean or did not reload; nginx keeps its running workers"
+  fi
+  set -e
+}
+# Any command that fails after the backups (a write on a full or read-only disk
+# under set -e) ends the block. These traps make sure that end puts conf and
+# snippet back together, instead of leaving the new snippet next to the old
+# conf, or a half written conf for the next restart to choke on.
+on_fault() {
+  echo "FATAL a command failed at line $1 after the backups (exit $2), restoring the conf and snippet"
+  restore
+}
+on_exit() {
+  local rc=$?
+  if [ "$ARMED" = 1 ] && [ "$RESTORED" = 0 ]; then
+    echo "FATAL the 5e block ended unfinished (exit $rc) after the backups, restoring the conf and snippet"
+    restore
+    [ "$rc" -eq 0 ] && rc=1
+  fi
+  rm -rf "$WORK"
+  exit "$rc"
+}
+trap 'on_fault "$LINENO" "$?"' ERR
+trap on_exit EXIT
+ARMED=1
+
+# What will change, before anything does.
+diff -u --label "server $name" --label "repo, rendered" "$CONF" "$WORK/conf" > "$WORK/conf.diff" || true
+diff -u --label "server snippet" --label "repo snippet" "$([ -f "$SNIP" ] && echo "$SNIP" || echo /dev/null)" "$WORK/snip" > "$WORK/snip.diff" || true
+echo "before conf diff lines = $(grep -cE '^[-+][^-+]|^[-+]$' "$WORK/conf.diff" || true)"
+echo "before snippet diff lines = $(grep -cE '^[-+][^-+]|^[-+]$' "$WORK/snip.diff" || true)"
+sed 's/^/  confdiff /' "$WORK/conf.diff"
+sed 's/^/  snipdiff /' "$WORK/snip.diff"
+
+conf_changed=yes; cmp -s "$CONF" "$WORK/conf" && conf_changed=no
+snip_changed=yes; [ -f "$SNIP" ] && cmp -s "$SNIP" "$WORK/snip" && snip_changed=no
+echo "after conf changed = $conf_changed"
+echo "after snippet changed = $snip_changed"
+
+if [ "$conf_changed" = yes ] || [ "$snip_changed" = yes ]; then
+  # cat into the file, not mv over it: the conf may be a symlink target, and
+  # its owner and mode stay as they were.
+  [ "$snip_changed" = yes ] && { mkdir -p "$SNIPDIR"; cat "$WORK/snip" > "$SNIP"; chmod 0644 "$SNIP"; }
+  [ "$conf_changed" = yes ] && cat "$WORK/conf" > "$CONF"
+  if [ "$(sha256sum "$CONF" | cut -d' ' -f1)" != "$WANT_CONF" ] \
+     || [ "$(sha256sum "$SNIP" | cut -d' ' -f1)" != "$WANT_SNIP" ]; then
+    echo "FATAL what is on disk after the write is not what was sent"
+    restore
+    exit 1
+  fi
+  rc=0
+  nginx -t > "$WORK/nginxt" 2>&1 || rc=$?
+  sed 's/^/  nginxt /' "$WORK/nginxt"
+  if [ "$rc" -ne 0 ]; then
+    echo "FATAL nginx -t failed on the repo conf, restoring the backed up conf and snippet"
+    restore
+    exit 1
+  fi
+  if ! systemctl reload nginx; then
+    echo "FATAL systemctl reload nginx failed, restoring the backed up conf and snippet"
+    restore
+    exit 1
+  fi
+  echo "reloaded nginx for the full conf"
+else
+  echo "the server already runs the repo conf and snippet; nothing written, nothing reloaded"
+fi
+echo "after conf sha256 prefix = $(sha256sum "$CONF" | cut -c1-16)"
+
+# Loopback, straight at the vhost: no DNS, no Caddy, so a fault here is this
+# conf and nothing else. The home page proves the site still answers.
+lb() { curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 10 -H 'Host: paramant.app' "http://127.0.0.1:8080$1" || echo 000; }
+# systemctl reload only signals the master: for a moment the old workers still
+# answer, with the old conf (measured: 27 of 100 checks right after a reload got
+# the old /parashare answer). So wait up to 10 s, every 0.5 s, for the new conf
+# to answer, and judge only then.
+WANT_SHARE="302 https://paramant.app/get?t=deploycheck5e"
+tries="${LB_TRIES:-20}"
+n=0
+while :; do
+  n=$((n + 1))
+  home="$(lb /)"
+  share="$(lb '/parashare?t=deploycheck5e')"
+  case "$home" in 200*) [ "$share" = "$WANT_SHARE" ] && break ;; esac
+  [ "$n" -ge "$tries" ] && break
+  sleep 0.5
+done
+echo "after loopback tries = $n"
+echo "after loopback home = $home"
+echo "after loopback parashare = $share"
+case "$home" in 200*) ;; *)
+  echo "FATAL the home page answers '$home' on 127.0.0.1:8080 after the reload, restoring"
+  restore
+  exit 1 ;;
+esac
+if [ "$share" != "$WANT_SHARE" ]; then
+  echo "FATAL /parashare?t= answers '$share' on 127.0.0.1:8080, expected a 302 to /get with the token, restoring"
+  restore
+  exit 1
+fi
+ARMED=0
+EOF
+  NGINX_PAYLOAD=""
+
+  # Anchored: the diff above prints conf lines, and only the block's own verdicts
+  # start a line with FATAL.
+  expect_not '^FATAL' "the repo site conf is in place, tested clean and reloaded, and the old one is backed up"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): /parashare?t= and /en/parashare?t= answer 302 to /get with the token, through Caddy\n'
+    printf '  SKIP  assert (dry-run): 12 parallel /api/user/me answer no 429, through Caddy\n'
+    return 0
+  fi
+  [ "$(remote_field 'after conf sha256 prefix')" = "$(printf '%s' "$NGX_CONF_SHA" | cut -c1-16)" ] \
+    || die "the live conf on the server is not the rendered repo conf after 5e"
+  ok "the live conf on the server is the repo conf, byte for byte ($NGINX_REF_USED)"
+  expect 'after loopback home = 200' "the home page answers 200 on the vhost after the reload"
+  expect 'after loopback parashare = 302 https://paramant.app/get\?t=deploycheck5e' \
+    "/parashare?t= answers 302 to /get on the vhost itself"
+
+  if nginx_sync_public_check; then
+    ok "through Caddy: /parashare?t= keeps its token, and 12 parallel /api/user/me get no 429"
+  else
+    warn "the outside checks failed after 5e; putting the previous conf and snippet back"
+    nginx_sync_restore
+    die "5e was rolled back: the repo conf passed nginx -t but failed the outside checks above"
+  fi
+  rm -rf "$NGX_TMP"
 }
 
 # =============================================================== PHASE 6 =====
@@ -3149,6 +3626,17 @@ for name in $RESOLVED_CONFS; do
 done
 echo "restored nginx confs = $n"
 
+# Phase 5e also placed the security-headers snippet. Its backup carries this
+# same TS; a marker instead of a backup means there was no snippet before.
+SNIP=/etc/nginx/snippets/paramant-security-headers.conf
+if [ -f "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" ]; then
+  cp -a "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" "$SNIP"
+  echo "restored the security-headers snippet from the 5e backup"
+elif [ -f "$NGBK/paramant-security-headers.conf.absent-nginx-sync-$TS" ]; then
+  rm -f "$SNIP"
+  echo "removed the security-headers snippet again; 5e found none before it"
+fi
+
 # Test before reload. A reload on a broken conf keeps the old workers alive and
 # hides the breakage until the next restart.
 rc=0
@@ -3271,6 +3759,23 @@ if [ "$VERIFY_ONLY" -eq 1 ]; then
   echo "server checkout is on, which is the commit that is actually deployed,"
   echo "and that is what the next run's phase 1a gates on. If $DEPLOY_REF has"
   echo "moved on since that deploy, the next full run fast-forwards to it."
+  hr
+  exit 0
+fi
+
+if [ "$NGINX_SYNC_ONLY" -eq 1 ]; then
+  phase 5e "The whole site conf from the repo (server, WRITE)" "Step 5e"
+  phase_5e
+  echo
+  hr
+  echo "NGINX SYNC FINISHED, warnings: $WARNINGS"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "Dry run: nothing was written. The diff above is what 5e would change."
+  else
+    echo "Phase 5e only. The live site conf and the security-headers snippet are"
+    echo "the repo's, rendered from $NGINX_REF_USED. Nothing else was touched."
+    echo "The previous files are in $NGINX_BACKUP_DIR under *.pre-nginx-sync-$TS."
+  fi
   hr
   exit 0
 fi
