@@ -59,7 +59,7 @@ test('co-sign opens a link without the half with the remembered one, and remembe
   const decrypt = fn.indexOf('await decryptDocumentCapsule(');
   const remember = fn.indexOf('rememberShare(envId, partyIndex,');
   assert.ok(decrypt > 0 && remember > decrypt, 'the half is kept only after it proved to open the document');
-  assert.match(src, /fetchAndOpenCapsule\(url, envId, partyIndex\)/);
+  assert.match(src, /fetchAndOpenCapsule\(url, envId, partyIndex[,)]/);
   assert.match(src, /de sleutel die deze browser bewaarde van uw eerste uitnodiging, en klopt met dit verzoek/);
 });
 
