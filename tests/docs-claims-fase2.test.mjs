@@ -123,7 +123,11 @@ test('open-API-spec: signer.completed en envelope.completed worden gevuurd, en s
   assert.match(repo('relay/relay.js'), /emitEvent\(_pdeps, id, 'signer\.completed'/);
   const spec = repo('docs/parasign-open-api-spec.md');
   assert.doesNotMatch(spec, /NOT yet auto-fired/);
-  assert.match(spec, /no retry/);
+  // P10 API-19-C/J: the relay now retries (three attempts) and keeps the order
+  // per envelope; the spec says exactly that and no longer "no retry".
+  assert.match(spec, /three attempts in all/);
+  assert.match(spec, /`seq`/);
+  assert.doesNotMatch(spec, /no retry and no\s+ordering guarantee/);
 });
 
 test('crypto-agility: alleen de core-set heet geladen, en het curl-voorbeeld is wat core antwoordt', () => {

@@ -201,34 +201,94 @@ const errRes = (res, code, error, message, J) => jsonRes(res, code, { error, mes
 // Mirrors relay.pushWebhooks headers so a client verifies identically:
 //   X-Paramant-Sig = hex HMAC_SHA256(webhook_secret, raw_body). Adds a unique
 //   X-Paramant-Delivery so clients can dedupe replays.
-async function emitEvent(deps, id, event, extra) {
-  const m = await resolveStore(deps).getMeta(id);
-  if (!m || !m.webhook_url) return { skipped: 'no_webhook' };
-  const payload = deps.J({
-    event, id, ts: new Date().toISOString(),
-    data: extra || {}, metadata: m.metadata || {},
-  });
-  const sig = m.webhook_secret
-    ? crypto.createHmac('sha256', m.webhook_secret).update(payload).digest('hex') : '';
-  const delivery = crypto.randomBytes(12).toString('hex');
-  try {
-    await deps.safeHttpsRequest(m.webhook_url, {
-      method: 'POST', timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
-        'X-Paramant-Event': event,
-        'X-Paramant-Sig': sig,
-        'X-Paramant-Delivery': delivery,
-        'User-Agent': 'paramant-relay/parasign-v1',
-      },
-      body: payload,
-    });
-    return { ok: true, delivery };
-  } catch (e) {
-    deps.log && deps.log('warn', 'parasign_v1_webhook_fail', { id, event, err: e.message, code: e.code });
-    return { ok: false, err: e.message };
+//
+// P10 API-19-C and API-19-J. Each event used to be one fire-and-forget POST:
+// a receiver that blinked lost the event for good, and signer.completed and
+// envelope.completed raced each other with nothing in the body to put them back
+// in order. Now:
+//   * RETRY. A delivery that fails on the network or answers 5xx (or 429) is
+//     tried again after WEBHOOK_RETRY_DELAYS_MS, three attempts in all, with the
+//     SAME body, signature and X-Paramant-Delivery, so a receiver that did get
+//     an earlier attempt drops the repeat by that id. A 2xx, 3xx or other 4xx
+//     ends it: the receiver answered, and a 4xx will not get better by asking
+//     again. X-Paramant-Attempt says which try this is.
+//   * ORDER. The events of one envelope go out one after another, in the order
+//     they happened, from a queue per envelope id; the next event waits until
+//     the previous one is delivered or has used up its attempts.
+//   * SEQ. Every body carries `seq`, derived from the envelope's own state, so
+//     it is the same number after a restart and on any relay:
+//       envelope.sent = 1, signer.completed = 1 + signed_count,
+//       envelope.completed and envelope.voided = party_count + 2 (terminal).
+//     A receiver that sees seq go down knows it holds a newer state already.
+const WEBHOOK_RETRY_DELAYS_MS = [2000, 10000];
+const _webhookQueues = new Map();   // envelope id -> tail promise
+
+function webhookSeq(event, extra) {
+  const x = extra || {};
+  if (event === 'envelope.sent') return 1;
+  if (event === 'signer.completed') return 1 + (Number(x.signed_count) || 0);
+  if (event === 'envelope.completed' || event === 'envelope.voided') {
+    const n = Number(x.party_count || x.signer_count);
+    return Number.isFinite(n) && n > 0 ? n + 2 : null;
   }
+  return null;
+}
+
+function _retryable(r) {
+  return !r || !Number.isFinite(r.status) || r.status >= 500 || r.status === 429;
+}
+
+async function _deliverWithRetry(deps, m, id, event, payload, sig, delivery) {
+  const delays = Array.isArray(deps.webhookRetryDelaysMs) ? deps.webhookRetryDelaysMs : WEBHOOK_RETRY_DELAYS_MS;
+  const wait = deps.webhookSleep || ((ms) => new Promise((r) => { const t = setTimeout(r, ms); if (t.unref) t.unref(); }));
+  let last = null;
+  for (let attempt = 1; attempt <= delays.length + 1; attempt++) {
+    try {
+      const r = await deps.safeHttpsRequest(m.webhook_url, {
+        method: 'POST', timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'X-Paramant-Event': event,
+          'X-Paramant-Sig': sig,
+          'X-Paramant-Delivery': delivery,
+          'X-Paramant-Attempt': String(attempt),
+          'User-Agent': 'paramant-relay/parasign-v1',
+        },
+        body: payload,
+      });
+      if (!_retryable(r)) return { ok: true, delivery, attempts: attempt, status: r.status };
+      last = { ok: false, err: 'http_' + (r && r.status), status: r && r.status };
+    } catch (e) {
+      last = { ok: false, err: e.message, code: e.code };
+    }
+    if (attempt <= delays.length) await wait(delays[attempt - 1]);
+  }
+  deps.log && deps.log('warn', 'parasign_v1_webhook_fail', { id, event, err: last && last.err, code: last && last.code, attempts: delays.length + 1 });
+  return Object.assign({ delivery, attempts: delays.length + 1 }, last);
+}
+
+function emitEvent(deps, id, event, extra) {
+  const prev = _webhookQueues.get(id) || Promise.resolve();
+  const run = prev.catch(() => {}).then(async () => {
+    const m = await resolveStore(deps).getMeta(id);
+    if (!m || !m.webhook_url) return { skipped: 'no_webhook' };
+    const seq = webhookSeq(event, extra);
+    const payload = deps.J({
+      event, id, ...(seq !== null ? { seq } : {}), ts: new Date().toISOString(),
+      data: extra || {}, metadata: m.metadata || {},
+    });
+    const sig = m.webhook_secret
+      ? crypto.createHmac('sha256', m.webhook_secret).update(payload).digest('hex') : '';
+    const delivery = crypto.randomBytes(12).toString('hex');
+    return _deliverWithRetry(deps, m, id, event, payload, sig, delivery);
+  });
+  _webhookQueues.set(id, run);
+  // Drop the queue entry once this was the last event in it, so the map holds
+  // only envelopes with a delivery in flight.
+  run.then(() => { if (_webhookQueues.get(id) === run) _webhookQueues.delete(id); },
+           () => { if (_webhookQueues.get(id) === run) _webhookQueues.delete(id); });
+  return run;
 }
 
 // ── /v1 Bearer authentication ─────────────────────────────────────────────────
@@ -341,6 +401,12 @@ async function createEnvelope(deps, apiKey, mode, rec) {
   if (d.binding_mode !== undefined && d.binding_mode !== 'email' && d.binding_mode !== 'open') {
     return errRes(res, 400, 'invalid_binding_mode', 'binding_mode must be "email" or "open".', J);
   }
+  // metadata is echoed back to the owner and into every webhook as an object.
+  // A string or an array used to be answered 201 and silently stored as {}
+  // (P10 API-13-B): the caller lost what it sent and was told nothing.
+  if (d.metadata !== undefined && d.metadata !== null && (typeof d.metadata !== 'object' || Array.isArray(d.metadata))) {
+    return errRes(res, 400, 'invalid_metadata', 'metadata must be a JSON object.', J);
+  }
   const signers0 = Array.isArray(d.signers) ? d.signers : [];
   if (signers0.length === 0) return errRes(res, 400, 'missing_signers', 'At least one signer is required.', J);
   // With email binding every slot is bound to a mailbox; a signer without a
@@ -361,6 +427,11 @@ async function createEnvelope(deps, apiKey, mode, rec) {
   let pdf = null;
   const doc = d.document || {};
   try {
+    // An empty content_base64 is an empty document, not a missing one: the
+    // caller did send the field (P10 API-13-C, the spec names empty_document).
+    if (typeof doc.content_base64 === 'string' && doc.content_base64.trim() === '' && !doc.url) {
+      return errRes(res, 400, 'empty_document', 'Empty document.', J);
+    }
     if (doc.content_base64) {
       pdf = Buffer.from(String(doc.content_base64), 'base64');
     } else if (doc.url) {
@@ -444,6 +515,14 @@ async function createEnvelope(deps, apiKey, mode, rec) {
       plan: rec && rec.plan,
     });
   } catch (e) {
+    // More names than the plan allows on one document is a caller error with a
+    // name of its own and the ceiling in numbers (P10 API-13-C), not the
+    // catch-all create_failed.
+    const tooMany = /too many parties \(max (\d+) on the ([a-z_-]+) plan\)/i.exec(String(e.message || ''));
+    if (tooMany) {
+      return jsonRes(res, 400, { error: 'too_many_signers', max_signers: Number(tooMany[1]), plan: tooMany[2],
+        message: e.message }, J);
+    }
     return errRes(res, 400, 'create_failed', e.message, J);
   }
 
@@ -487,7 +566,9 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     name: signers[i] ? (signers[i].name || null) : null,
     email: signers[i] ? (signers[i].email || null) : null,
     order: signers[i] ? (signers[i].order || (i + 1)) : (i + 1),
-    status: signedSet.has(pl.party_index) ? 'completed' : 'pending',
+    // The same word GET /v1/envelopes/:id uses for a signed slot ('signed'),
+    // so a client reads one enum, not two (P10 API-14-L).
+    status: signedSet.has(pl.party_index) ? 'signed' : 'pending',
     sign_url: origin + pl.sign_path,
   }));
   const finalStatus = (sandbox && sandbox.status === 'complete') ? 'completed' : 'sent';
@@ -831,12 +912,12 @@ async function voidEnvelope(deps, id, token, rec) {
   // drop the stored PDF + any stamped copy immediately (PII minimisation). The
   // small meta record is kept (TTL'd) so the webhook can still fire.
   try { await resolveStore(deps).delBlob(id); } catch (_) { /* best effort */ }
-  emitEvent(deps, id, 'envelope.voided', { status: 'void', reason });
+  emitEvent(deps, id, 'envelope.voided', { status: 'void', reason, party_count: Array.isArray(env.parties) ? env.parties.length : undefined });
   return jsonRes(res, 200, { id, status: 'void', voided_at: out.voided_at }, J);
 }
 
 module.exports = {
-  route, emitEvent, hasParaSignScope, externalStatus,
+  route, emitEvent, webhookSeq, hasParaSignScope, externalStatus,
   authenticateBearer,           // shared with the relay's own /v1 handlers
   grantParaSignScope, setParaSignEnabled,
   authorizeReceipt, hexEqual,   // exposed for tests
