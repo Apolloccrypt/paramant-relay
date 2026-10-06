@@ -180,8 +180,12 @@ export async function verifyEntry({ relay, index, leafHash, fetchFn }) {
     proof = r.ok ? await r.json() : null;
   } catch { proof = null; }
   if (!proof) { add('inclusion', null); return done(); }
+  // A relay from before 3.1.2 ignores ?tree_size and answers with the path to
+  // the tree at index + 1, without a tree_size field. That path cannot fold to
+  // the current head, and calling it "failed" would accuse an honest relay, so
+  // it is "not checked" instead.
+  if (proof.tree_size !== sth.tree_size) { add('inclusion', null); return done(); }
   const inclOk = String(proof.leaf_hash || '').toLowerCase() === String(leafHash || '').toLowerCase()
-    && (proof.tree_size === undefined || proof.tree_size === sth.tree_size)
     && verifyInclusion(String(leafHash || '').toLowerCase(), index, sth.tree_size, proof.proof, sth.sha3_root);
   if (!add('inclusion', inclOk)) return done();
 
