@@ -35,6 +35,20 @@ const PARAMANT_FLEET = Object.freeze({
   'iot.paramant.app':     'ce56ff0fafeedaa160c91dc7afee038b17dfb397665a9b2c88b0d3f77acd28c6',
 });
 
+// Retired keys: a relay that rotated its identity key keeps its OLD key here,
+// in the same commit that pins the new one (RUNBOOK.md, "Relay identity key
+// rotation"). Same entries as RETIRED_RELAY_ANCHORS in
+// frontend/js/relay-trust-anchors.js, held equal by
+// tests/fleet-pins-match-anchors.test.mjs. What a retired pin does:
+//   - the heads that key already sent stay in the public mirror, so the
+//     evidence of the old tree is not moved to purged/ at the next start;
+//   - a NEW head signed with it is refused (403, reason retired_key): a key
+//     that was rotated out may be a key someone else now holds.
+// Empty today: no relay has rotated since the pins were taken on 2026-09-05.
+const RETIRED_PARAMANT_FLEET = Object.freeze([
+  // { host: 'health.paramant.app', fingerprint: '<64 hex>', retired_at: 'JJJJ-MM-DD' },
+]);
+
 // The Paramant domain. A name under it that is not pinned is not ours to
 // mirror, and a head that claims one is impersonation, not an unknown peer.
 const PARAMANT_DOMAIN = /(^|\.)paramant\.app$/i;
@@ -68,7 +82,22 @@ function parseExtraPins(spec) {
   return out;
 }
 
-function buildPins(extraSpec) {
+// PEER_STH_RETIRED_PINS="host=fingerprint,..." does for a self-hosted fleet
+// what RETIRED_PARAMANT_FLEET does for ours. One host may have several.
+function parseRetiredPins(spec) {
+  const out = [];
+  for (const part of String(spec || '').split(',')) {
+    const p = part.trim();
+    const eq = p.lastIndexOf('=');
+    if (eq <= 0) continue;
+    const host = hostOfRelayId(p.slice(0, eq));
+    const fp = p.slice(eq + 1).trim().toLowerCase();
+    if (host && /^[0-9a-f]{64}$/.test(fp)) out.push({ host, fingerprint: fp, retired_at: null });
+  }
+  return out;
+}
+
+function buildPins(extraSpec, retiredList = RETIRED_PARAMANT_FLEET) {
   const byHost = new Map(Object.entries(PARAMANT_FLEET));
   for (const [host, fp] of parseExtraPins(extraSpec)) {
     if (!byHost.has(host)) byHost.set(host, fp);
@@ -78,7 +107,17 @@ function buildPins(extraSpec) {
     if (!byKey.has(fp)) byKey.set(fp, new Set());
     byKey.get(fp).add(host);
   }
-  return { byHost, byKey };
+  // fingerprint -> { hosts, retired_at }. A key that is pinned as current is
+  // never also retired (the test on the anchor file enforces that too).
+  const retired = new Map();
+  for (const r of retiredList || []) {
+    const host = hostOfRelayId(r && r.host);
+    const fp = String((r && r.fingerprint) || '').toLowerCase();
+    if (!host || !/^[0-9a-f]{64}$/.test(fp) || byKey.has(fp)) continue;
+    if (!retired.has(fp)) retired.set(fp, { hosts: new Set(), retired_at: r.retired_at || null });
+    retired.get(fp).hosts.add(host);
+  }
+  return { byHost, byKey, retired };
 }
 
 // The verdict for one head: 'pinned' (mirror it publicly), 'unpinned' (an
@@ -86,6 +125,12 @@ function buildPins(extraSpec) {
 function classifyPeer(pins, relayId, pkHash) {
   const host = hostOfRelayId(relayId);
   if (!host) return { verdict: 'refused', reason: 'relay_id_unparsable', host: null };
+  // health.paramant.app. (or %2e, or an ideographic full stop) is the same
+  // name in DNS but not the same string as the pin, so it used to slip past as
+  // an unknown peer. A name never needs the dot: refuse it outright.
+  if (/\.$/.test(host.replace(/:\d+$/, ''))) return { verdict: 'refused', reason: 'relay_id_trailing_dot', host };
+  const old = pins.retired && pins.retired.get(pkHash);
+  if (old && old.hosts.has(host)) return { verdict: 'retired', host, retired_at: old.retired_at };
   const pinned = pins.byHost.get(host);
   if (pinned && pinned !== pkHash) return { verdict: 'refused', reason: 'relay_id_pinned_to_other_key', host };
   const ownHosts = pins.byKey.get(pkHash);
@@ -118,4 +163,16 @@ function isParamantFleetHost(host) {
   return Object.prototype.hasOwnProperty.call(PARAMANT_FLEET, String(host || '').toLowerCase());
 }
 
-module.exports = { PARAMANT_FLEET, PARAMANT_DOMAIN, hostOfRelayId, parseExtraPins, buildPins, classifyPeer, isParamantFleetHost, isParamantUrl, mayTalkToParamantFleet };
+// Why this relay does or does not talk to the fleet, for /health and the log.
+function fleetGossipState({ env = {}, selfUrl, selfPkHash, pins }) {
+  if (mayTalkToParamantFleet({ env, selfUrl, selfPkHash, pins })) return { on: true, reason: 'pinned' };
+  if (env.PARAMANT_FLEET_GOSSIP === '0') return { on: false, reason: 'PARAMANT_FLEET_GOSSIP=0' };
+  if (/^(test|development|dev)$/i.test(env.NODE_ENV || '')) return { on: false, reason: `NODE_ENV=${env.NODE_ENV}` };
+  const selfHost = hostOfRelayId(selfUrl);
+  if (!isParamantFleetHost(selfHost)) return { on: false, reason: 'not_a_paramant_host' };
+  const old = pins && pins.retired && pins.retired.get(selfPkHash);
+  if (old && old.hosts.has(selfHost)) return { on: false, reason: 'own_key_retired' };
+  return { on: false, reason: 'own_key_not_pinned' };
+}
+
+module.exports = { PARAMANT_FLEET, RETIRED_PARAMANT_FLEET, parseRetiredPins, PARAMANT_DOMAIN, fleetGossipState, hostOfRelayId, parseExtraPins, buildPins, classifyPeer, isParamantFleetHost, isParamantUrl, mayTalkToParamantFleet };

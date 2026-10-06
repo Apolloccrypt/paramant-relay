@@ -378,9 +378,11 @@ body { min-height:100vh; }
     <span>Bij elke registratie worden hashes naar schijf geschreven (<code>/data/ct-log.json</code>)
     en bij het opstarten opnieuw ingelezen. Er wordt nooit inhoud opgeslagen, alleen cryptografische hashes.
     In april 2026 is het log wel opnieuw begonnen, tijdens tests:
-    de boom van <code>health.paramant.app</code> is toen opnieuw gestart, en 39 vermeldingen uit die tijd
-    (posities 1 tot en met 34 en 42 tot en met 46) horen bij die eerdere boom. Hun opgeslagen bewijs past
-    niet op de huidige boom. Van elke latere vermelding past de opgeslagen boomstand wel op de huidige boom
+    de boom van <code>health.paramant.app</code> is toen opnieuw gestart. 39 vermeldingen uit die tijd
+    (posities 1 tot en met 34 en 42 tot en met 46) hebben een opgeslagen bewijs dat niet op de huidige boom past.
+    Voor vijf ervan (42 tot en met 46) is aangetoond dat dat bewijs uit de herstarte boom komt; voor de andere 34
+    is dat waarschijnlijk, maar niet aangetoond. De lijst hieronder en het inclusiebewijs rekenen voor alle 39
+    met de huidige boom en tonen de oude waarde apart. Van elke latere vermelding past de opgeslagen boomstand wel op de huidige boom
     (onafhankelijk nagerekend op 6 oktober 2026). Verder begint het log alleen opnieuw als het volume van de relay wordt verwijderd.</span>
   </div>
 </div>
@@ -471,7 +473,7 @@ body { min-height:100vh; }
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.js?v=5" defer></script>
+<script src="/js/ct-log.page.js?v=6" defer></script>
 </main>
 <footer>
   <div class="container-lg">

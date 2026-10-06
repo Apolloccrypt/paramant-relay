@@ -521,6 +521,12 @@ curl "https://relay.paramant.app/v2/ct/log?limit=20&offset=0"
 derived at request time, so it always matches the index `/v2/ct/proof` resolves
 and the leaf position the Merkle tree commits to.
 
+`tree_hash` is the root of the tree at `index + 1` leaves, computed from the
+full tree at request time: the same value `/v2/ct/proof/<index>` returns. Where
+the value stored at append time differs (39 entries from April 2026 on health,
+from an earlier, restarted tree), the entry also carries `stored_tree_hash`
+with that old value and `"from_earlier_tree": true`.
+
 ---
 
 ### GET /v2/ct/proof: Inclusion proof for a specific index
@@ -579,9 +585,14 @@ The relay verifies the ML-DSA-65 signature, then checks that the key is pinned
 to `relay_id` (`relay/lib/fleet-pins.js`: the five Paramant relays, plus
 `PEER_STH_PINS`). A pinned name with another key, a pinned key under another
 name, or an unpinned paramant.app name answers 403. A relay that is not pinned
-answers 202 with `"mirrored": false`: its heads are not published below. There
-is no timestamp window: heads carry an hour-rounded timestamp, and a replayed
-head is the same signed statement again.
+answers 202 with `"mirrored": false`: its heads are not published below. A
+`relay_id` with a dot at the end (`health.paramant.app.`) answers 403
+(`relay_id_trailing_dot`). A key that was retired for its name (after a key
+rotation) answers 403 (`retired_key`); what it sent before stays mirrored.
+There is no timestamp window: heads carry an hour-rounded timestamp. A head
+this relay already holds (same key, `tree_size` and root) is not stored again:
+200 with `"stored": false, "duplicate": true`. Once a mirror file was compacted
+(`PEER_STH_FILE_MAX`), a head older than everything it still holds answers 409.
 
 ---
 

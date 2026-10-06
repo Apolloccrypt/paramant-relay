@@ -49,8 +49,8 @@ async function serve(r) {
   const srv = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     let body = null;
-    if (u.pathname === '/v2/ct/log') body = { ok: true, size: r.sth.tree_size, entries: [r.log_entry] };
-    else if (u.pathname === `/v2/ct/proof/${r.index}`) body = r.proof;
+    if (u.pathname === '/v2/ct/log') body = { ok: true, size: r.sth.tree_size, entries: r.log_entry ? [r.log_entry] : [] };
+    else if (u.pathname === `/v2/ct/proof/${r.index}`) body = r.proof || null;
     else if (u.pathname === '/v2/sth') body = { ok: true, sth: r.sth };
     else if (u.pathname === '/v2/sth/consistency') body = r.consistency;
     res.writeHead(body ? 200 : 404, { 'Content-Type': 'application/json' });
@@ -120,9 +120,9 @@ test('one byte changed in the signed root: not proven', async () => {
   assert.equal(r.code, 1, r.out);
 });
 
-test('a different leaf in the public log than in the proof: not proven', async () => {
+test('a different leaf at that position in the public tree than the proof is about: not proven', async () => {
   const f = clone(FIX);
-  f.log_entry.leaf_hash = flip(f.log_entry.leaf_hash);
+  f.proof.leaf_hash = flip(f.proof.leaf_hash);
   const r = await check(f);
   assert.equal(r.code, 1, r.out);
 });
@@ -208,6 +208,37 @@ test('receipt claiming relay.paramant.app but signed by another key: refused by 
   const r = await checkReceipt(receipt, world);
   assert.equal(r.code, 1, r.out);
   assert.ok(sigSteps(r.json).every((s) => s.ok === false));
+});
+
+// Review #576 (LAAG, punt 7): the leaf was looked up in /v2/ct/log, which only
+// shows the newest 10.000 entries (CT_MAX). Past that, an old and genuine
+// receipt failed with "vertrouw dit niet". /v2/ct/proof works for every leaf.
+test('an old receipt whose leaf fell out of the /v2/ct/log window is still proven', async () => {
+  const { receipt, world, pkB64 } = receiptWorld({ relayId: 'https://relay.example.org' });
+  world.log_entry = null; // the window no longer lists it
+  const r = await checkReceipt(receipt, world, ['--pubkey', pkB64]);
+  assert.ok(r.json, r.out + r.err);
+  for (const s of r.json.stappen.filter((x) => !/handtekening/.test(x.controle))) {
+    assert.equal(s.ok, true, `${s.controle}: ${s.detail}`);
+  }
+  assert.equal(r.code, MLDSA ? 0 : 3, r.out);
+});
+
+test('the leaf at that position differs from the receipt: not proven, also through the proof route', async () => {
+  const { receipt, world, pkB64 } = receiptWorld({ relayId: 'https://relay.example.org' });
+  world.proof.leaf_hash = flip(world.proof.leaf_hash);
+  world.log_entry = null;
+  const r = await checkReceipt(receipt, world, ['--pubkey', pkB64]);
+  assert.equal(r.code, 1, r.out);
+});
+
+test('a relay without /v2/ct/proof: the receipt is still checked against /v2/ct/log', async () => {
+  const { receipt, world, pkB64 } = receiptWorld({ relayId: 'https://relay.example.org' });
+  world.proof = null;
+  const r = await checkReceipt(receipt, world, ['--pubkey', pkB64]);
+  assert.ok(r.json, r.out + r.err);
+  assert.ok(r.json.stappen.some((s) => /openbare log is hetzelfde blad/.test(s.controle) && s.ok === true));
+  assert.equal(r.code, MLDSA ? 0 : 3, r.out);
 });
 
 test('a ParaSign proof is refused with the honest reason, not checked half', async () => {

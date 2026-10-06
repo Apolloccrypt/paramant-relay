@@ -443,13 +443,22 @@ role `blocklist-bron` (section 7); the test checks that.
 
 Every relay signs receipts and multi-party proofs with its own ML-DSA-65 identity key (`RELAY_IDENTITY_FILE` on its own volume). `/verify` checks those signatures offline against the keys pinned in `frontend/js/relay-trust-anchors.js`. A relay that signs with a key that is not pinned makes every new proof it counter-signs show red. A proof signed before a rotation must keep verifying for years.
 
-The rule: the old key goes to `RETIRED_RELAY_ANCHORS` BEFORE the relay starts signing with the new one. Never delete a pin.
+The same key signs the relay's tree heads, and the other relays mirror those heads only from the key pinned for its name (`relay/lib/fleet-pins.js`, `PARAMANT_FLEET`). A rotation done in the wrong order has two effects there: the rotated relay's new heads are refused by the fleet and it stops gossiping itself (an ERROR `gossip_to_paramant_fleet_skipped` every hour, `fleet_gossip` in the admin `/health`), and once its old key is no longer pinned at all, every relay moves the mirror of the old key to `peer-sths/purged/` at the next start. A retired pin prevents the second: the heads the old key sent stay mirrored, new heads under it are refused (403, `retired_key`).
 
-1. Read the current key of the relay, over TLS: `curl -s https://<host>/v2/pubkey`. It must equal the pin for that host. If it does not, stop: the relay already rotated (or lost its volume), go to step 5.
-2. In one commit on a branch:
-   - move the entry for that host from `RELAY_TRUST_ANCHORS` to `RETIRED_RELAY_ANCHORS`, unchanged, plus `retired_at: 'JJJJ-MM-DD'`;
-   - leave the new pin out for now: the new key does not exist yet.
-3. Deploy that commit (frontend only). Old proofs keep verifying through the retired entry.
-4. Rotate: stop the relay, move its identity file aside (keep it, offline, with the escrow), start it. It generates a new key. Read it with `curl -s https://<host>/v2/pubkey`, add it to `RELAY_TRUST_ANCHORS` with `fingerprint` = SHA3-256 of the decoded key (`node -e "console.log(require('crypto').createHash('sha3-256').update(Buffer.from(process.argv[1],'base64')).digest('hex'))" <key>`), and deploy. Between step 4 and this deploy, new proofs from that relay show "signed by a key this page does not recognise": keep that window short.
-5. Unplanned rotation (volume lost): there is no old key to retire if it was never pinned; if it was pinned, step 2 still applies (the pin is the old key). Then pin the new key as in step 4.
-6. Check: `node deploy/check-relay-anchors.mjs` must end with "every relay serves its pinned key". `deploy/deploy-3.1.sh` runs the same check in phase 6 (step 6k), also under `--verify-only`, and stops the deploy when a relay serves a key that is not the current pin. CI runs `tests/relay-anchors-check.test.mjs`, which holds the pin file consistent (every fingerprint is the SHA3-256 of its own key, a retired entry has `retired_at` and is not also pinned) but cannot reach the relays.
+The rule: the old key is retired and the new key pinned in ONE commit, in both files, and that release goes out together with the switch. Never delete a pin. So the new key has to exist before it is used.
+
+1. Read the current key of the relay, over TLS: `curl -s https://<host>/v2/pubkey`. It must equal the pin for that host. If it does not, stop: the relay already rotated (or lost its volume), go to step 6.
+2. Make the next key on the relay's own volume, without touching the running key:
+   `docker compose exec relay-<sector> node lib/relay-identity-next.js /data/relay-identity.next.json`
+   It refuses to overwrite a file, writes mode 600, and prints only the public key and its fingerprint (SHA3-256 of the decoded key). Run `deploy/ops/backup-full-state.sh` afterwards, so the escrow has the next key too.
+3. One commit on a branch:
+   - `frontend/js/relay-trust-anchors.js`: move the entry for that host from `RELAY_TRUST_ANCHORS` to `RETIRED_RELAY_ANCHORS`, unchanged, plus `retired_at: 'JJJJ-MM-DD'`; add the new key (from step 2) to `RELAY_TRUST_ANCHORS`;
+   - `relay/lib/fleet-pins.js`: the new fingerprint in `PARAMANT_FLEET`, the old one in `RETIRED_PARAMANT_FLEET` with the same `retired_at`.
+   `tests/fleet-pins-match-anchors.test.mjs` fails when the two files disagree, `tests/relay-anchors-check.test.mjs` when a fingerprint is not the hash of its key.
+4. Right before the deploy of that release, switch the files on the volume. The running relay keeps the key it loaded; the recreate in phase 4 starts it with the new key and the new pins at the same moment:
+   `docker compose exec relay-<sector> sh -c 'mv /data/relay-identity.json /data/relay-identity.retired-JJJJ-MM-DD.json && mv /data/relay-identity.next.json /data/relay-identity.json'`
+   Keep the retired file (and the escrow copy): it is the only proof that key was ours. If the deploy stops before phase 4 and the relay restarts on the old release, it signs with a key the old release does not pin: switch the two files back.
+5. Deploy (`deploy/deploy-3.1.sh`). Old proofs keep verifying through the retired anchor; the old key's mirror stays on every relay, marked `"retired": true` in `/v2/sth/peers`.
+6. Unplanned rotation (volume lost): there is no next key, so the relay starts with a fresh one. If the lost key was pinned, step 3 still applies (the pin is the old key; the new one is `curl -s https://<host>/v2/pubkey`). Until that release is out, the relay's heads reach nobody and it logs the hourly ERROR: keep that window short.
+7. A self-hosted fleet does the same with `PEER_STH_PINS` (new key) and `PEER_STH_RETIRED_PINS` (old key) in `.env` on every relay.
+8. Check: `node deploy/check-relay-anchors.mjs` must end with "every relay serves its pinned key". `deploy/deploy-3.1.sh` runs the same check in phase 6 (step 6k), also under `--verify-only`, and stops the deploy when a relay serves a key that is not the current pin. CI runs `tests/relay-anchors-check.test.mjs`, which holds the pin file consistent (every fingerprint is the SHA3-256 of its own key, a retired entry has `retired_at` and is not also pinned) but cannot reach the relays. Also: the admin `/health` of the rotated relay shows `"fleet_gossip":{"on":true,...}` (health is the one that gossips), and `/v2/sth/peers` on another relay lists the new key after its next append.

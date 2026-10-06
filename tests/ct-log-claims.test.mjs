@@ -19,8 +19,10 @@
 //      receipt. That proves what the relay signed then, not what the public log
 //      shows now.
 //   5. "Het log begint alleen opnieuw als het volume wordt verwijderd": the
-//      health tree restarted in April 2026 during tests, and 39 leaves from that
-//      time belong to the earlier tree.
+//      health tree restarted in April 2026 during tests. 39 leaves from that
+//      time carry a stored proof that does not fit the current tree; only for
+//      42-46 is it proven that it comes from the restarted tree (review #576),
+//      so the page may not say that of all 39.
 //
 // Each test reads the code that makes the corrected sentence true, so the page
 // cannot drift back. Node builtins only (root integration job, no browser).
@@ -98,7 +100,9 @@ test('/ct-log says "verified" only on the path that ran the cryptographic check'
   }
   // The relay does not publish device_hash in the projection, so the column
   // would be n/a forever.
-  assert.match(read('relay/relay.js'), /entries = pageR\.entries\.map\(\(e, i\) => \(\{ index: pageR\.start_index \+ i, type: e\.type, leaf_hash: e\.leaf_hash, tree_hash: e\.tree_hash, ts: ctCoarseTs\(e\.ts\) \}\)\)/);
+  // (Since review #576 tree_hash is recomputed from the full tree; the shape
+  // of the projection is otherwise the same: no device_hash.)
+  assert.match(read('relay/relay.js'), /return \{ index, type: e\.type, leaf_hash: e\.leaf_hash, tree_hash, ts: ctCoarseTs\(e\.ts\),\n\s+\.\.\.\(stale \? \{ stored_tree_hash: e\.tree_hash, from_earlier_tree: true \} : \{\}\) \};/);
   for (const p of ['frontend/ct-log.html', 'frontend/en/ct-log.html']) {
     assert.doesNotMatch(visible(read(p)), /Apparaat-hash|Device hash|device_hash/, `${p} still has a device-hash column`);
   }
@@ -128,4 +132,16 @@ test('/ct-log names the April 2026 restart instead of saying the log only restar
   // The bare sentence, without the April exception before it, is the lie.
   assert.doesNotMatch(nl, /hashes\. Het log begint alleen opnieuw als het volume/);
   assert.doesNotMatch(en, /hashes\. The log resets only when the relay volume is deleted/);
+  // Only 42-46 are proven to come from the restarted tree; the rest is likely.
+  assert.match(nl, /Voor vijf ervan \(42 tot en met 46\) is aangetoond/);
+  assert.match(nl, /voor de andere 34 is dat waarschijnlijk, maar niet aangetoond/);
+  assert.match(en, /For five of them \(42 to 46\) it is proven/);
+  assert.match(en, /for the other 34 that is likely, but not proven/);
+  assert.doesNotMatch(nl, /horen bij die eerdere boom/, 'claims all 39 belong to the earlier tree');
+  assert.doesNotMatch(en, /belong to that earlier tree/, 'claims all 39 belong to the earlier tree');
+  // "show the old value separately" is true only while the list renders it.
+  for (const p of ['frontend/js/ct-log.page.js', 'frontend/js/ct-log.page.en.js']) {
+    assert.match(read(p), /e\.from_earlier_tree \? [^\n]*e\.stored_tree_hash/, `${p} does not show the stored value of an April entry`);
+  }
+  assert.match(read('relay/relay.js'), /tree_hash = index < ctTree\.size \? ctTree\.root\(index \+ 1\)/, '/v2/ct/log no longer recomputes tree_hash');
 });

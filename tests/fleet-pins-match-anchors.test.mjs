@@ -11,10 +11,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { RELAY_TRUST_ANCHORS } from '../frontend/js/relay-trust-anchors.js';
+import { RELAY_TRUST_ANCHORS, RETIRED_RELAY_ANCHORS } from '../frontend/js/relay-trust-anchors.js';
 
 const require = createRequire(import.meta.url);
-const { PARAMANT_FLEET } = require('../relay/lib/fleet-pins.js');
+const { PARAMANT_FLEET, RETIRED_PARAMANT_FLEET } = require('../relay/lib/fleet-pins.js');
 
 test('every trust anchor is pinned on the relay with the same fingerprint, and nothing else is', () => {
   const fromAnchors = Object.fromEntries(RELAY_TRUST_ANCHORS.map((a) => [a.host, a.fingerprint]));
@@ -26,4 +26,12 @@ test('each pinned fingerprint is SHA3-256 of the anchored public key', () => {
     const fp = createHash('sha3-256').update(Buffer.from(a.key, 'base64')).digest('hex');
     assert.equal(PARAMANT_FLEET[a.host], fp, `${a.host}: pin is not the hash of its key`);
   }
+});
+
+// A rotation retires the old key in both files in the same commit. If only the
+// browser knows it, the relays move the old key's mirror to purged/ at the next
+// start; if only the relays know it, /verify calls old receipts forged.
+test('the retired keys on the relay are the retired anchors, entry for entry', () => {
+  const norm = (xs) => xs.map((a) => `${a.host}|${a.fingerprint}|${a.retired_at}`).sort();
+  assert.deepEqual(norm(RETIRED_PARAMANT_FLEET), norm(RETIRED_RELAY_ANCHORS));
 });

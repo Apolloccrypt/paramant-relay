@@ -29,7 +29,7 @@ Met een ontvangstbewijs:
 1. Het blad opnieuw berekenen uit `blob_hash`, `sector` en `ts` van het bewijs: `SHA3-256(0x02 || blob_hash || SHA3-256(sector) || ts)`, dezelfde formule als `relay/lib/ct-hash.js`.
 2. Het inclusiebewijs uit het ontvangstbewijs narekenen naar de root van toen (RFC 9162, 2.1.3.2).
 3. Controleren dat de boomtop in het bewijs bij die root en grootte hoort, en dat zijn handtekening klopt onder de gepinde sleutel van de relay die het bewijs noemt.
-4. In de openbare log (`/v2/ct/log`) nagaan dat op die positie hetzelfde blad staat.
+4. In de openbare boom nagaan dat op die positie hetzelfde blad staat (`/v2/ct/proof/<positie>`, uit de volledige boom; `/v2/ct/log` toont alleen de laatste 10.000 en is alleen de terugval voor een relay zonder die route).
 5. Het consistentiebewijs van de boom van toen naar de huidige boomtop narekenen (RFC 9162, 2.1.4.2). Dat toont dat er sindsdien alleen is bijgeschreven.
 6. De handtekening onder de huidige boomtop controleren tegen dezelfde gepinde sleutel.
 
@@ -60,7 +60,8 @@ Daarvoor moet het bewijs van een ParaSign-envelope eerst de invoer van het blad 
 
 - Echt blad 777 van relay.paramant.app, met de echte boomtop van 1523 bladen en de pin uit `relay-trust-anchors.js`: alle stappen kloppen. De fixture (`tests/fixtures/klant-controle/relay-777.json`) is herberekend met `relay/lib/ct-tree.js` over alle 1523 opgehaalde bladen.
 - Sabotage: één byte anders in het auditpad, de root, de handtekening of het blad geeft "niet aangetoond".
-- Een boomtop die een relay zonder pin noemt, is nooit "aangetoond".
+- Een boomtop die een relay zonder pin noemt, is zonder `--pubkey` nooit "aangetoond". Met `--pubkey` kan het wel, en de uitslag meldt dan dat de sleutel door u is opgegeven en niet gepind.
+- Een ontvangstbewijs waarvan het blad buiten het venster van `/v2/ct/log` valt, wordt nog steeds aangetoond.
 - Een ontvangstbewijs dat zich relay.paramant.app noemt maar met een andere sleutel is ondertekend, wordt door de pin geweigerd.
 - Een ontvangstbewijs van een zelf gehoste relay met een opgegeven sleutel klopt, en wordt gemeld als niet gepind.
 
@@ -68,4 +69,4 @@ In CI heeft de runner OpenSSL 3.0. Daar toetst de suite dat de uitslag dan ONVOL
 
 ## English summary
 
-`scripts/klant-controle.py` lets a customer check, with nothing but Python 3 and OpenSSL 3.5+, that a ParaSend transfer receipt is in Paramant's transparency log: it recomputes the leaf from the receipt, verifies the receipt's inclusion proof and head signature, finds the same leaf at that position in `/v2/ct/log`, verifies an RFC 9162 consistency proof from the receipt's tree to the current signed head, and checks that head against the key pinned in `frontend/js/relay-trust-anchors.js`. It proves the leaf is in the tree the relay signs now and that nothing was removed since. It does not prove that other people see the same tree: without an independent party storing signed heads, a split view cannot be detected. It does not work for ParaSign signatures yet, because the ParaSign verifier does not consult the log and the customer lacks the inputs needed to recompute an envelope leaf.
+`scripts/klant-controle.py` lets a customer check, with nothing but Python 3 and OpenSSL 3.5+, that a ParaSend transfer receipt is in Paramant's transparency log: it recomputes the leaf from the receipt, verifies the receipt's inclusion proof and head signature, finds the same leaf at that position in the full tree (`/v2/ct/proof`, so also past the 10,000 entries `/v2/ct/log` lists), verifies an RFC 9162 consistency proof from the receipt's tree to the current signed head, and checks that head against the key pinned in `frontend/js/relay-trust-anchors.js`. It proves the leaf is in the tree the relay signs now and that nothing was removed since. It does not prove that other people see the same tree: without an independent party storing signed heads, a split view cannot be detected. It does not work for ParaSign signatures yet, because the ParaSign verifier does not consult the log and the customer lacks the inputs needed to recompute an envelope leaf.

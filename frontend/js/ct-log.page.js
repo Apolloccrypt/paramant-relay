@@ -133,6 +133,7 @@ function render() {
       + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+esc(e.type)+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Leaf-hash</span><span class="dval">'+esc(e.leaf_hash||'n/a')+'</span></div>'
       + '<div class="drow"><span class="dkey">Tree-hash</span><span class="dval">'+esc(e.tree_hash||'n/a')+'</span></div>'
+      + (e.from_earlier_tree ? '<div class="drow"><span class="dkey">Opgeslagen tree-hash (uit een eerdere boom)</span><span class="dval">'+esc(e.stored_tree_hash||'n/a')+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+esc(String(idx))+'</span></div>'
       + '<div class="drow"><span class="dkey">Tijdstip</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : 'n/a')+'</span></div>'
       + proofHtml

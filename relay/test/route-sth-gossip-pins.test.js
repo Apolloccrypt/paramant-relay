@@ -64,6 +64,9 @@ const pinned = keypair();      // the relay we pin as PIN_HOST
 const stranger = keypair();    // a key nobody pinned
 const impostor = keypair();    // a key that claims to be health.paramant.app
 const tester = keypair();      // a local acceptance stack
+const rotated = keypair();     // the old key of RET_HOST, retired after a rotation
+const RET_HOST = 'peer.rotated.test';
+const rotatedNew = keypair();  // its new key
 let srv;
 let dir;
 
@@ -74,7 +77,16 @@ before(async () => {
   seed(dir, tester, [head(tester, 'https://relay.telling.test', 3)]);
   // A pinned key with one honest head and one head under a name it may not use.
   seed(dir, pinned, [head(pinned, `https://${PIN_HOST}`, 5), head(pinned, 'https://relay.p10-test.nl', 6)]);
-  srv = await boot({ tag: 'gossip-pins', dir, env: { PEER_STH_PINS: `${PIN_HOST}=${pinned.hash}` } });
+  // A relay that rotated: its old mirror, written under the old key, plus one
+  // exact duplicate as the open route used to let in.
+  const old1 = head(rotated, `https://${RET_HOST}`, 11);
+  seed(dir, rotated, [old1, head(rotated, `https://${RET_HOST}`, 12), old1]);
+  // A file that is not a mirror at all: left alone, not moved.
+  fs.writeFileSync(path.join(dir, 'peer-sths', 'sth-log.jsonl'), '{"not":"a mirror"}\n');
+  srv = await boot({ tag: 'gossip-pins', dir, env: {
+    PEER_STH_PINS: `${PIN_HOST}=${pinned.hash},${RET_HOST}=${rotatedNew.hash}`,
+    PEER_STH_RETIRED_PINS: `${RET_HOST}=${rotated.hash}`,
+    PEER_STH_FILE_MAX: '6', PEER_STH_FILE_KEEP: '3' } });
 });
 
 after(async () => { summary('route-sth-gossip-pins', checks); await killAll(); });
@@ -82,8 +94,8 @@ after(async () => { summary('route-sth-gossip-pins', checks); await killAll(); }
 test('startup purges mirrored heads whose key is not pinned to their relay_id, and logs it', async () => {
   const peers = await srv.get('/v2/sth/peers');
   assert.strictEqual(peers.status, 200);
-  const ids = peers.json.peers.map((p) => p.relay_pk_hash);
-  assert.deepStrictEqual(ids, [pinned.hash], `only the pinned relay may stay in the public mirror, got ${JSON.stringify(peers.json.peers)}`);
+  const ids = peers.json.peers.map((p) => p.relay_pk_hash).sort();
+  assert.deepStrictEqual(ids, [pinned.hash, rotated.hash].sort(), `only pinned (and retired) relays may stay in the public mirror, got ${JSON.stringify(peers.json.peers)}`);
   const hist = await srv.get(`/v2/sth/peers/${pinned.hash}`);
   assert.deepStrictEqual(hist.json.sths.map((s) => s.relay_id), [`https://${PIN_HOST}`],
     'the head the pinned key sent under someone else\'s name is gone too');
@@ -143,5 +155,61 @@ test('the pinned relay is mirrored, and received_at says the hour and nothing fi
   const peers = await srv.get('/v2/sth/peers');
   const me = peers.json.peers.find((p) => p.relay_pk_hash === pinned.hash);
   assert.ok(me && Date.parse(me.latest_ts) % HOUR_MS === 0, `latest_ts ${me && me.latest_ts} is sub-hour`);
+  did();
+});
+
+test('a retired key keeps its old heads in the mirror, but a new head under it is refused', async () => {
+  const hist = await srv.get(`/v2/sth/peers/${rotated.hash}`);
+  assert.strictEqual(hist.status, 200, 'the old mirror of a rotated relay was purged');
+  assert.deepStrictEqual(hist.json.sths.map((s) => s.tree_size), [11, 12], 'old heads kept, the duplicate dropped');
+  assert.ok(fs.existsSync(path.join(dir, 'peer-sths', rotated.hash + '.jsonl')), 'the old mirror file stays in place');
+  const peers = await srv.get('/v2/sth/peers');
+  const me = peers.json.peers.find((p) => p.relay_pk_hash === rotated.hash);
+  assert.strictEqual(me.retired, true);
+  const r = await srv.post('/v2/sth/ingest', { body: head(rotated, `https://${RET_HOST}`, 13) });
+  assert.strictEqual(r.status, 403, r.text);
+  assert.strictEqual(r.json.reason, 'retired_key');
+  // The new key carries on under the same name.
+  const r2 = await srv.post('/v2/sth/ingest', { body: head(rotatedNew, `https://${RET_HOST}`, 13) });
+  assert.strictEqual(r2.status, 200, r2.text);
+  // And a file in the directory that is no mirror was not touched.
+  assert.ok(fs.existsSync(path.join(dir, 'peer-sths', 'sth-log.jsonl')), 'a non-mirror .jsonl was moved');
+  did();
+});
+
+test('a relay_id with a dot at the end is refused, not filed as an unknown peer', async () => {
+  for (const rid of ['https://health.paramant.app.', 'https://health.paramant.app%2e', `https://${PIN_HOST}.`, 'https://relay.example.org.']) {
+    const r = await srv.post('/v2/sth/ingest', { body: head(stranger, rid, 3) });
+    assert.strictEqual(r.status, 403, `${rid} answered ${r.status}: ${r.text}`);
+    assert.strictEqual(r.json.reason, 'relay_id_trailing_dot');
+  }
+  did();
+});
+
+test('a head the mirror already holds is not stored again, and the file stays bounded', async () => {
+  const file = path.join(dir, 'peer-sths', pinned.hash + '.jsonl');
+  const lines = () => fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim()).length;
+  const h = head(pinned, `https://${PIN_HOST}`, 20);
+  const r1 = await srv.post('/v2/sth/ingest', { body: h });
+  assert.strictEqual(r1.status, 200, r1.text);
+  const before = (await srv.get(`/v2/sth/peers/${pinned.hash}`)).json.total;
+  for (let i = 0; i < 5; i++) {
+    const r = await srv.post('/v2/sth/ingest', { body: h });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.json.duplicate, true);
+    assert.strictEqual(r.json.stored, false);
+  }
+  assert.strictEqual((await srv.get(`/v2/sth/peers/${pinned.hash}`)).json.total, before, 'a replay was stored');
+  // A fork (same size, other root) is evidence and IS stored.
+  const fork = await srv.post('/v2/sth/ingest', { body: head(pinned, `https://${PIN_HOST}`, 20) });
+  assert.strictEqual(fork.status, 200);
+  assert.notStrictEqual(fork.json.duplicate, true);
+  // Past PEER_STH_FILE_MAX (6 here) the file is compacted to the newest 3.
+  for (let n = 21; n < 30; n++) {
+    assert.strictEqual((await srv.post('/v2/sth/ingest', { body: head(pinned, `https://${PIN_HOST}`, n) })).status, 200);
+  }
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(lines() <= 6, `mirror file has ${lines()} lines, more than PEER_STH_FILE_MAX`);
+  assert.match(srv.log(), /"msg":"peer_sth_compacted"/);
   did();
 });

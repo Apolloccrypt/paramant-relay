@@ -88,3 +88,23 @@ test('?tree_size=N proves inclusion straight against the current head', async ()
   assert.strictEqual((await srv.get(`/v2/ct/proof/${size}`)).status, 404);
   did();
 });
+
+test('/v2/ct/log lists the recomputed tree_hash, the same as /v2/ct/proof, and marks the stale April value', async () => {
+  const log = await srv.get('/v2/ct/log?from=0&limit=100');
+  assert.strictEqual(log.status, 200);
+  for (const e of log.json.entries) {
+    const expectRoot = ctTreeHash(truth.slice(0, e.index + 1));
+    assert.strictEqual(e.tree_hash, expectRoot, `listing tree_hash at ${e.index} is not the root of the published tree`);
+    const p = await srv.get(`/v2/ct/proof/${e.index}`);
+    assert.strictEqual(e.tree_hash, p.json.tree_hash, `listing and proof disagree at ${e.index}`);
+    const stale = e.index >= 42 && e.index <= 46;
+    assert.strictEqual(e.from_earlier_tree === true, stale, `from_earlier_tree wrong at ${e.index}`);
+    if (stale) {
+      assert.ok(/^[0-9a-f]{64}$/.test(e.stored_tree_hash) && e.stored_tree_hash !== e.tree_hash,
+        `the stored value at ${e.index} is shown as stored_tree_hash`);
+    } else {
+      assert.strictEqual(e.stored_tree_hash, undefined);
+    }
+  }
+  did();
+});

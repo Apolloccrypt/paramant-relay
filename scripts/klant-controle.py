@@ -43,6 +43,7 @@ import sys
 import tempfile
 import urllib.parse
 import urllib.request
+import urllib.error
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 DEFAULT_ANCHORS = os.path.join(ROOT, 'frontend', 'js', 'relay-trust-anchors.js')
@@ -207,6 +208,16 @@ def get_json(url):
         raise NetError(f'{url}: {e}') from e
 
 
+def get_json_or_none(url):
+    """Zelfde als get_json, maar een 404 is een antwoord (niet gevonden), geen netwerkfout."""
+    try:
+        return get_json(url)
+    except NetError as e:
+        if isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 404:
+            return None
+        raise
+
+
 def read_receipt(src):
     text = sys.stdin.read() if src == '-' else open(src, encoding='utf-8').read()
     text = text.strip()
@@ -288,24 +299,36 @@ def run(args):
         idx = args.index
         leaf = None
 
-    # Openbare log: staat dat blad op die plek?
-    log = get_json(f'{base}/v2/ct/log?from={idx}&limit=1')
-    entries = log.get('entries') or []
-    pub = entries[0] if entries and int(entries[0].get('index', -1)) == idx else None
-    if pub is None:
+    # Openbare log: staat dat blad op die plek? /v2/ct/proof/<index> komt uit
+    # de volledige boom, ook voor een blad dat buiten het venster van de
+    # laatste 10.000 valt dat /v2/ct/log toont. Daar zocht deze stap eerst, en
+    # een oud bewijs faalde dan vals met "vertrouw dit niet". /v2/ct/log is
+    # alleen nog de terugval voor een relay die /v2/ct/proof niet kent.
+    p = get_json_or_none(f'{base}/v2/ct/proof/{idx}')
+    if p is not None and int(p.get('index', -1)) == idx and p.get('leaf_hash'):
+        pub_leaf = p['leaf_hash']
+    else:
+        p = None
+        log = get_json_or_none(f'{base}/v2/ct/log?from={idx}&limit=1') or {}
+        entries = log.get('entries') or []
+        pub = entries[0] if entries and int(entries[0].get('index', -1)) == idx else None
+        pub_leaf = pub.get('leaf_hash') if pub else None
+    if not pub_leaf:
         rep.add(f'blad {idx} in de openbare log', False, 'niet gevonden')
         return rep, base
     if leaf is None:
-        leaf = pub['leaf_hash']
-        p = get_json(f'{base}/v2/ct/proof/{idx}')
+        if p is None:
+            rep.add(f'blad {idx} in de openbare log', None, 'deze relay geeft geen inclusiebewijs (/v2/ct/proof)')
+            return rep, base
+        leaf = pub_leaf
         size = int(p.get('tree_size') or idx + 1)
         root = p.get('tree_hash') or ''
         path = [bytes.fromhex(s['hash'] if isinstance(s, dict) else s) for s in p.get('proof') or []]
-        rep.add(f'blad {idx} in de openbare log', p.get('leaf_hash') == leaf, f'{leaf[:16]}…')
+        rep.add(f'blad {idx} in de openbare log', True, f'{leaf[:16]}…')
         rep.add(f'inclusiebewijs van de relay (boom van {size})',
                 verify_inclusion(idx, size, bytes.fromhex(leaf), path, bytes.fromhex(root)))
     else:
-        rep.add(f'blad {idx} in de openbare log is hetzelfde blad', pub.get('leaf_hash') == leaf)
+        rep.add(f'blad {idx} in de openbare log is hetzelfde blad', pub_leaf == leaf)
 
     # Consistentie naar de huidige boomtop, en die boomtop ondertekend.
     if sth is None:

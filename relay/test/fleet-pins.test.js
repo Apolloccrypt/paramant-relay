@@ -54,6 +54,41 @@ test('PEER_STH_PINS adds pins but can never replace a Paramant pin', () => {
   did();
 });
 
+test('a retired key keeps its name for old heads only, and never shadows the current pin', () => {
+  const NEW = 'c'.repeat(64);
+  const p = pins.buildPins(`relay.example.org=${NEW}`, [{ host: 'relay.example.org', fingerprint: OTHER, retired_at: '2026-10-06' }]);
+  const c = pins.classifyPeer(p, 'https://relay.example.org', OTHER);
+  assert.strictEqual(c.verdict, 'retired');
+  assert.strictEqual(c.retired_at, '2026-10-06');
+  assert.strictEqual(pins.classifyPeer(p, 'https://relay.example.org', NEW).verdict, 'pinned');
+  // A retired key under another name is just a foreign key there.
+  assert.strictEqual(pins.classifyPeer(p, 'https://health.paramant.app', OTHER).reason, 'relay_id_pinned_to_other_key');
+  // A key that is pinned as current cannot also be retired.
+  const q = pins.buildPins('', [{ host: 'health.paramant.app', fingerprint: HEALTH, retired_at: '2026-10-06' }]);
+  assert.strictEqual(pins.classifyPeer(q, 'https://health.paramant.app', HEALTH).verdict, 'pinned');
+  assert.deepStrictEqual(pins.parseRetiredPins(`a.example=${OTHER}, junk, a.example=${NEW}`).map((r) => r.fingerprint), [OTHER, NEW]);
+  did();
+});
+
+test('a dot at the end of a name is refused, also via %2e and an ideographic full stop', () => {
+  const p = pins.buildPins('');
+  for (const rid of ['https://health.paramant.app.', 'https://health.paramant.app%2e', 'health.paramant.app.:443', 'https://health.paramant.app\u3002', 'https://relay.example.org.']) {
+    assert.strictEqual(pins.classifyPeer(p, rid, OTHER).reason, 'relay_id_trailing_dot', rid);
+  }
+  did();
+});
+
+test('fleetGossipState says why a relay is silent, and a rotated key is loud', () => {
+  const p = pins.buildPins('', [{ host: 'health.paramant.app', fingerprint: OTHER, retired_at: '2026-10-06' }]);
+  const base = { env: {}, selfUrl: 'https://health.paramant.app', pins: p };
+  assert.deepStrictEqual(pins.fleetGossipState({ ...base, selfPkHash: HEALTH }), { on: true, reason: 'pinned' });
+  assert.strictEqual(pins.fleetGossipState({ ...base, selfPkHash: OTHER }).reason, 'own_key_retired');
+  assert.strictEqual(pins.fleetGossipState({ ...base, selfPkHash: 'd'.repeat(64) }).reason, 'own_key_not_pinned');
+  assert.strictEqual(pins.fleetGossipState({ ...base, selfPkHash: HEALTH, env: { NODE_ENV: 'test' } }).reason, 'NODE_ENV=test');
+  assert.strictEqual(pins.fleetGossipState({ ...base, selfUrl: 'https://relay.example.org', selfPkHash: HEALTH }).reason, 'not_a_paramant_host');
+  did();
+});
+
 test('only a pinned Paramant relay, outside test/dev, may talk to the production fleet', () => {
   const p = pins.buildPins('');
   const prod = { env: { NODE_ENV: 'production' }, selfUrl: 'https://health.paramant.app', selfPkHash: HEALTH, pins: p };
@@ -83,5 +118,25 @@ test('relay.js routes both outbound paths to the fleet through the gate', () => 
   };
   assert.match(fn('broadcastSTH'), /mayTalkToParamantFleet\(\)/, 'broadcastSTH does not consult the fleet gate');
   assert.match(fn('registerSelf'), /mayTalkToParamantFleet\(\)/, 'registerSelf does not consult the fleet gate');
+  did();
+});
+
+test('relay-identity-next makes a key the relay can load, prints only the public half, never overwrites', () => {
+  const { execFileSync, spawnSync } = require('child_process');
+  const os = require('os');
+  const crypto = require('crypto');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'identity-next-'));
+  const out = path.join(dir, 'relay-identity.next.json');
+  const cli = path.join(__dirname, '..', 'lib', 'relay-identity-next.js');
+  const printed = JSON.parse(execFileSync(process.execPath, [cli, out], { encoding: 'utf8' }));
+  const file = JSON.parse(fs.readFileSync(out, 'utf8'));
+  assert.strictEqual(printed.key, file.pk);
+  assert.strictEqual(printed.fingerprint, crypto.createHash('sha3-256').update(Buffer.from(file.pk, 'base64')).digest('hex'));
+  assert.ok(!JSON.stringify(printed).includes(file.sk), 'the secret key reached stdout');
+  assert.strictEqual(fs.statSync(out).mode & 0o777, 0o600);
+  const again = spawnSync(process.execPath, [cli, out], { encoding: 'utf8' });
+  assert.strictEqual(again.status, 1);
+  assert.strictEqual(JSON.parse(fs.readFileSync(out, 'utf8')).sk, file.sk, 'an existing identity file was overwritten');
+  fs.rmSync(dir, { recursive: true, force: true });
   did();
 });
