@@ -102,6 +102,11 @@
   <p class="auth-sub">Geen wachtwoord nodig: log in met uw passkey, of met een code van 6 cijfers uit uw authenticator-app.</p>
 </div>
 
+<div id="login-context" class="auth-note auth-context" role="note" hidden>
+  <p><strong>Om te versturen heeft u een gratis account nodig.</strong> Uw bestand gaat in uw eigen browser op slot en alleen de ontvanger kan het openen. Een account maken is gratis en u heeft geen betaalkaart nodig. Heeft u al een account, log dan hieronder in.</p>
+  <a class="btn btn-primary mt-3" id="login-context-signup" href="/signup?next=/parashare">Gratis account maken</a>
+</div>
+
 <div id="error" class="error auth-alert" role="alert" aria-live="assertive"></div>
 
 <form id="login-form" class="form-card auth-card" novalidate>
@@ -149,7 +154,7 @@
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
-<script src="/js/auth-login.js?v=9"></script>
+<script src="/js/auth-login.js?v=10"></script>
 <script type="module" src="/js/passkey.js?v=11"></script>
 
 <footer class="legal-strip">
