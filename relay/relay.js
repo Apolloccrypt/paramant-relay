@@ -1324,7 +1324,22 @@ const PEER_STH_MAX = parseInt(process.env.PEER_STH_MAX || '500'); // per peer
 // the least-recently-updated peer (closing its fd) when full.
 const PEER_STH_MAX_PEERS = parseInt(process.env.PEER_STH_MAX_PEERS || '256');
 // peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string, last: epoch_ms }
+// ONLY pinned relays live here, because this map IS the public mirror
+// (/v2/sth/peers and /v2/sth/peers/:id). See lib/fleet-pins.js for why.
 const peerSths = new Map();
+const fleetPins = require('./lib/fleet-pins');
+const PEER_PINS = fleetPins.buildPins(process.env.PEER_STH_PINS || '');
+// Heads from relays nobody pinned: kept in memory for the operator's log and
+// nothing else. Never published, never persisted, small and bounded, so a key
+// minted per request costs us a Map entry that falls off the end.
+const unpinnedPeerSths = new Map(); // pk_hash → { relay_id, count, last_tree_size, first_seen, last_seen }
+const UNPINNED_PEER_MAX = 64;
+// The public mirror says when a head arrived to the hour and no finer. A head
+// is gossiped the instant it is signed and it is signed on every append, so a
+// millisecond received_at is the leaf's own time, and that is exactly what the
+// hour rounding of the log exists to hide (measured 2026-10-06: 115 of 116
+// mirrored health heads gave the leaf's moment to the millisecond).
+function peerReceivedAt(ms) { return ctCoarseTs(new Date(ms).toISOString()); }
 const _peerSthStreams = new Map(); // pk_hash → fs.WriteStream
 
 function _peerSthStreamFor(pkHash) {
@@ -1370,6 +1385,28 @@ function _peerSthWrite(pkHash, sth) {
   try { stream.write(JSON.stringify(sth) + '\n'); } catch {}
 }
 
+// Clean what the open ingest route let in before peers were pinned. A file is
+// one key's mirror; every head in it must name a relay that is pinned to that
+// key. Heads that do not are dropped, and a file with nothing left is moved out
+// of the mirror into PEER_STH_DIR/purged/ (kept as evidence, never served).
+// Every purge is logged with the name the head claimed and why it went.
+function purgePeerSthFile(id, sths) {
+  const kept = [];
+  const dropped = new Map(); // relay_id → { count, reason }
+  for (const s of sths) {
+    const c = fleetPins.classifyPeer(PEER_PINS, s && s.relay_id, id);
+    if (c.verdict === 'pinned' && (!s.relay_pk_hash || s.relay_pk_hash === id)) { kept.push(s); continue; }
+    const rid = String((s && s.relay_id) || '').slice(0, 80);
+    const d = dropped.get(rid) || { count: 0, reason: c.reason || c.verdict };
+    d.count++;
+    dropped.set(rid, d);
+  }
+  for (const [relay_id, d] of dropped) {
+    log('warn', 'peer_sth_purged', { id: id.slice(0, 16), relay_id, heads: d.count, reason: d.reason, kept: kept.length });
+  }
+  return { kept, changed: dropped.size > 0 };
+}
+
 function loadPeerSths() {
   try {
     fs.mkdirSync(PEER_STH_DIR, { recursive: true });
@@ -1377,9 +1414,20 @@ function loadPeerSths() {
     for (const file of files) {
       const id = file.replace(/\.jsonl$/, '');
       try {
-        const lines = fs.readFileSync(nodePath.join(PEER_STH_DIR, file), 'utf8').split('\n').filter(l => l.trim());
-        const sths = [];
-        for (const line of lines) { try { sths.push(JSON.parse(line)); } catch {} }
+        const full = nodePath.join(PEER_STH_DIR, file);
+        const lines = fs.readFileSync(full, 'utf8').split('\n').filter(l => l.trim());
+        const parsed = [];
+        for (const line of lines) { try { parsed.push(JSON.parse(line)); } catch {} }
+        const { kept: sths, changed } = /^[0-9a-f]{64}$/.test(id) ? purgePeerSthFile(id, parsed) : { kept: [], changed: true };
+        if (changed) {
+          try {
+            const purgedDir = nodePath.join(PEER_STH_DIR, 'purged');
+            fs.mkdirSync(purgedDir, { recursive: true });
+            fs.renameSync(full, nodePath.join(purgedDir, `${file}.${Date.now()}`));
+            if (sths.length > 0) fs.writeFileSync(full, sths.map(x => JSON.stringify(x)).join('\n') + '\n');
+          } catch (e) { log('warn', 'peer_sth_purge_failed', { id: id.slice(0, 16), err: e.message }); }
+        }
+        if (sths.length === 0) continue;
         const recent = sths.slice(-PEER_STH_MAX);
         const pk_b64 = recent.length > 0 ? (recent[recent.length - 1].public_key || '') : '';
         const lastRec = recent.length > 0 ? Date.parse(recent[recent.length - 1].received_at || '') : 0;
@@ -1401,9 +1449,40 @@ function loadPeerSths() {
 // Outbound HTTPS goes through safeHttpsRequest so the per-request DNS guard
 // catches peers that registered with a public hostname but DNS-rebound to a
 // private/loopback IP before gossip fires. Same defence as pushWebhooks.
+// A test or dev stack never talks to the production fleet unless told to.
+// Measured 2026-10-06: production mirrored heads from local acceptance stacks
+// (relay.telling.test, relay.p10-test.nl, and 15 fresh keys calling
+// themselves https://health.paramant.app). The way in: docker-compose.yml
+// defaults RELAY_SELF_URL_<SECTOR> to the paramant.app names, so in any local
+// compose run the sister relays register with the local health under the
+// production URLs, and that health then gossips its heads to the real
+// https://relay.paramant.app and friends. A copied CT log does the same,
+// because the registry is rebuilt from its relay_reg leaves.
+//
+// So a relay sends to a paramant.app name only when it IS a pinned Paramant
+// relay (its own key is the pin for its own RELAY_SELF_URL) and is not running
+// as test or development, or when PARAMANT_FLEET_GOSSIP=1 says so explicitly.
+// The production relays carry their pinned keys, so nothing changes there.
+function mayTalkToParamantFleet() {
+  return fleetPins.mayTalkToParamantFleet({ env: process.env, selfUrl: RELAY_SELF_URL,
+    selfPkHash: relayIdentity && relayIdentity.pk_hash, pins: PEER_PINS });
+}
+const isParamantUrl = fleetPins.isParamantUrl;
+let _fleetGossipSkipLogged = false;
+
 async function broadcastSTH(sth) {
   if (!sth || !relayIdentity) return;
-  const peers = [...relayRegistry.values()].filter(r => r.url && r.url !== RELAY_SELF_URL);
+  const fleetOk = mayTalkToParamantFleet();
+  const peers = [...relayRegistry.values()].filter(r => r.url && r.url !== RELAY_SELF_URL)
+    .filter(r => {
+      if (fleetOk || !isParamantUrl(r.url)) return true;
+      if (!_fleetGossipSkipLogged) {
+        _fleetGossipSkipLogged = true;
+        log('warn', 'gossip_to_paramant_fleet_skipped', { url: String(r.url).slice(0, 60),
+          hint: 'This relay is not a pinned Paramant relay, so it does not send heads to paramant.app. Set PARAMANT_FLEET_GOSSIP=1 only if that is really meant.' });
+      }
+      return false;
+    });
   if (peers.length === 0) return;
   const body = JSON.stringify({
     ...sth,
@@ -4695,7 +4774,13 @@ function setHeaders(res, req) {
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
-  res.setHeader('Strict-Transport-Security',    'max-age=63072000; includeSubDomains; preload');
+  // No Strict-Transport-Security from the relay (CT-DEDUP, second round). The
+  // relay speaks plain HTTP behind a TLS edge, a browser ignores HSTS on plain
+  // HTTP, and the edge (deploy/caddy/Caddyfile, nginx-selfhost.conf) already
+  // sets it. Sending it here doubled the header on every relay answer: measured
+  // 2026-10-06, /health on all six hosts carried it twice. A relay exposed
+  // over TLS without an edge can ask for it with RELAY_SEND_HSTS=1.
+  if (process.env.RELAY_SEND_HSTS === '1') res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   res.setHeader('Referrer-Policy',              'no-referrer');
   // A relay answers json to script, never inside a frame. frame-ancestors in
   // the CSP above already says so to a current browser; this is the same
@@ -7297,22 +7382,39 @@ async function handleRelayRequest(req, res) {
   const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
   if (ctpm0 || (ctpq0 !== null && ctpq0 !== undefined)) {
     const idx = parseInt(ctpm0 ? ctpm0[1] : ctpq0);
-    // Positional by construction: get() resolves idx - base into the window, so
-    // this route never consulted the stored index field and was already right
-    // while the listing was wrong. The echoed `index` is the requested one.
-    const entry = ctWindow.get(idx);
-    if (!entry) {
-      // Aged out of the in-memory window but still in the tree: the leaf, its
-      // root and its audit path are all still exact. The full timestamp is not
-      // kept for pruned entries, so ts is null rather than invented.
-      if (Number.isInteger(idx) && idx >= 0 && idx < ctTree.size) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true, index: idx, leaf_hash: ctTree.leaf(idx), tree_hash: ctTree.root(idx + 1), proof: ctTree.inclusionProof(idx, idx + 1), ts: null, pruned: true }));
-      }
+    // Every field below comes from the full tree (lib/ct-tree), never from the
+    // tree_hash and proof stored with the entry. The stored pair is what the
+    // relay computed at append time, and on health 39 entries from April 2026
+    // (positions 1-34 and 42-46) carry a pair from an earlier, restarted tree:
+    // /v2/ct/proof/45 used to hand out a path that folds to a root of a tree
+    // that starts at position 38, so no verifier could check it against the
+    // published log. The leaves themselves are in the right place; only the
+    // stored proof was stale. Recomputing is O(log n) and always right.
+    //
+    // ?tree_size=N asks for the path to the root at N leaves, so a client can
+    // check inclusion straight against a signed tree head (N = sth.tree_size)
+    // without a separate consistency proof. Without it N = idx + 1, exactly
+    // what this route always returned.
+    if (!Number.isInteger(idx) || idx < 0 || idx >= ctTree.size) {
       res.writeHead(404); return res.end(J({ error: 'Index not found' }));
     }
+    let size = idx + 1;
+    if (query.tree_size !== undefined) {
+      const n = Number(query.tree_size);
+      if (!Number.isInteger(n) || n <= idx || n > ctTree.size) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: `tree_size must be an integer with index < tree_size <= ${ctTree.size}` }));
+      }
+      size = n;
+    }
+    // Positional by construction: get() resolves idx - base into the window.
+    // An entry that aged out of the window is still in the tree; only its full
+    // timestamp is gone, so ts is null rather than invented.
+    const entry = ctWindow.get(idx);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: ctCoarseTs(entry.ts) }));
+    return res.end(J({ ok: true, index: idx, leaf_hash: ctTree.leaf(idx), tree_size: size,
+                       tree_hash: ctTree.root(size), proof: ctTree.inclusionProof(idx, size),
+                       ts: entry ? ctCoarseTs(entry.ts) : null, ...(entry ? {} : { pruned: true }) }));
   }
 
   // ── GET /v2/sth, /v2/sth/history, /v2/sth/:timestamp — Signed Tree Head (public) ──
@@ -7460,7 +7562,9 @@ async function handleRelayRequest(req, res) {
     const all = [...relayRegistry.values()];
     const page = all.slice(offset, offset + limit).map(r => ({
       url: r.url, sector: r.sector, version: r.version, edition: r.edition,
-      pk_hash: r.pk_hash, verified_since: r.verified_since, last_seen: r.last_seen,
+      // To the hour, like the log: verified_since is the ts of a relay_reg leaf
+      // and a precise one undoes the rounding of that leaf.
+      pk_hash: r.pk_hash, verified_since: ctCoarseTs(r.verified_since), last_seen: ctCoarseTs(r.last_seen),
       ct_index: r.ct_index, last_ct_index: r.last_ct_index
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -7519,6 +7623,31 @@ async function handleRelayRequest(req, res) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Signature verification failed' }));
     }
+    // A valid signature only proves the head came with its own key. Whether
+    // that key may speak for relay_id is the question the route never asked;
+    // lib/fleet-pins.js answers it.
+    const pinCheck = fleetPins.classifyPeer(PEER_PINS, relay_id, computedPkHash);
+    if (pinCheck.verdict === 'refused') {
+      log('warn', 'sth_ingest_refused', { relay_id: String(relay_id).slice(0, 80), pk_hash: computedPkHash.slice(0, 16),
+                                         reason: pinCheck.reason, ip: getClientIp(req) });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'This relay_id is pinned to a different key, or this key to a different relay_id', reason: pinCheck.reason }));
+    }
+    if (pinCheck.verdict === 'unpinned') {
+      // Not refused (a self-hosted fleet gossips like this), not published.
+      const known = unpinnedPeerSths.get(computedPkHash);
+      const nowIso = new Date().toISOString();
+      unpinnedPeerSths.delete(computedPkHash); // re-insert: Map order = recency
+      unpinnedPeerSths.set(computedPkHash, {
+        relay_id: String(relay_id).slice(0, 200), count: (known?.count || 0) + 1,
+        last_tree_size: tree_size, first_seen: known?.first_seen || nowIso, last_seen: nowIso,
+      });
+      while (unpinnedPeerSths.size > UNPINNED_PEER_MAX) unpinnedPeerSths.delete(unpinnedPeerSths.keys().next().value);
+      if (!known) log('info', 'sth_ingest_unpinned', { relay_id: String(relay_id).slice(0, 80), pk_hash: computedPkHash.slice(0, 16), ip: getClientIp(req) });
+      res.writeHead(202, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, relay_pk_hash: computedPkHash, mirrored: false,
+                         reason: 'This relay is not pinned here (PEER_STH_PINS), so its heads are not published in /v2/sth/peers' }));
+    }
     if (!peerSths.has(computedPkHash)) {
       peerSths.set(computedPkHash, { sths: [], pk_b64: public_key, last: Date.now() });
       _evictPeerSthsIfNeeded(); // bound distinct peers (Map entries + fds + .jsonl files)
@@ -7533,7 +7662,7 @@ async function handleRelayRequest(req, res) {
     peer.pk_b64 = public_key;
     peer.last = Date.now();
     const record = { relay_id, relay_pk_hash: computedPkHash, sha3_root, timestamp, tree_size,
-                     version: version || 1, signature, public_key, received_at: new Date().toISOString() };
+                     version: version || 1, signature, public_key, received_at: peerReceivedAt(Date.now()) };
     peer.sths.push(record);
     if (peer.sths.length > PEER_STH_MAX) peer.sths.shift();
     _peerSthWrite(computedPkHash, record);
@@ -7553,7 +7682,7 @@ async function handleRelayRequest(req, res) {
         sth_count: peer.sths.length,
         latest_root: latest?.sha3_root || null,
         latest_tree_size: latest?.tree_size ?? null,
-        latest_ts: latest?.received_at || null,
+        latest_ts: latest?.received_at ? ctCoarseTs(latest.received_at) : null,
       });
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -7571,8 +7700,11 @@ async function handleRelayRequest(req, res) {
     const lim = Math.min(parseInt(query.limit || '100') || 100, 500);
     const off  = Math.max(parseInt(query.offset || '0') || 0, 0);
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    // received_at is coarsened on the way out as well as on the way in: heads
+    // mirrored before 3.1.2 were stored with the millisecond.
+    const sths = peer.sths.slice(off, off + lim).map(x => (x && x.received_at ? { ...x, received_at: ctCoarseTs(x.received_at) } : x));
     return res.end(J({ ok: true, relay_pk_hash: sthPeerMatch[1],
-                       sths: peer.sths.slice(off, off + lim), total: peer.sths.length, limit: lim, offset: off }));
+                       sths, total: peer.sths.length, limit: lim, offset: off }));
   }
 
   // ── GET /v2/sth/consistency — RFC 6962 consistency proof ──────────────────────
@@ -12553,6 +12685,13 @@ function applyKeyLimitEnforcement() {
 async function registerSelf() {
   if (!relayIdentity || !RELAY_SELF_URL) return;
   const target = RELAY_PRIMARY_URL || `http://localhost:${PORT}`;
+  // Same rule as broadcastSTH: a stack that is not the pinned fleet does not
+  // register itself with a production relay.
+  if (isParamantUrl(target) && !mayTalkToParamantFleet()) {
+    log('warn', 'relay_self_register_skipped', { target: String(target).slice(0, 60),
+      hint: 'Not a pinned Paramant relay: not registering with paramant.app. PARAMANT_FLEET_GOSSIP=1 overrides.' });
+    return;
+  }
   const timestamp = new Date().toISOString();
   const msg = Buffer.from(RELAY_SELF_URL + '|' + SECTOR + '|' + VERSION + '|' + timestamp, 'utf8');
   // API in @noble/post-quantum: sign(message, secretKey)

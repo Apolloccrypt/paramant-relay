@@ -94,10 +94,34 @@ test('the CSP denies framing and allows no eval beyond WebAssembly', async () =>
   did();
 });
 
-test('HSTS asks for at least a year and covers the subdomains', async () => {
-  const [r] = await bothWays();
+// HSTS is the TLS edge's header, not the relay's (CT-DEDUP, second round).
+// Measured 2026-10-06 on production: /health on all six hosts carried
+// Strict-Transport-Security twice, once from the edge and once from here,
+// because a header added by nginx or Caddy does not replace the one the
+// upstream already sent. The relay speaks plain HTTP, where a browser ignores
+// HSTS anyway, so the only effect of sending it was the duplicate.
+test('the relay leaves HSTS to the TLS edge, so the header appears once', async () => {
+  for (const r of await bothWays()) {
+    assert.strictEqual(r.headers['strict-transport-security'], undefined,
+      'the relay sent Strict-Transport-Security itself; behind the edge that doubles the header');
+  }
+  // The edge still sets it, exactly once, for every relay host.
+  const fs = require('fs');
+  const path = require('path');
+  const caddy = fs.readFileSync(path.join(__dirname, '../../deploy/caddy/Caddyfile'), 'utf8');
+  const lines = caddy.split('\n').filter((l) => /^\s*header\s+Strict-Transport-Security\b/.test(l));
+  assert.strictEqual(lines.length, 1, 'the Caddy edge sets HSTS once');
+  const maxAge = Number((/max-age=(\d+)/.exec(lines[0]) || [])[1]);
+  assert.ok(maxAge >= 31536000, `edge max-age ${maxAge} is under a year`);
+  assert.match(lines[0], /includeSubDomains/i);
+  did();
+});
+
+test('RELAY_SEND_HSTS=1 brings it back for a relay exposed without an edge', async () => {
+  const own = await boot({ tag: 'security-headers-hsts', env: { RELAY_SEND_HSTS: '1' } });
+  const r = await own.get('/health');
   const hsts = r.headers['strict-transport-security'];
-  assert.ok(hsts, 'Strict-Transport-Security is absent');
+  assert.ok(hsts, 'Strict-Transport-Security is absent with RELAY_SEND_HSTS=1');
   const maxAge = Number((/max-age=(\d+)/.exec(hsts) || [])[1]);
   assert.ok(maxAge >= 31536000, `max-age ${maxAge} is under a year`);
   assert.match(hsts, /includeSubDomains/i);
