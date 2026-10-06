@@ -27,7 +27,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/werkplek.css?v=1">
+<link rel="stylesheet" href="/werkplek.css?v=2">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FFFFFF, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -575,13 +575,13 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
            (dh-document, dh-send, dh-status, dh-progress), filled with example
            data that is marked as such on the frame and on every row. The title
            says what it is for, one line gives the price, and the two actions
-           sit in the head of the dashboard itself. Each tile plays a short
-           mini-flow and ends on one button into the real tool; js/home-demo.js
+           sit in the head of the dashboard itself. Each tile opens a short
+           explanation with one button into the real tool; js/home-demo.js
            drives it, and without script every tile is a plain link. -->
       <div class="wp-demo wp-demo-top" role="region" aria-labelledby="home-h1" data-wp-demo>
         <div class="wp-demo-bar">
           <span class="wp-sign" aria-hidden="true">Voorbeeld</span>
-          <p class="wp-demo-h" id="wp-demo-h">Zo ziet uw overzicht eruit. <span>Kies een document en kijk wat er gebeurt.</span></p>
+          <p class="wp-demo-h" id="wp-demo-h">Zo ziet uw overzicht eruit. <span>Kies een document en zie hoe het werkt.</span></p>
           <ul class="wp-appnav" aria-hidden="true">
             <li class="on">Documenten</li><li>Versturen</li><li>Ondertekenen</li><li>Controleren</li>
           </ul>
@@ -611,7 +611,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
                 <span class="dh-status in_progress">Wacht op 1 handtekening</span>
               </span>
             </span>
-            <span class="wp-tile-go">Bekijk hoe het gaat</span>
+            <span class="wp-tile-go">Hoe het werkt</span>
           </a>
           <a class="wp-tile dh-workspace" href="/parashare" data-wp-open="send" aria-haspopup="dialog">
             <span class="wp-tile-k">Versturen</span>
@@ -623,7 +623,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
                 <span class="dh-status completed">Opgehaald en gewist</span>
               </span>
             </span>
-            <span class="wp-tile-go">Bekijk hoe het gaat</span>
+            <span class="wp-tile-go">Hoe het werkt</span>
           </a>
           <a class="wp-tile dh-workspace" href="/verify" data-wp-open="verify" aria-haspopup="dialog">
             <span class="wp-tile-k">Controleren</span>
@@ -635,99 +635,76 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
                 <span class="dh-status completed">Echt</span>
               </span>
             </span>
-            <span class="wp-tile-go">Bekijk hoe het gaat</span>
+            <span class="wp-tile-go">Hoe het werkt</span>
           </a>
         </div>
       </div>
 
-      <!-- The stage: the dashboard's own detail dialog (dh-doc-dialog), with a
-           mini-flow inside instead of the detail list. One per tile; the
-           script shows one at a time and plays it once. -->
-      <div class="dh-doc-dialog wp-stage" id="wp-stage-sign" role="dialog" aria-modal="true" aria-labelledby="wp-stage-sign-h" data-wp-stage="sign" hidden>
+      <!-- The stage: the dashboard's own detail dialog (dh-doc-dialog). One
+           heading, one sentence, one button into the real tool; the steps sit
+           folded under it. No drawn product, no animation: the real tool is
+           one tap away. js/home-demo.js opens and closes it. -->
+
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-sign" role="dialog" aria-modal="true" aria-labelledby="wp-stage-sign-h" aria-describedby="wp-stage-sign-say" data-wp-stage="sign" hidden>
         <div class="dh-doc-dialog-panel">
-          <div class="dh-doc-dialog-head"><h2 id="wp-stage-sign-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Voorbeeld</span> Een contract laten tekenen</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-sign-h">Een contract laten tekenen</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
           <div class="dh-doc-dialog-body">
-            <div class="wp-play" data-wp-play>
-              <div class="wp-pages" aria-hidden="true">
-                <div class="wp-page"><i class="t"></i><i></i><i></i><i class="s"></i><b class="wp-par p1">PH</b><b class="wp-par p2">VH</b></div>
-                <div class="wp-page"><i class="t"></i><i></i><i class="s"></i><i></i><b class="wp-par p1">PH</b><b class="wp-par p2">VH</b></div>
-                <div class="wp-page"><i class="t"></i><i></i><i></i><b class="wp-par p1">PH</b><b class="wp-par p2">VH</b>
-                  <span class="wp-field f1"><svg viewBox="0 0 120 34"><path d="M4 24c10-16 16-18 15-7s-6 14 2 8 13-18 13-9-4 18 5 8 10-15 15-7 2 12 9 7 12-15 16-7 4 12 13 3 14-11 24-7"/></svg></span>
-                  <span class="wp-field f2"><svg viewBox="0 0 120 34"><path d="M4 20c8-10 14-14 18-6s-2 14 6 9 10-16 16-12 0 14 8 10 12-12 18-8 6 10 14 6 12-10 20-8 8 4 12 2"/></svg></span>
-                  <span class="wp-seal">Getekend</span>
-                </div>
-              </div>
-              <ol class="wp-people">
-                <li class="wp-who w1"><span class="wp-ini">PH</span><span><strong>Praktijkhouder</strong><em class="wp-state"><span class="c">Uitgenodigd per mail</span><span class="a">Tekent nu</span><span class="b">Getekend, met parafen</span></em></span></li>
-                <li class="wp-who w2"><span class="wp-ini">VH</span><span><strong>Verhuurder</strong><em class="wp-state"><span class="a">Is daarna aan de beurt</span><span class="b">Getekend, met parafen</span></em></span></li>
-              </ol>
-            </div>
-            <ol class="wp-steps" data-wp-steps>
-              <li>U zet een vak voor de handtekening, en een voor de paraaf op elke pagina.</li>
-              <li>De eerste persoon opent de link in de mail, parafeert en tekent.</li>
-              <li>De tweede doet hetzelfde. U ziet steeds wie er nog moet.</li>
-              <li>Klaar. Iedereen downloadt het getekende document met het bewijs.</li>
-            </ol>
+            <p class="wp-say" id="wp-stage-sign-say">Iedereen tekent via een link in de mail, en u ziet steeds wie er nog moet.</p>
             <div class="wp-end">
               <a class="wp-try" href="/sign?mode=invite">Probeer het zelf</a>
               <p class="wp-end-note">Klaarzetten kan zonder account. Voor het tekenen maakt u een gratis account.</p>
-              <button class="wp-replay" type="button" data-wp-replay>Nog een keer afspelen</button>
             </div>
+            <details class="wp-fold">
+              <summary>De stappen</summary>
+              <ol class="wp-how">
+                <li>U zet een vak voor de handtekening, en een voor de paraaf op elke pagina.</li>
+                <li>De eerste persoon opent de link in de mail, parafeert en tekent.</li>
+                <li>De tweede doet hetzelfde.</li>
+                <li>Iedereen downloadt het getekende document met het bewijs.</li>
+              </ol>
+            </details>
           </div>
         </div>
       </div>
 
-      <div class="dh-doc-dialog wp-stage" id="wp-stage-send" role="dialog" aria-modal="true" aria-labelledby="wp-stage-send-h" data-wp-stage="send" hidden>
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-send" role="dialog" aria-modal="true" aria-labelledby="wp-stage-send-h" aria-describedby="wp-stage-send-say" data-wp-stage="send" hidden>
         <div class="dh-doc-dialog-panel">
-          <div class="dh-doc-dialog-head"><h2 id="wp-stage-send-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Voorbeeld</span> Een dossier veilig versturen</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-send-h">Een dossier veilig versturen</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
           <div class="dh-doc-dialog-body">
-            <div class="wp-play wp-play-send" data-wp-play>
-              <div class="wp-lane" aria-hidden="true">
-                <div class="wp-file"><span class="wp-file-ic"></span><span class="wp-file-n">Verwijzing en dossier.pdf</span><span class="wp-lock"></span><span class="wp-stamp">Verstuurd</span></div>
-                <div class="wp-track"><i></i></div>
-                <div class="wp-to"><strong>Ontvanger</strong><span>Ophaalcode</span>
-                  <span class="wp-flap"><b data-f="4">4</b><b data-f="7">7</b><b data-f="2">2</b><b data-f="9">9</b><b data-f="1">1</b><b data-f="8">8</b></span>
-                </div>
-              </div>
-              <p class="wp-receipt" aria-hidden="true"><span>Ontvangstbewijs</span><span>Opgehaald &middot; gewist</span></p>
-            </div>
-            <ol class="wp-steps" data-wp-steps>
-              <li>Uw browser versleutelt het bestand voordat het vertrekt.</li>
-              <li>De ontvanger krijgt een link en een ophaalcode.</li>
-              <li>Na het ophalen is het bestand gewist. U houdt een ontvangstbewijs.</li>
-            </ol>
+            <p class="wp-say" id="wp-stage-send-say">Alleen de ontvanger kan het bestand openen, en na het ophalen is het gewist.</p>
             <div class="wp-end">
               <a class="wp-try" href="/parashare">Probeer het zelf</a>
               <p class="wp-end-note">Met een gratis account: 50 verzendingen per maand.</p>
-              <button class="wp-replay" type="button" data-wp-replay>Nog een keer afspelen</button>
             </div>
+            <details class="wp-fold">
+              <summary>De stappen</summary>
+              <ol class="wp-how">
+                <li>Uw browser versleutelt het bestand voordat het vertrekt.</li>
+                <li>De ontvanger krijgt een link en een ophaalcode.</li>
+                <li>Na het ophalen is het bestand gewist. U houdt een ontvangstbewijs.</li>
+              </ol>
+            </details>
           </div>
         </div>
       </div>
 
-      <div class="dh-doc-dialog wp-stage" id="wp-stage-verify" role="dialog" aria-modal="true" aria-labelledby="wp-stage-verify-h" data-wp-stage="verify" hidden>
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-verify" role="dialog" aria-modal="true" aria-labelledby="wp-stage-verify-h" aria-describedby="wp-stage-verify-say" data-wp-stage="verify" hidden>
         <div class="dh-doc-dialog-panel">
-          <div class="dh-doc-dialog-head"><h2 id="wp-stage-verify-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Voorbeeld</span> Een bewijs zelf controleren</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-verify-h">Een bewijs zelf controleren</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
           <div class="dh-doc-dialog-body">
-            <div class="wp-play wp-play-verify" data-wp-play>
-              <div class="wp-drop" aria-hidden="true"><span class="wp-chip c1">Arbeidsovereenkomst.pdf</span><span class="wp-chip c2">bewijs.psign</span></div>
-              <ul class="wp-checks" aria-hidden="true">
-                <li class="k1">Het document is niet veranderd</li>
-                <li class="k2">De handtekeningen kloppen</li>
-                <li class="k3">Paramant heeft het bekrachtigd</li>
-              </ul>
-              <span class="wp-ok" aria-hidden="true">Echt</span>
-            </div>
-            <ol class="wp-steps" data-wp-steps>
-              <li>U kiest het document en het bewijsbestand dat erbij hoort.</li>
-              <li>Uw eigen browser controleert alles. Het bestand blijft op uw computer.</li>
-              <li>U ziet meteen of het echt is. Dat werkt ook zonder ons.</li>
-            </ol>
+            <p class="wp-say" id="wp-stage-verify-say">U ziet op uw eigen apparaat of een getekend document echt is en niet is veranderd.</p>
             <div class="wp-end">
               <a class="wp-try" href="/verify">Probeer het zelf</a>
               <p class="wp-end-note">Geen account nodig.</p>
-              <button class="wp-replay" type="button" data-wp-replay>Nog een keer afspelen</button>
             </div>
+            <details class="wp-fold">
+              <summary>De stappen</summary>
+              <ol class="wp-how">
+                <li>U kiest het document en het bewijsbestand dat erbij hoort.</li>
+                <li>Uw eigen browser controleert alles. Het bestand blijft op uw computer.</li>
+                <li>Dat werkt ook zonder ons.</li>
+              </ol>
+            </details>
           </div>
         </div>
       </div>
@@ -991,6 +968,6 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/format-date.js?v=5" defer></script>
 <script src="/js/home-auth.js?v=10" defer></script>
-<script src="/js/home-demo.js?v=1" defer></script>
+<script src="/js/home-demo.js?v=2" defer></script>
 </body>
 </html>

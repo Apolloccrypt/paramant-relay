@@ -27,7 +27,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/werkplek.css?v=1">
+<link rel="stylesheet" href="/werkplek.css?v=2">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FFFFFF, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -550,7 +550,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
       <div class="wp-demo wp-demo-top" role="region" aria-labelledby="home-h1" data-wp-demo>
         <div class="wp-demo-bar">
           <span class="wp-sign" aria-hidden="true">Example</span>
-          <p class="wp-demo-h" id="wp-demo-h">This is what your overview looks like. <span>Pick a document and watch what happens.</span></p>
+          <p class="wp-demo-h" id="wp-demo-h">This is what your overview looks like. <span>Pick a document and see how it works.</span></p>
           <ul class="wp-appnav" aria-hidden="true">
             <li class="on">Documents</li><li>Send</li><li>Sign</li><li>Verify</li>
           </ul>
@@ -580,7 +580,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
                 <span class="dh-status in_progress">Waiting for 1 signature</span>
               </span>
             </span>
-            <span class="wp-tile-go">See how it works</span>
+            <span class="wp-tile-go">How it works</span>
           </a>
           <a class="wp-tile dh-workspace" href="/en/parashare" data-wp-open="send" aria-haspopup="dialog">
             <span class="wp-tile-k">Send</span>
@@ -592,7 +592,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
                 <span class="dh-status completed">Collected and deleted</span>
               </span>
             </span>
-            <span class="wp-tile-go">See how it works</span>
+            <span class="wp-tile-go">How it works</span>
           </a>
           <a class="wp-tile dh-workspace" href="/en/verify" data-wp-open="verify" aria-haspopup="dialog">
             <span class="wp-tile-k">Verify</span>
@@ -604,99 +604,76 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
                 <span class="dh-status completed">Genuine</span>
               </span>
             </span>
-            <span class="wp-tile-go">See how it works</span>
+            <span class="wp-tile-go">How it works</span>
           </a>
         </div>
       </div>
 
-      <!-- The stage: the dashboard's own detail dialog (dh-doc-dialog), with a
-           mini-flow inside instead of the detail list. One per tile; the
-           script shows one at a time and plays it once. -->
-      <div class="dh-doc-dialog wp-stage" id="wp-stage-sign" role="dialog" aria-modal="true" aria-labelledby="wp-stage-sign-h" data-wp-stage="sign" hidden>
+      <!-- The stage: the dashboard's own detail dialog (dh-doc-dialog). One
+           heading, one sentence, one button into the real tool; the steps sit
+           folded under it. No drawn product, no animation: the real tool is
+           one tap away. js/home-demo.js opens and closes it. -->
+
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-sign" role="dialog" aria-modal="true" aria-labelledby="wp-stage-sign-h" aria-describedby="wp-stage-sign-say" data-wp-stage="sign" hidden>
         <div class="dh-doc-dialog-panel">
-          <div class="dh-doc-dialog-head"><h2 id="wp-stage-sign-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Example</span> Getting a contract signed</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-sign-h">Getting a contract signed</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
           <div class="dh-doc-dialog-body">
-            <div class="wp-play" data-wp-play>
-              <div class="wp-pages" aria-hidden="true">
-                <div class="wp-page"><i class="t"></i><i></i><i></i><i class="s"></i><b class="wp-par p1">TN</b><b class="wp-par p2">LL</b></div>
-                <div class="wp-page"><i class="t"></i><i></i><i class="s"></i><i></i><b class="wp-par p1">TN</b><b class="wp-par p2">LL</b></div>
-                <div class="wp-page"><i class="t"></i><i></i><i></i><b class="wp-par p1">TN</b><b class="wp-par p2">LL</b>
-                  <span class="wp-field f1"><svg viewBox="0 0 120 34"><path d="M4 24c10-16 16-18 15-7s-6 14 2 8 13-18 13-9-4 18 5 8 10-15 15-7 2 12 9 7 12-15 16-7 4 12 13 3 14-11 24-7"/></svg></span>
-                  <span class="wp-field f2"><svg viewBox="0 0 120 34"><path d="M4 20c8-10 14-14 18-6s-2 14 6 9 10-16 16-12 0 14 8 10 12-12 18-8 6 10 14 6 12-10 20-8 8 4 12 2"/></svg></span>
-                  <span class="wp-seal">Signed</span>
-                </div>
-              </div>
-              <ol class="wp-people">
-                <li class="wp-who w1"><span class="wp-ini">TN</span><span><strong>Tenant</strong><em class="wp-state"><span class="c">Invited by email</span><span class="a">Signing now</span><span class="b">Signed, with initials</span></em></span></li>
-                <li class="wp-who w2"><span class="wp-ini">LL</span><span><strong>Landlord</strong><em class="wp-state"><span class="a">Goes next</span><span class="b">Signed, with initials</span></em></span></li>
-              </ol>
-            </div>
-            <ol class="wp-steps" data-wp-steps>
-              <li>You place a box for the signature, and one for initials on every page.</li>
-              <li>The first person opens the link in the email, initials and signs.</li>
-              <li>The second does the same. You always see who is still to sign.</li>
-              <li>Done. Everyone downloads the signed document with its proof.</li>
-            </ol>
+            <p class="wp-say" id="wp-stage-sign-say">Everyone signs through a link in the email, and you always see who is still to sign.</p>
             <div class="wp-end">
               <a class="wp-try" href="/en/sign?mode=invite">Try it yourself</a>
               <p class="wp-end-note">You can prepare a document without an account. To sign, you create a free one.</p>
-              <button class="wp-replay" type="button" data-wp-replay>Play it again</button>
             </div>
+            <details class="wp-fold">
+              <summary>The steps</summary>
+              <ol class="wp-how">
+                <li>You place a box for the signature, and one for initials on every page.</li>
+                <li>The first person opens the link in the email, initials and signs.</li>
+                <li>The second does the same.</li>
+                <li>Everyone downloads the signed document with its proof.</li>
+              </ol>
+            </details>
           </div>
         </div>
       </div>
 
-      <div class="dh-doc-dialog wp-stage" id="wp-stage-send" role="dialog" aria-modal="true" aria-labelledby="wp-stage-send-h" data-wp-stage="send" hidden>
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-send" role="dialog" aria-modal="true" aria-labelledby="wp-stage-send-h" aria-describedby="wp-stage-send-say" data-wp-stage="send" hidden>
         <div class="dh-doc-dialog-panel">
-          <div class="dh-doc-dialog-head"><h2 id="wp-stage-send-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Example</span> Sending a case file safely</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-send-h">Sending a case file safely</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
           <div class="dh-doc-dialog-body">
-            <div class="wp-play wp-play-send" data-wp-play>
-              <div class="wp-lane" aria-hidden="true">
-                <div class="wp-file"><span class="wp-file-ic"></span><span class="wp-file-n">Referral and case file.pdf</span><span class="wp-lock"></span><span class="wp-stamp">Sent</span></div>
-                <div class="wp-track"><i></i></div>
-                <div class="wp-to"><strong>Recipient</strong><span>Pickup code</span>
-                  <span class="wp-flap"><b data-f="4">4</b><b data-f="7">7</b><b data-f="2">2</b><b data-f="9">9</b><b data-f="1">1</b><b data-f="8">8</b></span>
-                </div>
-              </div>
-              <p class="wp-receipt" aria-hidden="true"><span>Receipt</span><span>Collected &middot; deleted</span></p>
-            </div>
-            <ol class="wp-steps" data-wp-steps>
-              <li>Your browser encrypts the file before it leaves.</li>
-              <li>The recipient gets a link and a pickup code.</li>
-              <li>Once collected, the file is deleted. You keep a receipt.</li>
-            </ol>
+            <p class="wp-say" id="wp-stage-send-say">Only the recipient can open the file, and once collected it is deleted.</p>
             <div class="wp-end">
               <a class="wp-try" href="/en/parashare">Try it yourself</a>
               <p class="wp-end-note">With a free account: 50 transfers a month.</p>
-              <button class="wp-replay" type="button" data-wp-replay>Play it again</button>
             </div>
+            <details class="wp-fold">
+              <summary>The steps</summary>
+              <ol class="wp-how">
+                <li>Your browser encrypts the file before it leaves.</li>
+                <li>The recipient gets a link and a pickup code.</li>
+                <li>Once collected, the file is deleted. You keep a receipt.</li>
+              </ol>
+            </details>
           </div>
         </div>
       </div>
 
-      <div class="dh-doc-dialog wp-stage" id="wp-stage-verify" role="dialog" aria-modal="true" aria-labelledby="wp-stage-verify-h" data-wp-stage="verify" hidden>
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-verify" role="dialog" aria-modal="true" aria-labelledby="wp-stage-verify-h" aria-describedby="wp-stage-verify-say" data-wp-stage="verify" hidden>
         <div class="dh-doc-dialog-panel">
-          <div class="dh-doc-dialog-head"><h2 id="wp-stage-verify-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Example</span> Checking a proof yourself</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-verify-h">Checking a proof yourself</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Close">&times;</button></div>
           <div class="dh-doc-dialog-body">
-            <div class="wp-play wp-play-verify" data-wp-play>
-              <div class="wp-drop" aria-hidden="true"><span class="wp-chip c1">Employment contract.pdf</span><span class="wp-chip c2">proof.psign</span></div>
-              <ul class="wp-checks" aria-hidden="true">
-                <li class="k1">The document has not changed</li>
-                <li class="k2">The signatures are valid</li>
-                <li class="k3">Paramant has countersigned it</li>
-              </ul>
-              <span class="wp-ok" aria-hidden="true">Genuine</span>
-            </div>
-            <ol class="wp-steps" data-wp-steps>
-              <li>You pick the document and the proof file that belongs to it.</li>
-              <li>Your own browser checks everything. The file stays on your computer.</li>
-              <li>You see at once whether it is genuine. That works without us, too.</li>
-            </ol>
+            <p class="wp-say" id="wp-stage-verify-say">You see on your own device whether a signed document is genuine and unchanged.</p>
             <div class="wp-end">
               <a class="wp-try" href="/en/verify">Try it yourself</a>
               <p class="wp-end-note">Checking needs no account and no invitation.</p>
-              <button class="wp-replay" type="button" data-wp-replay>Play it again</button>
             </div>
+            <details class="wp-fold">
+              <summary>The steps</summary>
+              <ol class="wp-how">
+                <li>You pick the document and the proof file that belongs to it.</li>
+                <li>Your own browser checks everything. The file stays on your computer.</li>
+                <li>That works without us, too.</li>
+              </ol>
+            </details>
           </div>
         </div>
       </div>
@@ -965,6 +942,6 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/format-date.js?v=5" defer></script>
 <script src="/js/home-auth.js?v=10" defer></script>
-<script src="/js/home-demo.js?v=1" defer></script>
+<script src="/js/home-demo.js?v=2" defer></script>
 </body>
 </html>
