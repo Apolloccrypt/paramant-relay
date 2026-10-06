@@ -126,6 +126,8 @@ async function start(opts = {}) {
   const commonEnv = {
     ...process.env,
     NODE_ENV: 'test',
+    // Never gossip to or register with the production fleet (relay/lib/fleet-pins.js).
+    PARAMANT_FLEET_GOSSIP: '0',
     REDIS_URL: redisUrl,
     RELAY_REDIS_URL: redisUrl,
     ADMIN_TOKEN: adminToken,
