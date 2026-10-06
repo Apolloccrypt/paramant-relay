@@ -92,11 +92,14 @@ function relayStub(state) {
     const pm = u.pathname.match(/^\/v2\/ct\/proof\/(\d+)$/);
     if (pm) {
       const i = parseInt(pm[1], 10);
-      const n = parseInt(u.searchParams.get('tree_size') || String(i + 1), 10);
+      // state.oldRelay: a relay from before 3.1.2 ignores ?tree_size and
+      // sends no tree_size field.
+      const n = state.oldRelay ? i + 1 : parseInt(u.searchParams.get('tree_size') || String(i + 1), 10);
       let proof = t.inclusionProof(i, n);
       if (state.forgeProof && proof.length) {
         proof = proof.map((s, k) => (k === 0 ? { ...s, hash: s.hash.slice(0, -1) + (s.hash.endsWith('0') ? '1' : '0') } : s));
       }
+      if (state.oldRelay) return json(200, { ok: true, index: i, leaf_hash: t.leaf(i), tree_hash: t.root(n), proof, ts: null });
       return json(200, { ok: true, index: i, leaf_hash: t.leaf(i), tree_size: n, tree_hash: t.root(n), proof, ts: null });
     }
     if (u.pathname === '/v2/sth/consistency') {
@@ -178,6 +181,16 @@ test('a forged inclusion proof does not go green', async () => {
   assert.equal(r.verdict, 'failed', r.text);
   assert.doesNotMatch(r.text, /Geverifieerd/);
   assert.ok(r.steps.includes('inclusion:f'), r.steps.join(','));
+  await ctx.close();
+});
+
+test('a relay from before 3.1.2 (no ?tree_size) is "not checked", not accused', async () => {
+  const state = { tree: makeTree(9), oldRelay: true };
+  const { ctx, page } = await openPage(state);
+  const r = await check(page, state.tree.leaf(3));
+  assert.equal(r.verdict, 'unchecked', r.text);
+  assert.ok(r.steps.includes('inclusion:n'), r.steps.join(','));
+  assert.doesNotMatch(r.text, /Geverifieerd/);
   await ctx.close();
 });
 
