@@ -4,8 +4,9 @@
 //
 // Security: the filename comes from the user's disk and the URL carries a key fragment, so
 // both are untrusted. Everything interpolated into HTML is escaped, and the href is
-// restricted to the https paramant.app origins we mint. A crafted filename must never
-// become live markup in the sender's mailbox.
+// restricted to the receive links we mint: a paramant.app origin, or the /get page of a
+// self-hosted relay (paramant-core receiveBaseFor), always https. A crafted filename must
+// never become live markup in the sender's mailbox.
 
 const ALLOWED_URL = /^https:\/\/(paramant\.app|[a-z0-9-]+\.paramant\.app)\//i;
 
@@ -16,7 +17,13 @@ export function escapeHtml(s) {
 }
 
 function safeUrl(url) {
-  return ALLOWED_URL.test(url) ? url : '#';
+  if (ALLOWED_URL.test(url)) return url;
+  // A self-hosted relay: https, no user info, and exactly its /get page.
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'https:' && !u.username && !u.password && u.pathname === '/get') return u.href;
+  } catch { /* not a URL */ }
+  return '#';
 }
 
 const DEFAULT_STRINGS = {

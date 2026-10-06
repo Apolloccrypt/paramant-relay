@@ -596,13 +596,17 @@
   function showIn(data) {
     if (notice) notice.hidden = !data.unknown;
     if (!data.unknown) {
-      // Personalise with the email local-part if we have it (textContent, so
-      // no markup injection). Falls back to a plain "Your documents." otherwise.
+      // Personalise only with the name the customer gave himself (the label
+      // from signup), via textContent. The local-part of the address used to
+      // stand here, which greeted a firm as "Your documents, info." or
+      // "Uw documenten, afzender." (acceptatie 3.1.1, taal 41). No name, no
+      // greeting: a plain "Your documents."
       var nameEl = inn.querySelector('[data-home-name]');
-      if (nameEl && data.email) {
-        var at = String(data.email).indexOf('@');
-        var local = at > 0 ? String(data.email).slice(0, at) : String(data.email);
-        if (local) nameEl.textContent = ', ' + local;
+      if (nameEl) {
+        getJSON('/api/user/me').then(function (me) {
+          var label = me && typeof me.label === 'string' ? me.label.trim() : '';
+          if (label && label.indexOf('@') === -1 && label.length <= 60) nameEl.textContent = ', ' + label;
+        });
       }
     }
     out.hidden = true;

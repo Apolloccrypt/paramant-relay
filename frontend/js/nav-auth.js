@@ -16,15 +16,31 @@
     return out;
   }
   var COSIGN_LINKS = 'paramant.cosign.links.v1:';
+  // The recipients' links of a send by name (parashare.page.js
+  // rememberSendLinks), kept for the reminder: same lifetime, same wipes.
+  var SEND_LINKS = 'paramant.send.links.v1:';
   function cosignLinks() {
     var out = [];
-    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_LINKS) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && (k.indexOf(COSIGN_LINKS) === 0 || k.indexOf(SEND_LINKS) === 0)) out.push(k); } } catch (e) { /* storage off */ }
     return out;
   }
+  // The signer's own key half per request (js/cosign-share-memory.js).
+  var COSIGN_SHARE = 'paramant.cosign.share.v1:';
+  function cosignShares() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_SHARE) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    return out;
+  }
+  // Which request a reader came from before making an account
+  // (login-return.js): path, envelope id, party index and expiry only. It
+  // goes on sign-out and when it expires, not on an account switch: making
+  // that account IS the switch.
+  var SIGNUP_RETURN = 'paramant:signup-return';
   function wipeLocal() {
     wipeDraft();
     cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
     cosignLinks().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    cosignShares().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
     try { localStorage.removeItem(OWNER); } catch (e) {}
   }
   window.paramantWipeLocal = wipeLocal;
@@ -40,10 +56,21 @@
   var COSIGN_KEY_MAX_MS = 864e5;
   (function sweep() {
     var now = Date.now();
-    // The signer links (sign-flow.js rememberSignerLinks) go when they expire.
-    cosignLinks().forEach(function(k) {
-      try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || !(now < Number(r.exp))) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
+    // The signer links (sign-flow.js rememberSignerLinks) and the signer's own
+    // key halves (cosign-share-memory.js) go when they expire.
+    // Only the sealed form (js/account-seal.js, v 2) may stay, and never past
+    // eight days from now (review #573, M4); a readable older record goes.
+    cosignLinks().concat(cosignShares()).forEach(function(k) {
+      try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || r.v !== 2 || !(now < Number(r.exp)) || Number(r.exp) > now + 8 * 864e5) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
     });
+    // An older record also held the invite link itself (url): it goes.
+    try {
+      var sr = localStorage.getItem(SIGNUP_RETURN);
+      if (sr !== null) {
+        var r = null; try { r = JSON.parse(sr); } catch (e) { r = null; }
+        if (!r || r.url !== undefined || !(now < Number(r.exp)) || Number(r.exp) > now + 864e5) localStorage.removeItem(SIGNUP_RETURN);
+      }
+    } catch (e) { /* storage off */ }
     cosignKeys().forEach(function(k) {
       try {
         var raw = localStorage.getItem(k) || '';
@@ -110,11 +137,13 @@
   ] : [
     // The English bar points at the English pages (apply-nav.py
     // to_english_links), /en/gereedschap included since fase 2 SITE-03-A.
-    ['Product', '/en#products'],
+    // The same five destinations as the Dutch bar since acceptance 3.1.1:
+    // the two products first, then tools, security and pricing.
+    ['Send', '/en/parasend'],
+    ['Sign', '/en/parasign'],
     ['Tools', '/en/gereedschap'],
     ['Security', '/en/security'],
-    ['Pricing', '/en/pricing'],
-    ['Docs', '/en/docs']
+    ['Pricing', '/en/pricing']
   ];
   // The workspace bar is verbs: what you came here to do, in the order you do
   // it. Send and Sign were the two; locking a file with a passphrase is the
@@ -221,7 +250,7 @@
       help: 'Hulp', docs: 'Documenten', account: 'Account', dev: 'Ontwikkelaarsinstellingen',
       plan: 'Abonnement en betaling', out: 'Uitloggen'
     } : {
-      help: 'Help', docs: 'Documents', account: 'Account', dev: 'Developer settings',
+      help: 'Help', docs: 'Documents', account: 'Account', dev: 'Developer settings (in Dutch)', devLang: 'nl',
       plan: 'Plan &amp; billing', out: 'Sign out'
     };
     container.innerHTML =
@@ -234,7 +263,7 @@
         '<div class="nav-user-menu" hidden>' +
           '<a href="' + R.dashboard + '" class="nav-menu-item">' + T.docs + '</a>' +
           '<a href="' + R.account + '" class="nav-menu-item">' + T.account + '</a>' +
-          '<a href="/developer" class="nav-menu-item">' + T.dev + '</a>' +
+          '<a href="/developer" class="nav-menu-item"' + (T.devLang ? ' hreflang="' + T.devLang + '"' : '') + '>' + T.dev + '</a>' +
           '<a href="' + R.pricing + '" class="nav-menu-item">' + T.plan + '</a>' +
           '<a href="' + R.help + '" class="nav-menu-item">' + T.help + '</a>' +
           '<div class="nav-menu-divider"></div>' +
@@ -267,6 +296,7 @@
         await fetch('/api/user/logout', { method: 'POST', credentials: 'include' });
       } catch (err) {}
       wipeLocal();
+      try { localStorage.removeItem(SIGNUP_RETURN); } catch (err) {}
       try { localStorage.removeItem('paramant_api_key'); } catch (err) {} // legacy: /parashare no longer writes it, clear an old one
       if (location.pathname === '/account' || location.pathname.startsWith('/auth/')) {
         location.href = '/';

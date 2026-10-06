@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **215 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **213 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -72,10 +72,9 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | 5 MB | `MAX_BLOB` `relay/relay.js:105` | `BLOB_SIZE_MB` `:1339`, `ANON_MAX` `:5360`, `TRIAL_MAX_SIZE` `:5545`, `tiers.js:47,56,65`, `parashare.page.js:829`, `paramant-core.js:30` | acht kopieen, een instelbaar |
 | sector naar poort | `admin/server.js:39-45` (alle vijf 3000) | `docker-compose.yml:311-315` (alle vijf 3000) | nee, gepind door `tests/sector-fallback-ports.test.mjs` |
 | `RELAY_HEALTH` | `admin/server.js:41` → `:3000` | de compose-listener staat op 3000 | nee, rechtgezet; stond op `:3005`, een poort die nergens in de repo bestaat |
-| `nginx-selfhost.conf` | de kopie in de wortel: geen bodygrens, `inbound` 10r/m | `deploy/nginx-selfhost.conf`: 35M, `inbound` 5r/m | **ja, twee bestanden met dezelfde naam** |
 | `install.sh` | de kopie in de wortel, 535 regels | `frontend/install.sh`, 466 regels, dit is de kopie die op paramant.app staat | **ja, 111 regels verschil** |
 | admin-paneel JS | `admin/public/app.js`, 895 regels | `frontend/js/admin.page.js`, 742 regels | **ja, 343 regels verschil** |
-| versie | `deploy/deploy-3.1.sh:121` `3.1.0` | `install.sh:24` `v3.1.0`, `deploy/.env.example` `v3.1.0` | nee (frontend/install.sh en install-pi.sh nog wel) |
+| versie | `deploy/deploy-3.1.sh:121` `3.1.1` | `install.sh:24` `v3.1.1`, `deploy/.env.example` `v3.1.1` | nee, ook `frontend/install.sh` en `frontend/install-pi.sh` op `v3.1.1` |
 | standaardwaarden | `admin/lib/config-schema.js` (25 sleutels) | `deploy/.env.example` | **ja, drie**, zie de tabel afwijkingen |
 | MFA-vertraging 10 / 300000 | `relay/lib/auth-throttle.js:24,26` | `admin/lib/login-ratelimit.js:150-152` | nee, gepind door `tests/redis-deadline-parity.test.mjs` |
 | tarieftabel | `relay/lib/tiers.js` | `frontend/js/quota-upgrade.js:54-57` | nee, gepind door `relay/test/quota-upgrade-render.test.js` |
@@ -167,6 +166,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `PARTNERS_PROD_SSH` | `tests/partners.test.mjs` | geen | ssh-doel (root@server) waarvandaan de test met `cut -d= -f1` alleen de sleutelnamen van `/opt/paramant-relay/.env` leest. Zonder: productiehelft overgeslagen, geen groen |
 | `PARTNERS_PROD_SSH_KEY` | `tests/partners.test.mjs` | geen, ssh kiest zelf | de ssh-sleutel voor `PARTNERS_PROD_SSH` |
 | `PLAYWRIGHT_CHROMIUM_PATH` | `scripts/shot-dashboard.mjs`, `scripts/ui-contrast-sweep.mjs` en 35 meer | geen | pad naar de browser voor elke Playwright-test |
+| `PW_SHOT_DIR` | `tests/admin-beheer.test.mjs` | geen | pad waar de test van het beheerscherm zijn schermafdrukken neerzet (ook gezet door `~/bin/pw-webkit.sh -o`); leeg betekent geen afdruk |
 | `RECEIPT_SHOTS_DIR` | `tests/receipt-verify.test.mjs` | `''` | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `RELAY_URL` | `scripts/dev-local-proxy.js` | `'http://127.0.0.1:3001'` | waar de dev-proxy de relay zoekt |
 | `ROF_JSON` | `tests/responsive-overflow.test.mjs` | geen | pad waar de overloopmeting elke bevinding als JSON neerzet, voor een telling voor en na; leeg betekent geen bestand |
@@ -183,6 +183,7 @@ overschrijven zonder de code aan te raken.
 
 | naam | gelezen in | standaard | wat hij doet |
 |---|---|---|---|
+| `ADDIN_URL` | `deploy/addin-uitrol.sh` | `https://addin.paramant.app` | welke host de add-in-uitrol publiek nameet na het wisselen van de map |
 | `BACKUP_DIR` | `scripts/cli/paramant-backup.sh`, `scripts/rollback-3.0.0.sh` | `/var/log/paramant/backups` / `/home/paramant/backups` | back-upmap van de relay-CLI en van het terugrolscript |
 | `BACKUP_ROOT` | `deploy/ops/backup-full-state.sh`, `deploy/ops/restore-full-state.sh` | `/home/paramant/backups/full-state` / `$WORK` | waar de volledige-staatback-up landt |
 | `CACHE_BUST_BASE` | `scripts/check-cache-bust.sh` | `origin/main` | met welke ref de cache-bust-poort de inhoud van css/js vergelijkt; gewijzigde inhoud onder dezelfde `?v=` is rood |
@@ -214,6 +215,7 @@ overschrijven zonder de code aan te raken.
 | `NGINX_PAYLOAD` | `deploy/deploy-3.1.sh` | leeg | intern: de regels die `remote_nginx` voor een remote blok zet (de conf en het snippet van 5e, base64). Geen operatorknop |
 | `NGINX_REF` | `deploy/deploy-3.1.sh` | `$DEPLOYED_HEAD` / `$DEPLOY_REF` | intern: de waarde van `PARAMANT_NGINX_REF` binnen fase 5e. Geen operatorknop |
 | `PARAMANT_API_KEY` | `scripts/paramant-cra.sh`, `scripts/paramant-firmware.sh` en 5 meer | `$(python3 -c "import json; print(json.load(open('${CFG` | sleutel voor de losse sectorscripts |
+| `PARAMANT_AIDE_MAX_AGE_DAYS` | `deploy/deploy-3.1.sh` | `2` | stap 6l: hoe oud de laatste AIDE-controle op de host mag zijn; /dpa noemt hetzelfde getal |
 | `PARAMANT_APP` | `scripts/security/audit.sh` | `https://paramant.app` | welke site het beveiligingsauditscript meet |
 | `PARAMANT_BACKUP_DIR` | `deploy/deploy-3.1.sh` | `/home/paramant/backups` | waar de deploy zijn back-ups zet |
 | `PARAMANT_BACKUP_HOST_PATHS` | `deploy/ops/backup-full-state.sh` | `/opt/paramant-relay/.env /etc/nginx /etc/letsencrypt /etc/caddy /home/paramant/secrets` | welke hostpaden de volledige-staatback-up onder host/ meeneemt |
@@ -320,11 +322,6 @@ deze regels doorbreken.
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-security-headers.conf` | `client_body_timeout` | `afwezig` |
-| `nginx-selfhost.conf` | `client_max_body_size` | `afwezig` |
-| `nginx-selfhost.conf` | `limit_req_zone` | `$binary_remote_addr zone=inbound:10m rate=10r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=health:10m rate=6r/m` |
-| `nginx-selfhost.conf` | `limit_conn` | `conn 20` |
-| `nginx-selfhost.conf` | `proxy_read_timeout` | `10s / 3600s / 3600s` |
-| `nginx-selfhost.conf` | `client_body_timeout` | `afwezig` |
 
 ## Constanten die instellingen zijn
 
@@ -359,9 +356,9 @@ controle valt om.
 | `admin/lib/audit.js` | `AUDIT_RETENTION_DAYS` | `400` | bewaartermijn van het auditlog; ongecontroleerde parseInt, 0 wist het log |
 | `admin/server.js` | `RELAY_HEALTH` | `3000` | terugvalpoort voor de health-relay; de container-interne listener, gepind aan docker-compose.yml |
 | `frontend/crypto-bridge.js` | `WASM_SHA256` | `30f1ae35` | integriteitspin op de wasm-module; verandert bij elke herbouw |
-| `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.0` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
+| `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.1` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
 | `deploy/deploy-3.1.sh` | `EXPECT_PROD_COMMIT` | `41501bb` | de startcommit uit het draaiboek |
-| `install.sh` | `PARAMANT_VERSION` | `v3.1.0` | welke tag de zelf-installateur kloont; gelijk met de deploy (de tag v3.1.0 moet bij de release bestaan) |
+| `install.sh` | `PARAMANT_VERSION` | `v3.1.1` | welke tag de zelf-installateur kloont; gelijk met de deploy (de tag v3.1.1 moet bij de release bestaan) |
 
 ## Afwijkingen die mogen blijven staan
 

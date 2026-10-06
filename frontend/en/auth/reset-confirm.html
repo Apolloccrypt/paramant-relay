@@ -44,11 +44,11 @@
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -65,11 +65,11 @@
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -86,8 +86,8 @@
 
 <section class="section">
   <div id="initial-view">
-    <p class="lede">You get two emails, one after the other. This page confirms that it is you. The next email brings the link to connect a new authenticator app.</p>
-    <p>Splitting it in two is the point: someone who briefly had your mailbox open cannot finish the reset, because the second link is only sent after this confirmation and has to be opened as well.</p>
+    <p class="lede">You get two emails, one after the other. On this page you confirm that it is you. The next email brings the link to connect a new authenticator app.</p>
+    <p>The two steps are on purpose. Someone who briefly had your mailbox open cannot finish the reset this way. The second link only comes after this confirmation, and you have to open it too.</p>
 
     <div class="warning-box">
       Only confirm if you asked for this reset yourself. If you did not, close this page. Nothing changes and your current authenticator keeps working.
@@ -101,7 +101,7 @@
   </div>
 
   <div id="success-view" style="display:none">
-    <p class="lede" style="color:var(--ok-ink)">Confirmed. The second email, the one with the setup link, is on its way.</p>
+    <p class="lede" style="color:var(--ok-ink)">Confirmed. The second email with the setup link is on its way.</p>
     <p>Look for an email from noreply@paramant.app with a setup link. Open it, scan the QR code, and your new authenticator app is connected.</p>
     <p style="margin-top:8px">Delete the old Paramant entry in your authenticator app first. Its codes no longer work.</p>
     <p class="footer-text mt-4"><a href="/en/auth/login">Return to sign in</a></p>
@@ -123,8 +123,8 @@
 </main>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
-<script src="/js/auth-reset-confirm.js?v=5"></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
+<script src="/js/auth-reset-confirm.js?v=6"></script>
 <footer class="legal-strip">
   <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a><span class="legal-sep">&middot;</span><a href="/en/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/auth/reset-confirm" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></span>
 </footer>

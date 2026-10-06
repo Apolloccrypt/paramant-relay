@@ -42,6 +42,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .pa-err-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 .dh-records-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
 .dh-records-row > div { flex-basis: 100%; }
+.dh-records-row[hidden] { display: none; }
+.dh-records-note { margin: 12px 0 0; font: 13px/1.6 var(--sans); color: var(--ink-2); }
 .dh-records-label { font-family: var(--mono); font-size: var(--text-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
 #dh-error .dh-btn { margin: 10px 8px 0 0; }
 #dh-error { border: 1px solid var(--line-2); border-left: 3px solid var(--sig-stop); border-radius: var(--r-1); background: var(--sig-stop-bg); padding: 16px 18px; color: var(--ink-1); }
@@ -450,10 +452,11 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 </style>
 <meta name="theme-color" content="#FFFFFF">
 <link rel="stylesheet" href="/app-2026.css?v=12">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=3"></script>
+<script src="/js/format-date.js?v=5"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
@@ -507,7 +510,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
        the real thing arrives. Lighthouse measured CLS 0.236 with the old
        centred spinner. -->
   <div id="dh-loading" class="pa-loading" aria-busy="true">
-    <p class="pa-sr-only">Uw sessie wordt gecontroleerd.</p>
+    <p class="pa-sr-only">We kijken of u bent ingelogd.</p>
     <div class="dh-skel-page" aria-hidden="true">
       <div class="dh-skel-hero">
         <div>
@@ -543,19 +546,35 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
     </header>
 
+    <!-- Right under the heading, above the tiles: on a phone it sat some
+         1070 px down and the buyer saw no confirmation (acceptatie 3.1.1,
+         betalen punt 7).
+         Where Mollie sends the buyer back to (/dashboard?billing=return). The
+         entitlement is granted by the webhook, never by this redirect, so the
+         two can arrive in either order: this band says which of the two the
+         page is looking at instead of leaving a paying customer on a dashboard
+         that still reads Community and says nothing about the money. Shown by
+         dashboard.js only when the query parameter is there. No link to
+         /pricing: the sale already happened. -->
+    <aside class="dh-paid" id="dh-billing-return" aria-label="Betaling" role="status" hidden>
+      <p class="dh-paid-kicker" data-dh="return-kicker">--</p>
+      <p class="dh-paid-lede" data-dh="return-lede">--</p>
+      <a class="btn btn-primary btn-small" data-dh="return-retry" href="/pricing" style="display:none;margin-top:12px">Opnieuw betalen</a>
+    </aside>
+
     <section class="dh-start" aria-label="Begin met een document">
       <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Handtekeningen vragen">
         <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
         <span class="dh-start-kicker">Ondertekenen</span>
         <h2>Handtekeningen vragen</h2>
-        <p>Stuur een beveiligd document naar de mensen die moeten tekenen en zie wie al getekend heeft. Zij krijgen een uitnodiging per e-mail en tekenen via de link daarin, nadat ze zijn ingelogd op het account waaraan de uitnodiging gericht is.</p>
-        <span class="dh-start-link">Verzoek starten &rarr;</span>
+        <p>Stuur een document naar wie moet tekenen en zie wie al getekend heeft. Iedereen krijgt een mail met een link. Ze tekenen na inloggen met het adres waar die mail naartoe ging.</p>
+        <span class="dh-start-link">Document laten tekenen &rarr;</span>
       </a>
       <a class="dh-start-card" href="/parashare" aria-label="Een bestand veilig versturen">
         <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
         <span class="dh-start-kicker">Versturen</span>
         <h2>Een bestand dat verdwijnt</h2>
-        <p>Het bestand wordt in uw browser versleuteld voordat het vertrekt. De ontvanger krijgt één link, en de webapp wist het bestand na de eerste keer openen. Er hoort geen ondertekening bij.</p>
+        <p>Uw browser versleutelt het bestand voordat het vertrekt. De ontvanger krijgt één link. Na de eerste keer openen wist de webapp het bestand. Er hoort geen handtekening bij.</p>
         <span class="dh-start-link">Bestand versturen &rarr;</span>
       </a>
       <a class="dh-start-card" href="/sign?mode=alone" aria-label="Zelf een document ondertekenen">
@@ -563,7 +582,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <span class="dh-start-kicker">Ondertekenen</span>
         <h2>Zelf ondertekenen</h2>
         <p>Zet uw handtekening en download het resultaat meteen.</p>
-        <span class="dh-start-link">Ondertekenen openen &rarr;</span>
+        <span class="dh-start-link">Zelf tekenen &rarr;</span>
       </a>
     </section>
 
@@ -574,23 +593,12 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-community" id="dh-community" aria-label="Uw plan" hidden>
       <div>
         <p class="dh-community-kicker">Community &middot; &euro;0</p>
-        <p class="dh-community-lede">U zit op het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers, zodat dat zo blijft.</p>
-        <p class="dh-community-adds">Met een zakelijk plan krijgt u 100 of 1.000 handtekeningen per maand in plaats van 2. Links blijven langer open, u houdt een overzicht van wat u verstuurde, u krijgt ondersteuning van een vaste contactpersoon en een audittrail die u kunt exporteren en overdragen.</p>
+        <p class="dh-community-lede">U zit op het Community-plan, en dat blijft gratis. Dat kan omdat de zakelijke plannen de servers betalen.</p>
+        <p class="dh-community-adds">Met Firm krijgt u 100 handtekeningen per maand in plaats van 2. Links blijven langer open en u ziet wat u verstuurde. Voor grotere organisaties is er Business, op aanvraag: 1.000 handtekeningen, een vaste contactpersoon en een audittrail die u kunt exporteren.</p>
       </div>
-      <a class="dh-community-cta" href="/pricing">Zakelijke plannen bekijken &rarr;</a>
+      <a class="dh-community-cta" href="/pricing">Bekijk Firm &rarr;</a>
     </aside>
 
-    <!-- Where Mollie sends the buyer back to (/dashboard?billing=return). The
-         entitlement is granted by the webhook, never by this redirect, so the
-         two can arrive in either order: this band says which of the two the
-         page is looking at instead of leaving a paying customer on a dashboard
-         that still reads Community and says nothing about the money. Shown by
-         dashboard.js only when the query parameter is there. No link to
-         /pricing: the sale already happened. -->
-    <aside class="dh-paid" id="dh-billing-return" aria-label="Betaling" role="status" hidden>
-      <p class="dh-paid-kicker" data-dh="return-kicker">--</p>
-      <p class="dh-paid-lede" data-dh="return-lede">--</p>
-    </aside>
 
     <!-- Shown by dashboard.js from seven days before the bought term runs out.
          A one-off payment has nothing to cancel and nothing to collect, so the
@@ -605,6 +613,16 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
          it, the day it stopped and where the account landed. Filled from
          paid_until_*, which the relay has emitted since the betaalpad fixes. -->
     <p class="plan-term-line" id="dh-term-line" hidden>--</p>
+    <ul class="plan-term-products" id="dh-term-products" hidden style="margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.6"></ul>
+
+    <!-- Shown by dashboard.js to every account, free or paid, from 80 percent
+         of a monthly quota (signatures or transfers). It reads the same
+         overview endpoint as /developer, without the developer gate
+         (DASH-27-N). -->
+    <div class="plan-term-warn" id="dh-usage-warn" role="status" aria-label="Verbruik" hidden>
+      <p class="plan-term-warn-text" data-dh="usage-warn">--</p>
+      <a class="plan-term-warn-cta" id="dh-usage-upgrade" href="/pricing">Bekijk een groter plan</a>
+    </div>
 
     <!-- What a paying customer bought, in the words /pricing sells it in. Shown
          by dashboard.js only on Firm, Business or Enterprise, and it carries no
@@ -612,7 +630,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-paid" id="dh-plan-paid" aria-label="Uw plan" hidden>
       <p class="dh-paid-kicker"><span data-dh="paid-name">--</span>-plan &middot; actief</p>
       <p class="dh-paid-lede" data-dh="paid-includes">--</p>
-      <p class="dh-paid-foot">Uw plan en de dag waarop uw termijn afloopt staan onder <a href="/account#billing-section">Plan en betaling</a>.</p>
+      <p class="dh-paid-foot"><span data-dh="paid-foot-lead">Facturen en verlengen vindt u onder </span><a href="/account#billing-section">Plan en betaling</a>.</p>
     </aside>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns
@@ -621,7 +639,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-purpose" id="dh-purpose" aria-label="Eén korte vraag" hidden>
       <span class="dh-purpose-kicker">Eén korte vraag</span>
       <h2>Waarvoor gebruikt u Paramant?</h2>
-      <p class="dh-purpose-sub">Eén tik, en we vragen het maar één keer. Zo weten we wat we het eerst moeten bouwen.</p>
+      <p class="dh-purpose-sub">Eén tik. We vragen het maar één keer, zodat we weten wat we eerst moeten bouwen.</p>
       <div class="dh-purpose-opts">
         <button type="button" class="dh-purpose-opt" data-pa-purpose="personal"><strong>Privégebruik</strong><span>Mijn eigen bestanden en documenten.</span></button>
         <button type="button" class="dh-purpose-opt" data-pa-purpose="organisation"><strong>Voor mijn organisatie</strong><span>Mijn bedrijf, praktijk of team.</span></button>
@@ -641,7 +659,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-inbox-title">Wacht op uw handtekening</h2>
-          <p>Documenten die anderen u stuurden. Elk document opent via de persoonlijke link in de uitnodigingsmail.</p>
+          <p>Documenten die anderen u stuurden. U opent ze met de link in uw uitnodigingsmail.</p>
         </div>
         <button class="dh-refresh" type="button" id="dh-inbox-refresh" data-pa-action="inbox-refresh">Vernieuwen</button>
       </div>
@@ -657,7 +675,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-sends-title">Bestanden die u verstuurde</h2>
-          <p>Wie heeft opgehaald, en wie nog niet.</p>
+          <p>Wie het al heeft opgehaald, en wie nog niet.</p>
         </div>
         <button class="dh-refresh" type="button" id="dh-sends-refresh" data-pa-action="sends-refresh">Vernieuwen</button>
       </div>
@@ -668,7 +686,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-documents-title">Lopende documenten</h2>
-          <p>Elk ondertekenverzoek dat u startte, en precies hoe ver elk verzoek is.</p>
+          <p>Documenten die u liet tekenen, en hoe ver ze zijn.</p>
         </div>
         <button class="dh-refresh" type="button" id="dh-documents-refresh" data-pa-action="documents-refresh">Vernieuwen</button>
       </div>
@@ -682,14 +700,14 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <!-- Loading state. Three rows in the shape of a register row, so the
              list does not jump when the real data lands. The screen reader
              hears the sentence, not the placeholder. -->
-        <p class="pa-sr-only">Uw documenten worden geladen. De status wordt uit uw account gelezen.</p>
+        <p class="pa-sr-only">Uw documenten worden geladen.</p>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
       </div>
       <div class="dh-invites">
         <span class="dh-invites-icon" aria-hidden="true">&#9993;</span>
-        <div><strong>Zoekt u een verzoek dat u kreeg?</strong><span>Verzoeken die op uw handtekening wachten staan hierboven. Elk verzoek opent via de persoonlijke link in de uitnodigingsmail, en uw account wordt gecontroleerd voordat het versleutelde document opent.</span></div>
+        <div><strong>Moet u zelf iets tekenen?</strong><span>Open de link in uw uitnodigingsmail. Na het inloggen opent het document.</span></div>
       </div>
     </section>
 
@@ -711,14 +729,18 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-records-title">Geschiedenis en audit-export</h2>
-          <p>Uw verzendgeschiedenis (Firm en hoger) en het ondertekenspoor als bestand (Business en hoger).</p>
+          <p>Wat u verstuurde, en met Business ook het ondertekenspoor als bestand.</p>
         </div>
       </div>
       <div class="dh-records-row">
         <button class="dh-btn" type="button" id="dh-hist-load">Geschiedenis tonen</button>
         <div id="dh-hist-body" aria-live="polite"></div>
       </div>
-      <div class="dh-records-row">
+      <!-- Only where the plan has it: the relay answers 403 below Business, and
+           Firm used to see two buttons that could only fail (acceptatie 3.1.1,
+           betalen punt 10). dashboard.js shows the row or the note. -->
+      <p class="dh-records-note" id="dh-export-note" hidden>Het ondertekenspoor als bestand exporteren hoort bij Business. Business is op aanvraag: mail <a href="mailto:privacy@paramant.app?subject=Business">privacy@paramant.app</a>.</p>
+      <div class="dh-records-row" id="dh-export-row">
         <span class="dh-records-label">Audit-export</span>
         <button class="dh-btn" type="button" id="dh-export-csv">CSV downloaden</button>
         <button class="dh-btn" type="button" id="dh-export-json">JSON downloaden</button>
@@ -727,7 +749,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     </section>
 
     <section class="dh-ask" aria-labelledby="dh-ask-title">
-      <h2 id="dh-ask-title">Wat mensen vragen voordat ze erop vertrouwen</h2>
+      <h2 id="dh-ask-title">Veelgestelde vragen</h2>
       <dl class="dh-ask-list">
         <div class="dh-ask-item">
           <dt>Wat kost het?</dt>
@@ -741,11 +763,11 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         </div>
         <div class="dh-ask-item">
           <dt>Wie kan lezen wat ik verstuur?</dt>
-          <dd>Bestanden worden in uw browser versleuteld, en de relay draait bij Hetzner in Neurenberg, Duitsland. <a href="/security">Lees hoe</a></dd>
+          <dd>Uw browser versleutelt elk bestand. Onze server staat bij Hetzner in Neurenberg, Duitsland. <a href="/security">Lees hoe</a></dd>
         </div>
         <div class="dh-ask-item">
           <dt>Kan de andere partij een handtekening controleren?</dt>
-          <dd>Ondertekende documenten zijn te controleren zonder account. Oudere bewijsbestanden worden nog op onze server gecontroleerd. <a href="/verify">Probeer de controle</a></dd>
+          <dd>Ja, zonder account. Het document wordt nooit geüpload. Bij een ouder bewijsbestand kijkt onze server alleen de vingerafdruk na. <a href="/verify">Probeer de controle</a></dd>
         </div>
       </dl>
       <p class="dh-ask-foot">Andere vragen beantwoorden we in het <a href="/help">hulpcentrum</a>.</p>
@@ -769,7 +791,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <div class="dh-acct-cell"><div class="dh-acct-lbl">E-mailadres</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Lid sinds</div><div class="dh-acct-val" data-dh="created">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Back-upcodes over</div><div class="dh-acct-val" data-dh="backup">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Sessie verloopt</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Nog ingelogd</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
         </div>
         <div class="dh-acct-actions">
           <a class="dh-btn" href="/account">Account en beveiliging</a>
@@ -783,7 +805,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   </div>
 
   <div id="dh-error" class="pa-loading" hidden role="alert">
-    <span id="dh-error-text">Uw overzicht kon niet worden geladen.</span>
+    <span id="dh-error-text">We konden uw overzicht niet laden.</span>
     <button type="button" class="dh-btn" id="dh-error-retry">Opnieuw proberen</button>
     <a class="pa-err-link" id="dh-error-login" href="/auth/login?next=%2Fdashboard" hidden>Opnieuw inloggen</a>
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
@@ -795,8 +817,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 <div id="dh-passkey-modal" class="dh-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dh-pm-title">
   <div class="dh-modal-card">
     <img class="dh-modal-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="72" height="72">
-    <h2 id="dh-pm-title">Maak uw account af</h2>
-    <p class="dh-modal-sub">Met een paar eenmalige stappen logt u sneller in en kunt u documenten ondertekenen.</p>
+    <h2 id="dh-pm-title">Sneller inloggen</h2>
+    <p class="dh-modal-sub">Niet verplicht. Met een passkey logt u in zonder code. Ondertekenen kan ook zonder.</p>
     <div id="dh-pm-items"></div>
     <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Later</button>
   </div>
@@ -833,9 +855,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/dashboard-history.js?v=2" defer></script>
-<script src="/js/dashboard.js?v=25" defer></script>
+<script src="/js/dashboard-history.js?v=4" defer></script>
+<script src="/js/dashboard.js?v=34" defer></script>
+<script src="/js/plan-terms.js?v=3" defer></script>
 </body>
 </html>

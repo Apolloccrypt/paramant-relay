@@ -17,10 +17,10 @@ function fmtTs(iso) {
 // A failed load in words, never "(HTTP 429)" (retest T5-1): what happened
 // and what the reader can do, by status.
 function loadFailText(status, nlWhat, enWhat) {
-  if (status === 429) return nlEn(nlWhat + ' konden even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
+  if (status === 429) return nlEn(nlWhat + ' laden even niet: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
   if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
-  if (status >= 500) return nlEn(nlWhat + ' konden nu niet worden geladen door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
-  return nlEn(nlWhat + ' konden nu niet worden geladen. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
+  if (status >= 500) return nlEn(nlWhat + ' laden nu niet door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  return nlEn(nlWhat + ' laden nu niet. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
 }
 
 async function loadEnrolledKeys() {
@@ -35,7 +35,7 @@ async function loadEnrolledKeys() {
     const data = await res.json();
     const keys = (data.keys || []);
     if (!keys.length) {
-      emptyEl.textContent = nlEn('Nog geen ondertekensleutels geregistreerd. Maak er een via "Uw ondertekensleutel instellen" hieronder.', 'No signing keys enrolled yet. Use "Set up your signing key" below to create one.');
+      emptyEl.textContent = nlEn('U heeft geen vaste ondertekensleutel, en dat hoeft ook niet: u tekent met de code uit uw authenticator-app. Liever tekenen met uw passkey? Stel het hieronder in.', 'You have no stored signing key, and you do not need one: you sign with the code from your authenticator app. Rather sign with your passkey? Set it up below.');
       listEl.innerHTML = '';
       return;
     }
@@ -64,7 +64,7 @@ async function loadEnrolledKeys() {
       b.addEventListener('click', () => revokeKey(b.getAttribute('data-revoke')));
     });
   } catch (e) {
-    emptyEl.textContent = nlEn('De geregistreerde sleutels konden niet worden geladen: ', 'Could not load enrolled keys: ') + e.message;
+    emptyEl.textContent = nlEn('We konden uw sleutels niet laden: ', 'Could not load your keys: ') + e.message;
   }
 }
 
@@ -74,7 +74,7 @@ function askRevokeTotp() {
     const input = document.getElementById('revoke-totp');
     const ok = document.getElementById('revoke-totp-confirm');
     const cancel = document.getElementById('revoke-totp-cancel');
-    if (!wrap || !input || !ok || !cancel) { resolve((window.prompt(nlEn('Vul de code van 6 cijfers uit uw authenticator-app in om deze ondertekensleutel in te trekken.', 'Enter your 6-digit authenticator code to revoke this signing key.')) || '').trim()); return; }
+    if (!wrap || !input || !ok || !cancel) { resolve((window.prompt(nlEn('Vul de code van 6 cijfers uit uw authenticator-app in. Daarmee trekt u deze sleutel in.', 'Enter the 6-digit code from your authenticator app. That revokes this key.')) || '').trim()); return; }
     input.value = ''; wrap.hidden = false; input.focus();
     const done = (v) => { ok.removeEventListener('click', onOk); cancel.removeEventListener('click', onCancel); input.removeEventListener('keydown', onKey); wrap.hidden = true; resolve(v); };
     const onOk = () => { const t = (input.value || '').trim(); if (!/^\d{6}$/.test(t)) { input.focus(); return; } done(t); };
@@ -105,19 +105,19 @@ async function revokeKey(pkHash) {
       return;
     }
     await loadEnrolledKeys();
-  } catch (e) { alert(nlEn('Intrekken mislukt: ', 'Revoke failed: ') + e.message); }
+  } catch (e) { alert(nlEn('Intrekken lukte niet: ', 'Could not revoke: ') + e.message); }
 }
 
 async function loadVaultStatus() {
   const el = document.getElementById('vault-status');
   if (!(await vaultAvailable())) {
-    el.textContent = nlEn('IndexedDB of WebCrypto is niet beschikbaar in deze browser (een privévenster kan de oorzaak zijn), dus hier kan geen ondertekensleutel worden bewaard.', 'IndexedDB or WebCrypto is unavailable in this browser (private/incognito mode can cause this), so a signing key cannot be stored here.');
+    el.textContent = nlEn('Deze browser kan hier geen ondertekensleutel bewaren (IndexedDB of WebCrypto ontbreekt). Een privévenster kan de oorzaak zijn.', 'This browser cannot store a signing key here (IndexedDB or WebCrypto is missing). A private window can cause this.');
     return;
   }
   try {
     const list = await vaultList();
     if (!list.length) {
-      el.textContent = nlEn('Nog geen ondertekensleutel in deze browser. Gebruik "Uw ondertekensleutel instellen" hieronder.', 'No signing key in this browser yet. Use "Set up your signing key" below.');
+      el.textContent = nlEn('Geen ondertekensleutel in deze browser. Niet nodig om te tekenen; wilt u er een, gebruik dan "Uw ondertekensleutel instellen" hieronder.', 'No signing key in this browser. You do not need one to sign; if you want one, use "Set up your signing key" below.');
       return;
     }
     const fmt = e => (e.label ? e.label : nlEn('(geen label)', '(no label)')) + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';
@@ -126,7 +126,7 @@ async function loadVaultStatus() {
       + (last ? nlEn('. Laatst gebruikt ', '. Last used ') + fmtTs(last) : nlEn('. Nog nooit geopend', '. Never unlocked yet'))
       + nlEn('. Sleutels: ', '. Keys: ') + list.map(fmt).join(', ');
   } catch (e) {
-    el.textContent = nlEn('De kluis in deze browser kon niet worden gelezen: ', 'Could not read browser vault: ') + e.message;
+    el.textContent = nlEn('We konden de sleutel in deze browser niet lezen: ', 'Could not read the key in this browser: ') + e.message;
   }
 }
 

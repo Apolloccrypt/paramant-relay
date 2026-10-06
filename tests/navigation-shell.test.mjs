@@ -32,7 +32,7 @@ await publicPage.route('**/api/user/session/verify', (route) => route.fulfill({ 
 // at /en since 23 September 2026. The Dutch homepage at / has its own bar,
 // checked right after them.
 await publicPage.goto(ORIGIN + '/en', { waitUntil:'domcontentloaded' });
-await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Product,Tools,Security,Pricing,Docs');
+await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Send,Sign,Tools,Security,Pricing');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 // The bar carries the free tools as their own destination. Everything a
 // visitor can use without an account lived one level down, behind /pricing or
@@ -42,12 +42,13 @@ const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').a
 // Dutch because the paid work behind it is, and this is the one word that
 // reads the same in both languages, so the bar stays English on the 42 English
 // pages that also carry it.
-ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Tools','Security','Pricing','Docs']), publicDesktop.join(', '));
-// The signed-out hero now offers ONE primary action and one secondary, not
-// three. Three equal buttons is three decisions before the visitor knows what
-// the product is; ParaSend keeps its own call to action further down the page,
-// where it is next to the three lines that explain it.
-ok('public homepage leads with one primary action and one secondary', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/en/parashare','/en/sign']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Send','Sign','Tools','Security','Pricing']), publicDesktop.join(', '));
+// Signed out, the visitor lands in the demo dashboard (Mick, 5 October 2026),
+// and its head carries ONE primary action and one secondary, not three: make
+// an account, or try it yourself. Both sit inside the dashboard, and there is
+// no hero above it; the dashboard is the first thing in <main>.
+ok('public homepage leads with one primary action and one secondary, inside the demo dashboard', JSON.stringify(await publicPage.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((node) => [node.getAttribute('href'), node.className, node.textContent.trim()]))) === JSON.stringify([['/en/signup','hp-btn hp-btn-fill','Create account'],['/en/sign?mode=invite','hp-btn hp-btn-line','Try it yourself']]), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+ok('public homepage opens on the demo dashboard, with nothing above it', await publicPage.evaluate(() => { const out = document.querySelector('[data-home="out"]'); return !!out && out.firstElementChild === document.querySelector('.wp-demo-top') && !!document.querySelector('.wp-demo-top h1'); }), 'the first child of [data-home="out"] must be .wp-demo-top, holding the h1');
 // Both product PAGES have to be reachable from the homepage, not just the two
 // apps. /parasend shipped with no inbound link anywhere on the site and
 // /parasign had exactly one, from /sign: a product page nothing links to is a
@@ -56,12 +57,13 @@ ok('public homepage leads with one primary action and one secondary', JSON.strin
 // pins the order: explain first, app second, per card.
 await (async () => {
   const ctas = await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
-  ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/en/parasign','/en/sign','/en/parasend','/en/parashare']), await publicPage.locator('#products').innerText());
-  ok('the homepage still routes to ParaSend from its own section', ctas.includes('/en/parashare'), await publicPage.locator('#products').innerText());
+  // Since acceptance 3.1.1 the English homepage has the Dutch one's cards:
+  // one button per product, to the page that explains it, sending first.
+  ok('the homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/en/parasend','/en/parasign']), await publicPage.locator('#products').innerText());
 })();
 // The Dutch homepage: the same bar in Dutch, with the two outward product
-// names, re-rendered identically by js/nav-auth.js after the session check; one
-// primary action (versturen) and one secondary (laten tekenen).
+// names, re-rendered identically by js/nav-auth.js after the session check;
+// and in the demo dashboard one primary action (Account maken) and one secondary (Probeer het zelf).
 await (async () => {
   const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
   await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
@@ -71,8 +73,8 @@ await (async () => {
   ok('the Dutch homepage names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
   const authText = await nl.locator('#nav-auth').evaluate((n) => n.textContent);
   ok('the Dutch bar says Hulp, Inloggen and Account maken after the session check', /Hulp/.test(authText) && /Inloggen/.test(authText) && /Account maken/.test(authText), authText);
-  const actions = await nl.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className]));
-  ok('the Dutch homepage leads with one primary action to versturen and one secondary', JSON.stringify(actions) === JSON.stringify([['/parashare','hp-btn hp-btn-fill'],['/sign','hp-btn hp-btn-line']]), JSON.stringify(actions));
+  const actions = await nl.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className, n.textContent.trim()]));
+  ok('the Dutch homepage leads with Account maken and Probeer het zelf, inside the demo dashboard', JSON.stringify(actions) === JSON.stringify([['/signup','hp-btn hp-btn-fill','Account maken'],['/sign?mode=invite','hp-btn hp-btn-line','Probeer het zelf']]), JSON.stringify(actions));
   const ctas = await nl.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
   ok('the Dutch homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/parasend','/parasign']), JSON.stringify(ctas));
   await nl.close();
@@ -363,8 +365,28 @@ const artIn = await artInsideTheClip(true);
 ok('signed in at 1440, no part of the hero art is cut off by the clip', artIn.cut.length === 0, JSON.stringify(artIn));
 // And the measurement above is capable of finding a box, which a vacuous pass
 // on an empty node list would not prove. Signed out the art is drawn, in full.
+//
+// Signed out, the drawn document retired on 5 October 2026: the hero now holds
+// the dashboard itself in a demo state (.wp-demo, js/home-demo.js), which shows
+// the real screens instead of a picture of a document. So signed out the art
+// draws nothing, and the measurement above is proven capable on the demo: its
+// three tiles are drawn, and drawn whole inside the same clip.
 const artOut = await artInsideTheClip(false);
-ok('signed out at 1440, the hero art is drawn and drawn whole', artOut.drawn > 0 && artOut.cut.length === 0, JSON.stringify(artOut));
+ok('signed out at 1440, the retired hero art draws nothing', artOut.drawn === 0, JSON.stringify(artOut));
+const demoPage = await browser.newPage({ viewport:{ width:1440, height:900 } });
+await demoPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await demoPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+await demoPage.locator('[data-home="out"]:not([hidden])').waitFor();
+const demoOut = await demoPage.evaluate(() => {
+  const main = document.querySelector('main').getBoundingClientRect();
+  const tiles = Array.from(document.querySelectorAll('[data-home="out"] .wp-demo .wp-tile')).map((tile) => tile.getBoundingClientRect());
+  return {
+    tiles: tiles.filter((box) => box.width > 0 && box.height > 0).length,
+    cut: tiles.filter((box) => box.bottom > main.bottom || box.top < main.top || box.left < main.left || box.right > main.right).length,
+  };
+});
+await demoPage.close();
+ok('signed out at 1440, the demo dashboard draws its three tiles whole', demoOut.tiles === 3 && demoOut.cut === 0, JSON.stringify(demoOut));
 
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
@@ -530,7 +552,7 @@ await accountPage.locator('.nav-user').waitFor();
 ok('account, billing and developer are one settings hierarchy', JSON.stringify(await accountPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account en beveiliging','Plan en betalingen','Instellingen voor ontwikkelaars']) && await accountPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/account', await accountPage.locator('.settings-tabs').innerText());
 ok('legacy account key is advanced instead of the first task', await accountPage.locator('details.acct-advanced:not([open])').count() === 1 && await accountPage.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Beveiliging.', await accountPage.locator('main').innerText());
 ok('billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPage.locator('#billing-section').innerText()), await accountPage.locator('#billing-section').innerText());
-ok('account action describes deactivation instead of erasure', /accountrecord blijft bewaard/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account|definitief|account verwijderen/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
+ok('account action describes deactivation instead of erasure', /persoonsgegevens wissen we/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account|definitief|account verwijderen/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
 ok('settings fit the phone viewport', await accountPage.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 if (process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH) await stableScreenshot(accountPage, { path:process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH, fullPage:true });
 await accountPage.close();
@@ -544,10 +566,10 @@ await accountPageEn.route('**/api/user/billing/status', (route) => route.fulfill
 await accountPageEn.goto(ORIGIN + '/en/account', { waitUntil:'domcontentloaded' });
 await accountPageEn.locator('#state-account:not(.hidden)').waitFor();
 await accountPageEn.locator('.nav-user').waitFor();
-ok('en: account, billing and developer are one settings hierarchy', JSON.stringify(await accountPageEn.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await accountPageEn.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/en/account', await accountPageEn.locator('.settings-tabs').innerText());
+ok('en: account, billing and developer are one settings hierarchy', JSON.stringify(await accountPageEn.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings (in Dutch)']) && await accountPageEn.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/en/account', await accountPageEn.locator('.settings-tabs').innerText());
 ok('en: legacy account key is advanced instead of the first task', await accountPageEn.locator('details.acct-advanced:not([open])').count() === 1 && await accountPageEn.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Security.', await accountPageEn.locator('main').innerText());
 ok('en: billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPageEn.locator('#billing-section').innerText()), await accountPageEn.locator('#billing-section').innerText());
-ok('en: account action describes deactivation instead of erasure', /account record is retained/i.test(await accountPageEn.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPageEn.locator('.acct-card.danger').innerText()), await accountPageEn.locator('.acct-card.danger').innerText());
+ok('en: account action describes deactivation instead of erasure', /erase your email address and other personal data/i.test(await accountPageEn.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPageEn.locator('.acct-card.danger').innerText()), await accountPageEn.locator('.acct-card.danger').innerText());
 ok('en: settings fit the phone viewport', await accountPageEn.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPageEn.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 await accountPageEn.close();
 

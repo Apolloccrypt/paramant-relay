@@ -111,7 +111,7 @@ const FLOOR_NAME = 'Community';
 const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']);
 
-// "3 October 2026". UTC and hand-built rather than toLocaleDateString: the
+// "3 October 2026". Hand-built rather than toLocaleDateString: the
 // same date has to read the same in a mail from any container, and Intl data is
 // not something a slim container image is guaranteed to carry.
 //
@@ -120,14 +120,34 @@ const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'J
 // ended last December reads exactly like one that ends this December. The
 // browser side writes the same string from frontend/js/format-date.js, so the
 // date in this mail and the date on /account are one date.
+//
+// Dutch time since acceptatie 3.1.1 ronde 2, like the other mails and the
+// site: a term that ends at 23:30 UTC ends the next day in Amsterdam, and the
+// site said one day while this mail said the other. Only the zone comes from
+// Intl; the month stays our own table. Without zone data it falls back to UTC.
+const NL_DAY = (() => {
+  try { return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: 'numeric', day: 'numeric' }); } catch { return null; }
+})();
+function amsterdamParts(d) {
+  if (NL_DAY) {
+    try {
+      const p = {};
+      for (const part of NL_DAY.formatToParts(d)) p[part.type] = part.value;
+      if (p.year && p.month && p.day) return { y: Number(p.year), m: Number(p.month), d: Number(p.day) };
+    } catch { /* UTC below */ }
+  }
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+}
+
 function formatDate(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  const p = amsterdamParts(d);
+  return `${p.d} ${MONTHS[p.m - 1]} ${p.y}`;
 }
 
-// The Dutch twin of formatDate: "3 oktober 2026". Same rule, same reason: UTC
-// and a hand-built month table, so the Dutch half of a mail reads the same from
+// The Dutch twin of formatDate: "3 oktober 2026". Same rule, same reason:
+// Dutch time and a hand-built month table, so the Dutch half of a mail reads the same from
 // every container whatever Intl data the image carries.
 const MONTHS_NL = Object.freeze(['januari', 'februari', 'maart', 'april', 'mei', 'juni',
   'juli', 'augustus', 'september', 'oktober', 'november', 'december']);
@@ -135,7 +155,8 @@ const MONTHS_NL = Object.freeze(['januari', 'februari', 'maart', 'april', 'mei',
 function formatDateNl(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getUTCDate()} ${MONTHS_NL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  const p = amsterdamParts(d);
+  return `${p.d} ${MONTHS_NL[p.m - 1]} ${p.y}`;
 }
 
 function memberOf(accountId, product) {
@@ -172,10 +193,26 @@ function planLabel(product, tier) {
 // Ondertekenen. The tier names stay as they are on /pricing.
 const PRODUCT_NAME_NL = Object.freeze({ parasign: 'Ondertekenen', parasend: 'Versturen' });
 
+// In a mail the customer reads the plan name /pricing sells (acceptatie
+// 3.1.1, taal #4 and #47): the tier key 'pro' is Firm on both products, and a
+// term on one product says what it is for. "Ondertekenen Pro" and
+// "Ondertekenen firm" were names that stand nowhere on the site.
+const TIER_NAME_MAIL = Object.freeze({ pro: 'Firm', firm: 'Firm', business: 'Business', enterprise: 'Enterprise' });
+const PRODUCT_FOR_NL = Object.freeze({ parasign: 'ondertekenen', parasend: 'versturen' });
+const PRODUCT_FOR_EN = Object.freeze({ parasign: 'signing', parasend: 'sending' });
+
 function planLabelNl(product, tier) {
-  const p = PRODUCT_NAME_NL[product] || product;
-  const t = TIER_NAME[tier] || tier;
-  return `${p} ${t}`;
+  const t = TIER_NAME_MAIL[String(tier || '').toLowerCase()] || tier;
+  const p = PRODUCT_FOR_NL[product] || PRODUCT_NAME_NL[product] || product;
+  return `${t}-plan voor ${p}`;
+}
+
+// The English twin, for the English half of a mail. planLabel() above stays
+// as it is: the billing history and the exports read it.
+function planLabelMail(product, tier) {
+  const t = TIER_NAME_MAIL[String(tier || '').toLowerCase()] || tier;
+  const p = PRODUCT_FOR_EN[product] || PRODUCT_NAME[product] || product;
+  return `${t} plan for ${p}`;
 }
 
 // What a BUNDLE is called in a mail, and what it actually contains. A Firm
@@ -184,7 +221,8 @@ function planLabelNl(product, tier) {
 // worse. The bundle name comes first and the products it covers follow, so the
 // sentence is both the name on his invoice and the thing he loses.
 const BUNDLE_LABEL = Object.freeze({
-  firm: 'Paramant Firm plan (ParaSign Pro and ParaSend Pro)',
+  firm: 'Firm plan for sending and signing',
+  business: 'Business plan for sending and signing',
 });
 
 function bundleLabel(bundle) {
@@ -192,7 +230,8 @@ function bundleLabel(bundle) {
 }
 
 const BUNDLE_LABEL_NL = Object.freeze({
-  firm: 'Paramant Firm-plan (Ondertekenen Pro en Versturen Pro)',
+  firm: 'Firm-plan voor versturen en ondertekenen',
+  business: 'Business-plan voor versturen en ondertekenen',
 });
 
 function bundleLabelNl(bundle) {
@@ -231,7 +270,7 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal, 
   const date = formatDate(paidUntil);
   if (!date) return null;
   const dateNl = formatDateNl(paidUntil);
-  const plan = bundleLabel(bundle) || planLabel(product, tier);
+  const plan = bundleLabel(bundle) || planLabelMail(product, tier);
   const planNl = bundleLabelNl(bundle) || planLabelNl(product, tier);
   const pricing = `${String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '')}/pricing`;
   if (renewal) return renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, pricing });
@@ -263,7 +302,7 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal, 
     return {
       subject: bilingualSubject(subjectNl, subjectEn),
       text: bilingualText(textNl, text),
-      html: htmlBody([[subjectNl, textNl], [subjectEn, text]], pricing),
+      html: htmlBody([[HEAD.endedNl, textNl], [HEAD.endedEn, text]], pricing),
     };
   }
   const subjectNl = `Uw ${planNl} loopt af op ${dateNl}`;
@@ -280,16 +319,16 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal, 
   const text = [
     `Your ${plan} ends on ${date}.`,
     '',
-    `Renew for another month or year, or let it fall back to ${FLOOR_NAME}; nothing is charged automatically.`,
+    `You can renew for a month or a year. If you do nothing, your account goes back to ${FLOOR_NAME}, and nothing is charged automatically.`,
     '',
-    `Your plans and prices are here: ${pricing}`,
+    `Plans and prices are here: ${pricing}`,
     '',
     'Paramant',
   ].join('\n');
   return {
     subject: bilingualSubject(subjectNl, subjectEn),
     text: bilingualText(textNl, text),
-    html: htmlBody([[subjectNl, textNl], [subjectEn, text]], pricing),
+    html: htmlBody([[HEAD.endsNl, textNl], [HEAD.endsEn, text]], pricing),
   };
 }
 
@@ -326,7 +365,7 @@ function renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, prici
     return {
       subject: bilingualSubject(subjectNl, subjectEn),
       text: bilingualText(textNl, text),
-      html: htmlBody([[subjectNl, textNl], [subjectEn, text]], pricing),
+      html: htmlBody([[HEAD.endedNl, textNl], [HEAD.endedEn, text]], pricing),
     };
   }
   const subjectNl = `Uw ${planNl} wordt op ${dateNl} verlengd`;
@@ -338,7 +377,7 @@ function renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, prici
       ? `Op die dag wordt uw plan automatisch met ${periodNl} verlengd en wordt ${money} afgeschreven.`
       : 'Op die dag wordt uw plan automatisch verlengd en wordt de volgende periode afgeschreven.',
     '',
-    `Wilt u dat niet, zeg dan vóór ${dateNl} op via ${account}. Wat u al betaald hebt, houdt u tot die dag.`,
+    `Wilt u dat niet, zeg dan vóór ${dateNl} op via ${account}. Wat u al betaald heeft, houdt u tot die dag.`,
     '',
     'Paramant',
   ].join('\n');
@@ -356,13 +395,23 @@ function renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, prici
   return {
     subject: bilingualSubject(subjectNl, subjectEn),
     text: bilingualText(textNl, text),
-    html: htmlBody([[subjectNl, textNl], [subjectEn, text]], account),
+    html: htmlBody([[HEAD.renewsNl, textNl], [HEAD.renewsEn, text]], account),
   };
 }
 
 const escHtml = (s) => String(s === null || s === undefined ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// Short headings for the HTML. The subject used to stand as the heading and
+// again as the first sentence: three times the same long line (acceptatie
+// 3.1.1, taal #48). The subject and the first sentence stay; the heading says
+// what kind of mail this is.
+const HEAD = Object.freeze({
+  endsNl: 'Uw plan loopt bijna af', endsEn: 'Your plan ends soon',
+  endedNl: 'Uw plan is afgelopen', endedEn: 'Your plan has ended',
+  renewsNl: 'Uw plan wordt verlengd', renewsEn: 'Your plan renews',
+});
 
 // sections: [[heading, text], ...], Dutch first. Each heading is that
 // language's subject; a thin rule separates the languages. The one link sits
@@ -687,7 +736,7 @@ module.exports = {
   WARN_DAYS, WARN_WINDOW_MS, ENDED_GRACE_MS, RENEWAL_HOLD_MS, PRUNE_AFTER_MS,
   NOTICE_TTL_S, SWEEP_INTERVAL_MS, LOCK_TTL_MS, DEFAULT_SITE_URL,
   formatDate, formatDateNl, memberOf, parseMember, noticeKey, planLabel, bundleLabel, BUNDLE_LABEL, expiryMail,
-  planLabelNl, bundleLabelNl, BUNDLE_LABEL_NL, bilingualSubject, bilingualText, htmlBody, MAIL_SEPARATOR,
+  planLabelNl, planLabelMail, bundleLabelNl, BUNDLE_LABEL_NL, bilingualSubject, bilingualText, htmlBody, MAIL_SEPARATOR,
   upsertExpiry, forgetAccount, seedIndex,
   acquireLock, releaseLock, runSweep, startPlanExpiryPlanner,
 };

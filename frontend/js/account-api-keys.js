@@ -74,15 +74,15 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
           // "Sleutel ingetrokken" then was a false all-clear (ACCT-34).
           if (!r.ok) {
             say(r.status === 503
-              ? nlEn('Intrekken lukte nu niet door een storing bij ons. De sleutel werkt nog. Probeer het zo opnieuw.', 'Revoking did not work right now because of a fault on our side. The key still works. Please try again shortly.')
-              : nlEn('Die sleutel kon niet worden ingetrokken. Hij werkt nog.', 'Could not revoke that key. It still works.'));
+              ? nlEn('Door een storing bij ons lukte intrekken niet. De sleutel werkt nog. Probeer het zo opnieuw.', 'Revoking did not work right now because of a fault on our side. The key still works. Please try again shortly.')
+              : nlEn('Intrekken lukte niet. De sleutel werkt nog.', 'Could not revoke that key. It still works.'));
             load();
             return;
           }
           say(nlEn('Sleutel ingetrokken.', 'Key revoked.'));
           load();
         })
-          .catch(function () { say(nlEn('Die sleutel kon niet worden ingetrokken. Hij werkt nog.', 'Could not revoke that key. It still works.')); });
+          .catch(function () { say(nlEn('Intrekken lukte niet. De sleutel werkt nog.', 'Could not revoke that key. It still works.')); });
       });
       li.appendChild(code); li.appendChild(mode); li.appendChild(revoke);
       ul.appendChild(li);
@@ -116,17 +116,17 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       }).then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
         .then(function (out) {
           if (out.status !== 201 && out.status !== 200) {
-            say((out.body && out.body.message) || nlEn('De sleutel kon niet worden gemaakt.', 'Could not create a key.'));
+            say((out.body && out.body.message) || nlEn('Het maken van de sleutel lukte niet.', 'Could not create a key.'));
             return;
           }
           say('');
           if (fresh) {
-            fresh.textContent = out.body.key + nlEn('  ·  kopieer hem nu. U ziet hem één keer en daarna niet meer.', '  ·  copy it now; it is shown once and cannot be read again.');
+            fresh.textContent = out.body.key + nlEn('  ·  kopieer hem nu. U ziet hem maar één keer.', '  ·  copy it now. You only see it once.');
             fresh.hidden = false;
           }
           load();
         })
-        .catch(function () { say(nlEn('De sleutel kon niet worden gemaakt.', 'Could not create a key.')); });
+        .catch(function () { say(nlEn('Het maken van de sleutel lukte niet.', 'Could not create a key.')); });
     });
   }
 

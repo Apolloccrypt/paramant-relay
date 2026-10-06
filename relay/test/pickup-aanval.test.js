@@ -281,7 +281,7 @@ test('2e: een onderschepper kan de ontvanger permanent buitensluiten', async () 
   const her = await fetch(BASE + '/v2/user/sends/reinvite', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Internal-Auth': INTERN },
-    body: JSON.stringify({ user_id: ACCOUNT, send_id: v.id, email: adres }),
+    body: JSON.stringify({ user_id: ACCOUNT, send_id: v.id, email: adres, token }),
   });
   assert.equal(her.status, 200, 'de herinnering zelf faalde: ' + (await her.text()));
 

@@ -175,7 +175,10 @@ async function geenTijdKwijt(acc, naam, proMaanden = 12) {
   assert.equal(na.ondertekenen, 'business', naam);
   assert.equal(na.ondertekenenTot, plusMaanden(proMaanden), `${naam}: betaald tot het einde van het jaar`);
   assert.equal(na.versturen, 'pro', naam);
-  assert.equal(na.versturenTot, plusMaanden(12), `${naam}: Versturen een jaar`);
+  // Business carries ParaSend Pro (besluit 05-10-2026), so the ParaSend half
+  // of the Firm year is paused for the Business month exactly like the
+  // ParaSign half: both end on the same day.
+  assert.equal(na.versturenTot, plusMaanden(proMaanden), `${naam}: Versturen loopt tot dezelfde dag als Ondertekenen`);
   assert.equal(na.termijnen, `business:${plusMaanden(1)},pro:${plusMaanden(proMaanden)}`,
     `${naam}: het Firm-jaar moet onder de Business-maand blijven liggen`);
   const rij = await S.redis.hGetAll(`paramant:entitlements:grant:${acc.key}`);

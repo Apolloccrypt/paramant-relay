@@ -64,7 +64,7 @@ test('ACCT-25/26: /user/me has created_at from the relay record, the session lis
   const me = await (await call(t, 'GET', '/api/user/me')).json();
   assert.strictEqual(me.created_at, '2026-01-02T03:04:05.000Z');
   const acct = await (await call(t, 'GET', '/api/user/account')).json();
-  assert.ok(acct.sessions.some((x) => x.user_agent_short === 'Chrome on Windows'), JSON.stringify(acct.sessions));
+  assert.ok(acct.sessions.some((x) => x.user_agent_short === 'Chrome · Windows'), JSON.stringify(acct.sessions));
 });
 
 test('back-up codes: no factor 400, wrong factor 403, TOTP 200', async () => {

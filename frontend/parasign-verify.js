@@ -10,6 +10,7 @@ import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
 // when its notary key is one of these; the key printed inside the receipt is
 // never trusted on its own, or any file could vouch for itself.
 import { anchorByFingerprint } from '/js/relay-trust-anchors.js?v=2';
+import { embeddedFiles, looksLikePdf } from '/js/pdf-embedded.js?v=2';
 
 const RELAY_URL = 'https://relay.paramant.app';
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync.
@@ -22,27 +23,54 @@ const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 
+// A moment as a reader says it: "5 oktober 2026 om 20:56", Dutch time. A
+// value that is not a date is shown as it is.
+function humanWhen(iso) {
+  const d = new Date(String(iso || ''));
+  if (Number.isNaN(d.getTime())) return String(iso || '');
+  const opts = { timeZone: 'Europe/Amsterdam' };
+  const loc = LANG === 'en' ? 'en-GB' : 'nl-NL';
+  const day = d.toLocaleDateString(loc, { ...opts, day: 'numeric', month: 'long', year: 'numeric' });
+  const time = d.toLocaleTimeString(loc, { ...opts, hour: '2-digit', minute: '2-digit' });
+  return day + t('infoAt') + time;
+}
+
+// Only the day of a moment, on the same Dutch clock: "6 oktober 2026". The
+// party list read "(2026-10-05)", a UTC slice, under "getekend op 6 oktober
+// 2026 om 00:47" (acceptatie 3.1.1 ronde 2, N2).
+function humanDay(iso) {
+  const d = new Date(String(iso || ''));
+  if (Number.isNaN(d.getTime())) return String(iso || '');
+  return d.toLocaleDateString(LANG === 'en' ? 'en-GB' : 'nl-NL', { timeZone: 'Europe/Amsterdam', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 // Visible text in both languages. /verify is Dutch, /en/verify English; the page's <html lang> picks the set.
 const LANG = ((typeof document !== 'undefined' && document.documentElement.lang) || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
 const T = {
   nl: {
     fileSize: ' ({kb} kB)',
-    notJson: 'Dit bestand is geen geldige JSON. Kies de .psign-envelop die bij het ondertekenen is gemaakt.',
-    notPsign: 'Dit lijkt geen .psign-envelop (het veld algorithm ontbreekt).',
+    notJson: 'Dit is geen bewijsbestand. Kies het .psign-bestand dat bij het ondertekenen is gemaakt.',
+    notPsign: 'Dit lijkt geen .psign-bestand (het veld algorithm ontbreekt).',
     notPsignFields: 'Dit bestand mist de velden van een ParaSign-bewijs (versie, ondertekenaar of handtekening). Kies het .psign-bestand dat bij het ondertekenen is gemaakt.',
     docUnreadable: 'Dit bestand kon niet worden gelezen. Het is mogelijk te groot voor deze browser.',
     infoAlg: 'algoritme: {v}',
-    infoSigned: 'ondertekend: {v}',
-    infoSigners: 'ondertekenaars: {v}',
-    infoEnvMulti: 'envelop: {v}…',
-    infoKeyless: 'zonder sleutel (offline)',
+    infoSigned: 'getekend op {v}',
+    infoSigners: '{v} ondertekenaars',
+    infoSolo: 'bewijs van één ondertekenaar',
     infoKey: 'sleutel {v}…',
-    infoEnv: 'envelop: {v}…',
+    techHead: 'Technische gegevens',
+    infoAt: ' om ',
     infoSignerLabel: 'ondertekenaar: {v}',
     unsupportedAlg: 'algoritme niet ondersteund: {v}',
     missingMpId: 'multiparty.envelope_id ontbreekt',
     missingSignedHash: 'de hash van het ondertekende document ontbreekt (stamped_hash of document_hash)',
-    hashMismatch: 'documenthash klopt niet: dit document is niet het document dat is ondertekend',
+    embeddedOriginal: 'Het origineel zit als bijlage in deze pdf.',
+    embeddedSave: 'Origineel opslaan',
+    embeddedTooLarge: 'Deze pdf bevat een bijlage die uitgepakt te groot is om hier te controleren. Die bijlage is niet bekeken. Controleer met het originele bestand zelf.',
+    // Review #565, M1: a pdf whose visible pages say something else, with the
+    // real signed original attached, verified with the full green banner.
+    embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekeningen zijn geldig, voor het origineel in deze pdf.</strong> Alleen dat origineel is gecontroleerd, niet de pagina\u2019s die u nu ziet. Die kunnen in theorie afwijken. Sla het origineel op en lees dat, dan weet u zeker wat er is getekend.</div>',
+    hashMismatch: 'de vingerafdruk klopt niet: dit is niet het document dat is ondertekend',
     wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. {pick}</strong> De handtekening in het .psign-bestand geldt voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Bij een pdf of afbeelding is dat de versie met de zegel erop, die u na het ondertekenen kreeg. Wat u koos, is niet wat er is ondertekend. Kies dat bestand en controleer opnieuw.</div>',
     partyNamesHead: 'Namen zoals de afzender ze opgaf (niet gecontroleerd; de handtekeningen zelf zijn wel gecontroleerd):',
     missingSignerPk: 'signer_public_key ontbreekt',
@@ -56,7 +84,7 @@ const T = {
     missingDocHash: 'document_hash ontbreekt',
     hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. De pdf met de zichtbare handtekeningen en parafen (onder elke handtekening de regel "Paramant ParaSign · PQ …") is ook niet het origineel. Kies het originele bestand dat ter ondertekening is aangeboden.',
     missingParties: 'partijen ontbreken',
-    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> Het .psign-bestand is in orde, maar de handtekeningen gelden voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Wat u koos, is dus niet wat er is ondertekend. Kies het originele bestand dat ter ondertekening is aangeboden en controleer opnieuw. Bij &quot;Samen ondertekenen&quot; is dat de pdf met het zegel van de afzender, zoals de afzender die na zijn eigen handtekening kreeg; een pdf met de handtekeningen van iedereen is een leesbare kopie en nooit het ondertekende bestand.</div>',
+    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> Het .psign-bestand is in orde, maar de handtekeningen gelden voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Wat u koos, is dus niet wat er is ondertekend. Kies het originele bestand dat ter ondertekening is aangeboden en controleer opnieuw. Bij &quot;Samen ondertekenen&quot; is dat de pdf met het zegel van de afzender, zoals de afzender die na zijn eigen handtekening kreeg; een pdf met de handtekeningen van iedereen is een leesbare kopie; die controleert hier alleen als het origineel erin is ingebed, zoals bij de complete pdf van Paramant.</div>',
     lookupFailed: '<p class="ps-help">Het opzoeken lukte nu niet; Paramant gaf geen antwoord. De controle hierboven blijft gelden. Probeer het later opnieuw.</p>',
     lookupRetry: 'Opnieuw opzoeken',
     qesNote: '<p class="ps-help">Volgens dit bewijs staat er in de pdf ook een gekwalificeerde handtekening (PAdES) van {provider}, certificaat <code class="mono">{fp}</code>{when}. Die tweede handtekening controleert deze pagina niet: open de ondertekende pdf in een PAdES-lezer, zoals Adobe Acrobat of de EU-validatiedienst DSS.</p>',
@@ -80,19 +108,19 @@ const T = {
     relayPkMismatch: 'hash van de publieke sleutel van de relay klopt niet',
     notaryInvalid: 'notarishandtekening ongeldig',
     notaryError: 'de notarishandtekening of de relaysleutel is beschadigd en kan niet worden gelezen',
-    relayUnknown: 'De relaysleutel die dit bewijs bekrachtigt (vingerafdruk {fp}…) is geen sleutel van Paramant. Dit bewijs komt dus niet aantoonbaar van Paramant, ook al klopt het met zichzelf.',
-    verifyingLocal: 'Bezig met controleren, lokaal in uw browser…',
-    verifyingRelay: 'Lokaal hashen, daarna controleren via de relay…',
+    relayUnknown: 'De serversleutel die dit bewijs bekrachtigt (vingerafdruk {fp}…) is geen sleutel van Paramant. Dit bewijs komt dus niet aantoonbaar van Paramant, ook al klopt het met zichzelf.',
+    verifyingLocal: 'Bezig met controleren in uw browser…',
+    verifyingRelay: 'Vingerafdruk maken op dit apparaat, daarna controleert onze server het bewijs…',
     verifyFailed: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span>Controle mislukt: {err}</div>',
     notLinked: '<p class="ps-help">Paramant kent geen account bij deze sleutel.</p>',
     noLabel: '<em>(geen naam)</em>',
     unverified: '<em>(niet geverifieerd)</em>',
     signedBy: '<p class="ps-help"><strong>Ondertekend door {label} ({email})</strong> &middot; {algo}</p>',
     revoked: '<p class="ps-help">Deze sleutel is ingetrokken op {when}. Dit bewijs bevat geen ondertekend tijdstip, dus of er voor die datum is getekend, valt hieruit niet af te leiden. Vertrouw de handtekening alleen als u het tijdstip op een andere manier kunt aantonen.</p>',
-    revokedNotary: '<p class="ps-help">Deze sleutel is ingetrokken op {when}. Het tijdstip in dit oude bewijs is door de relay ondertekend; de handtekening telt als die van voor die datum is.</p>',
+    revokedNotary: '<p class="ps-help">Deze sleutel is ingetrokken op {when}. Het tijdstip in dit oude bewijs is door onze server ondertekend; de handtekening telt als die van voor die datum is.</p>',
     revokedBanner: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Sleutel ingetrokken.</strong> De handtekening klopt wiskundig, maar de sleutel is ingetrokken. Zie hieronder.</div>',
     enrolled: '<p class="ps-help">Sleutel geregistreerd op {when}.</p>',
-    valid: '<div class="ps-banner ok"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>Handtekening geldig.</strong> Het document komt overeen met de ondertekende hash.</div>',
+    valid: '<div class="ps-banner ok"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>Handtekening geldig.</strong> Dit is precies het document dat is ondertekend.</div>',
     validTest: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Testbewijs, geen echte ondertekening.</strong> De handtekeningen kloppen, maar dit bewijs is gemaakt met een testsleutel (psk_test) en automatisch ondertekend door de sandbox van Paramant. Het heeft geen waarde als ondertekening.</div>',
     invalid: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Handtekening ONGELDIG.</strong></div>',
     notaryBy: '<p class="ps-help">Bekrachtigd door {name} (<code class="mono">{host}</code>), sleutel <code class="mono">{fp}…</code>, een vaste sleutel van deze site.</p>',
@@ -103,29 +131,33 @@ const T = {
     claimDate: '<li class="ps-help">Datum: {v} (opgegeven door de ondertekenaar, niet gecontroleerd)</li>',
     claimFpBad: '<li class="ps-help"><strong>Let op:</strong> de vingerafdruk die in het bestand staat (<code class="mono">{v}</code>) hoort niet bij de sleutel die tekende. Iemand heeft dit bestand aangepast.</li>',
     claimNone: '<li class="ps-help">Geen naam of datum.</li>',
-    partyScope: '<p class="ps-help"><strong>Voorbehoud:</strong> dit bewijs dekt één ondertekenaar (partij {i} van {n}). Of de andere partijen hebben getekend, of dat de envelop daarna is ingetrokken, staat niet in dit bestand.{counted}</p>',
+    partyScope: '<p class="ps-help"><strong>Voorbehoud:</strong> dit bewijs dekt één ondertekenaar (partij {i} van {n}). Of de andere partijen hebben getekend, of dat het verzoek daarna is ingetrokken, staat niet in dit bestand.{counted}</p>',
     partyCounted: ' Volgens het bestand hadden toen {s} van de {n} getekend (niet gecontroleerd).',
-    envOffline: '<p class="ps-help">Envelop: <code class="mono">{id}</code> &middot; offline gecontroleerd, zonder account.</p>',
+    envOffline: '<p class="ps-help">Verzoek: <code class="mono">{id}</code> &middot; offline gecontroleerd, zonder account.</p>',
     ctIndex: '<p class="ps-help">Positie in het CT-logboek: <a href="/ct-log">{idx}</a></p>',
   },
   en: {
     fileSize: ' ({kb} KB)',
-    notJson: 'This file is not valid JSON. Choose the .psign envelope produced when the document was signed.',
-    notPsign: 'This does not look like a .psign envelope (no algorithm field).',
+    notJson: 'This is not a proof file. Choose the .psign file made when the document was signed.',
+    notPsign: 'This does not look like a .psign file (no algorithm field).',
     notPsignFields: 'This file lacks the fields of a ParaSign proof (version, signer or signature). Choose the .psign file that was produced when the document was signed.',
     docUnreadable: 'This file could not be read. It may be too large for this browser.',
     infoAlg: 'algorithm: {v}',
-    infoSigned: 'signed_at: {v}',
-    infoSigners: 'signers: {v}',
-    infoEnvMulti: 'envelope: {v}…',
-    infoKeyless: 'keyless (offline)',
+    infoSigned: 'signed on {v}',
+    infoSigners: '{v} signers',
+    infoSolo: 'proof of one signer',
     infoKey: 'key {v}…',
-    infoEnv: 'envelope: {v}…',
+    techHead: 'Technical details',
+    infoAt: ' at ',
     infoSignerLabel: 'signer: {v}',
     unsupportedAlg: 'unsupported algorithm: {v}',
     missingMpId: 'missing multiparty.envelope_id',
     missingSignedHash: 'missing signed document hash (stamped_hash or document_hash)',
-    hashMismatch: 'document hash mismatch: this document does not match the one that was signed',
+    embeddedOriginal: 'The original is attached inside this pdf.',
+    embeddedSave: 'Save the original',
+    embeddedTooLarge: 'This pdf has an attachment that is too large unpacked to check here. That attachment was not looked at. Check with the original file itself.',
+    embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>The signatures are valid, for the original inside this pdf.</strong> Only that original was checked, not the pages you see now. In theory those could differ. Save the original and read it, then you know for sure what was signed.</div>',
+    hashMismatch: 'the fingerprint does not match: this is not the document that was signed',
     wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. {pick}</strong> The signature in the .psign file covers a different file (SHA3-256 fingerprint {hash}…). For a PDF or image that is the version with the seal on it, which you received after signing. What you chose is not what was signed. Choose that file and check again.</div>',
     partyNamesHead: 'Names as the sender entered them (not checked; the signatures themselves were checked):',
     missingSignerPk: 'missing signer_public_key',
@@ -139,7 +171,7 @@ const T = {
     missingDocHash: 'missing document_hash',
     hashMismatchMulti: 'This is not the document that was signed. The signatures cover the original file, with SHA3-256 fingerprint {hash}…. The PDF with the visible signatures and initials (the line "Paramant ParaSign · PQ …" under each signature) is not the original either. Choose the original file that was put up for signing.',
     missingParties: 'missing parties',
-    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. Check with the original file.</strong> The .psign file is in order, but the signatures cover a different file (SHA3-256 fingerprint {hash}…). What you chose is therefore not what was signed. Choose the original file that was put up for signing and check again. With &quot;Sign together&quot; that is the PDF with the seal of the sender, as the sender received it after signing; a PDF that shows all signatures is a readable copy and never the signed file.</div>',
+    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. Check with the original file.</strong> The .psign file is in order, but the signatures cover a different file (SHA3-256 fingerprint {hash}…). What you chose is therefore not what was signed. Choose the original file that was put up for signing and check again. With &quot;Sign together&quot; that is the PDF with the seal of the sender, as the sender received it after signing; a PDF that shows all signatures is a readable copy; it only checks here when the original is embedded in it, as in the complete PDF from Paramant.</div>',
     lookupFailed: '<p class="ps-help">The lookup did not work just now; Paramant did not answer. The check above still stands. Please try again later.</p>',
     lookupRetry: 'Look up again',
     qesNote: '<p class="ps-help">According to this proof, the PDF also carries a qualified signature (PAdES) from {provider}, certificate <code class="mono">{fp}</code>{when}. This page does not check that second signature: open the signed PDF in a PAdES reader, such as Adobe Acrobat or the EU validation service DSS.</p>',
@@ -163,19 +195,19 @@ const T = {
     relayPkMismatch: 'relay public key hash mismatch',
     notaryInvalid: 'notary signature invalid',
     notaryError: 'the notary signature or the relay key is damaged and cannot be read',
-    relayUnknown: 'The relay key that counter-signs this proof (fingerprint {fp}…) is not a Paramant key. This proof therefore does not demonstrably come from Paramant, even though it is consistent with itself.',
-    verifyingLocal: 'Verifying locally in your browser…',
-    verifyingRelay: 'Hashing locally + verifying via relay…',
+    relayUnknown: 'The server key that counter-signs this proof (fingerprint {fp}…) is not a Paramant key. This proof therefore does not demonstrably come from Paramant, even though it is consistent with itself.',
+    verifyingLocal: 'Checking in your browser…',
+    verifyingRelay: 'Taking the fingerprint on this device, then our server checks the proof…',
     verifyFailed: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span>Verify failed: {err}</div>',
     notLinked: '<p class="ps-help">Paramant knows no account for this key.</p>',
     noLabel: '<em>(no label)</em>',
     unverified: '<em>(unverified)</em>',
     signedBy: '<p class="ps-help"><strong>Signed by {label} ({email})</strong> &middot; {algo}</p>',
     revoked: '<p class="ps-help">This key was revoked on {when}. This proof carries no signed time, so whether it was signed before that date cannot be told from it. Trust the signature only if you can establish the time some other way.</p>',
-    revokedNotary: '<p class="ps-help">This key was revoked on {when}. The time in this older proof is signed by the relay; the signature counts if that time is before the revocation.</p>',
+    revokedNotary: '<p class="ps-help">This key was revoked on {when}. The time in this older proof is signed by our server; the signature counts if that time is before the revocation.</p>',
     revokedBanner: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Key revoked.</strong> The signature is mathematically correct, but the key has been revoked. See below.</div>',
     enrolled: '<p class="ps-help">Key enrolled on {when}.</p>',
-    valid: '<div class="ps-banner ok"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>Signature valid.</strong> Document matches the signed hash.</div>',
+    valid: '<div class="ps-banner ok"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>Signature valid.</strong> This is exactly the document that was signed.</div>',
     validTest: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Test proof, not a real signature.</strong> The signatures check out, but this proof was made with a test key (psk_test) and signed automatically by the Paramant sandbox. It has no value as a signature.</div>',
     invalid: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Signature INVALID.</strong></div>',
     notaryBy: '<p class="ps-help">Counter-signed by {name} (<code class="mono">{host}</code>), key <code class="mono">{fp}…</code>, a key pinned in this site.</p>',
@@ -186,9 +218,9 @@ const T = {
     claimDate: '<li class="ps-help">Date: {v} (stated by the signer, not checked)</li>',
     claimFpBad: '<li class="ps-help"><strong>Warning:</strong> the fingerprint written in the file (<code class="mono">{v}</code>) does not belong to the key that signed. Someone has altered this file.</li>',
     claimNone: '<li class="ps-help">No name or date.</li>',
-    partyScope: '<p class="ps-help"><strong>Caveat:</strong> this proof covers one signer (party {i} of {n}). Whether the other parties signed, or whether the envelope was withdrawn later, is not in this file.{counted}</p>',
+    partyScope: '<p class="ps-help"><strong>Caveat:</strong> this proof covers one signer (party {i} of {n}). Whether the other parties signed, or whether the request was withdrawn later, is not in this file.{counted}</p>',
     partyCounted: ' According to the file, {s} of the {n} had signed at that point (not checked).',
-    envOffline: '<p class="ps-help">Envelope: <code class="mono">{id}</code> &middot; verified offline, no account needed.</p>',
+    envOffline: '<p class="ps-help">Request: <code class="mono">{id}</code> &middot; verified offline, no account needed.</p>',
     ctIndex: '<p class="ps-help">CT log index: <a href="/en/ct-log">{idx}</a></p>',
   },
 };
@@ -357,31 +389,28 @@ async function onEnv(file) {
       throw new Error(t('notPsignFields'));
     }
 
+    // What a reader can use at a glance: how many signed and when. The
+    // algorithm, the request id and the key fingerprint are not for a reader
+    // who wants to know whether his document is in order; they are in
+    // "Technische gegevens" under the result (acceptance 3.1.1, 9).
     // signed_at of a v3 solo proof is outside the signature, so it is shown
     // with the result as a claim, never here as a fact.
-    const info = [t('infoAlg', { v: envelope.algorithm || '?' })];
-    if (isMulti && envelope.completed_at) info.push(t('infoSigned', { v: envelope.completed_at }));
-    if (!isV3 && envelope.signed_at) info.push(t('infoSigned', { v: envelope.signed_at }));
+    const info = [];
     if (isMulti) {
       info.push(t('infoSigners', { v: String((envelope.parties || []).length) }));
-      info.push(t('infoEnvMulti', { v: String(envelope.envelope_id || '').slice(0, 12) }));
-      info.push(t('infoKeyless'));
+      if (envelope.completed_at) info.push(t('infoSigned', { v: humanWhen(envelope.completed_at) }));
     } else if (isV3) {
-      // v3 (parasign-doc-3): signer_name and signer_pk_fingerprint are NOT in
-      // the signed message, so neither is shown as the signer. The fingerprint
-      // here is computed from the key that actually signs.
+      // The fingerprint is computed from the key that signs, and is the one
+      // thing a reader compares with the seal on the document.
+      info.push(t('infoSolo'));
       const fp = keyFingerprint(envelope.signer_public_key);
       if (fp) info.push(t('infoKey', { v: fp }));
-      const envId = envelope.multiparty && envelope.multiparty.envelope_id;
-      if (envId) info.push(t('infoEnv', { v: String(envId).slice(0, 12) }));
-      info.push(t('infoKeyless'));
     } else {
-      // v1/v2: nested signer.label + notary.ct_log_index.
+      // v1/v2: nested signer.label; the notary signs the time.
       if (envelope.signer && envelope.signer.label) info.push(t('infoSignerLabel', { v: envelope.signer.label }));
-      const idx = (envelope.notary && envelope.notary.ct_log_index);
-      if (idx != null) info.push('ct_log_index: ' + idx);
+      if (envelope.signed_at) info.push(t('infoSigned', { v: humanWhen(envelope.signed_at) }));
     }
-    $('vf-envelope-info').textContent = info.join('  |  ');
+    $('vf-envelope-info').textContent = info.join(' \u00b7 ');
   } catch (e) {
     $('vf-envelope-info').textContent = e.message;
     envelope = null; isV3 = false; isMulti = false;
@@ -535,13 +564,36 @@ async function verify() {
       $('vf-result').innerHTML = '<div class="ps-banner err">' + esc(t('docUnreadable')) + '</div>';
       return;
     }
+    // A readable copy from /co-sign carries the signed original inside it as
+    // a PDF attachment. When the chosen file is not the signed one, look
+    // there: an embedded file whose SHA3-256 IS the signed hash is the signed
+    // document itself, so the proof is checked against that (DASH-09-L).
+    let embedded = null;
+    let embeddedTooLarge = false;
+    const expected = String(isMulti ? (envelope && envelope.document_hash) || ''
+      : ((envelope && (envelope.stamped_hash || envelope.document_hash)) || '')).toLowerCase();
+    if (expected && toHex(docHash) !== expected && documentFile && documentFile.size < 512 * 1024 * 1024) {
+      try {
+        const head = new Uint8Array(await documentFile.slice(0, 5).arrayBuffer());
+        if (looksLikePdf(head)) {
+          const all = new Uint8Array(await documentFile.arrayBuffer());
+          const cands = await embeddedFiles(all);
+          for (const cand of cands) {
+            const h = sha3_256(cand.bytes);
+            if (toHex(h) === expected) { docHash = h; embedded = cand; break; }
+          }
+          embeddedTooLarge = !embedded && !!cands.tooLarge;
+        }
+      } catch { embedded = null; }
+    }
+    const withEmbedded = (r) => (embedded ? { ...r, embedded } : embeddedTooLarge ? { ...r, embeddedTooLarge } : r);
     if (isMulti) {
-      await renderResult(verifyMultiClient(toHex(docHash)));
+      await renderResult(withEmbedded(verifyMultiClient(toHex(docHash))));
       return;
     }
     if (isV3) {
       // Fully offline: never touches the network for the crypto.
-      await renderResult(verifyV3Client(toHex(docHash)));
+      await renderResult(withEmbedded(verifyV3Client(toHex(docHash))));
       return;
     }
     const res = await fetch(RELAY_URL + '/v2/verify', {
@@ -561,8 +613,8 @@ async function verify() {
         // bestand." (acceptatie r4, punt 3). Only when that is the one reason.
         const errs = Array.isArray(body.errors) ? body.errors : [];
         const onlyWrongFile = errs.length === 1 && /document_hash mismatch/i.test(String(errs[0] || ''));
-        await renderResult({ valid: false, errors: relayErrors(errs), note: null, wrongFile: onlyWrongFile,
-          docHash: (envelope && (envelope.document_hash || envelope.stamped_hash)) || '' });
+        await renderResult(withEmbedded({ valid: false, errors: relayErrors(errs), note: null, wrongFile: onlyWrongFile,
+          docHash: (envelope && (envelope.document_hash || envelope.stamped_hash)) || '' }));
         return;
       }
     }
@@ -574,7 +626,7 @@ async function verify() {
           : (LANG === 'nl' ? 'De controle kon nu niet worden uitgevoerd door een storing bij ons. Probeer het zo opnieuw.' : 'The check could not run right now because of a fault on our side. Please try again shortly.')) + '</div>';
       return;
     }
-    await renderResult(await res.json());
+    await renderResult(withEmbedded(await res.json()));
   } catch (e) {
     $('vf-result').innerHTML = t('verifyFailed', { err: esc(e.message) });
   } finally { $('vf-verify').disabled = false; }
@@ -707,6 +759,18 @@ function soloPick(env) {
   return /\.(png|jpe?g|webp|gif)$/i.test(name) || /image/i.test(name) ? 'pickSignedImage' : 'pickSignedPdf';
 }
 
+function wireEmbeddedSave(r) {
+  const btn = $('vf-embedded-save');
+  if (!btn || !r.embedded) return;
+  btn.onclick = () => {
+    const url = URL.createObjectURL(new Blob([r.embedded.bytes], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = LANG === 'en' ? 'signed-original.pdf' : 'ondertekend-origineel.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+}
+
 async function renderResult(r) {
   const out = [];
   // A v3 solo proof binds a key, not a person: no reassuring green for a name
@@ -717,7 +781,7 @@ async function renderResult(r) {
   const banner = !r.valid
     ? (r.wrongFile ? t(isV3 && !isMulti ? 'wrongFileSolo' : 'wrongFile', { hash: esc(String(r.docHash || '').slice(0, 16)), pick: t(soloPick(envelope)) })
       : t('invalid'))
-    : r.test ? t('validTest') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
+    : r.test ? t('validTest') : r.embedded ? t('embeddedValid') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
   out.push(banner);
   if (r.errors && r.errors.length && !r.wrongFile) {
     out.push('<ul style="margin-top:var(--space-3)">');
@@ -725,25 +789,34 @@ async function renderResult(r) {
     out.push('</ul>');
   }
   if (r.note) out.push('<p class="ps-help">' + esc(r.note) + '</p>');
+  if (!r.valid && r.embeddedTooLarge) out.push('<p class="ps-help" id="vf-embedded-too-large">' + esc(t('embeddedTooLarge')) + '</p>');
+  if (r.valid && r.embedded) out.push('<p class="ps-help" id="vf-embedded">' + esc(t('embeddedOriginal')) + ' <button type="button" class="btn btn-outline" id="vf-embedded-save">' + esc(t('embeddedSave')) + '</button></p>');
   if (isV3) {
+    // The plumbing (request id, offline, the relay's key, the algorithm and
+    // the raw time) goes into one fold under the result, so the banner and the
+    // names are what a reader sees first (acceptance 3.1.1, 9).
+    const tech = [];
     const envId = isMulti ? envelope && envelope.envelope_id : envelope && envelope.multiparty && envelope.multiparty.envelope_id;
-    if (envId) out.push(t('envOffline', { id: esc(String(envId)) }));
+    if (envId) tech.push(t('envOffline', { id: esc(String(envId)) }));
     if (r.valid && isMulti && r.anchor) {
       const a = r.anchor;
       const name = esc(LANG === 'en' ? a.name : (a.name_nl || a.name));
       const vars = { name, host: esc(a.host), fp: esc(String(a.fingerprint).slice(0, 16)), when: esc(a.retired_at || '') };
-      out.push(a.retired_at ? t('notaryByRetired', vars) : t('notaryBy', vars));
+      tech.push(a.retired_at ? t('notaryByRetired', vars) : t('notaryBy', vars));
     }
+    if (envelope && envelope.algorithm) tech.push('<p class="ps-help">' + esc(t('infoAlg', { v: envelope.algorithm })) + (isMulti && envelope.completed_at ? ' &middot; ' + esc(String(envelope.completed_at)) : '') + '</p>');
     if (r.valid && !isMulti) out.push(v3ScopeHtml(envelope));
     // The names in a multi-party proof are labels the sender typed: shown,
     // and said for what they are (acceptance r2, 5).
     if (r.valid && isMulti) out.push(partyNamesHtml(envelope));
     if (r.valid && isMulti) out.push(qesHtml(envelope));
+    if (tech.length) out.push('<details class="ps-tech"><summary class="ps-help">' + esc(t('techHead')) + '</summary>' + tech.join('') + '</details>');
   } else {
     const idx = envelope && envelope.notary && envelope.notary.ct_log_index;
     if (idx != null) out.push(t('ctIndex', { idx: esc(String(idx)) }));
   }
   $('vf-result').innerHTML = out.join('');
+  wireEmbeddedSave(r);
   // v1/v2 were checked by the relay already, so the account lookup rides along.
   if (r.valid && !isMulti && !isV3) {
     const attr = await lookupSignerHtml(envelope);
@@ -796,7 +869,7 @@ function partyNamesHtml(env) {
   const named = parties.filter((p) => p && p.label);
   if (!named.length) return '';
   return '<p class="ps-help">' + esc(t('partyNamesHead')) + '</p><ul>' +
-    named.map((p) => '<li class="ps-help">' + esc(String(p.label)) + (p.signed_at ? ' (' + esc(String(p.signed_at).slice(0, 10)) + ')' : '') + '</li>').join('') + '</ul>';
+    named.map((p) => '<li class="ps-help">' + esc(String(p.label)) + (p.signed_at ? ' (' + esc(humanDay(p.signed_at)) + ')' : '') + '</li>').join('') + '</ul>';
 }
 
 // The signer fingerprint written in a v3 solo proof, against the key that

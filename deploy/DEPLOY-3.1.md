@@ -1,4 +1,4 @@
-# Deploy runbook: main (3.1.0) to production
+# Deploy runbook: main (3.1.1) to production
 
 > `deploy/deploy-3.1.sh` executes this runbook. One command from the NUC
 > (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
@@ -643,7 +643,7 @@ shape:
 `recurring:false` and `mode_source:inferred` are the brake. If it says
 `recurring:true`, `BILLING_MODE` is set somewhere: stop, find it, and do not
 continue until the line reads as above. `relay_started` must say
-`version:"3.1.0"`.
+`version:"3.1.1"`.
 
 Then the rest:
 
@@ -655,6 +655,36 @@ for c in health finance legal admin; do wait_healthy paramant-relay-$c || exit 1
 ```
 
 ## Step 5: frontend and nginx (server)
+
+### First: tag v3.1.1 on the merge commit
+
+`frontend/install.sh` is what `curl -fsSL https://paramant.app/install.sh | bash`
+runs, and from 3.1.1 on it clones `v3.1.1` (`RELAY_VERSION` default; the same
+pin is in `install.sh` and `frontend/install-pi.sh`). The rsync below puts that
+installer live. Without the tag the one-line install stops at
+`git clone --branch v3.1.1` on every new machine. So the tag goes on the merge
+commit of the 3.1.1 PR on `main` **before** step 5, not afterwards in step 7:
+
+```bash
+# [admin], from a checkout of the repo
+git fetch origin main --tags
+C=<merge commit of the 3.1.1 PR on main>
+git merge-base --is-ancestor "$C" origin/main && echo "on main"
+git show "$C:package.json" | grep '"version": "3.1.1"'   # the tag is v plus this version
+git tag -a v3.1.1 -m "Release 3.1.1" "$C"
+git push origin v3.1.1
+git ls-remote --tags origin v3.1.1             # must print the tag before step 5
+```
+
+`deploy-3.1.sh` enforces this: before phase 2 (step `1z`, nothing written yet)
+and again right before phase 5 (step `5-pre`) it reads the tag the three
+installers pin, runs `git ls-remote --tags origin <tag>`, and stops when the tag
+is missing on origin or names another commit than the one it deploys. The stop
+line carries the exact `git tag -a ... && git push origin ...` to run.
+
+The tag push also starts `docker-publish.yml` (images `3.1.1`). If the server
+checkout is not on `$C` after step 3, stop: the tag would name a commit other
+than the one that is deployed.
 
 The docroot is a copy, not the checkout. Without `--delete`, on purpose:
 `dist/`, `paramant-mark.svg`, `developer.js` and the investor brief live only
@@ -1046,15 +1076,32 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://iot.paramant.app/v1/par
 curl -s -o /dev/null -w '%{http_code}\n' https://paramant.app/sign                                   # 200
 
 # 6f. the version the relay reports
-curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.0
+curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.1
 
 # 6g. billing stance on every relay, once more, from the logs
 for c in main health finance legal iot; do printf '%-8s' $c; docker logs paramant-relay-$c 2>&1 | grep '"billing_config"' | tail -1 | grep -o '"recurring":[a-z]*'; done
+
+# 6l. the host hardening /dpa promises, read-only (deploy-3.1.sh step 6l)
+systemctl is-active auditd                       # active
+command -v aide; ls -l /var/lib/aide/aide.db* /var/log/aide/   # binary, database, a log at most 2 days old
+aa-status --enabled && aa-status | grep 'profiles are in enforce mode'   # at least 1
 ```
+
+Step 6l also runs under `--verify-only`. It writes one line per point to the
+deploy log and flags a miss when auditd is not active, AIDE is missing, has no
+database or last checked more than 2 days ago (`PARAMANT_AIDE_MAX_AGE_DAYS`),
+or AppArmor is not enabled with at least one profile in enforce mode. A miss is
+a WARN, in the log and again in the summary under "HOST NOT PROVEN", and the
+deploy goes on to write the deployed-head marker: 6l runs after everything is
+live, and the host state was never measured before this step existed, so a stop
+here only left the next run stuck in 1a (review-574 N1). `--host-strict` makes
+a miss a STOP (never a rollback: the containers are fine). /dpa therefore
+promises the check ("we check at every deploy whether ..."), not its outcome.
+Once the host is right, confirm with `--verify-only --host-strict`.
 
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without
-`3.1.0`, or a `billing_config` line with `recurring:true`. A
+`3.1.1`, or a `billing_config` line with `recurring:true`. A
 `post-deploy-verify.sh` exit 1 stops the script too, but it is a non-critical
 failure: read the list, fix it, do not roll back on it.
 
@@ -1123,8 +1170,19 @@ passing on an empty search.
    server against `127.0.0.1:3000`.
 3. **Drift guard** from the NUC: `scripts/check-prod-drift.sh origin/main` must
    print `OK`.
-4. Tag it: `git tag v3.1.0 <commit> && git push origin v3.1.0`, and put the live
-   date in `CHANGELOG.md`.
+4. Check the tag from step 5 names the commit that is live, and put the live
+   date in `CHANGELOG.md`. `v3.1.1` was set on the merge commit before the
+   frontend went out (step 5, "First: tag v3.1.1 on the merge commit"); here
+   it is compared with `/home/paramant/backups/deployed-head`:
+   ```bash
+   # [admin]
+   C=$(ssh <server> cat /home/paramant/backups/deployed-head)
+   [ "$(git rev-parse 'v3.1.1^{commit}')" = "$C" ] && echo "tag is live commit"
+   ```
+   Then check the installer and upgrade path once from a clean machine (matrix
+   SELF-01-A, SELF-12-A, SELF-13-A): `curl -fsSL https://paramant.app/install.sh | bash`
+   reaches "Stack healthy" on `v3.1.1`, and on a v3.1.0 install
+   `paramant upgrade` moves HEAD to the newest tag.
 5. Write the deploy down in the vault (`Sessies/2026-09/`), with the
    `billing_config` line as it was logged.
 

@@ -47,8 +47,8 @@
   // The page's own language: Dutch on every page that declares <html lang="nl">,
   // English on the pages that still declare "en" (the copies under /en).
   var EN = document.documentElement.lang === 'en';
-  var BUSY = EN ? 'Checking your code...' : 'Uw code wordt gecontroleerd...';
-  var NO_HELPER = EN ? 'This page could not start. Reload and try again.' : 'Deze pagina kon niet starten. Laad hem opnieuw en probeer het nog eens.';
+  var BUSY = EN ? 'Checking your code...' : 'We controleren uw code...';
+  var NO_HELPER = EN ? 'This page did not load properly. Reload it and try again.' : 'Deze pagina laadde niet goed. Laad hem opnieuw en probeer het nog eens.';
   var OFFLINE = EN ? 'We could not reach the server. Please try again in a minute.' : 'We konden de server niet bereiken. Probeer het over een minuut opnieuw.';
   var EMPTY = EN ? 'Enter your code first.' : 'Vul eerst uw code in.';
 

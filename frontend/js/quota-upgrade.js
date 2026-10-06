@@ -70,15 +70,24 @@
   // says which tier it was. Firm is one rung for both dimensions now: the two
   // separate Pro plans it replaced are off sale, and one payment lifts both
   // ceilings at once.
+  //
+  // Business is not on the Dutch /pricing (one offer since 23-09); a Dutch
+  // reader is pointed at the contact address there, an English one at
+  // /en/pricing where the button is. `contact` says which (BUSINESS_WAY).
   var NEXT = {
     transfers_month: {
       community: { name: 'Firm', price: t('EUR 29/maand excl. btw', 'EUR 29/month excl. VAT'), limit: 500 }
     },
     signs_month: {
-      community: { name: 'Firm',              price: t('EUR 29/maand excl. btw', 'EUR 29/month excl. VAT'), limit: 100 },
-      pro:       { name: 'ParaSign Business', price: t('EUR 299/maand excl. btw', 'EUR 299/month excl. VAT'), limit: 1000 }
+      community: { name: 'Firm',     price: t('EUR 29/maand excl. btw', 'EUR 29/month excl. VAT'), limit: 100 },
+      pro:       { name: 'Business', price: t('EUR 299/maand excl. btw', 'EUR 299/month excl. VAT'), limit: 1000, business: true }
     }
   };
+
+  // How a reader gets to Business, in the language of the page.
+  var BUSINESS_WAY = t(
+    ' Neem daarvoor contact op via <a href="mailto:privacy@paramant.app?subject=Business">privacy@paramant.app</a>.',
+    ' <a href="/en/pricing#plans">Compare plans</a>.');
 
   // The tier that DECIDED the 402, as the relay reports it. Since #361 the
   // monthly_transfer_quota_reached body carries `plan` = the ParaSend
@@ -120,6 +129,12 @@
     return next.getFullYear() + '-' + mm + '-01';
   }
 
+  // 1000 as the site writes it: 1.000 in Dutch, 1,000 in English.
+  function fmt(n) {
+    var str = String(n);
+    return n >= 1000 ? str.replace(/\B(?=(\d{3})+(?!\d))/g, EN ? ',' : '.') : str;
+  }
+
   function resetDate(data) {
     var v = data && data.reset_date;
     return (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : firstOfNextMonth();
@@ -145,18 +160,29 @@
       '</div>';
   }
 
-  function legacyHtml(data) {
+  // Which monthly ceiling a 402 is about. The sign 402 carries no `dimension`,
+  // so it fell through to transfers and a Firm customer stopped at his 101st
+  // signature read "you have used all 100 transfers" (betaaltest 05-10, row 5).
+  function dimensionOf(data) {
+    var e = data && data.error;
+    if (e === 'monthly_sign_quota_reached' || e === 'sign_quota_insufficient') return 'signs_month';
     var dim = (data && data.dimension) || 'transfers_month';
-    if (!PRODUCTS[dim]) dim = 'transfers_month';
+    return PRODUCTS[dim] ? dim : 'transfers_month';
+  }
+
+  function legacyHtml(data) {
+    var dim = dimensionOf(data);
     var p = PRODUCTS[dim];
+    // Signatures are written the way /pricing writes them (1.000 / 1,000).
+    var num = function (n) { return dim === 'signs_month' ? fmt(n) : String(n); };
     var plan = planKey(data);
     // The 402 body's own limit first: that is the ceiling of the tier that
     // actually decided. The table is the fallback for a backend older than
     // #361, which sent no limit at all.
-    var limit = data && isFinite(Number(data.limit)) ? Number(data.limit) : CEILINGS[dim][plan];
+    var limit = data && data.limit != null && isFinite(Number(data.limit)) ? Number(data.limit) : CEILINGS[dim][plan];
     var used = limit != null
-      ? t('U heeft alle ' + limit + ' ' + p.unit + ' van uw plan voor deze maand gebruikt.',
-          'You have used all ' + limit + ' ' + p.unit + ' included in your plan this month.')
+      ? t('U heeft alle ' + num(limit) + ' ' + p.unit + ' van uw plan voor deze maand gebruikt.',
+          'You have used all ' + num(limit) + ' ' + p.unit + ' included in your plan this month.')
       : t('U heeft alle ' + p.unit + ' van uw plan voor deze maand gebruikt.',
           'You have used all ' + p.unit + ' included in your plan this month.');
     // Name the ceiling of the rung above. The card used to promise a vaguely
@@ -164,15 +190,20 @@
     // finite plafond, so it can say which one it is.
     var next = NEXT[dim][plan];
     var offer = next
-      ? t(' Stap over op ' + next.name + ' (' + next.price + ') voor ' + next.limit + ' ' +
+      ? t(' Stap over op ' + next.name + ' (' + next.price + ') voor ' + num(next.limit) + ' ' +
           p.unit + ' per maand, of wacht tot uw tegoed volgende maand opnieuw begint.',
-          ' Upgrade to ' + next.name + ' (' + next.price + ') for ' + next.limit + ' ' +
+          ' Upgrade to ' + next.name + ' (' + next.price + ') for ' + num(next.limit) + ' ' +
           p.unit + ' a month, or wait until your quota resets next month.')
+        + (next.business ? BUSINESS_WAY : '')
       : t(' Uw tegoed begint volgende maand opnieuw.', ' Your quota resets next month.');
+    // Business has no button on the Dutch /pricing, so the card does not send a
+    // Dutch Firm customer there for it: the contact line above is the way.
+    var button = (next && next.business && !EN) ? '' :
+      '<a class="btn btn-primary" href="' + (EN ? '/en/pricing' : '/pricing') + '">' + t('Plannen bekijken', 'View plans') + '</a>';
     return '<div class="pa-quota-upsell" role="status">' +
       '<strong>' + t('Maandlimiet van ' + PLAN_LABEL[plan] + ' bereikt.', PLAN_LABEL[plan] + ' monthly limit reached.') + '</strong>' +
       '<span>' + used + offer + '</span>' +
-      '<a class="btn btn-primary" href="/pricing">' + t('Plannen bekijken', 'View plans') + '</a>' +
+      button +
       '</div>';
   }
 
@@ -194,7 +225,7 @@
     if (included === 2 && used === 2) {
       return '<div class="pa-sign-note" role="status">' +
         t('<span>Dat was uw tweede handtekening deze maand. Voor de volgende heeft u Firm nodig (EUR 29/maand, 100 handtekeningen).</span>',
-          '<span>That\'s your second signature this month. One more and you\'ll need Firm (EUR 29/month, 100 signatures).</span>') +
+          '<span>That was your second signature this month. For the next one you need Firm (EUR 29/month, 100 signatures).</span>') +
         '</div>';
     }
     // The last signature Firm includes. Said once, when it happens, so nobody
@@ -204,8 +235,8 @@
     // the new month, or for a bigger plan.
     if (included === 100 && used === 100) {
       return '<div class="pa-sign-note" role="status">' +
-        t('<span>Dat was de 100e handtekening die uw Firm-plan deze maand bevat. Ondertekenen kan weer vanaf ' + resetDate(quota) + '. Business (EUR 299/maand) bevat 1.000 per maand. <a href="/pricing">Plannen vergelijken</a></span>',
-          '<span>That was the 100th signature your Firm plan includes this month. Signing starts again on ' + resetDate(quota) + '. Business (EUR 299/month) includes 1,000 a month. <a href="/pricing">Compare plans</a></span>') +
+        t('<span>Daarmee zijn de 100 handtekeningen van uw Firm-plan voor deze maand op. Ondertekenen kan weer vanaf ' + resetDate(quota) + '. Business (EUR 299/maand excl. btw) bevat 1.000 per maand.' + BUSINESS_WAY + '</span>',
+          '<span>That uses up the 100 signatures in your Firm plan for this month. Signing starts again on ' + resetDate(quota) + '. Business (EUR 299/month excl. VAT) includes 1,000 a month.' + BUSINESS_WAY + '</span>') +
         '</div>';
     }
     return '';

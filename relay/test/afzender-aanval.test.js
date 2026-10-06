@@ -305,7 +305,7 @@ test('intrekken na ophalen kan niet, en herinneren na intrekken ook niet', async
   // Herinneren van wie al ophaalde: ook 409, en er mag geen mail uit.
   post.length = 0;
   const her1 = await intern('/v2/user/sends/reinvite',
-    { user_id: ACCT_A, send_id: s.id, email: 'zeven@extern.test' });
+    { user_id: ACCT_A, send_id: s.id, email: 'zeven@extern.test', token: s.tokens['zeven@extern.test'] });
   assert.equal(her1.status, 409, JSON.stringify(her1.body));
   assert.equal(her1.body.error, 'already_collected');
   await new Promise((r) => setTimeout(r, 200));
@@ -319,7 +319,7 @@ test('intrekken na ophalen kan niet, en herinneren na intrekken ook niet', async
 
   post.length = 0;
   const her2 = await intern('/v2/user/sends/reinvite',
-    { user_id: ACCT_A, send_id: s.id, email: 'acht@extern.test' });
+    { user_id: ACCT_A, send_id: s.id, email: 'acht@extern.test', token: s.tokens['acht@extern.test'] });
   assert.equal(her2.status, 409, 'een ingetrokken ontvanger kreeg een herinnering: '
     + JSON.stringify(her2.body));
   assert.equal(her2.body.error, 'revoked');

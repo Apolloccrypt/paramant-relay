@@ -6,7 +6,8 @@
 //   DASH-10-A  the three Vernieuwen buttons did nothing
 //   DASH-01-K  a 429 said "Opnieuw inloggen HTTP 429"
 //   DASH-21-A  a 500 said "Opnieuw inloggen HTTP 500", with no way to retry
-//   DASH-15-A  "Herinnering verstuurd" stood there for less than 40 ms
+//   DASH-15-A  "Herinnering verstuurd" stood there for less than 40 ms; and
+//              since 2026-10-05 the reminder carries the same working link
 //   DASH-18-A  following the link in the passkey modal did not count as an answer
 //   DASH-18-F  "envelope" on the English page
 //   SENDNAME-18-A  "Sent 4 oktober 2026" on the Dutch page, every row "Een bestand"
@@ -47,8 +48,12 @@ before(async () => {
     if (u.pathname === '/api/user/me') return send(df.me.status, df.me.body);
     if (u.pathname === '/api/user/sends') return send(200, { sends: [dfSend] });
     if (u.pathname === '/api/user/sends/snd_1') return send(200, { id: 'snd_1', recipients: [{ email: 'a@x.test', status: 'waiting' }, { email: 'b@x.test', status: 'waiting' }] });
-    if (u.pathname === '/api/user/sends/snd_1/reinvite') return send(200, { ok: true });
+    if (u.pathname === '/api/user/sends/snd_1/reinvite') {
+      let b = ''; req.on('data', (c) => { b += c; });
+      return req.on('end', () => { try { df.lastReinvite = JSON.parse(b); } catch (_) { df.lastReinvite = null; } send(200, { ok: true }); });
+    }
     if (u.pathname === '/api/user/documents') return send(200, { documents: [dfDoc] });
+    if (u.pathname === '/api/user/sign-draft-key') return send(200, { key: Buffer.alloc(32, 5).toString('base64url') });
     if (u.pathname === '/api/user/account/webauthn/credentials') return send(200, df.passkeys);
     if (u.pathname === '/api/user/app/token') return send(200, { token: 'pst_app_test', expires_in_s: 900 });
     if (u.pathname === '/v2/parasign/audit-export') return send(200, 'ts,event\n1,signed\n', 'text/csv');
@@ -124,15 +129,39 @@ test('DASH-04-J: after the payment polls one click still acts once', async () =>
   await ctx.close();
 });
 
-test('DASH-15-A: the reminder confirmation stays on screen', async () => {
+test('DASH-15-A: the reminder carries the same link and the confirmation stays on screen', async () => {
   const { ctx, page } = await dfOpen();
+  // The link /parashare kept in this browser when it sent (rememberSendLinks).
+  // Sealed under the account key, as /parashare stores it (review #573, M4).
+  const kept = await page.evaluate(async () => {
+    const m = await import('/js/account-seal.js?v=1');
+    await m.sealPut('paramant.send.links.v1:snd_1', { links: [{ e: 'a@x.test', t: 'tok_demo_a' }, { e: 'b@x.test', t: 'tok_demo_b' }] }, Date.now() + 864e5);
+    return localStorage.getItem('paramant.send.links.v1:snd_1');
+  });
+  assert.ok(kept && !kept.includes('tok_demo_a'), 'the link sits readable in storage');
+  df.lastReinvite = undefined;
   await page.waitForSelector('#dh-sends .dh-send-row', { timeout: 10000 });
   await page.click('[data-pa-action="send-open"]');
   await page.waitForSelector('[data-pa-action="send-remind"]', { timeout: 5000 });
   await page.click('[data-pa-action="send-remind"]');
   await page.waitForTimeout(3000);
-  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Herinnering verstuurd/);
+  assert.deepEqual(df.lastReinvite, { email: 'a@x.test', token: 'tok_demo_a' }, 'the reminder is built from the link this browser kept');
+  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Herinnering verstuurd, met dezelfde link als de eerste mail\. Die link opent het bestand ook op een ander apparaat\./);
   assert.equal(await page.locator('[data-send-people="snd_1"]').isVisible(), true, 'the panel closed over the confirmation');
+  await ctx.close();
+});
+
+test('DASH-15-A: without the link in this browser, an honest way on and no reminder', async () => {
+  const { ctx, page } = await dfOpen();
+  df.lastReinvite = undefined;
+  const before = df.hits['/api/user/sends/snd_1/reinvite'] || 0;
+  await page.waitForSelector('#dh-sends .dh-send-row', { timeout: 10000 });
+  await page.click('[data-pa-action="send-open"]');
+  await page.waitForSelector('[data-pa-action="send-remind"]', { timeout: 5000 });
+  await page.click('[data-pa-action="send-remind"]');
+  await page.waitForTimeout(500);
+  assert.equal(df.hits['/api/user/sends/snd_1/reinvite'] || 0, before, 'no reminder without a working link');
+  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw\./);
   await ctx.close();
 });
 
@@ -156,7 +185,8 @@ test('DASH-20-A: no "--" for a member-since date the account does not have', asy
   await ctx.close();
 });
 
-test('VERIFY-36-A: a paying account can export the audit trail as CSV', async () => {
+test('VERIFY-36-A: a Business account can export the audit trail as CSV', async () => {
+  df.me = { status: 200, body: { email: 'business@zorg.test', plan: 'business', usage_purpose: 'organisation', created_at: null, backup_codes_remaining: 10 } };
   const { ctx, page, errors } = await dfOpen();
   await page.waitForSelector('#dh-records:not([hidden])', { timeout: 10000 });
   assert.equal(df.hits['/v2/parasign/audit-export'] || 0, 0, 'nothing may be fetched before the click');
@@ -167,6 +197,19 @@ test('VERIFY-36-A: a paying account can export the audit trail as CSV', async ()
   assert.equal(df.lastAuth['/v2/parasign/audit-export'], 'Bearer pst_app_test');
   assert.match(await page.locator('#dh-export-body').innerText(), /export is klaar/);
   assert.deepEqual(errors, []);
+  df.me = { status: 200, body: { email: 'firm@zorg.test', plan: 'pro', usage_purpose: 'organisation', created_at: null, backup_codes_remaining: 10 } };
+  await ctx.close();
+});
+
+// Acceptatie 3.1.1, betalen punt 10: Firm has no audit export (the relay answers
+// 403), so it gets one sentence and no buttons that can only fail.
+test('Firm sees the history but no audit-export buttons, and is told why', async () => {
+  const { ctx, page } = await dfOpen();
+  await page.waitForSelector('#dh-records:not([hidden])', { timeout: 10000 });
+  assert.equal(await page.locator('#dh-export-csv').isVisible(), false);
+  assert.equal(await page.locator('#dh-export-json').isVisible(), false);
+  assert.equal(await page.locator('#dh-hist-load').isVisible(), true);
+  assert.match(await page.locator('#dh-export-note').innerText(), /hoort bij Business/);
   await ctx.close();
 });
 

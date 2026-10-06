@@ -168,13 +168,22 @@ test('2. de vier schermen zeggen na de betaling hetzelfde', async () => {
   // De termijn staat op beide schermen, met dezelfde zin.
   // /account en /dashboard zijn Nederlands sinds 23 september 2026; de Engelse
   // kopieën onder /en houden de Engelse zin.
+  // Deze stapel draait met BILLING_MODE=test: er staat een abonnement achter
+  // (auto_renews true, zie test 6). Tot acceptatie 3.1.1 (taal 31) zei het
+  // scherm juist dan "er wordt niets automatisch verlengd", en deze test pinde
+  // die omgekeerde zin vast. Nu zegt het scherm wat er gebeurt.
   for (const [naam, tekst] of [['account', account], ['dashboard', dashboard]]) {
-    assert.match(tekst, /er wordt niets automatisch verlengd/,
+    assert.match(tekst, /automatisch verlengd/,
       `${naam} zegt niet wat er aan het einde van de termijn gebeurt`);
+    assert.doesNotMatch(tekst, /[Ee]r wordt niets automatisch verlengd/,
+      `${naam} zegt dat er niets verlengd wordt terwijl er een abonnement loopt`);
   }
   for (const pad of ['/en/account', '/en/dashboard']) {
-    assert.match(await schermtekst(S.pageK, pad), /nothing renews automatically/,
+    const t = await schermtekst(S.pageK, pad);
+    assert.match(t, /[Rr]enews automatically/,
       `${pad} zegt niet wat er aan het einde van de termijn gebeurt`);
+    assert.doesNotMatch(t, /[Nn]othing renews automatically/,
+      `${pad} zegt dat er niets verlengd wordt terwijl er een abonnement loopt`);
   }
 
   // En de API zegt hetzelfde als de schermen. current_plan zei 'community'
@@ -259,7 +268,9 @@ test('5. de factuur klopt, en het nummer loopt door', async () => {
   }, doc.number);
   assert.equal(pdf.status, 200);
   assert.ok(pdf.txt.includes(doc.number), 'de PDF noemt zijn eigen nummer niet');
-  assert.ok(pdf.txt.includes(FIRM_GROSS), 'de PDF noemt het betaalde bedrag niet');
+  // De koper kocht via de Nederlandse pagina, dus de PDF is Nederlands en
+  // schrijft het bedrag met een komma (acceptatie 3.1.1, betalen punt 5).
+  assert.ok(pdf.txt.includes(FIRM_GROSS.replace('.', ',')), 'de PDF noemt het betaalde bedrag niet');
 
   // Tweede aankoop: opvolgend nummer, en de termijn wordt verlengd, niet vervangen.
   const voor = (await api(S.pageK, '/api/user/billing/status')).body.access_until;
@@ -289,7 +300,7 @@ test('6. opzeggen stopt de incasso echt', async () => {
     'na "Cancellation scheduled" liep de incasso gewoon door');
 
   // De mail noemt het plan zoals de schermen het noemen.
-  const mail = S.resend.mails.find((m) => /cancellation/i.test(String(m.subject)));
+  const mail = S.resend.mails.find((m) => /cancel/i.test(String(m.subject))); // onderwerp: 'is cancelled as of <datum>'
   assert.ok(mail, 'er ging geen bevestiging van de opzegging uit');
   assert.match(String(mail.text), /Firm/, 'de opzegmail noemt een ander plan dan de accountpagina');
 

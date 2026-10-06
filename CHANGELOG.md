@@ -9,6 +9,20 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.1] - unreleased
+
+Tagged `v3.1.1` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+
+**In short.** The screens and the mails now say the same thing. An invitation
+to sign tells you plainly that you need a free account on the invited address,
+the paid plan is called Firm everywhere, and nothing that is paid once is called
+a subscription. English buyers get their invoice, payment description and PDF in
+English, Dutch buyers in Dutch. Visitors who are not signed in get an
+explanation on the send page instead of an error, an old tab picks up a sign-in
+from another tab by itself, and the admin log now shows sign-ups and logins.
+Every changed sentence is listed in `docs/acceptatie-3.1.1-oud-nieuw.md`.
+
 ### Added
 - **A gate that counts the work that never landed.** `fix/sector-port-drift` was
   ready on 10 June 2026 and fixes four fallback ports in `admin/server.js` that
@@ -31,6 +45,27 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lying turns the gate red.
 
 ### Fixed
+- **What a broken download without a claim costs, said precisely.** A claimless
+  read on `/v2/dl` or `/v2/outbound` counts once the relay has written the last
+  byte to the connection, not once it arrived. The operating system buffers a
+  few MB per connection, so up to the 5 MB default blob size a download broken
+  off after the first kilobytes has as a rule already used the read; only a
+  larger blob comes back. Measured with a 4 MB blob under the default limit.
+  `docs/api.md` and /docs say so and point at `?claim=` as the mode in which a
+  broken download costs nothing. Both routes now serve a blob at most five
+  times in all, broken reads included (`/v2/outbound` allowed a sixth).
+- **What a buyer reads around paying matches what he gets** (betaaltest
+  2026-10-05). Business now carries the ParaSend half of Firm, written by the
+  payment and floored at read time for older Business accounts, so /parashare
+  no longer sends a Business customer to Firm. The dashboard says what Mollie
+  says became of the last checkout (cancelled, failed, expired) with a button
+  to pay again, instead of "being confirmed". A one-off payment shows "paid
+  until, renewing possible from today" and no cancel button, and the cancel
+  route refuses it without a mail. /account writes one line per product. The
+  101st signature counts signatures and names Business. The English checkout
+  stays English from sign-in to dashboard. /pricing (NL and EN) shows per plan
+  what you can do afterwards, pinned to `tiers.js` and to the dashboard lines,
+  and says when VAT is reverse charged; so do the terms.
 - **A business in another EU country paid 21% Dutch VAT.** A service to a
   business established in another member state is taxed where that business is,
   and the VAT is reverse charged (Directive 2006/112/EC art. 44 and 196). The

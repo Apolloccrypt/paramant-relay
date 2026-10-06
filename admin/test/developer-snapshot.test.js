@@ -118,7 +118,9 @@ test('ParaSign Business: 1000 signs, and the row exists at all', async () => {
     { user_id: 'pgp_biz', email: 'biz@x.io' });
   assert.equal(snap.tiers.parasign, 'business');
   assert.equal(snap.quota.caps.signs, 1000, 'business is a tier the pricing page sells, not a fall-through to community');
-  assert.equal(snap.quota.caps.transfers, 50);
+  // Business is more than Firm (05-10-2026): while it runs, ParaSend is at
+  // least Pro (entitlements.parasendFloorUnder), so 500 transfers, not 50.
+  assert.equal(snap.quota.caps.transfers, 500);
 });
 
 test('community on both products: 2 signs, 50 transfers, counters default to 0', async () => {

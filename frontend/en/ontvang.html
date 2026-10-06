@@ -18,9 +18,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="live">
-<meta name="description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download.">
+<meta name="description" content="A secure file is waiting for you. It opens in your browser and disappears after one download.">
 <meta property="og:title" content="A secure file is waiting · Paramant">
-<meta property="og:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta property="og:description" content="A secure file is waiting for you. It opens in your browser and disappears after one download. Nothing is stored on the server.">
 <meta property="og:url" content="https://paramant.app/en/ontvang">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -28,7 +28,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="A secure file is waiting · Paramant">
-<meta name="twitter:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta name="twitter:description" content="A secure file is waiting for you. It opens in your browser and disappears after one download. Nothing is stored on the server.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/en/ontvang">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/ontvang">
@@ -137,11 +137,11 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -158,11 +158,11 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -182,12 +182,12 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
   <h1>Receive a file securely</h1>
-  <p class="sub">Your browser is generating a post-quantum keypair. The private key never leaves your device. Share your fingerprint with the sender to verify the connection.</p>
+  <p class="sub">Your browser is now making your own keys. The secret key never leaves your device. Then you read the check code out to the sender. That way you both know the connection is right.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Generating keypair...</div></div>
+    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Making your keys...</div></div>
     <div class="card-body">
-      <div class="status-line" id="keygen-status">Generating ML-KEM-768 + ECDH P-256 keypair in your browser...</div>
+      <div class="status-line" id="keygen-status">Your browser is making the keys (ML-KEM-768 and ECDH P-256)...</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="keygen-progress" style="width:30%"></div></div>
     </div>
   </div>
@@ -195,15 +195,15 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <!-- STEP 2: Show fingerprint, wait for sender -->
 <div class="step" id="step-fingerprint">
-  <h1>Your fingerprint</h1>
-  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This stops the relay from intercepting the file.</p>
+  <h1>Your check code</h1>
+  <p class="sub">Read this code out to the sender. They check that it matches the code on their screen. Only then is the file sealed. That way nobody can get in between.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for the sender to confirm...</div></div>
     <div class="card-body">
       <p class="fingerprint-label">Read this to the sender:</p>
       <div class="fingerprint" id="fp-display">-</div>
-      <div class="status-line" id="fp-status">Connected. The sender is checking your fingerprint.</div>
+      <div class="status-line" id="fp-status">Connected. The sender is checking your code.</div>
     </div>
   </div>
 </div>
@@ -211,7 +211,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- STEP 3: Receiving & decrypting -->
 <div class="step" id="step-receiving">
   <h1>Receiving file...</h1>
-  <p class="sub">Downloading and decrypting with your private key. The relay never had access to the decryption key.</p>
+  <p class="sub">The file is downloading and opens with your own key. Paramant never had that key.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Decrypting</div></div>
@@ -244,7 +244,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <div class="done-details-body">
         <p>Your browser made its own pair of keys when this page opened and kept the private half here, where it still is. The sender locked the file for the public half before it left their device, so what travelled was sealed for you and for nobody else (<code>ML-KEM-768</code> with <code>ECDH P-256</code> for the key exchange, <code>AES-256-GCM</code> for the file).</p>
         <p>The short code you both read out was worked out on this side too, from your own keys. Two screens showing the same code is what tells you nobody swapped a key in between.</p>
-        <p>A transfer through this web app is read once. Each block was wiped on our side as your browser took it, and our copy is destroyed on its own clock as well if nobody ever comes for it. What our relay reported on the way is written below.</p>
+        <p>A transfer through this web app is read once. Each block was wiped on our side as soon as your browser fetched it. If nobody fetches it, our copy is destroyed when the time runs out. What our server reported on the way is shown below.</p>
         <pre id="burn-receipt" hidden></pre>
       </div>
     </details>
@@ -300,8 +300,8 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
-<script src="/js/ontvang.page.js?v=10" defer></script>
+<script src="/js/ontvang.page.js?v=11" defer></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

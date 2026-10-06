@@ -42,12 +42,12 @@
   // code, and every error with no code at all, is unplanned by definition.
   var KNOWN = ENGLISH ? {
     totp_required:    'Enter the 6-digit code from your authenticator app.',
-    totp_invalid:     'That authenticator code didn\u2019t match. Try the current 6-digit code.',
+    totp_invalid:     'That code did not match. Try the code your app shows now.',
     totp_unavailable: 'Set up an authenticator app on your account first, then sign with its code.',
   } : {
-    totp_required:    'Vul de 6-cijferige code uit uw authenticator-app in.',
-    totp_invalid:     'Die code klopt niet. Probeer de huidige 6-cijferige code.',
-    totp_unavailable: 'Stel eerst een authenticator-app in op uw account en onderteken dan met de code daaruit.',
+    totp_required:    'Vul de code van 6 cijfers uit uw authenticator-app in.',
+    totp_invalid:     'Die code klopt niet. Probeer de code die uw app nu toont.',
+    totp_unavailable: 'Koppel eerst een authenticator-app aan uw account. Onderteken daarna met de code uit die app.',
   };
 
   function isKnownFailure(error) {

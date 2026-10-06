@@ -27,6 +27,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FFFFFF, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -427,6 +428,21 @@ footer a{color:var(--fg)}
 /* Signed in, the hero is the whole page and the workbench is English, like the
    rest of the app; the language line would only sit in the gap above the footer. */
 html[data-session="in"] .lang-switch{display:none}
+/* Signed out, the hero carries the dashboard in a demo state (werkplek.css,
+   js/home-demo.js). The drawn document retired with it: the demo shows the
+   real screens instead of a picture of a document. */
+.hp-art,.hp-proof{display:none}
+/* The rest of the story, folded under the demo: one line per subject. */
+main > .hp-sec{padding:0}
+main > .hp-sec + .hp-sec{border-top:0}
+main > .hp-sec:last-of-type{padding-bottom:48px}
+main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
+.home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
+.home-hero{padding-top:12px}
+@media (min-width:900px){
+  .home-hero{padding:20px 0 40px}
+  .home-hero .hp-wrap{width:min(100% - 2*var(--pad), 1120px)}
+}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -552,14 +568,169 @@ html[data-session="in"] .lang-switch{display:none}
 <section class="home-hero">
   <div class="hp-wrap">
     <div class="home-state" data-home="out">
-      <h1>Pati&euml;ntdossiers en processtukken veilig versturen en laten tekenen.</h1>
-      <p class="lede">Gemaakt in Nederland, voor <strong>praktijken en kantoren</strong>.</p>
-      <div class="home-actions">
-        <a class="hp-btn hp-btn-fill" href="/parashare">Veilig versturen</a>
-        <a class="hp-btn hp-btn-line" href="/sign">Laten tekenen</a>
+      <!-- Mick, 5 October 2026: "Moet meteen die dashboard zijn voor users maar
+           dan niet ingelogd." So there is no hero above it: the visitor lands
+           in the dashboard a signed-in customer gets, in a demo state. The same
+           head (title, plan) and the same register rows /dashboard renders
+           (dh-document, dh-send, dh-status, dh-progress), filled with example
+           data that is marked as such on the frame and on every row. The title
+           says what it is for, one line gives the price, and the two actions
+           sit in the head of the dashboard itself. Each tile plays a short
+           mini-flow and ends on one button into the real tool; js/home-demo.js
+           drives it, and without script every tile is a plain link. -->
+      <div class="wp-demo wp-demo-top" role="region" aria-labelledby="home-h1" data-wp-demo>
+        <div class="wp-demo-bar">
+          <span class="wp-sign" aria-hidden="true">Voorbeeld</span>
+          <p class="wp-demo-h" id="wp-demo-h">Zo ziet uw overzicht eruit. <span>Kies een document en kijk wat er gebeurt.</span></p>
+          <ul class="wp-appnav" aria-hidden="true">
+            <li class="on">Documenten</li><li>Versturen</li><li>Ondertekenen</li><li>Controleren</li>
+          </ul>
+        </div>
+        <header class="wp-demo-hero">
+          <div class="wp-demo-title">
+            <h1 id="home-h1">Veilig versturen en laten tekenen, voor praktijken en kantoren.</h1>
+            <p class="hero-note">Gratis met het <b>Community-plan</b>. Voor uw kantoor: 29 euro per maand, excl. btw.</p>
+          </div>
+          <div class="home-actions">
+            <a class="hp-btn hp-btn-fill" href="/signup">Account maken</a>
+            <a class="hp-btn hp-btn-line" href="/sign?mode=invite">Probeer het zelf</a>
+          </div>
+        </header>
+        <div class="wp-demo-head">
+          <p class="wp-demo-hi">Uw documenten <span class="wp-demo-tag">voorbeeld</span></p>
+          <span class="dh-plan wp-plan"><strong>Community</strong><span>plan</span></span>
+        </div>
+        <div class="wp-tiles">
+          <a class="wp-tile dh-workspace" href="/sign?mode=invite" data-wp-open="sign" aria-haspopup="dialog">
+            <span class="wp-tile-k">Ondertekenen</span>
+            <span class="wp-tile-t">Een contract dat twee mensen tekenen</span>
+            <span class="dh-document wp-row">
+              <span class="dh-document-open">
+                <span class="dh-document-name"><strong>Huurovereenkomst praktijkruimte.pdf</strong><span>Voorbeeld &middot; 4 pagina's</span></span>
+                <span class="dh-document-progress"><span>1 van 2 getekend</span><span class="dh-progress"><i style="width:50%"></i></span></span>
+                <span class="dh-status in_progress">Wacht op 1 handtekening</span>
+              </span>
+            </span>
+            <span class="wp-tile-go">Bekijk hoe het gaat</span>
+          </a>
+          <a class="wp-tile dh-workspace" href="/parashare" data-wp-open="send" aria-haspopup="dialog">
+            <span class="wp-tile-k">Versturen</span>
+            <span class="wp-tile-t">Een dossier, veilig verstuurd</span>
+            <span class="dh-send-row wp-row">
+              <span class="dh-send-open">
+                <span class="dh-send-name"><strong>Verwijzing en dossier.pdf</strong><span>Voorbeeld &middot; aan 1 ontvanger</span></span>
+                <span class="dh-send-progress"><span>1 van 1 opgehaald</span><span class="dh-progress"><i style="width:100%"></i></span></span>
+                <span class="dh-status completed">Opgehaald en gewist</span>
+              </span>
+            </span>
+            <span class="wp-tile-go">Bekijk hoe het gaat</span>
+          </a>
+          <a class="wp-tile dh-workspace" href="/verify" data-wp-open="verify" aria-haspopup="dialog">
+            <span class="wp-tile-k">Controleren</span>
+            <span class="wp-tile-t">Een bewijs, zelf nagekeken</span>
+            <span class="dh-document wp-row">
+              <span class="dh-document-open">
+                <span class="dh-document-name"><strong>Arbeidsovereenkomst.pdf</strong><span>Voorbeeld &middot; met het bewijsbestand</span></span>
+                <span class="dh-document-progress"><span>3 van 3 controles</span><span class="dh-progress"><i style="width:100%"></i></span></span>
+                <span class="dh-status completed">Echt</span>
+              </span>
+            </span>
+            <span class="wp-tile-go">Bekijk hoe het gaat</span>
+          </a>
+        </div>
       </div>
-      <p class="hero-note">Gratis met het <b>Community-plan</b>. Voor uw kantoor: 29 euro per maand, excl. btw.</p>
-      <p class="hp-proof">Is het bestand weg, dan blijft het bewijs. Iedereen kan het controleren zonder ons.</p>
+
+      <!-- The stage: the dashboard's own detail dialog (dh-doc-dialog), with a
+           mini-flow inside instead of the detail list. One per tile; the
+           script shows one at a time and plays it once. -->
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-sign" role="dialog" aria-modal="true" aria-labelledby="wp-stage-sign-h" data-wp-stage="sign" hidden>
+        <div class="dh-doc-dialog-panel">
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-sign-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Voorbeeld</span> Een contract laten tekenen</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
+          <div class="dh-doc-dialog-body">
+            <div class="wp-play" data-wp-play>
+              <div class="wp-pages" aria-hidden="true">
+                <div class="wp-page"><i class="t"></i><i></i><i></i><i class="s"></i><b class="wp-par p1">PH</b><b class="wp-par p2">VH</b></div>
+                <div class="wp-page"><i class="t"></i><i></i><i class="s"></i><i></i><b class="wp-par p1">PH</b><b class="wp-par p2">VH</b></div>
+                <div class="wp-page"><i class="t"></i><i></i><i></i><b class="wp-par p1">PH</b><b class="wp-par p2">VH</b>
+                  <span class="wp-field f1"><svg viewBox="0 0 120 34"><path d="M4 24c10-16 16-18 15-7s-6 14 2 8 13-18 13-9-4 18 5 8 10-15 15-7 2 12 9 7 12-15 16-7 4 12 13 3 14-11 24-7"/></svg></span>
+                  <span class="wp-field f2"><svg viewBox="0 0 120 34"><path d="M4 20c8-10 14-14 18-6s-2 14 6 9 10-16 16-12 0 14 8 10 12-12 18-8 6 10 14 6 12-10 20-8 8 4 12 2"/></svg></span>
+                  <span class="wp-seal">Getekend</span>
+                </div>
+              </div>
+              <ol class="wp-people">
+                <li class="wp-who w1"><span class="wp-ini">PH</span><span><strong>Praktijkhouder</strong><em class="wp-state"><span class="c">Uitgenodigd per mail</span><span class="a">Tekent nu</span><span class="b">Getekend, met parafen</span></em></span></li>
+                <li class="wp-who w2"><span class="wp-ini">VH</span><span><strong>Verhuurder</strong><em class="wp-state"><span class="a">Is daarna aan de beurt</span><span class="b">Getekend, met parafen</span></em></span></li>
+              </ol>
+            </div>
+            <ol class="wp-steps" data-wp-steps>
+              <li>U zet een vak voor de handtekening, en een voor de paraaf op elke pagina.</li>
+              <li>De eerste persoon opent de link in de mail, parafeert en tekent.</li>
+              <li>De tweede doet hetzelfde. U ziet steeds wie er nog moet.</li>
+              <li>Klaar. Iedereen downloadt het getekende document met het bewijs.</li>
+            </ol>
+            <div class="wp-end">
+              <a class="wp-try" href="/sign?mode=invite">Probeer het zelf</a>
+              <p class="wp-end-note">Klaarzetten kan zonder account. Voor het tekenen maakt u een gratis account.</p>
+              <button class="wp-replay" type="button" data-wp-replay>Nog een keer afspelen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-send" role="dialog" aria-modal="true" aria-labelledby="wp-stage-send-h" data-wp-stage="send" hidden>
+        <div class="dh-doc-dialog-panel">
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-send-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Voorbeeld</span> Een dossier veilig versturen</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
+          <div class="dh-doc-dialog-body">
+            <div class="wp-play wp-play-send" data-wp-play>
+              <div class="wp-lane" aria-hidden="true">
+                <div class="wp-file"><span class="wp-file-ic"></span><span class="wp-file-n">Verwijzing en dossier.pdf</span><span class="wp-lock"></span><span class="wp-stamp">Verstuurd</span></div>
+                <div class="wp-track"><i></i></div>
+                <div class="wp-to"><strong>Ontvanger</strong><span>Ophaalcode</span>
+                  <span class="wp-flap"><b data-f="4">4</b><b data-f="7">7</b><b data-f="2">2</b><b data-f="9">9</b><b data-f="1">1</b><b data-f="8">8</b></span>
+                </div>
+              </div>
+              <p class="wp-receipt" aria-hidden="true"><span>Ontvangstbewijs</span><span>Opgehaald &middot; gewist</span></p>
+            </div>
+            <ol class="wp-steps" data-wp-steps>
+              <li>Uw browser versleutelt het bestand voordat het vertrekt.</li>
+              <li>De ontvanger krijgt een link en een ophaalcode.</li>
+              <li>Na het ophalen is het bestand gewist. U houdt een ontvangstbewijs.</li>
+            </ol>
+            <div class="wp-end">
+              <a class="wp-try" href="/parashare">Probeer het zelf</a>
+              <p class="wp-end-note">Met een gratis account: 50 verzendingen per maand.</p>
+              <button class="wp-replay" type="button" data-wp-replay>Nog een keer afspelen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dh-doc-dialog wp-stage" id="wp-stage-verify" role="dialog" aria-modal="true" aria-labelledby="wp-stage-verify-h" data-wp-stage="verify" hidden>
+        <div class="dh-doc-dialog-panel">
+          <div class="dh-doc-dialog-head"><h2 id="wp-stage-verify-h"><span class="wp-sign wp-sign-sm" aria-hidden="true">Voorbeeld</span> Een bewijs zelf controleren</h2><button class="dh-doc-close" type="button" data-wp-close aria-label="Sluiten">&times;</button></div>
+          <div class="dh-doc-dialog-body">
+            <div class="wp-play wp-play-verify" data-wp-play>
+              <div class="wp-drop" aria-hidden="true"><span class="wp-chip c1">Arbeidsovereenkomst.pdf</span><span class="wp-chip c2">bewijs.psign</span></div>
+              <ul class="wp-checks" aria-hidden="true">
+                <li class="k1">Het document is niet veranderd</li>
+                <li class="k2">De handtekeningen kloppen</li>
+                <li class="k3">Paramant heeft het bekrachtigd</li>
+              </ul>
+              <span class="wp-ok" aria-hidden="true">Echt</span>
+            </div>
+            <ol class="wp-steps" data-wp-steps>
+              <li>U kiest het document en het bewijsbestand dat erbij hoort.</li>
+              <li>Uw eigen browser controleert alles. Het bestand blijft op uw computer.</li>
+              <li>U ziet meteen of het echt is. Dat werkt ook zonder ons.</li>
+            </ol>
+            <div class="wp-end">
+              <a class="wp-try" href="/verify">Probeer het zelf</a>
+              <p class="wp-end-note">Geen account nodig.</p>
+              <button class="wp-replay" type="button" data-wp-replay>Nog een keer afspelen</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="home-state" data-home="in" hidden>
       <h2 class="paramant-h1">Uw documenten<span class="home-hi-name" data-home-name></span>.</h2>
@@ -673,21 +844,27 @@ html[data-session="in"] .lang-switch{display:none}
 </section>
 <section class="hp-sec why-nl-sec" aria-labelledby="why-nl-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Waarom Nederlands telt</p>
-    <h2 id="why-nl-h" class="hp-h2">Nederlands is hier een feit, geen vlag.</h2>
+    <p class="wp-more-kicker">Meer weten voordat u begint</p>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Waarom Nederlands telt</span><h2 id="why-nl-h" class="hp-h2">Nederlands is hier een feit, geen vlag.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Wie de eigenaar is van uw leverancier, bepaalt onder welk recht uw dossiers vallen en wie gedwongen kan worden ze af te geven. Dat hoort dus bij de inkoop. Hieronder de drie antwoorden.</p>
     <ul class="check-grid why-grid">
       <li data-partner-context="digicert geen-partij"><span class="ck-fact">De Nederlandse namen zijn verkocht</span><p class="ck-how">Zivver is sinds juni 2025 onderdeel van Kiteworks in Californi&euml;. WeTransfer valt sinds juli 2024 onder Bending Spoons in Milaan. Signhost ging in 2022 naar Entrust, SignRequest in 2021 naar Box, en QuoVadis staat op de Nederlandse vertrouwenslijst als DigiCert Europe Netherlands. De namen bleven Nederlands. De eigenaren niet.</p></li>
       <li><span class="ck-fact">Deze niet</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132. Het moederbedrijf is Paramantis Digital B.V., ook Nederlands, KvK 42114664. Er is geen moederbedrijf in het buitenland. Op de voorwaarden is Nederlands recht van toepassing, en bij een geschil beslist een Nederlandse rechter.</p><a href="/terms#law">Toepasselijk recht &rarr;</a></li>
       <li><span class="ck-fact">En de weg van uw bestanden ook niet</span><p class="ck-how" data-partners-rollen>Servers bij Hetzner in Neurenberg, Duitsland. DNS bij Bunny in Sloveni&euml;. De versleutelde bestanden staan alleen daar. E-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen naar ontvangers op naam bevat die mail de link met het token, en de ophaalcode gaat ook per mail: wie beide mails leest, kan het bestand openen. Een uitnodiging om te ondertekenen bevat de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. Resend, onze e-mailprovider, is de enige Amerikaanse partij; we stappen over naar een Nederlandse aanbieder. Alle partijen en hun status staan op <a href="/partners">de partnerpagina</a>.</p><a href="/privacy">De subverwerkers &rarr;</a></li>
     </ul>
+    <p class="why-proud">Wij zijn Nederlands, en dat zeggen we liever dan dat we ons achter een adres in Delaware verschuilen.</p>
     <p class="why-src" data-partner-context="digicert geen-partij">Bronnen eigendom: de aankondiging van Kiteworks over de overname van Zivver (17 juni 2025); de aankondiging van Bending Spoons over de overname van WeTransfer (31 juli 2024); Entrust over Signhost (2022); Box over SignRequest (2021); de vertrouwenslijst van de RDI, met QuoVadis als DigiCert Europe Netherlands B.V. Gecontroleerd op 3 september 2026. Het moederbedrijf van Paramant staat op paramantis.nl, gecontroleerd op 23 september 2026.</p>
+      </div>
+    </details>
   </div>
 </section>
 <section class="hp-sec home-split-sec" aria-labelledby="split-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Wat het kost</p>
-    <h2 id="split-h" class="hp-h2">Voor uw kantoor: 29 euro per maand.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Wat het kost</span><h2 id="split-h" class="hp-h2">Voor uw kantoor: 29 euro per maand.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Excl. btw, dus 35,09 euro per maand met 21% btw. E&eacute;n betaling voor versturen en ondertekenen samen. U betaalt per maand of per jaar, en er loopt geen abonnement vanzelf door.</p>
     <div class="gift-grid">
       <article class="panel panel-paper">
@@ -699,7 +876,7 @@ html[data-session="in"] .lang-switch{display:none}
           <li>500 verzendingen per maand, tot 30 ontvangers per verzending, en links die 24 uur geldig blijven.</li>
           <li>Dezelfde versleuteling als elk plan, de verwerkersovereenkomst en servers in Duitsland.</li>
         </ul>
-        <div class="split-cta"><a class="hp-btn hp-btn-line" href="/pricing">Bekijk het kantoorplan</a></div>
+        <div class="split-cta"><a class="hp-btn hp-btn-line" href="/pricing">Bekijk Firm</a></div>
         <p class="offer-line">Meer nodig? Mail Mick: <a href="mailto:privacy@paramant.app?subject=Meer%20nodig">privacy@paramant.app</a></p>
       </article>
       <article class="panel panel-night">
@@ -709,7 +886,7 @@ html[data-session="in"] .lang-switch{display:none}
         <div class="letter">
           <p>Ik onderzoek hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen. Paramant is wat ik een klein kantoor gun: een document laten tekenen en een bestand versturen, met dossiers die in Europa blijven en bewijs dat u zonder ons kunt controleren.</p>
           <p>Het <strong>Community</strong>-plan is gratis en blijft gratis: 2 handtekeningen per maand, 50 verzendingen per maand, &eacute;&eacute;n ontvanger per verzending, en bestanden tot 500 MB als u ze direct overdraagt. Geen betaalkaart en geen proefperiode die afloopt. Dat is mijn bijdrage aan de samenleving.</p>
-          <p>Het kantoorplan betaalt de servers en het werk, en houdt de gratis helft gratis.</p>
+          <p>Firm betaalt de servers en het werk, en houdt de gratis helft gratis.</p>
         </div>
         <div class="letter-sign">
           <span class="by-mark" aria-hidden="true">MB</span>
@@ -717,12 +894,15 @@ html[data-session="in"] .lang-switch{display:none}
         </div>
       </article>
     </div>
+      </div>
+    </details>
   </div>
 </section>
 <section class="hp-sec check-sec" aria-labelledby="check-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Neem het niet van ons aan</p>
-    <h2 id="check-h" class="hp-h2">Vijf dingen die u vandaag zelf kunt nakijken.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Neem het niet van ons aan</span><h2 id="check-h" class="hp-h2">Vijf dingen die u vandaag zelf kunt nakijken.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Een website kan niet zelf beweren dat ze te vertrouwen is. Deze vijf feiten liggen elders vast, en bij elk staat waar u het nakijkt.</p>
     <ul class="check-grid">
       <li><span class="ck-fact">Een ingeschreven Nederlands bedrijf</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. Het KvK-register noemt het bedrijf achter elke belofte op deze pagina.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
@@ -731,12 +911,15 @@ html[data-session="in"] .lang-switch{display:none}
       <li><span class="ck-fact">Als er iets misgaat</span><p class="ck-how">Een datalek met persoonsgegevens melden we binnen 48 uur aan u. Dat staat in de verwerkersovereenkomst, niet in een blog. Uw ondertekeningsbewijzen zijn zonder ons te controleren, dus ze blijven geldig bewijs als wij er niet meer zijn.</p><a href="/dpa#incidents">Meldplicht, artikel 8 &rarr;</a></li>
       <li><span class="ck-fact">Code die u kunt lezen</span><p class="ck-how">De kern en de server zijn gepubliceerd. Negen regels, elk met een link naar het bewijs, staan op &eacute;&eacute;n plek.</p><a href="/rules">De negen regels &rarr;</a></li>
     </ul>
+      </div>
+    </details>
   </div>
 </section>
 <section class="hp-sec" id="products" aria-labelledby="products-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Twee dingen</p>
-    <h2 id="products-h" class="hp-h2">Versturen en ondertekenen.</h2>
+    <details class="wp-more">
+      <summary><span class="wp-more-k">Twee dingen</span><h2 id="products-h" class="hp-h2">Versturen en ondertekenen.</h2></summary>
+      <div class="wp-more-body">
     <p class="hp-lede">Allebei in een gewone browser. Niets te installeren, voor u niet en voor de ander niet.</p>
     <ul class="prod-grid">
       <li>
@@ -747,8 +930,8 @@ html[data-session="in"] .lang-switch{display:none}
           <li>Onze server bewaart alleen het versleutelde bestand, in het werkgeheugen en nooit op een schijf.</li>
           <li>Na de laatste keer lezen is het gewist. Er blijft niets over om later te lekken.</li>
           <li>Dat geldt voor de webapp en de SDK's. De browserextensies versleutelen nog op onze server. Dat gaan we aanpassen.</li>
-          <li>In de webapp zijn u en de ontvanger allebei online en vergelijkt u een korte code. Daarna gaat het bestand direct over. Is de ontvanger niet online, kies dan Later ophalen in de webapp, de API of de SDK.</li>
-          <li>&Eacute;&eacute;n ontvanger per verzending op Community, tot 30 ontvangers per verzending op het kantoorplan.</li>
+          <li>In de webapp stuurt u een link die de ontvanger opent wanneer het uitkomt, naar één persoon of, met Firm, naar meerdere mensen tegelijk. Met ‘Extra veilig’ zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. U kunt ook versturen met de API of SDK.</li>
+          <li>&Eacute;&eacute;n ontvanger per verzending op Community, tot 30 ontvangers per verzending op Firm.</li>
         </ul>
         <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">Meer over versturen</a></div>
       </li>
@@ -768,6 +951,8 @@ html[data-session="in"] .lang-switch{display:none}
       <summary>De techniek, voor wie het wil weten</summary>
       <p>De kern gebruikt ML-KEM-768 voor versleuteling en ML-DSA-65 voor handtekeningen, de twee standaarden die NIST in 2024 publiceerde. Versturen is hybride: ML-KEM-768 samen met ECDH P-256. <a href="/crypto-agility">Hoe we de versleuteling actueel houden</a></p>
       <p>De code is source-available (BUSL 1.1). Wilt u zelf op Paramant bouwen? Daarvoor zijn er een SDK, een API voor ondertekenen en een installer voor een eigen server. Zie <a href="/docs">de documentatie voor ontwikkelaars</a>.</p>
+    </details>
+      </div>
     </details>
   </div>
 </section>
@@ -803,8 +988,9 @@ html[data-session="in"] .lang-switch{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
-<script src="/js/format-date.js?v=3" defer></script>
-<script src="/js/home-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
+<script src="/js/format-date.js?v=5" defer></script>
+<script src="/js/home-auth.js?v=10" defer></script>
+<script src="/js/home-demo.js?v=1" defer></script>
 </body>
 </html>

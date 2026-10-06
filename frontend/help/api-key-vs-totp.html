@@ -264,7 +264,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>API-sleutel of <em>TOTP</em>: wat is het verschil?</h1>
 
-  <p class="lead">Paramant kent twee soorten gegevens, elk met een eigen doel. De accountsleutel is voor machines en scripts. De code van 6 cijfers (of uw passkey) is om zelf in te loggen op de website. U heeft ze nooit allebei tegelijk nodig.</p>
+  <p class="lead">Paramant kent twee soorten inloggegevens, elk voor iets anders. De accountsleutel is voor machines en scripts. De code van 6 cijfers (of uw passkey) is om zelf in te loggen op de website. U heeft ze nooit allebei tegelijk nodig.</p>
 
   <h2>In het kort</h2>
 
@@ -273,10 +273,10 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <h4>API-sleutel</h4>
       <ul>
         <li>Een vaste geheime reeks: <code>pgp_</code> gevolgd door 64 hexadecimale tekens</li>
-        <li>Maakt uw account bekend bij de API</li>
+        <li>Vertelt de API welk account het is</li>
         <li>Verloopt niet vanzelf</li>
-        <li>Eenmalig uitgegeven, door u bewaard</li>
-        <li>Gebruikt door machines, scripts en koppelingen</li>
+        <li>U krijgt hem één keer en bewaart hem zelf</li>
+        <li>Voor machines, scripts en koppelingen</li>
       </ul>
     </div>
     <div class="compare-card">
@@ -284,9 +284,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <ul>
         <li>Een code van 6 cijfers die elke 30 seconden verandert</li>
         <li>Bewijst dat u er zelf bij bent</li>
-        <li>Gemaakt door uw authenticator-app</li>
+        <li>Uw authenticator-app maakt hem</li>
         <li>Kan niet opnieuw gebruikt of uit logs gestolen worden</li>
-        <li>Gebruikt om zelf in te loggen op de website, samen met uw e-mailadres</li>
+        <li>Om zelf in te loggen op de website, samen met uw e-mailadres</li>
       </ul>
     </div>
   </div>
@@ -379,6 +379,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

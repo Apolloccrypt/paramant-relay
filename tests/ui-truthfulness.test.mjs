@@ -12,13 +12,20 @@ const email = read('admin/lib/email-templates.js');
 
 assert.doesNotMatch(account + accountJs + adminHtml + adminJs, /Delete account permanently|Account deleted|permanent, cannot undo|Account definitief verwijderen|Account verwijderd|definitief, kan niet ongedaan/i);
 assert.match(account, /werkt de API-sleutel niet meer/i);
-assert.match(account, /sessies en de koppeling met uw authenticator-app worden verwijderd/i);
-assert.match(account, /accountrecord blijft bewaard/i);
+// What deactivation erases, said the same way on the screen and in the mail
+// (acceptatie 3.1.1, taal #8): the screen said "the account record is kept"
+// while the mail said "your personal data has been erased".
+assert.match(account, /Uw sessies, de koppeling met uw authenticator-app en open ondertekenverzoeken verdwijnen/i);
+assert.match(account, /persoonsgegevens wissen we/i);
+assert.doesNotMatch(account, /accountrecord blijft bewaard/i);
 assert.doesNotMatch(account, /Stub mode|No real payments are charged|Mollie integration pending/i);
-assert.match(adminHtml, /blocks the account key and removes active sessions and TOTP/i);
-assert.match(adminHtml, /Type DEACTIVATE to confirm/);
-assert.match(adminJs, /Account deactivated/);
-// frontend/admin.html is Dutch only; admin/public stays English.
+// Both admin screens speak Dutch since 2026-10-05 (admin/public was English).
+// Each one on its own must say what deactivation does, so they are read apart.
+const adminMainHtml = read('admin/public/index.html');
+const adminMainJs = read('admin/public/app.js');
+assert.match(adminMainHtml, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
+assert.match(adminMainHtml, /Typ DEACTIVATE om te bevestigen/);
+assert.match(adminMainJs, /Account gedeactiveerd/);
 const adminNl = read('frontend/admin.html');
 const adminNlJs = read('frontend/js/admin.page.js');
 assert.match(adminNl, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
@@ -29,8 +36,11 @@ assert.match(adminNlJs, /Account gedeactiveerd/);
 // left the address in users.json (audit finding 5 of 2026-07-21). A mail that
 // undersells an erasure is as untrue as one that oversells it, which is what
 // this file exists to catch.
-assert.match(email, /Personal data removed from our systems/);
-assert.match(email, /Billing records kept for as long as tax law requires/);
+assert.match(email, /personal data have been erased/);
+assert.match(email, /persoonsgegevens zijn gewist/);
+assert.match(email, /Invoices are kept for as long as tax law requires/);
+// After an erasure there is nothing to switch back on.
+assert.doesNotMatch(email, /wilt u weer toegang|want access again/i);
 assert.doesNotMatch(email, /Account record and audit entries retained/);
 assert.doesNotMatch(email, /sign up again|Files already relayed are not affected/i);
 
@@ -116,14 +126,36 @@ assert.doesNotMatch(signJs, /showProofScope\([^)]*signingMode/,
 // 2. A visitor without a session is told what signing needs BEFORE picking a
 // file, not after. The page used to be behind an nginx auth_request; moving the
 // dead end to the last step would be worse than the redirect it replaced.
-assert.match(signHtml, /Voor ondertekenen is een account nodig/i,
+// Said once, in the bar above the steps; the block under it says what works
+// without an account instead of repeating the requirement (acceptatie 3.1.1
+// ronde 2, taal #18).
+assert.match(signHtml, /Om te tekenen of te versturen heeft u een gratis Community-account nodig\./,
   'sign.html must state the account requirement up front');
+assert.doesNotMatch(signHtml, /Voor ondertekenen is een account nodig/i,
+  'sign.html says the requirement twice, in the bar and in the block under it');
 assert.match(signHtml, /een verzoek openen dat iemand u stuurde/i,
   'sign.html must say what an invited signer can still do without an account');
-assert.match(signEnHtml, /Signing a document needs an account/i,
+assert.match(signEnHtml, /To sign or send it, you need a free Community account\./,
   'en/sign.html must state the account requirement up front');
+assert.doesNotMatch(signEnHtml, /Signing a document needs an account/i,
+  'en/sign.html says the requirement twice');
 assert.match(signEnHtml, /open a signing request someone sent you/i,
   'en/sign.html must say what an invited signer can still do without an account');
+// And it may not promise signing WITHOUT an account: co-sign.js asks the
+// invitee to sign in with the invited mailbox before the sign step, and sends
+// someone without an account to /signup with the invitation's address first
+// ("Nog geen account? Maak er gratis een met het e-mailadres van deze
+// uitnodiging"). So the page says an account is made first, then signed.
+assert.doesNotMatch(signHtml, /tekenen met de link uit die e-mail/i,
+  'sign.html must not promise signing without an account');
+assert.doesNotMatch(signEnHtml, /sign it with the link from that email/i,
+  'en/sign.html must not promise signing without an account');
+assert.match(signHtml, /Maak dan gratis een account op dat adres/i,
+  'sign.html must say the invitee makes a free account on the invited address first');
+assert.match(signEnHtml, /Create a free one on that address/i,
+  'en/sign.html must say the invitee makes a free account on the invited address first');
+assert.match(read('frontend/co-sign.js'), /Maak er gratis een<\/a> met het e-mailadres van deze uitnodiging/,
+  'co-sign.js still sends an invitee without an account to signup with the invited address');
 assert.match(signJs, /function showSessionRequirement/,
   'sign-flow.js must have the session-requirement control');
 
@@ -139,17 +171,17 @@ assert.match(signJs, /function showSessionRequirement/,
 const authFirstSentence = {
   'frontend/en/auth/login.html': /No password to type: sign in with your passkey/i,
   'frontend/en/auth/setup.html': /Pick one now and add the other later/i,
-  'frontend/en/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
+  'frontend/en/auth/backup.html': /Each code works once\. You do not need your authenticator app for it/i,
   // A back-up code is required since the mailbox alone stopped being enough.
-  'frontend/en/auth/request-reset.html': /one of your back-up codes\. If they match, we send a\s+link/i,
+  'frontend/en/auth/request-reset.html': /one of your backup codes\. If they match, we first send an email to confirm the request/i,
   'frontend/en/auth/reset-confirm.html': /You get two emails, one after the other/i,
   'frontend/en/signup/verified.html': /Paramant has no passwords/i,
   'frontend/auth/login.html': /Geen wachtwoord nodig: log in met uw passkey/i,
   'frontend/auth/setup.html': /Kies er nu één en voeg de andere later toe/i,
-  'frontend/auth/backup.html': /Elke code\s+werkt één keer en laat u binnen zonder uw authenticator-app/i,
-  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan\s+sturen wij een link/i,
-  'frontend/auth/reset-confirm.html': /U krijgt twee mails, na elkaar/i,
-  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoorden/i,
+  'frontend/auth/backup.html': /Elke code werkt één keer\. Uw authenticator-app heeft u er niet voor nodig/i,
+  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan krijgt u eerst een mail om het verzoek te bevestigen/i,
+  'frontend/auth/reset-confirm.html': /U krijgt twee mails na elkaar/i,
+  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoord/i,
 };
 for (const [file, rx] of Object.entries(authFirstSentence)) {
   assert.match(read(file), rx, `${file} must open by saying what this screen does`);
@@ -306,7 +338,7 @@ assert.match(requestResetJs, /res\.status === 429/,
   'request-reset must handle 429 separately: retrying does not help for up to a day');
 assert.match(requestResetJs, /up to 24 hours to clear/i,
   'the 429 text must state the wait the server actually imposes (retry_after 86400)');
-assert.match(requestResetJs, /dus dit kan tot 24 uur duren/,
+assert.match(requestResetJs, /Het kan dus tot 24 uur duren/,
   'the Dutch 429 text must state the same wait');
 
 // 5. Every one of these screens must name the party behind the product and the
@@ -399,8 +431,11 @@ const onPage = (page) => (amount) => new RegExp(`(?:&euro;${amount.replace(/[.]/
 // per-signature rate; that rate was never charged and the line is gone, so the
 // floor moved down with it rather than the check being weakened for something
 // else. Dutch: the two amounts of the one offer, 0 and 29.
+// Since acceptance 3.1.1 the English homepage has the Dutch homepage's cards
+// and sells the same one offer, so it is held to the same two amounts.
 const homePricesEn = pricesOf(home);
-assert.ok(homePricesEn.length >= 5, `expected the English homepage to quote its tiers, found ${homePricesEn.length} prices`);
+assert.ok(homePricesEn.includes('0') && homePricesEn.includes('29'),
+  `expected the English homepage to name Community at 0 and Firm at 29, found ${homePricesEn.join(', ')}`);
 const homePrices = pricesOf(homeNl);
 assert.ok(homePrices.includes('0') && homePrices.includes('29'),
   `expected the Dutch homepage to name Community at 0 and the kantoorplan at 29, found ${homePrices.join(', ')}`);
@@ -934,7 +969,7 @@ assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}
   'pricing.html is the source of the ParaSign Community allowance quoted on /help');
 assert.match(pricing, /&euro;29<span/,
   'pricing.html is the source of the Firm price quoted on /help');
-assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% btw/,
+assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% VAT/,
   'pricing.html is the source of the incl. btw figure quoted on /help');
 assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures a month\./,
   'help/index.html must name the free allowance, not just promise that free exists');
@@ -982,8 +1017,10 @@ assert.doesNotMatch(helpAnswers, /no US company/i,
 // would quote back. So /help may name a key only in the negative: any sentence
 // that mentions a key and a piece of infrastructure must be saying the key is
 // not there.
-assert.match(homeGrid, /Generated on your device, never sent/,
-  'index.html is the source of the promise that a key never reaches a server');
+// The English homepage lost its rules grid in acceptance 3.1.1 (it has the
+// Dutch homepage's four cards now); /en/parasend carries the rule.
+assert.match(read('frontend/en/parasend.html'), /Generated on your device, never sent/,
+  'en/parasend.html is the source of the promise that a key never reaches a server');
 // Fase 2 (SITE-30): the row now names its three exceptions.
 assert.match(securityHtml, /sends to named recipients and the extensions, the relay holds only ciphertext, no keys/,
   'security.html is the source of the promise that the relay holds no keys');
@@ -1015,9 +1052,9 @@ for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/))
 const helpNlAnswers = [...helpNlHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
 assert.equal(helpNlAnswers.split('\n').length, 3,
   'help/index.html must keep the three buyer answers in the Dutch block too');
-assert.match(helpNlAnswers, /Voor het ondertekenen van een document heeft u een account nodig\./,
+assert.match(helpNlAnswers, /Om te ondertekenen heeft u een account nodig\./,
   'help/index.html must answer whether an account is required');
-assert.match(helpNlAnswers, /Zonder account kunt u een verzoek tot ondertekenen wel openen\./,
+assert.match(helpNlAnswers, /Kreeg u een verzoek om te ondertekenen\? Dat opent u ook zonder account\./,
   'help/index.html must say what an invited signer can do without an account');
 assert.match(helpNlAnswers, /ParaSign Community is gratis, voor altijd, zonder betaalkaart: 2 handtekeningen per maand\./,
   'help/index.html must name the free allowance, not just promise that free exists');
@@ -1110,8 +1147,10 @@ const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). The encrypted';
 // aangezet; zie deploy/partners.json en tests/partners.test.mjs.
 const EU_EXCEPTION = 'Email still goes through Resend in the United States for now';
 const homeVisible = visible('frontend/en/index.html');
+// The homepage says it in its "Why Dutch matters" card, in that card's words.
+const EU_CLAIM_HOME = 'Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. The encrypted files sit only there.';
 for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
-  assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
+  assert.ok(text.includes(name === 'index' ? EU_CLAIM_HOME : EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
   assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
 }
 // /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
@@ -1268,9 +1307,9 @@ assert.ok(parasign.includes('niet om functies vrij te spelen, en dat houdt het C
   'parasign.html lost the Community-plan promise');
 // /sign carries the same split in one line, next to the account requirement,
 // and it names the plan the way /pricing names it.
-assert.match(signVisibleText, /Met een Community-account ondertekent u 2 documenten per maand/,
+assert.match(signVisibleText, /Met een Community-account zet u 2 handtekeningen per maand/,
   'sign.html must keep the free-tier line, under the plan name /pricing uses');
-assert.match(visible('frontend/en/sign.html'), /Community accounts sign 2 documents a month/,
+assert.match(visible('frontend/en/sign.html'), /A Community account gives you 2 signatures a month/,
   'en/sign.html must keep the free-tier line, under the plan name /pricing uses');
 assert.doesNotMatch(signVisibleText, /\bFree accounts\b|tier named Free|the tier is called Free/,
   'sign.html must not call the Community plan Free; one name across the site');
@@ -2420,8 +2459,10 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
   // really derive the live stand from that box and nothing else.
   // Sabotage: drop the label, pre-tick the box, or let sendMode go live
   // without extraSafe, and this goes red.
-  const LIVE_EN = /<strong>Extra safe<\/strong>: the other person is available right now\. You check a short code together, and nothing is stored\./;
-  const LIVE_NL = /<strong>Extra veilig<\/strong>: de ontvanger is nu bereikbaar\. U controleert samen een korte code, en er wordt niets bewaard\./;
+  // Acceptatie 3.1.1 (taal 36): a condition, not a claim. "The other person is
+  // available right now" read as a statement the page made about him.
+  const LIVE_EN = /<strong>Extra safe<\/strong>: choose this when the other person is at a screen right now too\. You compare a short code together, and nothing is stored\./;
+  const LIVE_NL = /<strong>Extra veilig<\/strong>: kies dit als de ontvanger nu ook achter een scherm zit\. U vergelijkt samen een korte code, en er wordt niets bewaard\./;
   for (const [naam, html, zin, box] of [['/en/parashare', parashareEn, LIVE_EN, 'Extra safe'], ['/parashare', parashare, LIVE_NL, 'Extra veilig']]) {
     assert.match(html, zin, `${naam} must say, on the Extra safe box, that the other person has to be there now and that you check a code together`);
     assert.match(html, /<input type="checkbox" id="ps-extra-safe"(?![^>]*checked)[^>]*>/,

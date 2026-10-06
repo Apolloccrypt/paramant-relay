@@ -59,6 +59,13 @@ confirm through a separate channel before sending anything sensitive.
 | Firewall | UFW/nftables, default deny |
 | Login banners | Configured |
 
+This table is the state on that date, not a standing claim. What is checked
+continuously is narrower: every deploy, including `deploy/deploy-3.1.sh
+--verify-only`, reads the production host in step 6l and fails when auditd is
+not active, AIDE is missing or its daily check is more than 2 days old, or
+AppArmor is not enabled with profiles in enforce mode. /dpa promises those
+three points and no more.
+
 ### 2026-04-11 — R. Zwarts (verification review)
 
 14 findings, all resolved in commit `e6f216d`.
@@ -899,14 +906,13 @@ Additional fixes applied 2026-04-13:
 `/dpa` promises, in the article 28 agreement customers sign electronically:
 "TLS 1.3 minimum on all relay endpoints". Every nginx config in this repository
 allowed TLS 1.2 as well, and `deploy/nginx/addin.paramant.app.conf` named no
-protocols at all and so inherited whatever the host default was. All nine
+protocols at all and so inherited whatever the host default was. All eight
 TLS-terminating server blocks now carry `ssl_protocols TLSv1.3;`:
 
 | File | Server blocks |
 |------|---------------|
 | `deploy/nginx-paramant-public.conf` | 6 (paramant.app + the five sector relays) |
 | `deploy/nginx-selfhost.conf` | 1 |
-| `nginx-selfhost.conf` | 1 |
 | `deploy/nginx/addin.paramant.app.conf` | 1 (was inheriting the default) |
 
 `deploy/nginx-paramant-live.conf` is not in that list and does not terminate

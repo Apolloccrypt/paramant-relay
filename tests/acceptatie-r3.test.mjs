@@ -29,6 +29,7 @@ const docs = [
 ];
 
 let server, browser, ORIGIN;
+const invites = [];
 before(async () => {
   server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -37,6 +38,11 @@ before(async () => {
     if (u.pathname === '/api/user/session/verify') return send(200, { authenticated: true, email: 'demo@example.com' });
     if (u.pathname === '/api/user/documents') return send(200, { documents: docs });
     if (u.pathname === '/api/user/sends') return send(200, { sends: [] });
+    if (u.pathname === '/api/user/sign-draft-key') return send(200, { key: Buffer.alloc(32, 3).toString('base64url') });
+    if (u.pathname === '/api/user/envelopes/env_open_000000000000000001/invitations') {
+      let b = ''; req.on('data', (c) => { b += c; });
+      return req.on('end', () => { try { invites.push(JSON.parse(b)); } catch (_) { invites.push(null); } send(200, { ok: true, results: [{ party_index: 0, ok: true }] }); });
+    }
     if (u.pathname === '/api/user/account/webauthn/credentials') return send(200, { passkeys: [] });
     if (u.pathname.startsWith('/api/') || u.pathname.startsWith('/v2/')) return send(200, {});
     const file = path.join(FE, u.pathname === '/dashboard' ? 'dashboard.html' : u.pathname);
@@ -54,12 +60,17 @@ async function dashboard() {
   await ctx.addInitScript((link) => {
     try {
       localStorage.setItem('paramant.keysetup.dismissed.v1', '1');
-      localStorage.setItem('paramant.cosign.links.v1:env_open_000000000000000001', JSON.stringify({ exp: Date.now() + 864e5, links: [{ i: 0, label: 'Signer Demo', url: link }] }));
     } catch (_) {}
   }, LINK);
   const page = await ctx.newPage();
   await page.goto(ORIGIN + '/dashboard');
   await page.waitForSelector('#dh-documents .dh-document', { timeout: 15000 });
+  // The links as sign-flow.js keeps them: sealed under the account key
+  // (review #573, M4), never readable.
+  await page.evaluate(async (link) => {
+    const m = await import('/js/account-seal.js?v=1');
+    await m.sealPut('paramant.cosign.links.v1:env_open_000000000000000001', { links: [{ i: 0, label: 'Signer Demo', e: 'demo@example.com', url: link }] }, Date.now() + 864e5);
+  }, LINK);
   return { ctx, page };
 }
 
@@ -93,18 +104,39 @@ test('A3: the dialog of an open request hands over the full link kept in this br
   await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] .dh-document-open').click();
   await page.waitForSelector('#dh-document-dialog:not([hidden])');
   const btn = page.locator('[data-pa-action="document-copy-link"]');
+  await btn.waitFor();
   assert.equal(await btn.count(), 1);
   assert.equal(await btn.getAttribute('data-link'), LINK);
+  assert.doesNotMatch(await page.evaluate(() => localStorage.getItem('paramant.cosign.links.v1:env_open_000000000000000001')), /#ks=|AAAAAAAA/, 'the key half sits readable in storage');
+  // COSIGN-46-A: the resend is the first invitation again, built here.
+  invites.length = 0;
+  await page.locator('[data-pa-action="document-resend-invite"][data-party="0"]').click();
+  await page.waitForFunction(() => /Verstuurd naar demo@example\.com/.test(document.querySelector('[data-resend-say="0"]')?.textContent || ''));
+  assert.deepEqual(invites[0].invitations, [{ party_index: 0, email: 'demo@example.com', label: 'Signer Demo', invite_url: LINK }]);
+  // Same language behaviour as the first invitation (sign-flow.js sends no
+  // lang, so NL with EN underneath): acceptatie 3.1.1 r2 got the resend in Dutch only.
+  assert.equal(invites[0].lang, undefined, 'the resend picks no single language');
   await page.evaluate(() => localStorage.removeItem('paramant.cosign.links.v1:env_open_000000000000000001'));
   await page.evaluate(() => document.querySelector('[data-pa-action="document-close"]')?.click());
   await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] .dh-document-open').click();
   await page.waitForSelector('#dh-document-dialog:not([hidden])');
-  assert.match(await page.locator('#dh-document-dialog').innerText(), /niet in deze browser[\s\S]*nieuw verzoek/);
+  await page.waitForFunction(() => /niet in deze browser/.test(document.querySelector('#dh-document-dialog')?.innerText || ''));
+  assert.match(await page.locator('#dh-document-dialog').innerText(), /niet in deze browser\. Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw\./);
   await ctx.close();
   const relay = read('relay/relay.js');
-  assert.match(relay, /Kopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde/, 'the mail to the sender points at that exact place');
+  assert.match(relay, /Open deze link in de browser waarmee u het verzoek verstuurde/, 'the mail to the sender points at that exact place');
   assert.doesNotMatch(relay, /uit uw dashboard of uit uw eigen verzonden bericht/);
   assert.match(read('frontend/sign-flow.js'), /rememberSignerLinks\(envelope\.id/);
+});
+
+test('COSIGN-46-A: the button in the mail to the sender opens that request with the resend in focus', async () => {
+  const { ctx, page } = await dashboard();
+  await page.goto(ORIGIN + '/dashboard?herzend=env_open_000000000000000001&p=0');
+  await page.waitForSelector('#dh-document-dialog:not([hidden])', { timeout: 15000 });
+  await page.waitForFunction(() => document.activeElement && document.activeElement.getAttribute('data-pa-action') === 'document-resend-invite');
+  assert.match(await page.locator('[data-resend-say="0"]').innerText(), /vroeg om de uitnodiging/);
+  assert.equal(new URL(page.url()).search, '', 'the query goes, so a reload does not reopen it');
+  await ctx.close();
 });
 
 test('A1 and A4: the texts say what is true', () => {
@@ -116,5 +148,7 @@ test('A1 and A4: the texts say what is true', () => {
   assert.match(noKey, /webauthn\/credentials/, 'no passkey on the account: the code, not Face ID');
   assert.match(noKey, /U ondertekent met de code uit uw authenticator-app\./);
   assert.doesNotMatch(read('frontend/sign.html'), /dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel\./);
-  assert.match(read('frontend/co-sign.js'), /samen met het bestand dat iedereen tekende/);
+  // Since acceptance 3.1.1 (16): keep the original, named by its file name,
+  // together with the proof.
+  assert.match(read('frontend/co-sign.js'), /Bewaar het origineel \(' \+ String\(__envelope\.original_filename/);
 });

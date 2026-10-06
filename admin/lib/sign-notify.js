@@ -38,7 +38,9 @@ const idHash = (id) => crypto.createHash('sha256').update('paramant/sign-notify\
 async function rememberSender(client, envelopeId, { user_id, email } = {}) {
   if (!ID_RE.test(String(envelopeId || ''))) return false;
   if (!user_id || !EMAIL_RE.test(String(email || ''))) return false;
-  await client.set(keyFor(envelopeId), JSON.stringify({ uid: idHash(user_id), email: String(email).toLowerCase().trim() }), { EX: TTL_SECONDS });
+  // 'at' is the day the request went out: the mails name the request by it,
+  // since the file name may not travel (acceptatie 3.1.1, taal #45).
+  await client.set(keyFor(envelopeId), JSON.stringify({ uid: idHash(user_id), email: String(email).toLowerCase().trim(), at: Date.now() }), { EX: TTL_SECONDS });
   return true;
 }
 
@@ -134,7 +136,8 @@ async function afterSignature({ client, envelopeId, signerAccountId, relayBody, 
       // their own slot knows; they did it.
       const to = await senderToTell(client, envelopeId, { signerAccountId });
       if (!to || !counted) return 'skipped';
-      await sendEmail(to, template({ signedCount: signed, partyCount: total, complete, envelopeId, resultUrl: null }));
+      const r0 = await recordFor(client, envelopeId).catch(() => null);
+      await sendEmail(to, template({ signedCount: signed, partyCount: total, complete, envelopeId, resultUrl: null, sentAt: r0 && r0.at }));
       return 'sent';
     }
     // Complete. Everyone hears it once, also when the sender was the last to
@@ -152,7 +155,7 @@ async function afterSignature({ client, envelopeId, signerAccountId, relayBody, 
     await forget(client, envelopeId).catch(() => {});
     let sent = 0;
     if (rec && counted) {
-      await sendEmail(rec.email, template({ signedCount: signed, partyCount: total, complete, envelopeId, resultUrl }));
+      await sendEmail(rec.email, template({ signedCount: signed, partyCount: total, complete, envelopeId, resultUrl, sentAt: rec.at }));
       sent++;
     }
     // One mail per address: the sender's own address, also when it was
@@ -172,16 +175,45 @@ async function afterSignature({ client, envelopeId, signerAccountId, relayBody, 
 
 // A party refused. The request is over, so the sender hears it once and the
 // record goes. Same rules as above: no names, no file name, no envelope id.
-async function afterDecline({ client, envelopeId, sendEmail, template }) {
+// Since acceptatie 3.1.1 (taal #42) the other invited parties hear it too:
+// they had a link that now opens a closed request, and nobody told them.
+async function afterDecline({ client, envelopeId, sendEmail, template, partyTemplate, declinerEmail }) {
   try {
     const rec = await recordFor(client, envelopeId);
+    const parties = typeof partyTemplate === 'function' ? await partiesFor(client, envelopeId).catch(() => []) : [];
     await forget(client, envelopeId).catch(() => {});
-    if (!rec) return 'skipped';
-    await sendEmail(rec.email, template({ envelopeId }));
-    return 'sent';
+    let sent = 0;
+    if (rec) { await sendEmail(rec.email, template({ envelopeId, sentAt: rec.at })); sent++; }
+    const skip = String(declinerEmail || '').toLowerCase().trim();
+    for (const to of parties) {
+      if (to === skip || (rec && to === rec.email)) continue;
+      try { await sendEmail(to, partyTemplate({ reason: 'declined', envelopeId })); sent++; }
+      catch { /* one address failing must not cost the others theirs */ }
+    }
+    return sent ? 'sent' : 'skipped';
   } catch {
     return 'failed';
   }
 }
 
-module.exports = { idHash, rememberSender, rememberParties, partiesFor, senderToTell, forget, afterSignature, afterDecline, rememberResult, resolveResult, KEY_PREFIX, RESULT_PREFIX, PARTIES_PREFIX, TTL_SECONDS, RESULT_TTL_SECONDS };
+// The sender withdrew the request (dashboard, POST /api/user/documents/:id/
+// cancel). Every invited party hears it once, so nobody opens a link to a
+// closed request without knowing why (acceptatie 3.1.1, taal #42). The record
+// goes. An expired request has no event to hang this on: the invitation
+// already names the last day to sign.
+async function afterWithdraw({ client, envelopeId, sendEmail, partyTemplate }) {
+  try {
+    const parties = await partiesFor(client, envelopeId).catch(() => []);
+    await forget(client, envelopeId).catch(() => {});
+    let sent = 0;
+    for (const to of parties) {
+      try { await sendEmail(to, partyTemplate({ reason: 'withdrawn', envelopeId })); sent++; }
+      catch { /* one address failing must not cost the others theirs */ }
+    }
+    return sent ? 'sent' : 'skipped';
+  } catch {
+    return 'failed';
+  }
+}
+
+module.exports = { idHash, rememberSender, rememberParties, partiesFor, senderToTell, forget, afterSignature, afterDecline, afterWithdraw, rememberResult, resolveResult, KEY_PREFIX, RESULT_PREFIX, PARTIES_PREFIX, TTL_SECONDS, RESULT_TTL_SECONDS };

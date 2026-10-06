@@ -358,9 +358,14 @@ function redeemMail({ code, grants, ends, siteUrl } = {}) {
   const list = Array.isArray(grants) ? grants : [];
   if (list.length === 0) return null;
   const site = String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '');
+  // The English half names the plan the way the site does, like the Dutch
+  // half (acceptatie 3.1.1, taal #4 and #47). describeGrants() stays as it is
+  // for the billing history and the answer to the browser.
   const lines = list
-    .map((g) => `${planExpiry.planLabel(g.product, g.tier)} until ${planExpiry.formatDate(g.ends || ends)}`)
+    .map((g) => `${planExpiry.planLabelMail(g.product, g.tier)} until ${planExpiry.formatDate(g.ends || ends)}`)
     .join('\n');
+  const namesEn = list.map((g) => planExpiry.planLabelMail(g.product, g.tier));
+  const describedEn = `${humanDuration(list[0].days)} of ${namesEn.length === 1 ? namesEn[0] : `${namesEn.slice(0, -1).join(', ')} and ${namesEn[namesEn.length - 1]}`}`;
   const linesNl = list
     .map((g) => `${planExpiry.planLabelNl(g.product, g.tier)} tot ${planExpiry.formatDateNl(g.ends || ends)}`)
     .join('\n');
@@ -378,7 +383,7 @@ function redeemMail({ code, grants, ends, siteUrl } = {}) {
     'Paramant',
   ].join('\n');
   const text = [
-    `Thank you. Your code ${code} gives you ${describeGrants(list)}.`,
+    `Thank you. Your code ${code} gives you ${describedEn}.`,
     '',
     lines,
     '',

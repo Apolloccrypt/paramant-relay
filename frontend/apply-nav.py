@@ -9,11 +9,11 @@ NEW_NAV = '''\
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/parasend" class="nav-link">Send</a></li>
+    <li><a href="/parasign" class="nav-link">Sign</a></li>
     <li><a href="/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -37,11 +37,11 @@ NEW_NAV = '''\
 # is how a signed-in phone ended up with no route to support at all.
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Sign in</a>
@@ -311,7 +311,7 @@ LEGAL_STRIP_NL = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=33">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=29">'
 NAV_JS    = '<script src="/nav.js?v=17" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=18" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=22" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,

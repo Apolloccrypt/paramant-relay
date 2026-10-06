@@ -33,6 +33,9 @@
 <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/components-parasign.css?v=7">
+<link rel="stylesheet" href="/receipt-verify.css?v=1">
+<link rel="stylesheet" href="/app-2026.css?v=12">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <script type="application/ld+json" data-paramant-seo="1">
 {
   "@context": "https://schema.org",
@@ -115,11 +118,11 @@
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -136,11 +139,11 @@
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -153,7 +156,7 @@
   <header class="ps-head">
     <p class="ps-kicker">Verify</p>
     <h1 class="ps-title">Check a Paramant proof</h1>
-    <p class="ps-lede">Two kinds of proof come out of Paramant: a signed document, and a receipt that says a file was delivered and then destroyed. Both are checked here, on your own device. Nothing you drop in is uploaded, and neither check needs an account.</p>
+    <p class="ps-lede">Check a signed document or a delivery receipt, on your own device. Nothing you drop in is uploaded, and you need no account.</p>
   </header>
 
   <div class="rv-tabs" role="tablist" aria-label="What do you want to check">
@@ -169,10 +172,10 @@
   </section>
 
   <section class="card ps-panel" aria-labelledby="v2">
-    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope</h2></div>
+    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">Proof file (.psign)</h2></div>
     <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Choose the .psign file</span><span class="ps-file-meta" id="vf-envelope-info">No file selected</span></label>
     <div class="ps-field" id="vf-key-block" hidden>
-      <p class="ps-warn">This is a legacy (v1/v2) envelope. Its relay notary signature is checked by the relay: this page sends the document's fingerprint and the proof, never the document itself. No account or key needed. Current signatures verify fully offline.</p>
+      <p class="ps-warn">This is an old proof file (v1 or v2). Our server checks the server seal inside it. For that, this page sends the document's fingerprint and the proof, never the document itself. No account or key needed. New signatures verify fully offline.</p>
     </div>
   </section>
 
@@ -182,16 +185,15 @@
     <div class="ps-result" id="vf-result" hidden role="status" aria-live="polite"></div>
   </section>
 
-  <aside class="ps-info">
-    <h2>What is checked</h2>
+  <details class="ps-info wp-fold">
+    <summary>What is checked</summary>
     <ul>
-      <li>SHA3-256 of your document matches the hash inside the envelope</li>
-      <li>The signer's ML-DSA-65 signature over that hash is valid</li>
+      <li>The fingerprint (SHA3-256) of your document matches the one in the proof</li>
+      <li>The signer's signature (ML-DSA-65) over that fingerprint is valid</li>
       <li>For a proof with several signers: the counter-signature was made with a key Paramant pins in this site, not with a key taken from the file itself</li>
     </ul>
     <p class="ps-help">A current proof is checked entirely in your browser, offline too. Only an old envelope (v1 or v2) goes past the relay: then this page sends the fingerprint and the proof, never the document. No account or API key needed.</p>
-    <p><a href="/en/dashboard">Open your dashboard &rarr;</a></p>
-  </aside>
+    <p><a href="/en/dashboard">Open your dashboard &rarr;</a></p>  </details>
   </div>
 
   <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
@@ -217,24 +219,23 @@
 
     <details class="card ps-panel" id="rv-keyblock">
       <summary class="ps-panel-title">Checking a receipt from another server</summary>
-      <p class="ps-help">This page carries the signing key of every Paramant relay, and picks the one the receipt names, so the usual receipt is checked without asking anything of the network. A receipt from a server you run yourself is checked by pasting that server's key below.</p>
+      <p class="ps-help">This page knows the key of every Paramant server and picks the one the receipt names. So a normal receipt is checked without anything going over the network. Do you run your own server? Paste that server's key below.</p>
       <div class="ps-field">
         <label class="ps-label" for="rv-key">Signing key of the server that issued the receipt</label>
         <textarea class="rv-paste" id="rv-key" spellcheck="false" placeholder="Leave this empty to use the key that came with this page."></textarea>
-        <p class="ps-help">Every relay publishes its own key at <code class="mono">/v2/pubkey</code>, for example <code class="mono" id="rv-key-hint"></code>.</p>
+        <p class="ps-help">Every server publishes its own key at <code class="mono">/v2/pubkey</code>, for example <code class="mono" id="rv-key-hint"></code>.</p>
       </div>
     </details>
 
-    <aside class="ps-info">
-      <h2>What is checked</h2>
+    <details class="ps-info wp-fold">
+      <summary>What is checked</summary>
       <ul>
         <li>The receipt is about the file it names and no other</li>
         <li>The entry it points to really sits in the public transparency log</li>
         <li>The signature over the whole receipt holds, so nothing was altered</li>
         <li>The log snapshot the receipt relies on was signed too</li>
       </ul>
-      <p class="ps-help">All four run on this device. Once the page has loaded, you can go offline and the answer stays the same.</p>
-    </aside>
+      <p class="ps-help">All four run on this device. Once the page has loaded, you can go offline and the answer stays the same.</p>    </details>
   </div>
 </main>
 
@@ -269,8 +270,8 @@
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
-<script type="module" src="/parasign-verify.js?v=15"></script>
-<script type="module" src="/js/receipt-verify.js?v=4"></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
+<script type="module" src="/parasign-verify.js?v=20"></script>
+<script type="module" src="/js/receipt-verify.js?v=5"></script>
 </body>
 </html>

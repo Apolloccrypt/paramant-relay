@@ -53,10 +53,13 @@
           'Content-Type': 'application/json',
           Accept: 'application/json'
         },
+        /* lang: the relay sends the buyer back to /en/dashboard after paying
+         * when he bought on the English page, and to /dashboard otherwise. */
         body: JSON.stringify({
           product: btn.getAttribute('data-billing-product'),
           plan: btn.getAttribute('data-billing-plan'),
-          interval: btn.getAttribute('data-billing-interval')
+          interval: btn.getAttribute('data-billing-interval'),
+          lang: NL ? 'nl' : 'en'
         })
       });
     }).then(function (r) {
@@ -164,7 +167,7 @@
   function refusalText(body) {
     if (body.error !== 'other_plan_running') {
       return NL
-        ? 'Dit plan kan nu niet worden afgerekend. Er is niets afgeschreven. Wilt u van plan wisselen, mail dan privacy@paramant.app.'
+        ? 'U kunt dit plan nu niet kopen. Er is niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
         : (body.message || 'This plan cannot be bought right now. Nothing has been charged. To change plans, mail privacy@paramant.app.');
     }
     if (!NL && body.message) return body.message;
@@ -179,7 +182,7 @@
       }
     }
     return NL
-      ? 'U heeft al ' + plan.trim() + until + '. Dit plan zou ernaast lopen en dan betaalt u dezelfde weken twee keer, dus er is geen betaling gestart en niets afgeschreven. Wilt u van plan wisselen, mail dan privacy@paramant.app.'
+      ? 'U heeft al ' + plan.trim() + until + '. Dit plan zou ernaast lopen, en dan betaalt u dezelfde weken twee keer. Daarom is er geen betaling gestart en niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
       : 'You already have ' + plan.trim() + until + '. This plan would run alongside it and you would pay twice for the same weeks, so no payment was started. To change plans, mail privacy@paramant.app.';
   }
 
@@ -208,7 +211,11 @@
             msg === 'token_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
             msg.indexOf('checkout_http_403') === 0) {
           rememberIntent(btn);
-          window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
+          /* The sign-in page in the language of this page. It was always the
+           * Dutch one, also from /en/pricing (betaaltest 05-10, row 6). */
+          var back = encodeURIComponent(location.pathname + location.search);
+          if (NL) window.location.href = '/auth/login?next=' + back;
+          else window.location.href = '/en/auth/login?next=' + back;
           return;
         }
         if (msg === 'checkout_http_409') {
@@ -216,7 +223,7 @@
           return;
         }
         showError(btn, NL
-          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw, of mail privacy@paramant.app, dan lossen we het op.'
+          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw. Lukt het weer niet? Mail privacy@paramant.app, dan lossen we het op.'
           : 'Could not start checkout. Nothing has been charged. ' +
             'Please try again, or mail privacy@paramant.app and we will sort it out.');
       });

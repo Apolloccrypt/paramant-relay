@@ -100,7 +100,7 @@ async function openCosign({ bytes, fragment = 'auto', account = 200, envelope = 
   await page.waitForFunction(() => {
     const s = document.getElementById('sign-status');
     const d = document.getElementById('document-delivery-status');
-    return (s && !s.hidden && /storing/i.test(s.textContent)) || (d && !d.hidden && d.textContent && !/wordt gedownload|Downloading/.test(d.textContent));
+    return (s && !s.hidden && /storing/i.test(s.textContent)) || (d && !d.hidden && d.textContent && !/wordt gedownload|wordt opgehaald|Downloading|Fetching the document/.test(d.textContent)) /* Mick 05-10: taalronde */;
   }, null, { timeout: 30000 });
   await page.waitForTimeout(800);
   return { page, ctx, errors };
@@ -125,8 +125,8 @@ test('COSIGN-46: link zonder sleutel legt uit wat er mis is en wat werkt', async
   const { page, ctx, errors } = await openCosign({ bytes, fragment: '' });
   const r = await read(page);
   await ctx.close();
-  assert.match(r.delivery, /eerdere uitnodigingsmail/);
-  assert.match(r.delivery, /vraag de afzender om de link opnieuw te sturen/);
+  assert.match(r.delivery, /eerste uitnodigingsmail/);
+  assert.match(r.delivery, /Vraag de afzender dan om de uitnodiging opnieuw te sturen vanuit zijn overzicht/);
   assert.equal(r.manual, true, 'het document zelf kiezen staat klaar');
   assert.deepEqual(errors, []);
 });

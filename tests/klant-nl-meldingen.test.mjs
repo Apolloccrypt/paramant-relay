@@ -34,6 +34,7 @@ const MIME = {
 const aliases = {
   '/': '/index.html', '/account': '/account.html', '/en/account': '/en/account.html',
   '/pricing': '/pricing.html', '/en/pricing': '/en/pricing.html', '/developer': '/developer.html',
+  '/dashboard': '/dashboard.html', '/en/dashboard': '/en/dashboard.html',
 };
 
 const server = http.createServer((req, res) => {
@@ -73,6 +74,10 @@ async function stub(page, extra = {}) {
   if (extra.redeem) await page.route('**/v2/billing/redeem', extra.redeem);
   if (extra.snapshot) await page.route('**/api/user/developer/snapshot', (route) => json(route, extra.snapshot));
   if (extra.snapshot) await page.route('**/api/user/developer/parasign-keys', (route) => json(route, { keys: [] }));
+  if (extra.overview) await page.route('**/api/user/dashboard/overview', (route) => json(route, extra.overview));
+  if (extra.overview) await page.route('**/api/user/me', (route) => json(route, {
+    email: 'demo@example.com', plan: 'community', plan_parasign: 'community', plan_parasend: 'community',
+  }));
 }
 
 async function open(slug, extra) {
@@ -133,7 +138,7 @@ async function redeemSays(slug, body, status) {
   await page.click('[data-redeem-form] [data-redeem-submit]');
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-redeem-form] [data-redeem-message]');
-    return el && !el.hidden && el.textContent && !/Checking your code|Uw code wordt gecontroleerd/.test(el.textContent);
+    return el && !el.hidden && el.textContent && !/Checking your code|We controleren uw code/.test(el.textContent);
   }, null, { timeout: 10000 });
   const text = (await page.textContent('[data-redeem-form] [data-redeem-message]')).trim();
   await page.close();
@@ -206,4 +211,42 @@ test('/dashboard carries no dead usage panel any more', () => {
   const src = fs.readFileSync(path.join(ROOT, 'js', 'dashboard.js'), 'utf8');
   assert.doesNotMatch(src, /dh-ops-usage|loadOperations|function renderOps/,
     'the panel drew into #dh-ops, which /dashboard does not have: the warning reached nobody');
+});
+
+// Eindmatrix DASH-27-N: /developer is behind an operator allowlist (404 for an
+// ordinary account), so the warning there still reached no customer. The
+// dashboard, which every account opens, reads the ungated overview and warns.
+async function dashUsage(slug, quota) {
+  const page = await open(slug, { overview: { tiers: { parasign: 'community', parasend: 'community' }, quota, audit: [] } });
+  await page.waitForSelector('#dh-root:not([hidden])', { timeout: 10000 });
+  await page.waitForTimeout(800);
+  const band = page.locator('#dh-usage-warn');
+  const shown = await band.isVisible();
+  const text = shown ? (await band.innerText()).replace(/\s+/g, ' ').trim() : '';
+  const href = shown ? await page.locator('#dh-usage-upgrade').getAttribute('href') : null;
+  await page.close();
+  return { shown, text, href };
+}
+
+test('/dashboard warns every account at 80% of a monthly quota and names the way up', async () => {
+  const high = await dashUsage('/dashboard', { signs: 85, transfers: 0, caps: { signs: 100, transfers: 50 } });
+  assert.equal(high.shown, true, 'band visible at 85%');
+  assert.match(high.text, /U heeft 85 van uw 100 handtekeningen deze maand gebruikt, nog 15 over\. Bijna op\. Meer nodig\?/, high.text);
+  assert.equal(high.href, '/pricing');
+  const full = await dashUsage('/dashboard', { signs: 0, transfers: 50, caps: { signs: 100, transfers: 50 } });
+  assert.match(full.text, /Uw tegoed van 50 verzendingen is op voor deze maand/, full.text);
+  const en = await dashUsage('/en/dashboard', { signs: 9, transfers: 0, caps: { signs: 10, transfers: 50 } });
+  assert.match(en.text, /You have used 9 of your 10 signatures this month, 1 left\. Almost used up/, en.text);
+  assert.equal(en.href, '/en/pricing');
+  const low = await dashUsage('/dashboard', { signs: 10, transfers: 1, caps: { signs: 100, transfers: 50 } });
+  assert.equal(low.shown, false, 'no band below 80%');
+  const unknown = await dashUsage('/dashboard', { signs: 99, transfers: 0, caps: { signs: null, transfers: null } });
+  assert.equal(unknown.shown, false, 'no band when the cap is unknown');
+});
+
+test('the overview the dashboard reads is not behind the developer gate', () => {
+  const src = fs.readFileSync(path.join(ROOT, '..', 'admin', 'server.js'), 'utf8');
+  const line = src.split('\n').find((l) => l.includes('api.get("/user/dashboard/overview"'));
+  assert.ok(line, 'route exists');
+  assert.doesNotMatch(line, /developerGate/);
 });

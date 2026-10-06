@@ -71,6 +71,7 @@ async function openSender(opts) {
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ authenticated: true, email: 'demo@example.com' }),
   }));
+  if (opts.me) await page.route('**/api/user/me', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(opts.me) }));
   await page.route('**/api/user/parasend/token', (r) => r.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ token: 'pst_' + 'b'.repeat(64), expires_in_s: 900 }),
@@ -230,14 +231,43 @@ test('the limit line says what this plan does, and only Community gets the Firm 
         assert.equal(await page.textContent('#ps-upsell-line'),
           'With Firm you send to up to 30 people at once, a link stays open for 24 hours, and you see who has opened it.');
       }
-      // The expiry picker offers nothing the plan does not honour.
-      const offered = await page.$$eval('#ttl-select option', (os) => os.filter((o) => !o.disabled).map((o) => Number(o.value)));
+      // The expiry picker offers nothing the plan does not honour. Counted
+      // over every option, not only the enabled ones: Safari on an iPhone
+      // shows a hidden <option> anyway, so a 24-hour plan still offered
+      // "7 days" there (acceptatie 3.1.1, betalen). They are taken out now.
+      const offered = await page.$$eval('#ttl-select option', (os) => os.map((o) => Number(o.value)));
       assert.ok(offered.length && offered.every((v) => v <= plan.ttl), `${plan.plan}: offered ${offered.join(',')}`);
+      assert.ok(offered.includes(plan.ttl), `${plan.plan}: the plan's own ceiling is offered`);
       // The contradictory sentences of the old page are gone.
       const text = await page.evaluate(() => document.getElementById('step-setup').innerText);
       assert.doesNotMatch(text, /on Community, .* on Firm and .* on Enterprise/);
     } finally { await page.close(); }
   }
+});
+
+// Acceptatie 3.1.1 (taal 6): an account whose Firm term covers signing only
+// (a term from before Firm wrote both products) has Community limits on
+// sending. The line under them used to offer him "Firm" as if he had nothing;
+// it now says what his plan covers and what holds for sending.
+test('a plan that covers signing only is named, not sold to him again', async () => {
+  const { page } = await openSender({ plan: COMMUNITY, precheck: () => ({ status: 200, body: { ok: true } }), inbound: 'ok', file: false,
+    me: { plan_parasign: 'pro', plan_parasend: null, paid_until_parasign: null } });
+  try {
+    await page.waitForFunction(() => /covers signing/.test(document.getElementById('ps-upsell-line').textContent), null, { timeout: 10000 });
+    assert.equal(await page.textContent('#ps-limit'), 'You send to 1 person. A link stays open for up to 1 hour. A file can be up to 5 MB.');
+    assert.equal(await page.textContent('#ps-upsell-line'), 'Your Firm plan covers signing. For sending you are on Community, with the limits above.');
+    assert.equal(await page.textContent('#ps-upsell-btn'), 'Send with Firm too');
+  } finally { await page.close(); }
+});
+
+test('a signing term that has run out does not count', async () => {
+  const { page } = await openSender({ plan: COMMUNITY, precheck: () => ({ status: 200, body: { ok: true } }), inbound: 'ok', file: false,
+    me: { plan_parasign: 'pro', paid_until_parasign: '2020-01-01T00:00:00Z' } });
+  try {
+    await page.waitForTimeout(800);
+    assert.match(await page.textContent('#ps-upsell-line'), /^With Firm you send to up to 30 people/);
+    assert.equal(await page.textContent('#ps-upsell-btn'), 'See Firm');
+  } finally { await page.close(); }
 });
 
 test('no session token is ever on screen, and the row says who is signed in', async () => {
@@ -355,7 +385,7 @@ test('zonder bekend plafond weigert de precheck in het Nederlands, voor er iets 
     await page.locator('#btn-create-session').click();
     await page.waitForSelector('#step-over-limit.active', { timeout: 15000 });
     const line = await page.textContent('#over-limit-line');
-    assert.match(line, /Uw abonnement verstuurt naar 1 ontvanger tegelijk\. U noemde er 2\./);
+    assert.match(line, /Uw plan verstuurt naar 1 ontvanger tegelijk\. U noemde er 2\./);
     assert.equal(await page.getAttribute('#step-over-limit a.btn', 'href'), '/pricing');
     assert.equal(calls.inbound, 0, 'er is niets geüpload');
     assert.equal(calls.sends, 0);

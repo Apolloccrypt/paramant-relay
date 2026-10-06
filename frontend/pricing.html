@@ -227,6 +227,12 @@
 .pr-faq{border-bottom:1px solid var(--ink-hair);padding:var(--space-2) 0}
 .pr-faq summary{cursor:pointer;font-weight:600;color:var(--ink);min-height:44px;display:flex;align-items:center}
 .pr-faq p{margin:var(--space-2) 0 var(--space-3)}
+.pr-table{width:100%;border-collapse:collapse;margin:0 0 var(--space-3);font-size:var(--text-base)}
+.pr-table th,.pr-table td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink-hair);vertical-align:top;color:var(--ink)}
+.pr-table thead th{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);word-break:keep-all;overflow-wrap:normal;hyphens:none}
+.pr-table tbody th{font-weight:400}
+.pr-table tr.pr-group th{padding-top:18px;font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim)}
+@media(max-width:480px){.pr-table{font-size:var(--text-sm)}}
 .lang-switch{max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px}
 .lang-switch a{color:var(--ink)}
 </style>
@@ -271,8 +277,10 @@
   <a href="/help" class="nav-tail-link">Hulp</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/pricing" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/pricing" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
-<!-- De Nederlandse prijspagina (23-09-2026). Eén aanbod: het kantoorplan
-     (in de code heet het Firm), met één knop. Community blijft zichtbaar als
+<!-- De Nederlandse prijspagina (23-09-2026). Eén aanbod: Firm, het
+     kantoorplan, met één knop. Sinds de acceptatie van 3.1.1 heet het hier ook
+     Firm, zoals op /dashboard, /account en in de mails (taal 4), en staat
+     Business in de tabel en in de regel onder de knop, op aanvraag (taal 5). Community blijft zichtbaar als
      de gratis helft. Business en Enterprise zijn niet weg, ze staan niet in de
      etalage: wie meer nodig heeft mailt Mick, en /en/pricing toont de volledige
      tabel. De bedragen komen uit relay/lib/billing-catalog.js en worden daar
@@ -284,18 +292,18 @@
     <h1 class="paramant-h2" style="margin-bottom:var(--space-3)">Prijzen</h1>
     <p class="pr-what">Documenten laten tekenen en bestanden versturen die zichzelf wissen na het lezen.</p>
     <div class="offer" id="kantoor">
-      <p class="offer-kicker">Voor uw kantoor</p>
+      <p class="offer-kicker">Firm, het kantoorplan</p>
       <h2 class="offer-h">Voor uw kantoor: 29 euro per maand.</h2>
       <p class="offer-btw">Excl. btw. U betaalt &euro;35,09 per maand, inclusief 21% btw.</p>
-      <p class="offer-what">E&eacute;n betaling voor versturen en ondertekenen samen: 100 handtekeningen per maand, 500 verzendingen per maand, tot 30 ontvangers per verzending, en links die 24 uur geldig blijven. Bij versturen vanuit de webapp zijn u en de ontvanger allebei online en vergelijkt u een korte code.</p>
-      <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary offer-btn">Kies het kantoorplan &rarr; <span style="font-weight:400;opacity:.85">&euro;35,09 per maand incl.</span></a>
+      <p class="offer-what">E&eacute;n betaling voor versturen en ondertekenen samen: 100 handtekeningen per maand, 500 verzendingen per maand, tot 30 ontvangers per verzending, en links die 24 uur geldig blijven. U verstuurt een link en de ontvanger opent hem wanneer het uitkomt. Met Extra veilig zijn u en de ontvanger allebei online en vergelijkt u een korte code.</p>
+      <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary offer-btn">Kies Firm &rarr; <span style="font-weight:400;opacity:.85">&euro;35,09 per maand incl.</span></a>
       <p class="offer-year"><a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="yearly" class="yearly-alt">Liever per jaar: &euro;350,90 incl. btw (&euro;290 excl.), twee maanden minder &rarr;</a></p>
-      <p class="offer-more">Meer nodig? Mail Mick: <a href="mailto:privacy@paramant.app?subject=Meer%20nodig">privacy@paramant.app</a></p>
+      <p class="offer-more">Grotere organisatie? Dan is er Business, op aanvraag: 1.000 handtekeningen per maand, een vaste contactpersoon en een audittrail die u kunt exporteren, voor &euro;299 per maand excl. btw. Neem contact op: <a href="mailto:privacy@paramant.app?subject=Business">privacy@paramant.app</a></p>
     </div>
     <div class="free">
       <p class="offer-kicker">Community</p>
-      <p class="free-amt"><strong>Community is &euro;0 per maand, voor altijd:</strong> 2 handtekeningen per maand, 50 verzendingen per maand, &eacute;&eacute;n ontvanger per verzending, en bestanden tot 500 MB als u ze direct overdraagt. Geen betaalkaart.</p>
-      <p class="free-why">Voor een eenmanspraktijk, een vrijwilligersbestuur of een huishouden. Het is geen proefperiode en geen lokkertje. Zo geeft de oprichter iets terug aan de samenleving, en het kantoorplan houdt het gratis.</p>
+      <p class="free-amt"><strong>Community is &euro;0 per maand, voor altijd:</strong> 2 handtekeningen per maand, 50 verzendingen per maand, &eacute;&eacute;n ontvanger per verzending. Een bestand via een link mag tot 5 MB zijn, met Extra veilig tot 500 MB. Geen betaalkaart.</p>
+      <p class="free-why">Voor een eenmanspraktijk, een vrijwilligersbestuur of een huishouden. Het is geen proefperiode en geen lokkertje. Zo geeft de oprichter iets terug aan de samenleving, en Firm houdt het gratis.</p>
       <p><a href="/signup" class="btn btn-secondary">Maak een gratis account &rarr;</a></p>
     </div>
     <p class="pr-company">Gemaakt in Harderwijk door <strong style="color:var(--navy)">Paramantis Solutions B.V.</strong> (KvK 42115132). <a href="/about" style="color:var(--cobalt)">Over Paramant &rarr;</a></p>
@@ -304,14 +312,42 @@
 </section>
 <section style="padding:0 0 var(--space-9)" id="plans">
   <div class="container-md">
+    <!-- WAT U DAARNA PRECIES KUNT. Elk getal hier is een grens die de relay
+         afdwingt (relay/lib/tiers.js, gemeten tot en met de grens in de
+         betaaltest van 05-10-2026) en die /dashboard na betalen in dezelfde
+         woorden noemt. tests/site-claims.test.mjs pint deze tabel aan tiers.js
+         en aan frontend/js/dashboard.js. -->
+    <div class="pr-block" id="wat-u-kunt">
+      <h2 class="pr-h">Wat u daarna precies kunt</h2>
+      <div style="overflow-x:auto">
+      <table class="pr-table">
+        <thead><tr><th scope="col"></th><th scope="col">Community</th><th scope="col">Firm</th><th scope="col">Business (op aanvraag)</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Handtekeningen per maand</th><td>2</td><td>100</td><td>1.000</td></tr>
+          <tr><th scope="row">Verzendingen per maand</th><td>50</td><td>500, hooguit 500 per uur</td><td>500, hooguit 500 per uur</td></tr>
+          <tr><th scope="row">Ontvangers per verzending</th><td>1</td><td>30</td><td>30</td></tr>
+          <tr><th scope="row">Een link blijft geldig</th><td>1 uur</td><td>24 uur</td><td>24 uur</td></tr>
+          <tr><th scope="row">Bestand via een eenmalige link</th><td>5 MB</td><td>5 MB</td><td>5 MB</td></tr>
+          <tr><th scope="row">Audittrail exporteren</th><td>nee</td><td>nee</td><td>ja</td></tr>
+          <tr class="pr-group"><th scope="rowgroup" colspan="4">Voor een koppeling met uw eigen systemen (API)</th></tr>
+          <tr><th scope="row">Ondertekenaars per document</th><td>20</td><td>20</td><td>30</td></tr>
+          <tr><th scope="row">Keer openen per link</th><td>1</td><td>10</td><td>10</td></tr>
+          <tr><th scope="row">Geregistreerde apparaten</th><td>5</td><td>50</td><td>50</td></tr>
+          <tr><th scope="row">API-sleutel voor ondertekenen</th><td>nee</td><td>ja</td><td>ja</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>Is een grens bereikt, dan wacht het tot de nieuwe maand; er wordt nooit iets bijgerekend. Vraagt u via de API een langere link of vaker openen dan uw plan toestaat, dan krijgt u de grens van uw plan. De webapp wist een bestand op elk plan na de eerste keer openen. Business is op aanvraag: mail <a href="mailto:privacy@paramant.app?subject=Business">privacy@paramant.app</a>.</p>
+    </div>
     <div class="pr-block">
       <h2 class="pr-h">Hoe betalen werkt</h2>
-      <p>U betaalt een Nederlands bedrijf, in euro, via een Nederlandse betaaldienst (Mollie). Elke betaling is eenmalig voor de periode die u koopt: een maand, of een jaar vooruit. Automatisch verlengen staat niet aan, dus er is geen incassomachtiging en geen abonnement dat vanzelf doorloopt. Loopt de periode af, dan valt uw account terug op het gratis Community-plan en wordt er niets meer afgeschreven, tenzij u zelf de volgende periode koopt.</p>
-      <p>Het kantoorplan kost per account, niet per gebruiker. Een account met meerdere gebruikers komt nog; tot die tijd is het &eacute;&eacute;n account per kantoor.</p>
+      <p>U betaalt een Nederlands bedrijf, in euro, via een Nederlandse betaaldienst (Mollie). Elke betaling is eenmalig voor de periode die u koopt: een maand, of een jaar vooruit. Automatisch verlengen staat niet aan, dus er is geen incassomachtiging en geen abonnement dat vanzelf doorloopt. Loopt de periode af? Dan valt uw account terug op het gratis Community-plan. Er wordt dan niets meer afgeschreven, tenzij u zelf de volgende periode koopt.</p>
+      <p data-partner-context="vies voorwaardelijk">Bent u een bedrijf in een ander EU-land, dan wordt de btw verlegd. U betaalt dan &euro;29 per maand zonder btw (de knop toont het bedrag met 21%), en op de factuur staan 0% btw, &ldquo;Btw verlegd&rdquo; en de btw-nummers van u en van ons. Dat gebeurt alleen als uw btw-nummer, bedrijfsnaam en adres in uw account staan en de Europese btw-controle (VIES) het nummer bij het afrekenen geldig noemt. In alle andere gevallen, ook voor een Nederlands bedrijf, een particulier of een bedrijf buiten de EU, betaalt u 21% btw.</p>
+      <p>Firm kost per account, niet per gebruiker. Een account met meerdere gebruikers komt nog. Tot dan is het &eacute;&eacute;n account per kantoor.</p>
     </div>
     <form data-redeem-form class="pr-block pr-code">
       <h2 class="pr-h">Heeft u een code?</h2>
-      <p>Een code geeft u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er is niets op te zeggen. Log eerst in en vul hem dan hier in, of open <a href="/redeem">de codepagina</a>.</p>
+      <p>Met een code krijgt u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er is niets op te zeggen. Log eerst in en vul hem hier in. Of open <a href="/redeem">de codepagina</a>.</p>
       <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:flex-end">
         <label style="display:flex;flex-direction:column;gap:6px;flex:1 1 220px">
           <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)">Uw code</span>
@@ -325,7 +361,7 @@
       <h2 class="pr-h">Veelgestelde vragen</h2>
       <details class="pr-faq">
         <summary>Wat gebeurt er met mijn bestand nadat de ontvanger het heeft opgehaald?</summary>
-        <p>Het bestand staat alleen in het werkgeheugen van de server, nooit op een schijf, en wordt gewist na de laatste keer lezen die de link toestaat. De webapp en de extensies wissen het na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op het kantoorplan. Verloopt de link, dan is het bestand ook weg.</p>
+        <p>Het bestand staat alleen in het werkgeheugen van de server, nooit op een schijf, en wordt gewist na de laatste keer lezen die de link toestaat. De webapp en de extensies wissen het na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op Firm. Verloopt de link, dan is het bestand ook weg.</p>
       </details>
       <details class="pr-faq">
         <summary>Is een gewone elektronische handtekening genoeg voor mijn documenten?</summary>
@@ -341,11 +377,11 @@
       </details>
       <details class="pr-faq">
         <summary>Wat als Paramant stopt?</summary>
-        <p>De code staat openbaar op <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> onder BUSL-1.1. Een server die u zelf draait, blijft werken. Uw ondertekeningsbewijzen zijn zonder ons te controleren.</p>
+        <p>De code staat openbaar op <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> onder BUSL-1.1. Een server die u zelf draait, blijft werken. Uw ondertekeningsbewijzen kunt u ook zonder ons controleren.</p>
       </details>
       <details class="pr-faq">
         <summary>De techniek, voor wie het wil weten</summary>
-        <p>Elk plan krijgt dezelfde versleuteling. Versturen uit de webapp gebruikt ML-KEM-768 samen met ECDH P-256; ondertekenen gebruikt ML-DSA-65. De bestandsgrootte verschilt niet per plan: 500 MB bij direct overdragen, 5 MB via een eenmalige link, en 25 MB als u naar een lijst van ontvangers verstuurt. Het kantoorplan geeft verder API-toegang, tot 50 geregistreerde apparaten, verzendgeschiedenis en webhooks. De volledige tabel met alle plannen staat op <a href="/en/pricing">de Engelse prijspagina</a>.</p>
+        <p>Elk plan krijgt dezelfde versleuteling. Versturen uit de webapp gebruikt ML-KEM-768 samen met ECDH P-256; ondertekenen gebruikt ML-DSA-65. De bestandsgrootte verschilt niet per plan: 500 MB bij direct overdragen, 5 MB via een eenmalige link, en 25 MB als u naar een lijst van ontvangers verstuurt. Firm geeft verder API-toegang, tot 50 geregistreerde apparaten, verzendgeschiedenis en webhooks. Enterprise, met een eigen server en een SLA, staat op <a href="/en/pricing">de Engelse prijspagina</a>.</p>
       </details>
     </div>
   </div>
@@ -383,9 +419,9 @@
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/pricing-billing.js?v=5" defer></script>
-<script src="/js/redeem-code.js?v=4" defer></script>
+<script src="/js/pricing-billing.js?v=8" defer></script>
+<script src="/js/redeem-code.js?v=5" defer></script>
 </body>
 </html>

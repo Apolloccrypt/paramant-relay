@@ -51,7 +51,22 @@ test('lang nl gives a Dutch mail, lang en an English one (SENDNAME-23-F)', () =>
   tn.maybeNotify({ keyData: kd, event: 'upload', hashPrefix: 'abcdef', bytes: 3, sendEmail: (m) => calls.push(m), lang: 'nl' });
   tn.maybeNotify({ keyData: kd, event: 'download', hashPrefix: 'abcdef', bytes: 3, sendEmail: (m) => calls.push(m), lang: 'en' });
   assert.strictEqual(calls[0].subject, tn.SUBJECTS_NL.upload);
-  assert.match(calls[0].text, /Kenmerk/);
+  assert.match(calls[0].text, /staat klaar voor de ontvanger/);
   assert.strictEqual(calls[1].subject, tn.SUBJECTS.download);
-  assert.doesNotMatch(calls[1].text, /Kenmerk/);
+  assert.match(calls[1].text, /has been picked up/);
+  assert.doesNotMatch(calls[1].text, /staat klaar/);
+});
+
+// Acceptatie 3.1.1, taal #38: "Kenmerk: ab12cd34ef56 · Grootte: 123456 bytes"
+// told a customer nothing. The mail says what happened and the size as a
+// person writes it, and never the content hash.
+test('the notice gives a readable size and no hash or byte count', () => {
+  const calls = [];
+  const kd = { plan: 'pro', plan_parasend: 'pro', email: 'a@example.test', active: true };
+  tn.maybeNotify({ keyData: kd, event: 'upload', hashPrefix: 'abcdef0123456789', bytes: 1288490, sendEmail: (m) => calls.push(m) });
+  assert.match(calls[0].text, /\(1,2 MB\)/);
+  assert.match(calls[0].text, /\(1\.2 MB\)/);
+  assert.doesNotMatch(calls[0].text, /abcdef|bytes|Kenmerk|Reference/);
+  assert.strictEqual(tn.humanSize(3, 'nl'), '1 KB');
+  assert.strictEqual(tn.humanSize(123456, 'en'), '121 KB');
 });

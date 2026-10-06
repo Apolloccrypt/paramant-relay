@@ -82,8 +82,9 @@ async function pickJpeg(page) {
 const out = await openSign(false);
 await out.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
 ok('the English page says it is English', await out.evaluate(() => document.documentElement.lang) === 'en', 'lang');
+// Mick 05-10: taalronde
 ok('signed out, the bar speaks English',
-  /You are not signed in\. You can prepare a document here; signing or sending it needs a free Community account\./.test(await out.locator('#ds-signedout').innerText()),
+  /You are not signed in\. You can already prepare a document\. To sign or send it, you need a free Community account\./.test(await out.locator('#ds-signedout').innerText()),
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /en/sign afterwards',

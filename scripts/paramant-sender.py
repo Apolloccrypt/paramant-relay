@@ -170,10 +170,24 @@ def send_blob(relay_url, key, blob, ttl_ms=300000, max_views=1, lookup_hash=None
             log(f"{Y}Poging {attempt} fout: {ex} — retry...{E}")
             time.sleep(2 ** attempt)
 
+
+def resolve_relay(value):
+    """A hosted sector name, or the URL of your own relay (API-36-A: the CLI
+    example on /docs has to work against a self-host too). https only, except
+    plain http to this machine for a local relay."""
+    import re
+    v = (value or "").strip()
+    if v in RELAYS:
+        return RELAYS[v]
+    if re.match(r"^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$", v) or re.match(r"^http://(127\.0\.0\.1|localhost)(:[0-9]+)?/?$", v):
+        return v.rstrip("/")
+    raise argparse.ArgumentTypeError(f"--relay: a sector ({', '.join(RELAYS)}) or https://your-relay, not {v!r}")
+
 def main():
     p = argparse.ArgumentParser(description=f"PARAMANT Sender v{VERSION}")
     p.add_argument("--key",        required=True)
-    p.add_argument("--relay",      default="health", choices=list(RELAYS.keys()))
+    p.add_argument("--relay",      default="health", type=resolve_relay, metavar="SECTOR|URL",
+                   help="hosted sector (" + ", ".join(RELAYS) + ") or the https URL of your own relay")
     p.add_argument("--file",       help="Bestand om te sturen")
     p.add_argument("--stdin",      action="store_true")
     p.add_argument("--text",       help="Stuur tekst direct")
@@ -202,7 +216,7 @@ def main():
     p.add_argument("--version",    action="version", version=f"%(prog)s {VERSION}")
     args = p.parse_args()
 
-    relay_url = RELAYS[args.relay]
+    relay_url = args.relay
     blob_size = BLOCKS[args.pad_block]
     secret = None
     if not args.no_encrypt and not args.drop:
@@ -342,9 +356,9 @@ def main():
         if not args.no_encrypt:
             if args.hybrid:
                 log("Hybrid-modus — klassiek + post-quantum...")
-                blob, _ = encrypt_hybrid(data, args.key, blob_size=blob_size)
+                blob, _ = encrypt_hybrid(data, secret, blob_size=blob_size)
             else:
-                log("Versleutelen..."); blob, _ = encrypt(data, args.key, blob_size=blob_size)
+                log("Versleutelen..."); blob, _ = encrypt(data, secret, blob_size=blob_size)
         else:
             blob = pad(data, blob_size)
 

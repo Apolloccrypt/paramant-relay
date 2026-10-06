@@ -105,7 +105,7 @@
     histLoad.disabled = true;
     var orig = histLoad.textContent;
     histLoad.textContent = nlEn('Bezig...', 'Loading...');
-    histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw geschiedenis wordt gelezen...', 'Reading your history...') + '</div>';
+    histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw geschiedenis wordt geladen...', 'Loading your history...') + '</div>';
     relayCall(function (tok) {
       return fetch('/v2/user/history?limit=100', {
         headers: { Authorization: 'Bearer ' + tok, Accept: 'application/json' }, cache: 'no-store'
@@ -119,16 +119,16 @@
       if (res.status === 403) {
         // Fallback only; the relay sends its own message. Both name Firm,
         // the plan /pricing actually sells, not the tier key behind the gate.
-        histBody.innerHTML = upsell(nlEn('De verzendgeschiedenis hoort bij Firm en hoger.', 'Send history comes with Firm and higher.'), '/pricing');
+        histBody.innerHTML = upsell(nlEn('De verzendgeschiedenis hoort bij Firm en Business.', 'Send history comes with Firm and Business.'), nlEn('/pricing', '/en/pricing'));
         return;
       }
       if (res.status === 401) {
-        histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw sessie is verlopen. Log opnieuw in om uw geschiedenis te zien.', 'Your session has ended. Sign in again to see your history.') + '</div>';
+        histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('U bent uitgelogd. Log opnieuw in om uw geschiedenis te zien.', 'You were signed out. Sign in again to see your history.') + '</div>';
         return;
       }
       histBody.innerHTML = '<div class="dh-ops-dim">' + (res.status === 429
-        ? nlEn('Even te veel verzoeken. Probeer het over een minuut opnieuw.', 'Too many requests just now. Try again in a minute.')
-        : nlEn('Uw geschiedenis kon nu niet worden gelezen. Er is niets veranderd. Probeer het zo opnieuw.', 'Your history could not be read just now. Nothing changed. Try again shortly.')) + '</div>';
+        ? nlEn('Even te veel tegelijk. Probeer het over een minuut opnieuw.', 'Too much at once. Try again in a minute.')
+        : nlEn('We konden uw geschiedenis nu niet laden. Er is niets veranderd. Probeer het zo opnieuw.', 'We could not load your history just now. Nothing changed. Try again shortly.')) + '</div>';
     }).catch(function () {
       histLoad.disabled = false; histLoad.textContent = orig;
       histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Geen verbinding. Er is niets veranderd. Probeer het opnieuw.', 'No connection. Nothing changed. Try again.') + '</div>';
@@ -173,15 +173,15 @@
         return;
       }
       if (res.status === 403) {
-        expBody.innerHTML = upsell(nlEn('De audit-export hoort bij Business en hoger.', 'The audit export comes with Business and higher.'), '/pricing');
+        expBody.innerHTML = upsell(nlEn('Exporteren hoort bij Business. Business is op aanvraag via privacy@paramant.app.', 'Exporting comes with Business.'), nlEn('/pricing#wat-u-kunt', '/en/pricing'));
         return;
       }
       if (res.status === 401) {
-        expBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw sessie is verlopen. Log opnieuw in om te exporteren.', 'Your session has ended. Sign in again to export.') + '</div>';
+        expBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('U bent uitgelogd. Log opnieuw in om te exporteren.', 'You were signed out. Sign in again to export.') + '</div>';
         return;
       }
       expBody.innerHTML = '<div class="dh-ops-dim">' + (res.status === 429
-        ? nlEn('Even te veel verzoeken. Probeer het over een minuut opnieuw.', 'Too many requests just now. Try again in a minute.')
+        ? nlEn('Even te veel tegelijk. Probeer het over een minuut opnieuw.', 'Too much at once. Try again in a minute.')
         : nlEn('De export kon nu niet worden gemaakt. Probeer het zo opnieuw.', 'The export could not be made just now. Try again shortly.')) + '</div>';
     }).catch(function () {
       buttons.forEach(function (b) { if (b) b.disabled = false; });

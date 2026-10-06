@@ -106,19 +106,19 @@ test('one sweep warns the account inside the window, tells the lapsed one, and l
     'ten days out is not warned; five days out and expired yesterday are');
 
   const warn = send.sent.find((m) => m.to === 'five@example.com');
-  assert.equal(warn.subject, 'Uw Ondertekenen Pro loopt af op 1 oktober 2026 / Your ParaSign Pro ends on 1 October 2026');
+  assert.equal(warn.subject, 'Uw Firm-plan voor ondertekenen loopt af op 1 oktober 2026 / Your Firm plan for signing ends on 1 October 2026');
   // Dutch first, English below it.
-  assert.match(warn.text, /^Uw Ondertekenen Pro loopt af op 1 oktober 2026\./);
+  assert.match(warn.text, /^Uw Firm-plan voor ondertekenen loopt af op 1 oktober 2026\./);
   assert.match(warn.text, /Doet u niets, dan gaat uw account terug naar Community\. Er wordt niets automatisch afgeschreven\./);
-  assert.ok(warn.text.indexOf('Uw Ondertekenen Pro') < warn.text.indexOf('Your ParaSign Pro'), 'the Dutch text comes first');
+  assert.ok(warn.text.indexOf('Uw Firm-plan voor ondertekenen') < warn.text.indexOf('Your Firm plan for signing'), 'the Dutch text comes first');
   assert.ok(warn.html.indexOf('loopt af op 1 oktober 2026') < warn.html.indexOf('ends on 1 October 2026'), 'the Dutch html comes first');
-  assert.match(warn.text, /Your ParaSign Pro ends on 1 October 2026\./);
-  assert.match(warn.text, /Renew for another month or year, or let it fall back to Community; nothing is charged automatically\./);
+  assert.match(warn.text, /Your Firm plan for signing ends on 1 October 2026\./);
+  assert.match(warn.text, /If you do nothing, your account goes back to Community, and nothing is charged automatically\./);
   assert.match(warn.text, /https:\/\/paramant\.app\/pricing/);
 
   const ended = send.sent.find((m) => m.to === 'gone@example.com');
-  assert.equal(ended.subject, 'Uw Versturen Pro is afgelopen / Your ParaSend Pro has ended');
-  assert.match(ended.text, /Uw Versturen Pro is afgelopen op 25 september 2026\. Uw account staat nu op Community\./);
+  assert.equal(ended.subject, 'Uw Firm-plan voor versturen is afgelopen / Your Firm plan for sending has ended');
+  assert.match(ended.text, /Uw Firm-plan voor versturen is afgelopen op 25 september 2026\. Uw account staat nu op Community\./);
   assert.match(ended.text, /Er is niets afgeschreven\./);
   assert.match(ended.text, /ended on 25 September 2026, and your account is now on Community\./);
   assert.match(ended.text, /Nothing was charged\./);
@@ -205,7 +205,7 @@ test('a renewal moves the date, and the new period gets its own warning', async 
   await planExpiry.runSweep({ redis, now: NOW + 30 * DAY, sendEmail: due, siteUrl: SITE });
   assert.equal(due.sent.length, 1);
   assert.equal(due.sent[0].to, 'five@example.com');
-  assert.equal(due.sent[0].subject, 'Uw Ondertekenen Pro loopt af op 31 oktober 2026 / Your ParaSign Pro ends on 31 October 2026');
+  assert.equal(due.sent[0].subject, 'Uw Firm-plan voor ondertekenen loopt af op 31 oktober 2026 / Your Firm plan for signing ends on 31 October 2026');
 });
 
 test('without a mailer nothing is marked as sent, so the next sweep tries again', async () => {
@@ -326,11 +326,14 @@ test('no redis is a sweep that does not run, not a sweep that crashes', async ()
 });
 
 test('the date in the mail is the same date in every container', () => {
-  // Hand-built and UTC on purpose: toLocaleDateString needs Intl data a slim
-  // container image is not guaranteed to carry, and a mail that says a
-  // different day depending on which relay sent it is worse than no mail.
+  // Hand-built month table, on Dutch time like the site (format-date.js) and
+  // the other mails: 23:59 UTC on 1 January is 2 January in Amsterdam, and
+  // 22:30 UTC in summer is already the next day (acceptatie 3.1.1 ronde 2).
   assert.equal(planExpiry.formatDate('2026-10-03T00:00:00.000Z'), '3 October 2026');
-  assert.equal(planExpiry.formatDate('2026-01-01T23:59:59.000Z'), '1 January 2026');
+  assert.equal(planExpiry.formatDate('2026-01-01T23:59:59.000Z'), '2 January 2026');
+  assert.equal(planExpiry.formatDate('2026-01-01T22:59:59.000Z'), '1 January 2026');
+  assert.equal(planExpiry.formatDateNl('2026-10-05T22:46:00.000Z'), '6 oktober 2026');
+  assert.equal(planExpiry.formatDateNl('2026-10-05T21:59:00.000Z'), '5 oktober 2026');
   assert.equal(planExpiry.formatDate('not a date'), null);
 });
 

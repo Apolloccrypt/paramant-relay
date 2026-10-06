@@ -200,14 +200,25 @@ burns anything:
   download. The receiver fetches, decrypts and checks, and only then confirms
   with `POST /v2/dl/:token/ack`. A transfer that dies mid-flight leaves the token
   spendable, so a dropped connection is a retry and not a lost file.
-- Without a claim (old SDKs and scripts) the blob is deleted and its buffer
-  zeroed on the `finish` event of the download response: the moment the last
-  byte is handed to the kernel or the proxy in front of the relay, not when the
-  receiver has it. A connection that breaks after that point costs the file.
-  Use the claim mode if your client can.
+- Without a claim (old SDKs and scripts) nothing burns until the whole body is
+  delivered, meaning the relay has written the last byte to the connection.
+  From then on the read counts, whatever the connection does next: a reset
+  after the last byte cannot be told apart from a reader that took every byte
+  and reset on purpose. A receiver that breaks off before that point gets the
+  link back and can simply try again; a link is served at most five times in
+  all. "Before that point" is measured at the relay, not at the receiver:
+  the operating system buffers a few MB per connection, so a file of a few MB
+  is written to the connection in one go. Up to the 5 MB default blob size, a
+  download broken off after the first kilobytes has as a rule already cost
+  the read; only a larger file keeps the link on a broken line. The link is
+  hidden from the
+  last byte on (a second `GET` answers `410` at once). The response says
+  `X-Burned: on-delivery`.
+  The claim mode stays the exact one: there the burn waits for the receiver's
+  own confirmation that it decrypted the file.
 
-Once a download is confirmed (claim) or finished (no claim), the token is marked
-used and the bytes are gone. The TTL is enforced separately by a
+Once a download is confirmed (claim) or delivered (no claim), the token is
+marked used and the bytes are gone. The TTL is enforced separately by a
 timer, so a link nobody opens is destroyed when it expires whether or not
 anybody asks.
 
@@ -224,10 +235,24 @@ record of what happened to the token, not a signed statement.
 
 ### GET /v2/outbound/:hash: Download (burn-on-read)
 
-The blob is burned when the last byte of the response is handed to the kernel
-or the proxy, not when your client has it: a download that breaks after that
-point costs the file, and a second `GET` answers `404`. This route has no claim
-mode; for retry-safe delivery use the share link with `?claim=` (above).
+The read counts, and a burning read destroys the blob, only once the whole
+response was delivered, meaning the relay has written the last byte to the
+connection. While it is being sent and right after, the blob is hidden: a
+second `GET` answers `404`. If your client breaks off before the last byte
+(it closes or resets the connection), the relay puts the blob back and the
+next `GET` serves it again in full; a blob is served at most five times in
+all. "Before the last byte" is measured at the relay, not at your client:
+the operating system buffers a few MB per connection, so a blob up to the
+5 MB default is as a rule written in full at once, and a break after the
+first kilobytes then already counts as a delivery. A reset after
+the last byte counts as a delivery. A proxy in front of the relay (nginx,
+docker's port proxy) can hide a break: it has read every byte and closes
+towards the relay normally. So a connection that closes within three seconds
+of the last byte keeps the blob for three more seconds, for one retry by the
+same API key only, once per blob. Any other key gets `404`. After that, or
+after three seconds on an open connection, a complete download is gone for
+good. For a delivery confirmed by your own client after
+decryption, use the share link with `?claim=` (above).
 
 ```bash
 curl https://relay.paramant.app/v2/outbound/a3f2… \
@@ -239,7 +264,7 @@ Response headers:
 
 | Header | Value |
 |--------|-------|
-| `X-Paramant-Burned` | `true` if blob was destroyed |
+| `X-Paramant-Burned` | `true` if this read burns the blob (once it is delivered), `false` when views remain |
 | `X-Paramant-Hash` | SHA-256 hex of the blob |
 | `X-Paramant-Receipt-Id` | 32 hex characters. Fetch the receipt with it |
 | `X-Paramant-Receipt-Hash` | `sha3-256:<hex>` over the receipt bytes you will get back |
@@ -856,11 +881,13 @@ hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
 
 # Receive: returns (data, receipt); burn-on-read
 data, receipt = gp.receive(hash_)
-
-# Anonymous drop (BIP39 mnemonic)
-mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data = gp.pickup(mnemonic)    # pickup by mnemonic returns the bytes
 ```
+
+`gp.drop()` and `gp.pickup()` (the anonymous BIP39 drop) do not work in 3.0.0
+against the current relay. The relay checks that an upload's `hash` is the
+SHA-256 of the payload and answers `400 hash_mismatch` otherwise; a mnemonic
+drop addresses the blob by a hash derived from the phrase, so the upload is
+refused. For an anonymous transfer use ParaShare (`/parashare`).
 
 This is `paramant-sdk` 3.0.0 on PyPI. In 3.0.0 `receipt` is usually `None`: the
 SDK reads it only from the inline `X-Paramant-Receipt` header, which the relay
@@ -878,7 +905,7 @@ below live in this repository and run from a clone.
 
 | Script | What it does |
 |---|---|
-| `scripts/paramant-sender.py` | encrypt and upload a file, stdin or text; `--watch DIR` sends new files. `--relay` chooses among the hosted sectors only |
+| `scripts/paramant-sender.py` | encrypt and upload a file, stdin or text; `--watch DIR` sends new files. `--relay` takes a hosted sector or the https URL of your own relay |
 | `scripts/paramant-receiver.py` | fetch and decrypt by hash; `--listen` keeps polling |
 | `scripts/paramant-verify-sth` | fetch `/v2/sth` and `/v2/pubkey`, verify the ML-DSA-65 signature, exit non-zero if invalid |
 | `scripts/paramant-verify-peers` | fetch `/v2/sth/peers` and check that each mirrored head is consistent and that tree sizes only grow |

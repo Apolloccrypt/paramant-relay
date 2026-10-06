@@ -124,7 +124,7 @@ test('herinneren en ophalen tegelijk: de herinnering mag de ophaling niet omduwe
 
     const [op, her] = await Promise.all([
       H.pickup(B(), token, { code }),
-      H.intern(B(), '/v2/user/sends/reinvite', { send_id: v.id, email: adres }),
+      H.intern(B(), '/v2/user/sends/reinvite', { send_id: v.id, email: adres, token }),
     ]);
     const kreegBytes = op.status === 200 && (await op.arrayBuffer()).byteLength > 0;
     if (op.status !== 200) await op.text();

@@ -55,11 +55,29 @@ test('API-30-C / API-30-N: /v2/dl answers as documented (403 for preview bots, a
   assert.match(API, /where `reason` is `downloaded`, `expired`, `withdrawn`, `exhausted`, `lost` or `unknown`/);
 });
 
-test('API-24-K / API-30-K: the docs no longer promise that a broken claimless download is a retry', () => {
-  assert.match(RELAY, /Without \?claim= it is the old burn-on-read/);
-  assert.match(API, /Without a claim \(old SDKs and scripts\) the blob is deleted/);
-  assert.match(API, /A connection that breaks after that point costs the file\./);
-  assert.match(API, /This route has no claim\s+mode; for retry-safe delivery use the share link with `\?claim=`/);
+test('API-24-K / API-30-K / API-35-K: nothing burns before the whole body is delivered, and the docs say so', () => {
+  assert.match(RELAY, /function afterDelivery\(req, res, \{ onFinish, onDelivered, onAborted, onCleanCloseEarly \}\)/);
+  assert.match(RELAY, /'X-Burned': 'on-delivery'/);
+  assert.doesNotMatch(RELAY, /'X-Burned': 'true'/, 'no response says burned before a byte has left');
+  assert.match(API, /Without a claim \(old SDKs and scripts\) nothing burns until the whole body is\s+delivered, meaning the relay has written the last byte/);
+  assert.doesNotMatch(API, /A connection that breaks after that point costs the file\./);
+  assert.match(API, /If your client breaks off before the last byte\s+\(it closes or resets the connection\), the relay puts the blob back/);
+  // Review #565 B1/H1: a reset after the last byte counts, the hold is once per blob.
+  assert.match(API, /A reset after\s+the last byte counts as a delivery\./);
+  assert.match(API, /for one retry by the\s+same API key only, once per blob/);
+  assert.match(RELAY, /if \(!burned \|\| !apiKey \|\| entry\.retryHeld\) return delivered\(\);/);
+  assert.match(section(NL, 'outbound'), /Een lezing telt pas als de hele blob is afgeleverd/);
+  assert.match(section(EN, 'outbound'), /A read only counts once the whole blob was delivered/);
+  // Review #573, M3: at the default 5 MB a break after the first kilobytes
+  // already counts (socket buffers), measured in
+  // relay/test/route-burn-after-delivery.test.js. The docs say so, and point
+  // at the claim mode as the exact way.
+  assert.match(API, /Up to the 5 MB default blob size, a\s+download broken off after the first kilobytes has as a rule already cost\s+the read/);
+  assert.match(API, /a blob up to the\s+5 MB default is as a rule written in full at once/);
+  assert.doesNotMatch(API, /on a fast line the last\s+byte leaves the relay well before it arrives/);
+  assert.match(section(NL, 'outbound'), /een blob tot de standaardgrens van 5 MB is meestal in één keer verstuurd/);
+  assert.match(section(EN, 'outbound'), /a blob up to the 5 MB default is as a rule sent in one go/);
+  for (const html of [NL, EN]) assert.doesNotMatch(html, /download halverwege af, dan blijft de blob|download off halfway, the blob stays/);
 });
 
 test('API-31-N: the CT examples show the fields the relay sends', () => {
@@ -82,11 +100,13 @@ test('API-13-F / API-21-N: two error shapes, and 402 in the table and on /docs',
   assert.match(SPEC, /`402 monthly_sign_quota_reached` carries `plan`, `limit`, `used` and\s+`reset_date`/);
 });
 
-test('API-20-N: the envelope limit is described as the clock hour it is', () => {
-  assert.match(RELAY, /const bucket = Math\.floor\(Date\.now\(\) \/ 3600_000\);/);
-  assert.match(section(NL, 'v1-envelopes'), /50 nieuwe envelopes per sleutel per klokuur/);
-  assert.match(section(EN, 'v1-envelopes'), /50 envelope creations per key per clock hour/);
-  assert.match(SPEC, /The window is the clock\s+hour \(UTC\), not a sliding hour/);
+test('API-20-N: 50 creates in any hour, a sliding window, and the docs say so', () => {
+  assert.doesNotMatch(RELAY, /const bucket = Math\.floor\(Date\.now\(\) \/ 3600_000\);/, 'the clock-hour bucket is gone');
+  assert.match(RELAY, /rateLimit\.slidingWindowAllowRedis\(redisClient, rk, ENV_CREATE_LIMIT, 3600_000\)/);
+  assert.match(section(NL, 'v1-envelopes'), /50 nieuwe envelopes per sleutel in elk willekeurig uur \(een schuivend venster, niet het klokuur\)/);
+  assert.match(section(EN, 'v1-envelopes'), /50 envelope creations per key in any sixty minutes \(a sliding window, not the clock hour\)/);
+  assert.match(SPEC, /The\s+window slides: at most 50 creations in any hour/);
+  assert.doesNotMatch(SPEC + NL + EN, /up to 100|tot 100 bij/);
 });
 
 test('API-09-N / API-14-N: id, sign_url and signer status as the relay makes them', () => {
@@ -95,7 +115,9 @@ test('API-09-N / API-14-N: id, sign_url and signer status as the relay makes the
   assert.doesNotMatch(SPEC, /paramant\.app\/sign\//);
   assert.match(SPEC, /"sign_url": "https:\/\/paramant\.app\/co-sign\?env=/);
   assert.match(SPEC, /`pending` until that slot is signed and `signed` after/);
+  assert.doesNotMatch(read('README.md'), /"env_|envelopes\/env_/, 'the README quickstart shows the id the relay makes');
   for (const html of [NL, EN]) {
+    assert.doesNotMatch(html, /"envelope_id": "env_/);
     const v1 = section(html, 'v1-envelopes');
     assert.doesNotMatch(v1, /env_\.\.\./);
     assert.match(v1, /co-sign\?env=/);
@@ -117,8 +139,24 @@ test('API-35-A: the Python SDK examples are the 3.0.0 calling convention', () =>
   }
   const py = API.slice(API.indexOf('## Python SDK'), API.indexOf('## CLI tools'));
   assert.match(py, /gp\.receive_setup\(\)/);
-  assert.match(py, /data = gp\.pickup\(mnemonic\)/);
   assert.doesNotMatch(py, /receipt\["burn_confirmed"\]/, 'the SDK 3.0.0 receipt is usually None');
+});
+
+test('API-35-A: no Python example calls the mnemonic drop the relay refuses', () => {
+  // SDK 3.0.0 drop() posts to /v2/inbound with a hash derived from the phrase,
+  // not sha256(payload). The relay binds hash to the bytes on both inbound
+  // routes, so the drop comes back 400 hash_mismatch. As long as that binding
+  // stands, no runnable Python block may call drop() or pickup().
+  const inbound = RELAY.slice(RELAY.indexOf("path === '/v2/inbound'"));
+  assert.match(inbound, /createHash\('sha256'\)\.update\(blob\)\.digest\('hex'\) !== hash\) \{[^}]*hash_mismatch/,
+    'relay /v2/inbound binds hash to sha256(payload)');
+  const blocks = (txt) => [...txt.matchAll(/```python\n([\s\S]*?)```/g)].map((m) => m[1]);
+  for (const [name, txt] of [['docs/api.md', API], ['README.md', read('README.md')]]) {
+    const py = blocks(txt);
+    assert.ok(py.some((b) => /gp\.send\(/.test(b)), `${name}: has the send example`);
+    for (const b of py) assert.doesNotMatch(b, /gp\.(drop|pickup)\(/, `${name}: a Python block calls drop/pickup`);
+    assert.match(txt, /hash_mismatch/, `${name}: says why drop is left out`);
+  }
 });
 
 test('API-36-A: every command the CLI reference names exists in the repository', () => {

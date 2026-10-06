@@ -59,7 +59,9 @@ test('the record holds a hash of the account and the address, and expires after 
   const raw = await rc.get(signNotify.KEY_PREFIX + id);
   assert.ok(raw);
   assert.ok(!raw.includes(SENDER.user_id), 'the account id is a credential; only its hash may be stored');
-  assert.deepEqual(JSON.parse(raw), { uid: signNotify.idHash(SENDER.user_id), email: SENDER.email.toLowerCase() });
+  const rec = JSON.parse(raw);
+  assert.ok(Number.isFinite(rec.at) && Math.abs(Date.now() - rec.at) < 60000, 'the day the request went out, to name it in the mail');
+  assert.deepEqual(rec, { uid: signNotify.idHash(SENDER.user_id), email: SENDER.email.toLowerCase(), at: rec.at });
   const ttl = await rc.ttl(signNotify.KEY_PREFIX + id);
   assert.ok(ttl > 7 * 86400 && ttl <= 8 * 86400, `ttl ${ttl}s must outlive the 7-day invite and not much more`);
 });
@@ -74,8 +76,9 @@ test('a co-signer signing mails the sender the count, and completion mails once 
   assert.equal(mail.sent.length, 1);
   assert.equal(mail.sent[0].to, SENDER.email.toLowerCase());
   assert.match(mail.sent[0].msg.subject, /Er is getekend \(1 van 3\)/);
-  assert.match(mail.sent[0].msg.text, /1 van de 3 ondertekenaars heeft nu getekend/);
-  assert.match(mail.sent[0].msg.text, /1 of 3 signers has now signed/);
+  // Named by the day it went out (acceptatie 3.1.1, taal #45).
+  assert.match(mail.sent[0].msg.text, /1 van de 3 ondertekenaars van uw verzoek van \d{1,2} \w+ \d{4} heeft nu getekend/);
+  assert.match(mail.sent[0].msg.text, /1 of 3 signers of your request of \d{1,2} \w+ \d{4} has now signed/);
   assert.ok(await rc.get(signNotify.KEY_PREFIX + id), 'not complete yet, so the record stays');
 
   assert.equal(await run(id, COSIGNER + '2', { signed_count: 3, party_count: 3, status: 'complete' }, mail), 'sent');
@@ -135,7 +138,7 @@ test('the sender signing last: result link to the sender, one mail per party, no
   assert.equal(await signNotify.resolveResult(rc, ref[1], SENDER.user_id), id);
   const toA = mail.sent.find((m) => m.to === A).msg;
   assert.match(toA.subject, /^Iedereen heeft getekend \/ Everyone has signed$/);
-  assert.match(toA.text, /Open de link uit uw uitnodigingsmail/);
+  assert.match(toA.text, /Open de link uit uw uitnodiging/);
   for (const part of [toA.subject, toA.text, toA.html]) assert.ok(!part.includes(id), 'no envelope id in the party mail');
   assert.doesNotMatch(toA.text, /result=/, 'the result link is the sender\'s alone');
   assert.equal(await rc.get(signNotify.PARTIES_PREFIX + id), null, 'the invited addresses are gone on completion');
@@ -177,18 +180,22 @@ test('the mail carries a count and a link, never a file name, a party name or th
   const msg = emailTemplates.signatureReceivedEmail({ signedCount: 2, partyCount: 2, complete: true, envelopeId: id });
   for (const part of [msg.subject, msg.text, msg.html]) assert.ok(!part.includes(id), 'envelope id must not be in the mail');
   assert.match(msg.text, /\/dashboard/);
-  assert.match(msg.text, /Uw document is ondertekend door alle 2 ondertekenaars/);
+  assert.match(msg.text, /Beide ondertekenaars hebben het document van uw verzoek getekend/);
+  assert.doesNotMatch(msg.text, /Alle 2|All 2|Log in met dit account/);
+  const three = emailTemplates.signatureReceivedEmail({ signedCount: 3, partyCount: 3, complete: true, envelopeId: id, sentAt: Date.UTC(2026, 9, 5, 12) });
+  assert.match(three.text, /Alle 3 ondertekenaars hebben het document van uw verzoek van 5 oktober 2026 getekend/);
+  assert.match(three.text, /All 3 signers have signed the document of your request of 5 October 2026/);
   assert.match(msg.html, /lang="nl"/);
   const two = emailTemplates.signatureReceivedEmail({ signedCount: 2, partyCount: 3, complete: false, envelopeId: id });
-  assert.match(two.text, /2 van de 3 ondertekenaars hebben nu getekend/);
-  assert.match(two.text, /2 of 3 signers have now signed/);
+  assert.match(two.text, /2 van de 3 ondertekenaars van uw verzoek hebben nu getekend/);
+  assert.match(two.text, /2 of 3 signers of your request have now signed/);
 });
 
 test('one signer is one signer: no "alle 1 ondertekenaars" (hertest r2 K2)', () => {
   const one = emailTemplates.signatureReceivedEmail({ signedCount: 1, partyCount: 1, complete: true, envelopeId: 'X' });
   assert.doesNotMatch(one.text, /alle 1 ondertekenaars|all 1 signers/);
-  assert.match(one.text, /Uw document is ondertekend door de ondertekenaar\./);
-  assert.match(one.text, /Your document has been signed by the signer\./);
+  assert.match(one.text, /De ondertekenaar heeft het document van uw verzoek getekend\./);
+  assert.match(one.text, /The signer has signed the document of your request\./);
 });
 
 test('server.js remembers the sender on create and tells them after a submit, without awaiting the mail', () => {
@@ -243,4 +250,53 @@ test('a refusal mails the sender once, without names or the envelope id, and for
   for (const part of [mail.sent[0].msg.text, mail.sent[0].msg.html]) assert.ok(!part.includes(id));
   assert.equal(await rc.get(signNotify.KEY_PREFIX + id), null, 'the record is gone');
   assert.equal(await signNotify.afterDecline({ client: rc, envelopeId: id, sendEmail: mail.sendEmail, template: emailTemplates.signatureDeclinedEmail }), 'skipped', 'and a second refusal mails nobody');
+});
+
+// Acceptatie 3.1.1, taal #42: a party whose request was withdrawn or declined
+// by somebody else heard nothing, and later opened a link to a closed request.
+test('a withdrawal tells every invited party once, without names or the envelope id, and forgets', async (t) => {
+  if (!rc) return t.skip('redis declared absent');
+  const id = envId('wd');
+  await signNotify.rememberSender(rc, id, SENDER);
+  const A = `wa_${RUN}@example.com`;
+  const B = `wb_${RUN}@example.com`;
+  await signNotify.rememberParties(rc, id, [A, B]);
+  const mail = capture();
+  assert.equal(await signNotify.afterWithdraw({ client: rc, envelopeId: id, sendEmail: mail.sendEmail, partyTemplate: emailTemplates.requestStoppedPartyEmail }), 'sent');
+  assert.deepEqual(mail.sent.map((m) => m.to).sort(), [A, B].sort());
+  const msg = mail.sent[0].msg;
+  assert.equal(msg.subject, 'Verzoek ingetrokken / Request withdrawn');
+  assert.match(msg.text, /De afzender heeft het verzoek ingetrokken/);
+  assert.match(msg.text, /The sender withdrew the request/);
+  for (const part of [msg.subject, msg.text, msg.html]) assert.ok(!part.includes(id), 'no envelope id');
+  assert.equal(await rc.exists(signNotify.PARTIES_PREFIX + id), 0, 'the addresses are gone');
+  assert.equal(await rc.get(signNotify.KEY_PREFIX + id), null, 'the record is gone');
+  assert.equal(await signNotify.afterWithdraw({ client: rc, envelopeId: id, sendEmail: mail.sendEmail, partyTemplate: emailTemplates.requestStoppedPartyEmail }), 'skipped', 'a second withdrawal mails nobody');
+});
+
+test('a refusal also tells the other parties, not the one who declined, and not the sender twice', async (t) => {
+  if (!rc) return t.skip('redis declared absent');
+  const id = envId('dec2');
+  await signNotify.rememberSender(rc, id, SENDER);
+  const A = `da_${RUN}@example.com`;
+  const B = `db_${RUN}@example.com`;
+  await signNotify.rememberParties(rc, id, [A, B, SENDER.email]);
+  const mail = capture();
+  assert.equal(await signNotify.afterDecline({ client: rc, envelopeId: id, sendEmail: mail.sendEmail, template: emailTemplates.signatureDeclinedEmail, partyTemplate: emailTemplates.requestStoppedPartyEmail, declinerEmail: A.toUpperCase() }), 'sent');
+  assert.deepEqual(mail.sent.map((m) => m.to).sort(), [B, SENDER.email.toLowerCase()].sort());
+  const toB = mail.sent.find((m) => m.to === B).msg;
+  assert.equal(toB.subject, 'Verzoek gestopt / Request stopped');
+  assert.match(toB.text, /Een andere ondertekenaar heeft het verzoek geweigerd/);
+  const toSender = mail.sent.find((m) => m.to === SENDER.email.toLowerCase()).msg;
+  assert.match(toSender.text, /Een ondertekenaar heeft uw verzoek van \d{1,2} \w+ \d{4} geweigerd/);
+});
+
+test('server.js tells the parties after a withdrawal and after a refusal, without awaiting the mail', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const cancel = src.match(/api\.post\("\/user\/documents\/:id\/cancel"[\s\S]*?\n\}\);/);
+  assert.ok(cancel);
+  assert.match(cancel[0], /\n      signNotify\.afterWithdraw\(\{ client: redis\(\), envelopeId: id, sendEmail: emailTemplates\.sendEmail, partyTemplate: emailTemplates\.requestStoppedPartyEmail \}\)/);
+  assert.doesNotMatch(cancel[0], /await signNotify\.afterWithdraw/);
+  const decline = src.match(/api\.post\("\/user\/envelopes\/:id\/decline"[\s\S]*?\n\}\);/);
+  assert.match(decline[0], /partyTemplate: emailTemplates\.requestStoppedPartyEmail, declinerEmail: req\.userSession\.email/);
 });

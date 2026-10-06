@@ -78,7 +78,7 @@ CRED_ID = await page.evaluate(async () => {
 });
 
 const phase1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=22');
+  const m = await import('/js/parasign-signer.js?v=23');
   const pqc = await import('/vendor/paramant-pqc.js');
   const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
@@ -125,7 +125,7 @@ const phase1 = await page.evaluate(async () => {
 
 // Phase 2a: ensureSigningKey branching + ephemeral TOTP enrol (admin stubbed ok).
 const phase2a = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=22');
+  const m = await import('/js/parasign-signer.js?v=23');
   const pqc = await import('/vendor/paramant-pqc.js');
   const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
@@ -151,14 +151,14 @@ const phase2a = await page.evaluate(async () => {
 // Phase 2b: TOTP enrol error mapping (admin stub returns relay 403s).
 totpResp = { status: 403, body: { error: 'invalid_totp' } };
 const phase2b1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=22');
+  const m = await import('/js/parasign-signer.js?v=23');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J1 relay 403 invalid_totp -> totp_invalid', c==='totp_invalid', c);
   return T;
 });
 totpResp = { status: 403, body: { error: 'no_totp_setup' } };
 const phase2b2 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=22');
+  const m = await import('/js/parasign-signer.js?v=23');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J2 relay 403 no_totp_setup -> totp_unavailable', c==='totp_unavailable', c);
   return T;
@@ -168,7 +168,7 @@ totpResp = { status: 200, body: { ok: true } };
 // Phase 2c: server 409 no_passkey path.
 noPasskeyMode = true;
 const phase2c = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=22');
+  const m = await import('/js/parasign-signer.js?v=23');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   await delDB();
@@ -409,12 +409,32 @@ await drawPage.mouse.down();
 await drawPage.mouse.move(drawBox.x + 150, drawBox.y + 35, { steps: 12 });
 await drawPage.mouse.move(drawBox.x + 260, drawBox.y + 100, { steps: 12 });
 const inkDuringPointerDown = await countInk();
+// Time pointerup -> "Verder" enabled inside the page, on the page clock. A
+// Node-side Date.now() also counted every Playwright round trip of the poll
+// loop, and on a busy CI runner that alone crossed 200 ms (204 ms, PR #573)
+// while the page itself had no delay. The bound stays 200 ms: the old 250 ms
+// debounce this guards against still fails it.
+await drawPage.evaluate(() => {
+  const btn = document.getElementById('ds-identity-continue');
+  window.__sigExport = { up: null, enabled: null };
+  window.addEventListener('pointerup', () => { window.__sigExport.up = performance.now(); }, { capture: true, once: true });
+  const obs = new MutationObserver(() => {
+    if (!btn.disabled && window.__sigExport.up !== null && window.__sigExport.enabled === null) {
+      window.__sigExport.enabled = performance.now();
+      obs.disconnect();
+    }
+  });
+  obs.observe(btn, { attributes: true, attributeFilter: ['disabled'] });
+});
 const exportStartedAt = Date.now();
 await drawPage.mouse.up();
 while (Date.now() - exportStartedAt < 1000 && await drawPage.locator('#ds-identity-continue').isDisabled()) {
   await drawPage.waitForTimeout(10);
 }
-const exportDelayMs = Date.now() - exportStartedAt;
+const sigExport = await drawPage.evaluate(() => window.__sigExport);
+const exportDelayMs = (sigExport.up !== null && sigExport.enabled !== null)
+  ? Math.round(sigExport.enabled - sigExport.up)
+  : Infinity;
 const phase5 = {
   inkDuringPointerDown,
   exportDelayMs,

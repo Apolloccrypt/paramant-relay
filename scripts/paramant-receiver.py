@@ -216,10 +216,24 @@ def pickup(relay_url, key, phrase, output):
         if aes_key: _zero(aes_key)
         _zero(entropy)
 
+
+def resolve_relay(value):
+    """A hosted sector name, or the URL of your own relay (API-36-A: the CLI
+    example on /docs has to work against a self-host too). https only, except
+    plain http to this machine for a local relay."""
+    import re
+    v = (value or "").strip()
+    if v in RELAYS:
+        return RELAYS[v]
+    if re.match(r"^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$", v) or re.match(r"^http://(127\.0\.0\.1|localhost)(:[0-9]+)?/?$", v):
+        return v.rstrip("/")
+    raise argparse.ArgumentTypeError(f"--relay: a sector ({', '.join(RELAYS)}) or https://your-relay, not {v!r}")
+
 def main():
     p = argparse.ArgumentParser(description=f"PARAMANT Receiver v{VERSION}")
     p.add_argument("--key",        required=True)
-    p.add_argument("--relay",      default="health", choices=list(RELAYS.keys()))
+    p.add_argument("--relay",      default="health", type=resolve_relay, metavar="SECTOR|URL",
+                   help="hosted sector (" + ", ".join(RELAYS) + ") or the https URL of your own relay")
     p.add_argument("--hash",       help="Specifieke hash ophalen")
     p.add_argument("--pickup",     help='12-woord BIP39 mnemonic voor anonieme drop',
                    metavar="MNEMONIC")
@@ -232,7 +246,7 @@ def main():
     p.add_argument("--version",    action="version", version=f"%(prog)s {VERSION}")
     args = p.parse_args()
 
-    relay_url = RELAYS[args.relay]
+    relay_url = args.relay
     global SECRET
     SECRET = transfer_secret(args.secret)
     if not args.no_decrypt and not args.pickup and SECRET is None:

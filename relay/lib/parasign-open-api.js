@@ -462,8 +462,10 @@ async function createEnvelopeRun(deps, apiKey, mode, rec, { d, bodyHash, idemKey
   }
 
   // envCreateRateOk is now the fleet-wide (redis-backed) limiter, so await it.
-  if (!(await envCreateRateOk(apiKey))) {
-    const left = 3600 - Math.floor((Date.now() % 3600000) / 1000);
+  // true/false (old stubs) or { ok, retryAfterMs } (the sliding window).
+  const rl = await envCreateRateOk(apiKey);
+  if (!(rl === true || (rl && rl.ok === true))) {
+    const left = rl && rl.retryAfterMs ? Math.max(1, Math.ceil(rl.retryAfterMs / 1000)) : 3600;
     return jsonRes(res, 429, { error: 'rate_limited', message: 'Envelope create quota exceeded (50/hour/key).', retry_after_s: left }, J, { 'Retry-After': String(left) });
   }
 
@@ -833,7 +835,7 @@ async function getDocument(deps, id, token, rec) {
 // Does NO authorization and NO status check -- the caller gates that (receipt:
 // authorizeReceipt + completed; export: completed-only). Throws if the notary
 // sign fails (caller maps to a 500 / skips the envelope).
-function buildEnvelopePsign({ env, meta, canonicalJSON, sigEngine, relayIdentity, publicOrigin }) {
+function buildEnvelopePsign({ env, meta, canonicalJSON, sigEngine, relayIdentity, publicOrigin, relayId }) {
   const m = meta || {};
   const psign = {
     type: 'parasign-envelope-receipt',
@@ -868,6 +870,10 @@ function buildEnvelopePsign({ env, meta, canonicalJSON, sigEngine, relayIdentity
       relay_pk_hash: relayIdentity.pk_hash,
       relay_public_key: Buffer.from(relayIdentity.pk).toString('base64'),
       relay_pubkey_url: (publicOrigin || 'https://paramant.app') + '/v2/pubkey',
+      // Which relay notarised this, by its own public URL (RELAY_SELF_URL),
+      // so a self-host's proof names the self-host (matrix API-16-N). Inside
+      // the notary signature like every other field.
+      relay_id: relayId || publicOrigin || 'https://paramant.app',
     },
   };
   // Sandbox/test evidence marker: a psk_test_ envelope (driven to completion
@@ -917,7 +923,7 @@ async function getReceipt(deps, id, token, rec) {
   const m = (await resolveStore(deps).getMeta(id)) || {};
 
   let psign;
-  try { psign = buildEnvelopePsign({ env, meta: m, canonicalJSON, sigEngine, relayIdentity, publicOrigin: deps.publicOrigin }); }
+  try { psign = buildEnvelopePsign({ env, meta: m, canonicalJSON, sigEngine, relayIdentity, publicOrigin: deps.publicOrigin, relayId: deps.relayId }); }
   catch (e) { return errRes(res, 500, 'notary_sign_failed', e.message, J); }
 
   const base = (m.original_filename || env.original_filename || 'document').replace(/\.pdf$/i, '') || 'document';

@@ -79,7 +79,10 @@ test('without redis, envelope creation is capped at 50 per hour for one key', as
   }
   const over = await createEnvelope(srv, key);
   assert.strictEqual(over.status, 429, 'the 51st create in an hour must be refused');
-  assert.strictEqual(over.headers['retry-after'], '3600', 'and must say when to come back');
+  // A sliding hour: come back when the oldest create of the last hour falls
+  // out of it, so a little under 3600 s after the first one.
+  const ra = Number(over.headers['retry-after']);
+  assert.ok(ra > 3500 && ra <= 3600, `and must say when to come back, got ${over.headers['retry-after']}`);
   assert.match(String(over.json.error), /50\/hour/);
 
   // The budget is per KEY, not per process: a second tenant is untouched.
@@ -119,17 +122,19 @@ test('with redis the budget is FLEET-WIDE: two relays share one 50/hour cap', as
     const onB = await createEnvelope(b, key);
     assert.strictEqual(onB.status, 429,
       'relay B must see relay A\'s spend; a per-process counter would have let this through');
-    assert.strictEqual(onB.headers['retry-after'], '3600');
+    const raB = Number(onB.headers['retry-after']);
+    assert.ok(raB > 3500 && raB <= 3600, `retry-after ${onB.headers['retry-after']}`);
     // And A agrees.
     assert.strictEqual((await createEnvelope(a, key)).status, 429);
 
     // The counter is exactly where the code says it is, so an operator can read
     // it, and it carries an expiry (no key left behind for an hour that passed).
-    const bucket = Math.floor(Date.now() / 3_600_000);
-    const rk = `paramant:rl:envcreate:${bucket}:${key}`;
-    assert.strictEqual(Number(await rc.get(rk)), ENV_CREATE_LIMIT + 2, 'refused attempts are counted too');
-    const ttl = await rc.ttl(rk);
-    assert.ok(ttl > 0 && ttl <= 3600, `the bucket must expire with its hour, got ttl ${ttl}`);
+    // A sliding window in one sorted set per key (hashed), where an operator
+    // can read it: the 50 allowed creates, not the refusals, and an expiry.
+    const rk = `paramant:rl:envcreate:sw:${require('crypto').createHash('sha256').update(key).digest('hex').slice(0, 32)}`;
+    assert.strictEqual(Number(await rc.zCard(rk)), ENV_CREATE_LIMIT, 'only the allowed creates sit in the window');
+    const pttl = await rc.pTTL(rk);
+    assert.ok(pttl > 0 && pttl <= 3_600_000, `the window must expire within the hour, got pttl ${pttl}`);
     await rc.del(rk);
   } finally {
     a.stop(); b.stop();

@@ -1,6 +1,6 @@
 # PARAMANT — Post-Quantum Encrypted File Relay
 
-[![Version](https://img.shields.io/badge/version-v3.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.1.1-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 [![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
@@ -32,7 +32,7 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3001/health
-# {"ok":true,"version":"3.1.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.1.1","sector":"health","edition":"licensed"}
 ```
 
 Or on a Raspberry Pi / fresh VPS:
@@ -219,14 +219,14 @@ curl -X POST https://paramant.app/v1/envelopes \
         ],
         "webhook_url": "https://app.example.com/hooks/parasign"
       }'
-# 201 -> { "id": "env_...", "status": "sent",
-#          "signers": [ { "sign_url": "https://paramant.app/..." } ],
+# 201 -> { "id": "Us4rFoLj35sU_4cOlPJcs3eMZlw4xjMp", "status": "sent",
+#          "signers": [ { "sign_url": "https://paramant.app/co-sign?env=...&p=0&t=..." } ],
 #          "webhook_secret": "..." }   # returned once, for HMAC verification
 
 # 2. The signer opens sign_url and signs ML-DSA-65 client-side (hosted ceremony).
 
 # 3. On completion, pull the full .psign proof.
-curl https://paramant.app/v1/envelopes/env_.../receipt \
+curl https://paramant.app/v1/envelopes/<id>/receipt \
   -H "Authorization: Bearer psk_live_..." \
   --output quote-8842.psign
 ```
@@ -409,7 +409,7 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
 ```bash
 curl https://health.paramant.app/health
-# {"ok":true,"version":"3.1.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.1.1","sector":"health","edition":"licensed"}
 ```
 
 ### CT log (public)
@@ -515,26 +515,20 @@ pip install paramant-sdk
 ```
 
 ```python
-from paramant import GhostPipe
+from paramant_sdk import GhostPipe
 
 gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
+gp.receive_setup()            # register this device's keys first (once per device)
 
-# Send — returns (hash, inclusion_proof)
+# Send: returns (hash, inclusion_proof)
 hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
-# proof contains leaf_hash, leaf_index, tree_size, audit_path, root, sth
 
-# Receive — returns (data, receipt)
+# Receive: returns (data, receipt); burn-on-read
 data, receipt = gp.receive(hash_)
-# receipt contains blob_hash, burn_confirmed, tree_size_at_retrieval, ML-DSA-65 signature
-
-# Verify receipt (calls POST /v2/verify-receipt)
-result = gp.verify_receipt(receipt)
-assert result["valid"]
-
-# Anonymous drop with 12-word mnemonic
-mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data, _  = gp.receive(mnemonic)
 ```
+
+The anonymous drop (`gp.drop()` / `gp.pickup()`) does not work in 3.0.0 against
+the current relay (`400 hash_mismatch`); see [docs/api.md](docs/api.md#python-sdk).
 
 ---
 

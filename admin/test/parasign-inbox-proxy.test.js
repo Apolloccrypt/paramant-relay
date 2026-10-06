@@ -10,9 +10,10 @@
 //   1. the browser never names an account or an address. The inbox forwards the
 //      session's own key and the relay derives the address from it; the resend
 //      asserts the hash of the SESSION address and mails that same address;
-//   2. the resend does not mint. It reuses the invitation template and the
-//      invite token the relay stored, so the seven-day window is untouched and
-//      the link already in the reader's mailbox keeps working;
+//   2. the resend does not mint. The admin mails nothing; the sender is asked
+//      and resends the same invitation (same token, same key half) from the
+//      browser that holds it, so the seven-day window is untouched and the
+//      link already in the reader's mailbox keeps working;
 //   3. it is capped at one per envelope per hour, on a bucket keyed to the
 //      session account as well as the envelope, so an id a caller gets to name
 //      can cost that caller a resend and never deny anybody else theirs.
@@ -56,15 +57,25 @@ test('the resend asserts the session address and can only mail that address', ()
   assert.match(resendRoute[0], /authUser/);
   assert.match(resendRoute[0], /const \{ user_id, email \} = req\.userSession/);
   assert.match(resendRoute[0], /"X-Verified-Email-Hash": partyEmailHashAdmin\(email\)/);
-  assert.match(resendRoute[0], /sendEmail\(email,/,
-    'the mail goes to the session address, which is the address the hash was asserted for');
+  // COSIGN-46-A (2026-10-05): no mail from here at all. A link rebuilt from
+  // the stored token carries no key half; the sender is asked instead and
+  // resends from the dashboard, with the link that opens the document.
+  assert.doesNotMatch(resendRoute[0], /sendEmail\(/,
+    'the admin must not mail a link that opens only the request');
+  assert.match(resendRoute[0], /if \(!invite\.sender_notified\) return res\.status\(502\)\.json\(\{ error: "sender_not_reachable" \}\)/);
+  assert.match(resendRoute[0], /asked_sender: true/);
   assert.doesNotMatch(resendRoute[0], /req\.body/,
     'nothing about a resend may come from the request body');
 });
 
-test('the resend reuses the invitation mail and mints no token', () => {
-  assert.match(resendRoute[0], /emailTemplates\.signingInviteEmail\(/,
-    'the resent mail is the invitation mail, not a second template that could drift from it');
+test('the resend mints no token, and the sender resends the same invitation', () => {
+  // The resent mail is the invitation mail, through the same route as the
+  // first one (dashboard.js resendSignerInvite -> /invitations).
+  const dash = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'js', 'dashboard.js'), 'utf8');
+  const fn = dash.slice(dash.indexOf('function resendSignerInvite'), dash.indexOf('function openResendFromMail'));
+  assert.match(fn, /'\/api\/user\/envelopes\/' \+ encodeURIComponent\(id\) \+ '\/invitations'/);
+  assert.match(fn, /invite_url: link\.url/);
+  assert.match(relaySource, /'\/dashboard\?herzend=' \+ encodeURIComponent\(String\(envelopeId\)\)/);
   assert.doesNotMatch(resendRoute[0], /randomBytes|createHash\("sha3/,
     'a resend that generated anything would be minting a capability');
   // The relay hands back what it stored; nothing on either side writes a token.
@@ -108,7 +119,7 @@ test('neither invitation mail can carry the document key, and both say so', () =
     const all = mail.text + mail.html + mail.subject;
     assert.ok(!all.includes(KEY), `${label} carries no document key`);
     assert.ok(!all.includes('Engagement letter'), `${label} carries no filename`);
-    assert.match(mail.text, /It does not open the document/,
+    assert.match(mail.text, /opens the request, but not the document/,
       `${label} says the link opens the request and not the document`);
   }
   assert.equal(resent.subject, original.subject, 'both are the same mail about the same request');

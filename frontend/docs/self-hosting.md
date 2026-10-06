@@ -1,4 +1,4 @@
-# Self-Hosting Guide: PARAMANT Relay v3.1.0
+# Self-Hosting Guide: PARAMANT Relay v3.1.1
 
 **License:** BUSL-1.1 — source available, free for up to 5 active API keys per relay.
 
@@ -14,7 +14,7 @@ curl -fsSL https://paramant.app/install.sh | bash
 # (falls back to a localhost URL on a headless host)
 ```
 
-The installer clones release tag `v3.1.0` (override with `PARAMANT_VERSION`) and
+The installer clones release tag `v3.1.1` (override with `PARAMANT_VERSION`) and
 writes a `.env` (mode 600) with everything the compose stack needs:
 `ADMIN_TOKEN`, `REDIS_PASSWORD` and `RELAY_REDIS_URL`
 (`redis://:<password>@redis:6379`), `PARAMANT_TOTP_MASTER_KEY` (32 bytes,
@@ -43,7 +43,7 @@ cp .env.example .env
 nano .env
 docker compose up -d
 curl http://localhost:3001/health
-# {"ok":true,"version":"3.1.0","sector":"health","edition":"community"}
+# {"ok":true,"version":"3.1.1","sector":"health","edition":"community"}
 ```
 
 **Option 3 — Raspberry Pi / arm64:**
@@ -409,8 +409,8 @@ By hand: the Docker image is built from the `relay/` subdirectory in your clone.
 
 ```bash
 cd /path/to/paramant-relay   # wherever you cloned the repo
-git fetch --depth 1 origin tag v3.1.0
-git checkout v3.1.0
+git fetch --depth 1 origin tag v3.1.1
+git checkout v3.1.1
 
 # Build new images (node_modules cached; only relay.js layer is rebuilt)
 docker compose build relay-main relay-health relay-finance relay-legal relay-iot
@@ -576,7 +576,7 @@ Expected output (one entry per registered relay):
     {
       "url": "https://relay.yourdomain.com",
       "sector": "relay",
-      "version": "3.1.0",
+      "version": "3.1.1",
       "edition": "community",
       "pk_hash": "3d9b960c...",
       "verified_since": "2026-04-11T02:14:13Z",

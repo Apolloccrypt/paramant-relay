@@ -273,7 +273,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Paramant voor <em>Gmail</em>: versleutelde bijlagen versturen zonder uw inbox te verlaten.</h1>
 
-  <p class="lead">De Paramant-extensie voor Chrome zet een knop in het opstelvenster van Gmail. U kiest een bestand, de extensie uploadt het naar Paramant en zet de link die na het lezen vervalt in uw e-mail. De webapp en de extensies wissen het bestand na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op Firm en 100 keer op Enterprise.</p>
+  <p class="lead">De Paramant-extensie voor Chrome zet een knop in het opstelvenster van Gmail. U kiest een bestand. De extensie uploadt het naar Paramant en zet een link in uw e-mail die na het lezen vervalt. De webapp en de extensies wissen het bestand na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op Firm en 100 keer op Enterprise.</p>
 
   <h2>Voordat u begint</h2>
 
@@ -330,7 +330,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>Klik op het Paramant-pictogram en kies een bestand</h2>
       <p>Klik op <strong>Paramant</strong>. Er opent een venster om een bestand te kiezen. Kies het bestand dat u wilt versturen. De extensie versleutelt het in uw browser en uploadt het daarna. De voortgang ziet u in een balk bovenin het venster.</p>
-      <p>Bestanden tot 500 MB worden ondersteund. Dat is de grens per bestand op elk plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). De extensie knipt het bestand in stukken en uploadt per stuk één vast blok van 5 MB. Die 5 MB is dus het formaat onderweg, niet de grootte van het bestand dat u mag versturen.</p>
+      <p>U kunt bestanden tot 500 MB versturen. Dat is de grens per bestand op elk plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). De extensie knipt het bestand in stukken en uploadt per stuk één vast blok van 5 MB. Die 5 MB is dus het formaat onderweg, niet de grootte van het bestand dat u mag versturen.</p>
     </div>
   </div>
 
@@ -349,7 +349,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">4</div>
     <div class="step-body">
       <h2>De ontvanger downloadt het bestand</h2>
-      <p>Uw ontvanger heeft geen account nodig. Hij klikt op de link, ziet hoe lang het bestand nog klaarstaat, klikt op <strong>Bestand downloaden</strong> en krijgt het bestand met de oorspronkelijke naam. Direct na die eerste download worden link en bestand gewist, op elk plan. De extensie vraagt de relay namelijk nooit om een tweede keer lezen, en een tweede poging krijgt een 404.</p>
+      <p>Uw ontvanger heeft geen account nodig. Hij klikt op de link, ziet hoe lang het bestand nog klaarstaat, klikt op <strong>Bestand downloaden</strong> en krijgt het bestand met de oorspronkelijke naam. Direct na die eerste download worden link en bestand gewist, op elk plan. De extensie vraagt de relay nooit om een tweede keer lezen. Een tweede poging krijgt een 404.</p>
     </div>
   </div>
 
@@ -435,6 +435,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

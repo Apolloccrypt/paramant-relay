@@ -262,14 +262,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Problemen met sessie en <em>inloggen</em>.</h1>
 
-  <p class="lead">De meeste inlogproblemen bij Paramant hebben een handvol oorzaken. Zoek hieronder uw foutmelding op en volg de stappen.</p>
+  <p class="lead">De meeste inlogproblemen hebben maar een paar oorzaken. Zoek hieronder uw foutmelding op en volg de stappen.</p>
 
   <h2>Veelvoorkomende problemen</h2>
 
   <div class="issue-block">
     <div class="issue-header">"Invalid TOTP code", terwijl de code goed lijkt</div>
     <div class="issue-body">
-      <p><strong>Meest waarschijnlijke oorzaak: de klok wijkt af.</strong> TOTP-codes hangen af van de tijd. Loopt de klok van uw telefoon meer dan 30 seconden voor of achter, dan wordt elke code geweigerd.</p>
+      <p><strong>Meestal loopt de klok niet gelijk.</strong> TOTP-codes hangen af van de tijd. Loopt de klok van uw telefoon meer dan 30 seconden voor of achter, dan wordt elke code geweigerd.</p>
       <p>Op een iPhone: Instellingen &rarr; Algemeen &rarr; Datum en tijd &rarr; zet <strong>Automatisch instellen</strong> uit en weer aan.<br>
       Op Android: Instellingen &rarr; Algemeen beheer &rarr; Datum en tijd &rarr; zet <strong>Automatische datum en tijd</strong> aan.</p>
       <p><strong>Tweede mogelijkheid: de code is al gebruikt.</strong> Elke code van 30 seconden wordt maar één keer geaccepteerd. Wacht tot de volgende code verschijnt (let op de voortgangsring in uw authenticator-app) en vul die nieuwe code meteen in.</p>
@@ -288,7 +288,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="issue-header">"Session expired", opnieuw inloggen</div>
     <div class="issue-body">
       <p>Een sessie loopt af na <strong>een uur zonder activiteit</strong>. Zolang u bezig bent, schuift dat uur mee, maar na <strong>twaalf uur</strong> loopt elke sessie af, hoe actief u ook was. Dat is bewust: Paramant verwerkt gevoelige bestanden en kent geen blijvende sessies. Ga terug naar <a href="/auth/login">paramant.app/auth/login</a> en log opnieuw in.</p>
-      <p>Wordt u vaak midden in uw werk uitgelogd, overweeg dan de API rechtstreeks vanuit een script te gebruiken in plaats van het webdashboard. Dan onderbreekt een verlopen sessie uw werk niet.</p>
+      <p>Wordt u vaak midden in uw werk uitgelogd? Gebruik dan eventueel de API vanuit een script in plaats van het webdashboard. Dan onderbreekt een verlopen sessie uw werk niet.</p>
     </div>
   </div>
 
@@ -382,6 +382,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

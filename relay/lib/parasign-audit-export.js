@@ -11,12 +11,13 @@
 // tree head (STH). Driven the DI way (injected state + a fake-free `res`) so the
 // tier gate is unit-testable without a socket (test/parasign-audit-export.test.js).
 const tierGate = require('./tier-gate');
+const { neutralize } = require('./csv-safe');
 
 const DEFAULT_LIMIT = 1000;
 const MAX_LIMIT = 10000;
 
 function csvCell(v) {
-  const s = String(v == null ? '' : v);
+  const s = neutralize(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
@@ -34,10 +35,10 @@ function csvCell(v) {
 //   envStore               — EnvelopeStore (listAccountEnvelopeIds + getForReceipt)
 //   metaStore              — ParaSign side-store (getMeta) for the test marker
 //   buildPsign(...)        — parasign-open-api.buildEnvelopePsign (shared recipe)
-//   sigEngine, relayIdentity, canonicalJSON, publicOrigin — notary inputs
+//   sigEngine, relayIdentity, canonicalJSON, publicOrigin, relayId: notary inputs
 async function handle({
   res, J, keyData, memberKeys, auditFor, ctHead, verifyChain, query,
-  account, envStore, metaStore, buildPsign, sigEngine, relayIdentity, canonicalJSON, publicOrigin,
+  account, envStore, metaStore, buildPsign, sigEngine, relayIdentity, canonicalJSON, publicOrigin, relayId,
 }) {
   if (!keyData || keyData.active === false) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -138,7 +139,7 @@ async function handle({
       let meta = null;
       try { meta = metaStore ? await metaStore.getMeta(id) : null; } catch { meta = null; }
       let psign = null;
-      try { psign = buildPsign({ env, meta, canonicalJSON, sigEngine, relayIdentity, publicOrigin }); }
+      try { psign = buildPsign({ env, meta, canonicalJSON, sigEngine, relayIdentity, publicOrigin, relayId }); }
       catch { psign = null; }
       envelopes.push({ envelope_id: id, status: 'completed', psign });
     }

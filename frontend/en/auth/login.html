@@ -53,7 +53,7 @@
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=3"></script>
+<script src="/js/format-date.js?v=5"></script>
 </head>
 <body>
 
@@ -61,11 +61,11 @@
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -82,11 +82,11 @@
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -129,15 +129,14 @@
 </form>
 
 <div id="sha1-notice" class="auth-note" hidden role="note">
-  <p><strong>You are signed in.</strong> A tip for later: your authenticator app (Google Authenticator, for example) makes codes the common, slightly older way. That works fine; some other apps protect a little more strongly. <a href="/en/help/authenticator-apps">See which apps those are</a>.</p>
+  <p><strong>You are signed in.</strong> A tip for later: your authenticator app (Google Authenticator, for example) makes codes the common, slightly older way. That works fine. Some other apps protect a little more strongly. <a href="/en/help/authenticator-apps">See which apps those are</a>.</p>
   <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Continue</a>
   <p class="auth-note-sub" id="sha1-auto" aria-live="polite"></p>
 </div>
 
 <p class="footer-text auth-foot">
-  Lost your authenticator app? <a href="/en/auth/backup">Sign in with a backup code</a><br>
-  Linking a new authenticator app? <a href="/en/auth/request-reset">You can with a backup code</a><br>
-  Backup codes gone too? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address; support restores access. <a href="/en/help/lost-authenticator">How it works</a><br>
+  Lost your authenticator app? With a backup code you can <a href="/en/auth/backup">sign in</a> or <a href="/en/auth/request-reset">link a new app</a>.<br>
+  Backup codes gone too? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address. Support then restores your access. <a href="/en/help/lost-authenticator">How it works</a><br>
   No account yet? <a href="/en/signup">Create one</a>
 </p>
 
@@ -149,9 +148,9 @@
 
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
-<script src="/js/auth-login.js?v=8"></script>
-<script type="module" src="/js/passkey.js?v=9"></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
+<script src="/js/auth-login.js?v=9"></script>
+<script type="module" src="/js/passkey.js?v=11"></script>
 
 <footer class="legal-strip">
   <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a><span class="legal-sep">&middot;</span><a href="/en/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/auth/login" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></span>

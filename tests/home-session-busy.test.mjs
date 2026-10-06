@@ -36,6 +36,7 @@ async function open(slug, { signedInHere, verify }) {
   const state = { verify };
   await page.route('**/api/**', (route) => {
     if (route.request().url().includes('/api/user/session/verify')) return state.verify(route);
+    if (route.request().url().includes('/api/user/me') && state.me) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.me) });
     return route.fulfill({ status: 429, headers: { 'Retry-After': '1' }, body: '' });
   });
   await page.goto(ORIGIN + slug);
@@ -79,10 +80,25 @@ test('/: a visitor this browser never saw signed in keeps the pitch under a last
 test('/: the pending workbench turns into the real one once the check answers', async () => {
   const t = await open('/', { signedInHere: true, verify: busy });
   await t.page.waitForTimeout(4500);
+  t.state.me = { email: 'anna@kantoor.nl', label: 'Demo Acme' };
   t.state.verify = (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"authenticated":true,"email":"anna@kantoor.nl"}' });
   await t.page.waitForTimeout(6500);
   const s = await t.read();
   assert.ok(s.bench && !s.pitch && s.notice === '', JSON.stringify(s));
-  assert.match(await t.page.textContent('[data-home-name]'), /anna/);
+  // The greeting is the name the customer gave, never the local-part of the
+  // address (acceptatie 3.1.1, taal 41).
+  assert.equal(await t.page.textContent('[data-home-name]'), ', Demo Acme');
+  await t.ctx.close();
+});
+
+test('/: without a name on the account the heading stays plain, no local-part', async () => {
+  const t = await open('/', { signedInHere: true, verify: busy });
+  await t.page.waitForTimeout(4500);
+  t.state.me = { email: 'afzender@kantoor.nl', label: null };
+  t.state.verify = (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"authenticated":true,"email":"afzender@kantoor.nl"}' });
+  await t.page.waitForTimeout(6500);
+  const s = await t.read();
+  assert.ok(s.bench && !s.pitch, JSON.stringify(s));
+  assert.equal(await t.page.textContent('[data-home-name]'), '');
   await t.ctx.close();
 });

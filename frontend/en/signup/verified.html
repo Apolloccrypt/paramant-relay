@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
   <style>
     /* Every colour here is a token from app-2026.css, so this page follows the
        theme instead of staying light inside a dark shell. Section 5 of
@@ -108,11 +108,11 @@
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -129,11 +129,11 @@
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -151,7 +151,7 @@
 
   <h1 class="vtitle">One step left. Open the second email.</h1>
 
-  <p class="vlead">Your address is confirmed and your account exists. Paramant has no passwords, so the last step is to link a passkey or an authenticator app, and that happens through the second email we just sent you.</p>
+  <p class="vlead">Your address is confirmed and your account exists. Paramant has no passwords. So as a last step you link a passkey or an authenticator app. You do that through the second email we just sent you.</p>
 
   <div class="next-box">
     <div class="next-step">Do this now</div>
@@ -165,11 +165,11 @@
     <h2>Frequently asked</h2>
     <details>
       <summary>I don't see the second email</summary>
-      <p>The email is on its way, but we cannot promise how fast your provider delivers it. Check your spam and junk folders; the sender is <code>noreply@paramant.app</code>. Still nothing after a few minutes? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from the same address and we send a new setup link. The authenticator reset page asks for a back-up code, and you only get those when you link the app.</p>
+      <p>The email is on its way, but we cannot promise how fast your provider delivers it. Check your spam and junk folders. The sender is <code>noreply@paramant.app</code>. Still nothing after a few minutes? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from the same address and we send a new setup link. The authenticator reset page asks for a back-up code, and you only get those when you link the app.</p>
     </details>
     <details>
       <summary>Where's the 6-digit code in the email?</summary>
-      <p>It is not in the email, and it never will be. The codes are produced on your phone by the authenticator app, once you have scanned the QR code in the setup email. Any standard app works; <a href="/en/help/authenticator-apps">the help page compares them</a>.</p>
+      <p>It is not in the email, and it never will be. The codes are produced on your phone by the authenticator app, once you have scanned the QR code in the setup email. Any standard app works. <a href="/en/help/authenticator-apps">the help page compares them</a>.</p>
     </details>
     <details>
       <summary>I already completed the setup</summary>

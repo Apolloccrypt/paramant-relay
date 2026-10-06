@@ -26,7 +26,7 @@
 // The manifest itself did not change: type, page and coordinates, hashed byte
 // for byte as before (relay/envelope.js normaliseAppearance).
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=22';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=23';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
@@ -34,7 +34,9 @@ import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentity
 import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk, paraafCoveredPages, pageListText } from '/js/cosign-layout.js?v=5';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
-import { stashReturn, resumeReturn } from '/js/login-return.js?v=1';
+import { stashReturn, resumeReturn, stashSignupReturn, takeSignupReturn } from '/js/login-return.js?v=2';
+import { rememberShare, recallShare, forgetShare } from '/js/cosign-share-memory.js?v=2';
+import { cosignHeading } from '/js/cosign-heading.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -43,9 +45,110 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 const EN = document.documentElement.lang === 'en';
 const L = (nl, en) => (EN ? en : nl);
 
-// Back from signing in: put the full address (token, key fragment) back first,
-// so everything below reads the link as it was (login-return.js).
-try { resumeReturn(window.sessionStorage, location, history); } catch { /* no storage: the link as it is */ }
+// Back from signing in: put the full address (token, key fragment) back
+// first, so everything below reads the link as it was (login-return.js); it
+// waited in this tab's sessionStorage.
+// Back from making an account, which goes through two mails and so new tabs:
+// this browser kept only which request and which party (review #566), never
+// the token or the key. The full address is asked from a tab that still shows
+// the invitation (askHandoff below, in memory, nothing stored); without one,
+// the page says to open the mail link again.
+let __localStore = null;
+try { __localStore = window.localStorage; } catch { __localStore = null; }
+let __signupResume = false;
+try {
+  if (!resumeReturn(window.sessionStorage, location, history) && __localStore
+      && !new URLSearchParams(location.search).get('t')) {
+    __signupResume = takeSignupReturn(__localStore, location);
+  }
+} catch { /* no storage: the link as it is */ }
+
+// Tab to tab, same origin only, nothing written anywhere: a tab with the full
+// invitation link answers a tab that came back from making an account for the
+// same request and party.
+const HANDOFF = 'paramant:cosign-handoff';
+function sameRequest(a, b) {
+  return a.get('env') === b.get('env') && a.get('p') === b.get('p') && !!a.get('env');
+}
+function answerHandoff() {
+  if (typeof BroadcastChannel !== 'function') return;
+  if (!new URLSearchParams(location.search).get('t')) return;
+  const ch = new BroadcastChannel(HANDOFF);
+  ch.onmessage = (ev) => {
+    const m = ev && ev.data;
+    if (!m || m.want !== true) return;
+    const mine = new URLSearchParams(location.search);
+    if (!sameRequest(mine, new URLSearchParams(String(m.search || '')))) return;
+    ch.postMessage({ link: location.pathname + location.search + location.hash, search: String(m.search || '') });
+  };
+}
+function askHandoff(ms = 900) {
+  return new Promise((resolve) => {
+    if (typeof BroadcastChannel !== 'function') return resolve(false);
+    const ch = new BroadcastChannel(HANDOFF);
+    const here = new URLSearchParams(location.search);
+    const done = (ok) => { clearTimeout(timer); try { ch.close(); } catch { /* closed */ } resolve(ok); };
+    const timer = setTimeout(() => done(false), ms);
+    ch.onmessage = (ev) => {
+      const m = ev && ev.data;
+      if (!m || typeof m.link !== 'string' || !m.link.startsWith(location.pathname + '?')) return;
+      const u = new URL(m.link, location.origin);
+      if (!sameRequest(here, u.searchParams) || !u.searchParams.get('t')) return;
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+      done(true);
+    };
+    ch.postMessage({ want: true, search: location.search });
+  });
+}
+
+// Signed in in another tab of this browser: a tab that still says "Inloggen
+// om verder te gaan" goes on by itself (acceptance 3.1.1, 5). The usual way
+// there: the invitee makes an account from this page, the sign-up opens in a
+// new tab and comes back to /co-sign signed in, and this tab stayed on the
+// login button. Three signals, any of which re-asks the session:
+//   - a BroadcastChannel message from a co-sign tab that found a session;
+//   - a storage event as the fallback where BroadcastChannel is missing. The
+//     key is written and removed in the same moment, so nothing stays in the
+//     browser; only the event reaches the other tabs;
+//   - coming back to this tab (focus, visibilitychange), which also covers a
+//     login on any other page.
+// Only a real session reloads the page; the link in this tab still has its
+// token and key, so the reload opens the document.
+const SIGNED_IN_CHANNEL = 'paramant:signed-in';
+const SIGNED_IN_PING = 'paramant:signed-in-ping';
+function announceSignedIn() {
+  try {
+    if (typeof BroadcastChannel === 'function') {
+      const ch = new BroadcastChannel(SIGNED_IN_CHANNEL);
+      ch.postMessage({ signedIn: true });
+      ch.close();
+    }
+  } catch { /* no channel: the fallback below */ }
+  try {
+    if (__localStore) { __localStore.setItem(SIGNED_IN_PING, String(Date.now())); __localStore.removeItem(SIGNED_IN_PING); }
+  } catch { /* storage off: focus still rechecks */ }
+}
+let __watchingSignIn = false;
+function watchForSignIn() {
+  if (__watchingSignIn) return;
+  __watchingSignIn = true;
+  let busy = false;
+  const recheck = async () => {
+    if (busy) return;
+    busy = true;
+    try { if (await loadSession()) { location.reload(); return; } } catch { /* stay */ }
+    busy = false;
+  };
+  window.addEventListener('focus', () => { if (document.visibilityState !== 'hidden') recheck(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') recheck(); });
+  try {
+    if (typeof BroadcastChannel === 'function') {
+      const ch = new BroadcastChannel(SIGNED_IN_CHANNEL);
+      ch.onmessage = (ev) => { if (ev && ev.data && ev.data.signedIn === true) recheck(); };
+    }
+  } catch { /* focus still rechecks */ }
+  window.addEventListener('storage', (ev) => { if (ev && ev.key === SIGNED_IN_PING && ev.newValue) recheck(); });
+}
 
 // The language link has to carry the query (which envelope, which party, the
 // invite token) and the #fragment (the document key). A fragment never leaves
@@ -66,8 +169,8 @@ function showError(m, kind) {
   const step = $('step-error');
   const h = step && step.querySelector('h1'), sub = step && step.querySelector('.sub');
   if (step && !step.dataset.h1) { step.dataset.h1 = h ? h.textContent : ''; step.dataset.sub = sub ? sub.textContent : ''; }
-  if (h) h.textContent = kind === 'busy' ? L('Even te druk', 'Busy for a moment') : kind === 'fault' ? L('Even een storing', 'A fault for a moment') : step.dataset.h1;
-  if (sub) sub.textContent = kind === 'busy' ? L('De link is in orde. Er kwamen even te veel verzoeken tegelijk binnen.', 'The link is fine. Too many requests came in at once.') : kind === 'fault' ? L('De link is in orde. Het ligt aan ons.', 'The link is fine. The fault is ours.') : step.dataset.sub;
+  if (h) h.textContent = kind === 'busy' ? L('Even te druk', 'Busy for a moment') : kind === 'fault' ? L('Even een storing', 'A fault for a moment') : kind === 'ready' ? L('Uw account staat klaar', 'Your account is ready') : step.dataset.h1;
+  if (sub) sub.textContent = kind === 'busy' ? L('De link is in orde. Er kwamen even te veel verzoeken tegelijk binnen.', 'The link is fine. Too many requests came in at once.') : kind === 'fault' ? L('De link is in orde. Het ligt aan ons.', 'The link is fine. The fault is ours.') : kind === 'ready' ? L('Nog \u00e9\u00e9n stap naar het document.', 'One more step to the document.') : step.dataset.sub;
   showStep('step-error');
 }
 function toHex(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0'); return s; }
@@ -121,6 +224,9 @@ function waitForPdfjs() {
 let __envelope = null;
 let __partyIndex = -1;
 let __inviteToken = '';
+// The invite token travels in this header, never in a request URL: a URL ends
+// up in access logs (acceptance r5, B). Only the mailed link itself has ?t=.
+function inviteHeaders() { return __inviteToken ? { 'X-Parasign-Invite-Token': __inviteToken } : {}; }
 let __ownerMode = false;    // the sender's result page (?result=<ref> or ?owner=<id>)
 let __session = null;       // { email } when logged in as the invited recipient
 let __signKey = null;       // { vaultId, pk_b64, fingerprint, hasPrf } — PUBLIC metadata only
@@ -253,7 +359,7 @@ function ownerClosedExplanation(state, env) {
     const when = d && d.declined_at ? L(' op ', ' on ') + humanDate(d.declined_at) : '';
     return L('Geweigerd door ', 'Declined by ') + who + when + L('. Daarmee is dit verzoek gestopt en kan niemand er nog op tekenen. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', '. This request has stopped and nobody can sign it any more. To try again, send a new request.');
   }
-  if (state === 'cancelled') return L('U hebt dit verzoek ingetrokken. Niemand kan er nog op tekenen.', 'You withdrew this request. Nobody can sign it any more.');
+  if (state === 'cancelled') return L('U heeft dit verzoek ingetrokken. Niemand kan er nog op tekenen.', 'You withdrew this request. Nobody can sign it any more.');
   if (state === 'expired') return L('De termijn om te tekenen is voorbij. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', 'The signing period has ended. To try again, send a new request.');
   return '';
 }
@@ -268,8 +374,11 @@ async function init() {
   const envId = (params.get('env') || '').trim();
   const partyIndex = parseInt(params.get('p') || '', 10);
   __inviteToken = (params.get('t') || '').trim();
+  if (__signupResume && !__inviteToken) {
+    return showError(L('Open de link uit de uitnodigingsmail nog een keer, in deze browser. U bent nu ingelogd, dus het document opent dan meteen. De link zelf bewaart deze browser niet, omdat hij de sleutel van het document bevat.', 'Open the link from the invitation email once more, in this browser. You are signed in now, so the document opens straight away. This browser does not keep the link itself, because it holds the key to the document.'), 'ready');
+  }
   if (!envId || !Number.isInteger(partyIndex) || partyIndex < 0) {
-    return showError(L('Deze link is onvolledig. De gegevens van het verzoek ontbreken of kloppen niet.', 'This link is incomplete: the request details are missing or wrong.'));
+    return showError(L('Deze link is niet compleet. Open de link uit de mail nog een keer, of vraag de afzender om een nieuwe.', 'This link is not complete. Open the link from the email once more, or ask the sender for a new one.'));
   }
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(envId)) {
     return showError(L('De link bevat geen geldig verzoek.', 'The link does not contain a valid request.'));
@@ -282,11 +391,11 @@ async function init() {
   try {
     // Ask as this party, not as a passer-by. The invite token is what entitles
     // this page to the document hash, the filename and the other parties.
-    const partyQuery = '?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
-    const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery);
+    const partyQuery = '?p=' + encodeURIComponent(partyIndex);
+    const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery, { headers: inviteHeaders() });
     if (r.status === 404) return showError(L('Dit verzoek bestaat niet, is verlopen of is al gebruikt.', 'This request does not exist, has expired, or was already used.'));
-    if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too many requests from this address. Try again in a minute.'), 'busy');
-    if (!r.ok) return showError(L('Het verzoek kon nu niet worden opgehaald door een storing bij ons. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'The request could not be fetched right now because of a fault on our side. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
+    if (r.status === 429) return showError(L('Even te veel tegelijk vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too much at once from this address. Try again in a minute.'), 'busy');
+    if (!r.ok) return showError(L('Door een storing bij ons lukt het ophalen nu niet. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'A fault on our side stops us from fetching it right now. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
     const data = await r.json();
     __envelope = withPlainLabels(data.envelope);
     if (__partyIndex >= __envelope.party_count) return showError(L('Deze link verwijst naar een ondertekenaar die niet in dit verzoek staat.', 'This link points to a signer who is not part of this request.'));
@@ -307,8 +416,10 @@ async function init() {
     renderEnvelope();
     showStep('step-cosign');
     __session = await loadSession();
+    if (__session) announceSignedIn();
 
     if (state === 'declined' || state === 'cancelled' || (state === 'expired' && me.status !== 'signed')) {
+      try { forgetShare(envId, partyIndex); } catch { /* storage off */ }
       return showClosed(state);
     }
     if (__sessionFault) return showSessionFault();
@@ -317,7 +428,7 @@ async function init() {
     }
     await prepareSigning();
     if (__session) await loadDeliveredDocument(envId, partyIndex);
-    else setDeliveryStatus('warn', L('Log in met het uitgenodigde e-mailadres om dit versleutelde document te openen.', 'Sign in with the invited email address to open this encrypted document.'));
+    else setDeliveryStatus('warn', L('Log in met het e-mailadres van deze uitnodiging. Dan opent het document.', 'Sign in with the email address this invitation went to. Then the document opens.'));
   } catch (e) {
     showError(e.message || L('Er is geen verbinding. Controleer uw internet en probeer het opnieuw.', 'No connection. Check your internet and try again.'));
   }
@@ -335,6 +446,12 @@ function renderEnvelope() {
   $('env-expires').textContent = humanDate(e.sign_expires_at || e.expires_at);
   $('env-progress').textContent = e.signed_count + ' / ' + e.party_count + L(' getekend', ' signed');
   $('env-status').textContent = statusText(state, e);
+  {
+    const head = cosignHeading({ state, signedByMe: (e.parties[__partyIndex] || {}).status === 'signed', owner: __ownerMode }, L);
+    const t = $('cosign-title'), sub = $('cosign-sub');
+    if (t) t.textContent = head.title;
+    if (sub) sub.textContent = head.sub;
+  }
   const dot = $('env-status-dot');
   dot.className = 'dot ' + (state === 'complete' ? '' : state === 'open' ? 'amber' : 'red');
 
@@ -361,7 +478,8 @@ function renderEnvelope() {
   }
 
   const me = e.parties[__partyIndex] || {};
-  $('me-label').textContent = (me.label || L('ondertekenaar ', 'signer ') + (__partyIndex + 1));
+  // Absent once the card is retitled for the result (retitleForResult).
+  if ($('me-label')) $('me-label').textContent = (me.label || L('ondertekenaar ', 'signer ') + (__partyIndex + 1));
   $('verify-file').onchange = onVerifyFile;
   const go = $('requested-note-go');
   if (go) go.onclick = () => scrollToRequestedSpot('smooth');
@@ -548,7 +666,7 @@ function renderQuotaNote(quota) {
 async function refreshEnvelopeStatus() {
   try {
     const response = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(__envelope.id)
-      + '?p=' + encodeURIComponent(__partyIndex) + '&t=' + encodeURIComponent(__inviteToken), { cache: 'no-store' });
+      + '?p=' + encodeURIComponent(__partyIndex), { cache: 'no-store', headers: inviteHeaders() });
     if (response.ok) __envelope = withPlainLabels((await response.json()).envelope) || __envelope;
   } catch { /* the accepted sign result remains authoritative */ }
 }
@@ -586,8 +704,19 @@ function loginCtaHtml() {
   try { store = window.sessionStorage; } catch { store = null; }
   const ret = encodeURIComponent(store ? stashReturn(store, location) : location.pathname);
   return '<a class="btn" href="/auth/login?return=' + ret + '">' + L('Inloggen om verder te gaan', 'Sign in to continue') + '</a>'
-    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup">Maak er gratis een</a> met het e-mailadres waarop u deze uitnodiging kreeg. Open daarna deze link opnieuw.', 'No account yet? <a href="/en/signup">Create one for free</a> with the email address this invitation was sent to, then open this link again.') + '</p>';
+    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link" target="_blank" rel="noopener">Maak er gratis een</a> met het e-mailadres van deze uitnodiging. Daarna komt u vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link" target="_blank" rel="noopener">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
 }
+
+// "Maak er gratis een": which request and party this is waits in this browser
+// until the new account is ready, and the setup page brings the reader back
+// here (login-return.js, acceptance r5, A; review #566). Kept on the click,
+// not on showing the button, so nothing is stored for a reader who never
+// signs up. The sign-up opens in a new tab, so this tab keeps the invitation
+// link with its token and key, and can hand it to the returning tab.
+document.addEventListener('click', (ev) => {
+  const a = ev.target && ev.target.closest ? ev.target.closest('#cs-signup-link') : null;
+  if (a && __localStore) stashSignupReturn(__localStore, location);
+});
 
 function showClosed(state) {
   document.body.classList.add('request-closed');
@@ -605,8 +734,11 @@ async function prepareSigning() {
     // button and the authenticator panel, so signing in is the only thing on
     // screen. It comes off the moment a session resolves.
     document.body.classList.add('needs-login');
-    setStatus('warn', L('Log in als de ontvanger aan wie deze uitnodiging is gestuurd. Kom daarna hier terug om te tekenen.', 'Sign in as the recipient this invite was sent to, then return here to sign.'));
+    setStatus('warn', L('Log in met het e-mailadres waarop u bent uitgenodigd. Dan opent het document en kunt u tekenen.', 'Sign in with the email address this invitation went to. Then the document opens and you can sign.'));
     showCta(loginCtaHtml());
+    // Back in this tab after making an account or signing in elsewhere: the
+    // link here still has the token and the key, so this tab just reloads.
+    watchForSignIn();
     return;
   }
   document.body.classList.remove('needs-login');
@@ -677,20 +809,33 @@ function keyFromFragment() {
   return share ? { share } : null;
 }
 
-async function fetchAndOpenCapsule(url, envId) {
+async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
   let key;
   try { key = keyFromFragment(); }
   catch (e) { throw new Error(e.message); }
+  // The '#ks=' text of this link, kept so this browser can remember it once
+  // the document has opened (js/cosign-share-memory.js).
+  let ksText = '';
+  try { ksText = new URLSearchParams(String(location.hash || '').replace(/^#/, '')).get('ks') || ''; } catch { ksText = ''; }
+  // A link without the key half (sent again from the dashboard): if this
+  // browser opened the full invitation for this request and this party
+  // before, it kept that half, and the document opens here (COSIGN-46-A).
+  let fromMemory = false;
+  if (!key) {
+    const remembered = await recallShare(envId, partyIndex);
+    const share = remembered ? parseKeyShareFragment('#ks=' + remembered) : null;
+    if (share) { key = { share }; fromMemory = true; }
+  }
   if (!key) {
     // A link without '#ks=' or '#doc=' (an older resend from the dashboard,
     // or a link that lost its end on the way: matrix COSIGN-46). The request
     // itself is fine; only this copy of the link cannot open the document.
     // Say so, and give the ways that do work, in order.
-    const err = new Error(L('Deze link opent het verzoek, maar niet het document: het laatste stuk van de link, met de sleutel, ontbreekt. Dat gebeurt bij een link die opnieuw is verstuurd of onderweg is ingekort. Heeft u een eerdere uitnodigingsmail voor dit verzoek, open dan de link daaruit; die opent het document wel. Anders: vraag de afzender om de link opnieuw te sturen. Heeft u het document al als bestand, kies het dan hieronder: wij controleren of het precies het document uit dit verzoek is.', 'This link opens the request, but not the document: the last part of the link, which holds the key, is missing. That happens with a link that was sent again or cut short on the way. If you have an earlier invitation email for this request, open the link from that one; it opens the document. Otherwise, ask the sender to send you the link again. If you already have the document as a file, choose it below: we check that it is exactly the document of this request.'));
+    const err = new Error(L('Deze link opent het document niet, omdat het laatste stuk van de link ontbreekt. Open de link uit uw eerste uitnodigingsmail, of open deze link in de browser waarin u die eerste uitnodiging al opende. Lukt dat niet? Vraag de afzender dan om de uitnodiging opnieuw te sturen vanuit zijn overzicht. Heeft u het document al als bestand? Kies het dan hieronder. Wij controleren of het precies het document uit dit verzoek is.', 'This link does not open the document, because the last part of the link is missing. Open the link from your first invitation email, or open this link in the browser where you opened that first invitation. Does that not work? Then ask the sender to send the invitation again from their overview. Do you already have the document as a file? Choose it below. We check that it is exactly the document of this request.'));
     err.noKey = true;
     throw err;
   }
-  const r = await fetch(url, { credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(60000) });
+  const r = await fetch(url, { credentials: 'include', cache: 'no-store', headers, signal: AbortSignal.timeout(60000) });
   if (r.status === 401) throw new Error(L('Log in met het uitgenodigde e-mailadres om dit document te openen.', 'Sign in with the invited email address to open this document.'));
   if (r.status === 403) {
     let code = '';
@@ -698,10 +843,10 @@ async function fetchAndOpenCapsule(url, envId) {
     if (code === 'recipient_mismatch' || code === 'not_authorized') throw new Error(L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het uitgenodigde adres.', 'This invitation belongs to a different email address. Sign in with the invited address.'));
     throw new Error(L('Het document kon niet worden geopend met deze link. Open de link uit de uitnodigingsmail opnieuw.', 'The document could not be opened with this link. Open the link from the invitation email again.'));
   }
-  if (r.status === 404) throw new Error(L('Het versleutelde document is niet beschikbaar. Misschien is het een ouder verzoek, of is de link onvolledig.', 'The encrypted document is unavailable. It may be an older request or the link may be incomplete.'));
+  if (r.status === 404) throw new Error(L('Het document is niet beschikbaar. Misschien is het een ouder verzoek, of is de link onvolledig.', 'The document is unavailable. It may be an older request or the link may be incomplete.'));
   if (r.status === 410) throw new Error(L('Dit verzoek of het document is verlopen. Vraag de afzender om een nieuw verzoek.', 'This signing request or its document has expired. Ask the sender for a new request.'));
   if (r.status === 429) throw new Error(L('Het is even te druk. Probeer het over een minuut opnieuw.', 'It is busy right now. Try again in a minute.'));
-  if (!r.ok) throw new Error(L('Het versleutelde document kon nu niet worden opgehaald door een storing bij ons. Probeer het over een paar minuten opnieuw.', 'The encrypted document could not be fetched right now because of a fault on our side. Please try again in a few minutes.'));
+  if (!r.ok) throw new Error(L('Door een storing bij ons lukt het ophalen van het document nu niet. Probeer het over een paar minuten opnieuw.', 'A fault on our side stops us from fetching the document right now. Please try again in a few minutes.'));
   let docKey;
   if (key.whole) docKey = key.whole;
   else {
@@ -714,6 +859,10 @@ async function fetchAndOpenCapsule(url, envId) {
   try {
     const delivered = await decryptDocumentCapsule({ capsule, fragment: documentKeyFragment(docKey), envelopeId: envId, docHash: __envelope.doc_hash });
     __docKey = docKey;
+    // The half from the link opened the document: remember it for a link
+    // without one (only a half, and only after it proved to be the right one).
+    if (!fromMemory && !key.whole && ksText && partyIndex != null) rememberShare(envId, partyIndex, 'v1.' + String(ksText).replace(/^v1\./, ''), __envelope.sign_expires_at).catch(() => {});
+    delivered.fromMemory = fromMemory;
     return delivered;
   } finally {
     capsule.fill(0);
@@ -721,13 +870,15 @@ async function fetchAndOpenCapsule(url, envId) {
 }
 
 async function loadDeliveredDocument(envId, partyIndex) {
-  setDeliveryStatus('', L('Het versleutelde document wordt gedownload...', 'Downloading the encrypted document...'));
+  setDeliveryStatus('', L('Het document wordt opgehaald...', 'Fetching the document...'));
   try {
-    const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
-    const delivered = await fetchAndOpenCapsule(url, envId);
+    const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex);
+    const delivered = await fetchAndOpenCapsule(url, envId, partyIndex, inviteHeaders());
     await verifyAndRenderDocument(delivered.bytes, 'delivery');
     if (__hashMatches) {
-      setDeliveryStatus('ok', L('Het document is geopend en klopt met dit verzoek.', 'The document is open and matches this request.'));
+      setDeliveryStatus('ok', delivered.fromMemory
+        ? L('Het document is geopend met de sleutel die deze browser bewaarde van uw eerste uitnodiging, en klopt met dit verzoek.', 'The document is open with the key this browser kept from your first invitation, and matches this request.')
+        : L('Het document is geopend en klopt met dit verzoek.', 'The document is open and matches this request.'));
     }
   } catch (e) {
     setDeliveryStatus('err', (e.message || L('Het document kon niet vanzelf worden geladen.', 'Automatic document loading failed.')) + (e && e.noKey ? '' : L(' Kies het document hieronder zelf.', ' Choose the document manually below.')));
@@ -809,6 +960,10 @@ async function verifyAndRenderDocument(buf, source) {
   b.hidden = false;
   if (__hashMatches) {
     b.className = 'banner ok';
+    // Opened from the invitation: the delivery line above already says the
+    // document matches this request, so this one stays quiet (acceptance
+    // 3.1.1, 15). A file the reader chose himself still gets it.
+    b.hidden = source === 'delivery';
     b.textContent = source === 'delivery'
       ? L('De controle klopt. Dit is precies het document dat bij dit verzoek hoort.', 'The check matches. This is exactly the document of this request.')
       : L('De controle klopt. Dit is precies het document uit dit verzoek. Wat u hieronder ziet, is wat u ondertekent.', 'The check matches. This is exactly the document in this request: what you see below is what you sign.');
@@ -1426,6 +1581,30 @@ async function decryptPriorInks() {
   }
 }
 
+// A download that needs the invite token: a fetch with the token in a header
+// and a blob, because a plain link would put the token in the URL (r5, B).
+function wireTokenDownload(anchor, url) {
+  anchor.href = '#';
+  anchor.onclick = async (ev) => {
+    ev.preventDefault();
+    if (anchor.dataset.busy) return;
+    anchor.dataset.busy = '1';
+    try {
+      const r = await fetch(url, { credentials: 'include', cache: 'no-store', headers: inviteHeaders() });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const cd = r.headers.get('content-disposition') || '';
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+      let name = fileBase() + '.psign';
+      if (m) { try { name = decodeURIComponent(m[1]); } catch { name = m[1]; } }
+      downloadBytes(new Uint8Array(await r.arrayBuffer()), name, r.headers.get('content-type') || 'application/octet-stream');
+    } catch {
+      setStatus('err', L('Het bewijs kon nu niet worden gedownload. Probeer het over een paar minuten opnieuw.', 'The proof could not be downloaded right now. Please try again in a few minutes.'));
+    } finally {
+      delete anchor.dataset.busy;
+    }
+  };
+}
+
 function downloadBytes(bytes, filename, type) {
   const url = URL.createObjectURL(new Blob([bytes], { type }));
   const anchor = document.createElement('a');
@@ -1590,6 +1769,18 @@ async function renderPdfWithRecords(records) {
       }
     }
   }
+  // The signed original travels inside this copy, byte for byte, as a PDF
+  // attachment. /verify takes it out and checks THAT against the proof, so
+  // this copy plus the .psign verifies without hunting for the original
+  // (eindmatrix DASH-09-L). The drawn signatures on the pages are still not
+  // covered by any signature; /verify says that next to the green.
+  try {
+    const name = String(__envelope.original_filename || 'origineel.pdf').replace(/[\r\n\t/\\]+/g, ' ').slice(0, 120) || 'origineel.pdf';
+    await pdf.attach(__documentBytes, name, {
+      mimeType: 'application/pdf',
+      description: L('Het ondertekende origineel (controleer op /verify)', 'The signed original (check it on /verify)'),
+    });
+  } catch { /* no attachment: /verify then asks for the original, as before */ }
   // Label this file as Paramant's reading copy of THIS envelope and THIS
   // original, in a plain (uncompressed) Info entry. It is a label, not
   // evidence: no signature covers it, so /verify ignores it and treats this
@@ -1637,21 +1828,34 @@ function fileBase() {
   return (__envelope.original_filename || 'document.pdf').replace(/\.pdf$/i, '');
 }
 
+// After signing there is nothing left to sign: the cards stop saying "Bekijk
+// wat u ondertekent" and "Ondertekenen als ..." (acceptatie 3.1.1 ronde 2,
+// taal #10 and N3). The download buttons stand ABOVE the status line, so the
+// line no longer says "hieronder".
+function retitleForResult(owner) {
+  const review = $('review-title');
+  if (review) review.textContent = L('Het document', 'The document');
+  const sign = $('sign-title');
+  if (sign) sign.textContent = owner ? L('Stand van het verzoek', 'State of the request') : L('Uw handtekening', 'Your signature');
+}
+
 async function showResultForParty(envId, partyIndex) {
   document.body.classList.add('result-mode');
+  retitleForResult(false);
   const complete = __envelope.status === 'complete';
   setStatus('ok', complete
-    ? L('Iedereen heeft getekend. Hieronder downloadt u het complete document met alle handtekeningen, en het bewijs.', 'Everyone has signed. Below you can download the complete document with every signature, and the proof.')
+    ? L('Iedereen heeft getekend. Het complete document met alle handtekeningen en het bewijs staan klaar bij Het getekende document.', 'Everyone has signed. The complete document with every signature and the proof are ready under The signed document.')
     : L('U heeft getekend. Zodra iedereen heeft getekend, opent deze zelfde link het complete document.', 'You have signed. Once everyone has signed, this same link opens the complete document.'));
   $('sign-confirm').hidden = true;
-  if (!__session) { showCta(loginCtaHtml()); return; }
+  if (!__session) { showCta(loginCtaHtml()); watchForSignIn(); return; }
   await loadDeliveredDocument(envId, partyIndex);
   wireResultCard({
-    proofUrl: complete ? '/api/user/envelopes/' + encodeURIComponent(envId) + '/receipt?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken) : '',
+    proofUrl: complete ? '/api/user/envelopes/' + encodeURIComponent(envId) + '/receipt?p=' + encodeURIComponent(partyIndex) : '',
+    proofNeedsToken: true,
   });
 }
 
-function wireResultCard({ proofUrl }) {
+function wireResultCard({ proofUrl, proofNeedsToken = false }) {
   const card = $('result-card');
   if (!card) return;
   card.hidden = false;
@@ -1673,7 +1877,8 @@ function wireResultCard({ proofUrl }) {
   }
   if (proof) {
     proof.hidden = !proofUrl;
-    if (proofUrl) proof.href = proofUrl;
+    if (proofUrl && proofNeedsToken) wireTokenDownload(proof, proofUrl);
+    else if (proofUrl) { proof.onclick = null; proof.href = proofUrl; }
   }
   const orig = $('result-download-original');
   if (orig) {
@@ -1683,9 +1888,13 @@ function wireResultCard({ proofUrl }) {
   if (note) {
     note.hidden = false;
     note.textContent = complete
-      ? L('Het bewijs (.psign) toont aan wie waar heeft getekend. Controleer het op /verify samen met het bestand dat iedereen tekende: ', 'The proof (.psign) shows who signed where. Check it on /verify together with the file everyone signed: ') +
-        String(__envelope.original_filename || L('het originele document', 'the original document')) +
-        L(' (de knop voor het origineel hierboven). De pdf met alle handtekeningen is een leesbare kopie daarvan en geeft op /verify rood.', ' (the button for the original above). The pdf with every signature is a readable copy of it and shows red on /verify.')
+      // Plain words: what to keep, and that it can be checked later. The file
+      // name says which original; no file extensions, paths or "embedded"
+      // (acceptance 3.1.1, 16). Only point at buttons that are on screen:
+      // without the document both are hidden (r5, C).
+      ? (__documentBytes
+        ? L('Bewaar het origineel (' + String(__envelope.original_filename || 'het originele document') + ') en het bewijs samen. Daarmee kan iedereen later op paramant.app/verify nagaan wie waar heeft getekend. De pdf met alle handtekeningen werkt daar ook.', 'Keep the original (' + String(__envelope.original_filename || 'the original document') + ') and the proof together. With them anyone can check later, on paramant.app/en/verify, who signed where. The pdf with every signature works there too.')
+        : L('Het origineel en de pdf met alle handtekeningen kunt u hier downloaden zodra het document op deze pagina is geopend. De melding hierboven zegt waarom dat nu niet lukte.', 'You can download the original and the pdf with every signature here once the document has opened on this page. The message above says why that did not work just now.'))
       : L('Het bewijs komt beschikbaar zodra iedereen heeft getekend.', 'The proof becomes available once everyone has signed.');
   }
 }
@@ -1703,9 +1912,11 @@ async function initOwner(resultRef, ownerId) {
       const r = await fetch('/api/user/results/' + encodeURIComponent(resultRef), { credentials: 'include', cache: 'no-store' });
       if (r.status === 401) {
         showStep('step-cosign');
+        { const head = cosignHeading({ state: 'open', owner: true }, L); $('cosign-title').textContent = head.title; $('cosign-sub').textContent = head.sub; }
         setStatus('warn', L('Log in met het account waarmee u het verzoek verstuurde.', 'Sign in with the account you sent the request from.'));
         showCta(loginCtaHtml());
         document.body.classList.add('needs-login');
+        watchForSignIn();
         return;
       }
       if (!r.ok) return showError(L('Deze link werkt niet (meer). Open uw documenten in het dashboard.', 'This link no longer works. Open your documents in the dashboard.'));
@@ -1719,10 +1930,11 @@ async function initOwner(resultRef, ownerId) {
     __partyIndex = -1;
     renderEnvelope();
     showStep('step-cosign');
+    retitleForResult(true);
     $('sign-confirm').hidden = true;
     const state = envelopeState(__envelope);
     setStatus(state === 'complete' ? 'ok' : state === 'open' ? '' : 'err', state === 'complete'
-      ? L('Iedereen heeft getekend. Download hieronder het complete document en het bewijs.', 'Everyone has signed. Download the complete document and the proof below.')
+      ? L('Iedereen heeft getekend. Het complete document en het bewijs staan klaar bij Het getekende document.', 'Everyone has signed. The complete document and the proof are ready under The signed document.')
       : (ownerClosedExplanation(state, __envelope) || L('Nog niet iedereen heeft getekend.', 'Not everyone has signed yet.')));
     // A stopped request has nothing to open or download: no red "choose the
     // original" with a button that leads nowhere, and no fetch that only
@@ -1817,7 +2029,7 @@ async function doSign() {
     return;
   }
   if (__documentBytes && isPdfBytes(__documentBytes) && __visualCopy.ok && Number(__envelope.recipe_version) >= 5 && __appearance.fields.length === 0) {
-    if (!confirm(L('Ondertekenen zonder zichtbare handtekening in het document? Uw cryptografische handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your cryptographic signature will still be recorded.'))) return;
+    if (!confirm(L('Ondertekenen zonder zichtbare handtekening in het document? Uw handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your signature is still recorded.'))) return;
   }
   $('sign-confirm').disabled = true;
   $('sign-cta').hidden = true;
@@ -1874,12 +2086,14 @@ async function doSign() {
     let ink = '';
     try { ink = await sealInk({ ink: __ink, documentKey: __docKey, envelopeId: __envelope.id, partyIndex: __partyIndex }); } catch { ink = ''; }
     const data = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance, ink });
+    // Signed: the remembered key half has no use left (review #573, M4).
+    try { forgetShare(__envelope.id, __partyIndex); } catch { /* storage off */ }
 
     // The line under the heading follows the status: the last signer read
     // "once everyone has signed..." under "Signed by everyone" (hertest r2 K1).
     { const sub = $('done-sub'); if (sub) sub.textContent = data.status === 'complete'
-      ? L('Uw handtekening is vastgelegd. Iedereen heeft nu getekend: download hieronder het complete document met alle handtekeningen. Dezelfde link uit uw uitnodiging opent het later opnieuw.', 'Your signature is recorded. Everyone has now signed: download the complete document with every signature below. The same link from your invitation opens it again later.')
-      : L('Uw handtekening is vastgelegd. Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.', 'Your signature is recorded. Once everyone has signed, the same link from your invitation opens the complete document with every signature.'); }
+      ? L('Iedereen heeft nu getekend. Download hieronder het complete document met alle handtekeningen. Dezelfde link uit uw uitnodiging opent het later opnieuw.', 'Everyone has now signed. Download the complete document with every signature below. The same link from your invitation opens it again later.')
+      : L('Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.', 'Once everyone has signed, the same link from your invitation opens the complete document with every signature.'); }
     $('done-env-id').textContent = __envelope.id;
     $('done-status').textContent = data.status === 'complete' ? L('Door iedereen getekend', 'Signed by everyone') : L('Wacht op de anderen', 'Waiting for the others');
     $('done-progress').textContent = (data.signed_count != null ? data.signed_count : '?') + ' / ' + (data.party_count != null ? data.party_count : __envelope.party_count) + L(' getekend', ' signed');
@@ -1909,7 +2123,7 @@ async function doSign() {
     const proofWait = $('done-proof-wait');
     if (data.status === 'complete' && proof) {
       proof.hidden = false;
-      proof.href = '/api/user/envelopes/' + encodeURIComponent(__envelope.id) + '/receipt?p=' + encodeURIComponent(__partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
+      wireTokenDownload(proof, '/api/user/envelopes/' + encodeURIComponent(__envelope.id) + '/receipt?p=' + encodeURIComponent(__partyIndex));
       if (proofWait) proofWait.hidden = true;
     } else if (proofWait) {
       proofWait.hidden = false;
@@ -1937,7 +2151,7 @@ async function doSign() {
     if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, Inloggen met passkey) en open daarna deze link opnieuw. De passkey waarmee u inlogt wordt dan uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link. Your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of duurde te lang. Tik op Ondertekenen om het opnieuw te proberen.', 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.');
-    else if (e && e.status === 401) msg = L('Uw sessie is verlopen. Log opnieuw in als de uitgenodigde ontvanger en probeer het nog eens.', 'Your session expired. Sign in again as the invited recipient, then retry.');
+    else if (e && e.status === 401) msg = L('U bent uitgelogd. Log opnieuw in met het uitgenodigde e-mailadres en probeer het nog eens.', 'You were signed out. Sign in again with the invited email address and try again.');
     else if (e && e.status === 429) {
       const wait = Number(e.data && (e.data.retry_after || e.data.retryAfter)) || 0;
       msg = wait > 0
@@ -2004,4 +2218,5 @@ async function relinkSigningKey() {
 // For the browser tests: the page's own state, read-only.
 window.__cosignDebug = { appearance: () => __appearance, ink: () => __ink, seed: () => __appearanceIsSeed, pages: () => __pageSizes.length };
 
-init();
+answerHandoff();
+(__signupResume ? askHandoff() : Promise.resolve(false)).then(() => init());

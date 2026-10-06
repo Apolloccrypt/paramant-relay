@@ -37,8 +37,8 @@ assert.ok(!everything.includes('#doc='), 'no part of the mail carries a key frag
 assert.ok(!everything.includes('opzegging-huurcontract'), 'no part of the mail carries the filename');
 assert.ok(mail.text.includes(base), 'plain text carries the link to the request itself');
 assert.ok(mail.html.includes(base), 'HTML action carries the link to the request itself');
-assert.ok(/It does not open the document/.test(mail.text), 'the mail says what the link cannot do');
-assert.ok(mail.text.includes('Sign in with this invited email address'), 'identity requirement is explicit');
+assert.ok(/but not the document/.test(mail.text), 'the mail says what the link cannot do');
+assert.ok(mail.text.includes('It only works with the email address this invitation went to'), 'identity requirement is explicit');
 assert.ok(!mail.html.includes('<Signer Demo>'), 'recipient label is HTML escaped');
 assert.ok(!mail.html.includes('<review before signing>'), 'message is HTML escaped');
 assert.ok(!mail.headers['X-Entity-Ref-ID'].includes(token), 'mail header does not expose invite token');
@@ -55,15 +55,15 @@ assert.equal(noSubject.subject, 'Verzoek om te ondertekenen / Signature requeste
 assert.ok(!noSubject.text.includes(key) && !noSubject.html.includes(key), 'and still carries no key');
 
 // Dutch first, English underneath, unless the caller names one language.
-assert.ok(mail.text.indexOf('Log in met het e-mailadres waarop u bent uitgenodigd') < mail.text.indexOf('Sign in with this invited email address'), 'Dutch comes before English');
-assert.ok(/Hij opent het document niet/.test(mail.text), 'the Dutch text says what the link cannot do');
+assert.ok(mail.text.indexOf('Hij werkt alleen met het e-mailadres waarop u bent uitgenodigd') < mail.text.indexOf('It only works with the email address this invitation went to'), 'Dutch comes before English');
+assert.ok(/maar niet het document/.test(mail.text), 'the Dutch text says what the link cannot do');
 assert.ok(/<html lang="nl">/.test(mail.html), 'the bilingual mail is marked Dutch first');
 const onlyEn = signingInviteEmail({ inviteUrl: withKey, envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0, lang: 'en' });
 assert.equal(onlyEn.subject, 'Signature requested', 'lang en keeps the English default subject');
-assert.ok(!/Hij opent het document niet/.test(onlyEn.text) && /It does not open the document/.test(onlyEn.text), 'lang en is English only');
+assert.ok(!/maar niet het document/.test(onlyEn.text) && /but not the document/.test(onlyEn.text), 'lang en is English only');
 const onlyNl = signingInviteEmail({ inviteUrl: withKey, envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0, lang: 'nl' });
 assert.equal(onlyNl.subject, 'Verzoek om te ondertekenen', 'lang nl has the Dutch default subject');
-assert.ok(!/It does not open the document/.test(onlyNl.text) && !onlyNl.text.includes(key) && !onlyNl.html.includes(key), 'lang nl is Dutch only and carries no key');
+assert.ok(!/but not the document/.test(onlyNl.text) && !onlyNl.text.includes(key) && !onlyNl.html.includes(key), 'lang nl is Dutch only and carries no key');
 
 console.log('signing-invite-email: 22 checks passed');
 
@@ -74,11 +74,20 @@ console.log('signing-invite-email: 22 checks passed');
   const share = 's'.repeat(43);
   const shareMail = signingInviteEmail({ inviteUrl: `${base}#ks=v1.${share}`, senderLabel: 'sender@example.com', envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0 });
   assert.ok(shareMail.text.includes(`${base}#ks=v1.${share}`), 'the key share rides in the link');
-  assert.ok(/opens the document in your browser once you have signed in/.test(shareMail.text), 'and the mail says the link opens the document');
-  assert.ok(/opent het document in uw browser zodra u bent ingelogd/.test(shareMail.text), 'in Dutch too');
+  // One truth with /sign and /co-sign (acceptatie 3.1.1, taal #1 and #2):
+  // the link opens the request; the document opens after signing in with the
+  // invited address; no account yet means a free one on that address.
+  assert.ok(/The link opens the request\. The document itself opens as soon as you sign in with the email address this invitation went to\./.test(shareMail.text), 'and the mail says when the link opens the document');
+  assert.ok(/De link opent het verzoek\. Het document zelf opent zodra u inlogt met het e-mailadres waarop u bent uitgenodigd\./.test(shareMail.text), 'in Dutch too');
+  assert.ok(/Heeft u nog geen account\? Dan maakt u via de link gratis een account op dit adres\./.test(shareMail.text), 'a new signer reads that he first makes a free account');
+  assert.ok(/No account yet\? Then create a free account on this address through the link\./.test(shareMail.text), 'in English too');
+  assert.ok(!/Zonder inloggen opent de link niets|Without signing in, the link opens nothing/.test(shareMail.text), 'no claim that /co-sign contradicts');
+  assert.ok(!/Hebt u/.test(shareMail.text + mail.text), 'Heeft u, never Hebt u');
+  // The last day in Amsterdam time, without UTC or seconds (#19).
+  assert.ok(!/UTC|:\d\d:\d\d/.test(mail.text), 'no UTC stamp with seconds');
   const sneaky = signingInviteEmail({ inviteUrl: `${base}#ks=v1.${share}&doc=v1.${key}`, senderLabel: 'x', envelopeId: 'e', partyIndex: 0 });
   assert.ok(!(sneaky.text + sneaky.html).includes(key), 'a whole key smuggled next to a share is cut off');
-  assert.ok(/It does not open the document/.test(sneaky.text), 'and that mail falls back to the notice');
+  assert.ok(/but not the document/.test(sneaky.text), 'and that mail falls back to the notice');
 }
 
 // Retest 04-10: the mail promised "zet uw paraaf" also when the sender asked
@@ -88,7 +97,7 @@ console.log('signing-invite-email: 22 checks passed');
   const url = `${base}#ks=v1.${share}`;
   const plain = signingInviteEmail({ inviteUrl: url, senderLabel: 'x', envelopeId: 'e', partyIndex: 0 });
   assert.ok(!/paraaf/i.test(plain.text + plain.html) && !/initials/i.test(plain.text + plain.html), 'no paraaf asked: the mail promises none');
-  assert.ok(/zet uw handtekening en bent klaar/.test(plain.text) && /add your signature, and you are done/.test(plain.text), 'it names the signature only');
+  assert.ok(/zet u uw handtekening en bent u klaar/.test(plain.text) && /add your signature, and you are done/.test(plain.text), 'it names the signature only');
   const withParaaf = signingInviteEmail({ inviteUrl: url, senderLabel: 'x', envelopeId: 'e', partyIndex: 0, asksParaaf: true });
-  assert.ok(/zet uw paraaf en handtekening/.test(withParaaf.text) && /add your initials and signature/.test(withParaaf.text), 'paraaf asked: the mail names it');
+  assert.ok(/zet u uw paraaf en handtekening/.test(withParaaf.text) && /add your initials and signature/.test(withParaaf.text), 'paraaf asked: the mail names it');
 }

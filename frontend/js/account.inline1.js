@@ -64,7 +64,7 @@ function paSecondFactorError(status, body) {
   if (code === 'second_factor_required') return nlEn('Vul eerst de code van 6 cijfers of een back-upcode in. Er is niets veranderd.', 'Enter the 6-digit code or a back-up code first. Nothing changed.');
   if (status === 429) return nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.');
   if (status === 401) return nlEn('Uw sessie is verlopen. Log opnieuw in en probeer het nog eens. Er is niets veranderd.', 'Your session has expired. Sign in again and retry. Nothing changed.');
-  if (status >= 500) return nlEn('Dit lukte nu niet door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work right now because of a fault on our side. Nothing changed. Please try again shortly.');
+  if (status >= 500) return nlEn('Er is een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Something went wrong on our side. Nothing changed. Please try again shortly.');
   return nlEn('Dit is niet gelukt. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work. Nothing changed. Please try again shortly.');
 }
 window.paSecondFactorError = paSecondFactorError;
@@ -166,7 +166,7 @@ window.paSecondFactorError = paSecondFactorError;
         show('state-busy');
         if (res.status !== 429) {
           var bt = document.getElementById('acct-busy-text');
-          if (bt) bt.firstChild.textContent = nlEn('Uw account kon even niet worden geladen door een storing bij ons. U bent nog ingelogd. ', 'Your account could not be loaded just now because of a fault on our side. You are still signed in. ');
+          if (bt) bt.firstChild.textContent = nlEn('Door een storing bij ons laadt uw account even niet. U bent nog ingelogd. ', 'Your account will not load just now because of a fault on our side. You are still signed in. ');
         }
         return;
       }
@@ -388,7 +388,7 @@ window.paSecondFactorError = paSecondFactorError;
       if (st === 401) { show('state-unauth'); return; }
       alert(st === 429
         ? nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.')
-        : nlEn('Dit lukte nu niet door een storing bij ons. De andere sessies zijn nog actief en u bent nog ingelogd. Probeer het zo opnieuw.', 'This did not work right now because of a fault on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
+        : nlEn('Er is een storing bij ons. De andere sessies zijn nog actief en u bent nog ingelogd. Probeer het zo opnieuw.', 'Something went wrong on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
       return;
     }
     alert(nlEn('De andere sessies zijn uitgelogd.', 'Other sessions signed out.'));
@@ -396,14 +396,14 @@ window.paSecondFactorError = paSecondFactorError;
   });
 
   document.getElementById('delete-account').addEventListener('click', async function() {
-    const answer = prompt(nlEn('Typ DEACTIVEREN om het deactiveren van uw account te bevestigen:', 'Type DEACTIVATE to confirm account deactivation:'));
+    const answer = prompt(nlEn('Weet u het zeker? Typ DEACTIVEREN om uw account te deactiveren:', 'Are you sure? Type DEACTIVATE to deactivate your account:'));
     if (answer !== nlEn('DEACTIVEREN', 'DEACTIVATE')) return;
     var data = await accountAction(this, '/api/user/account', 'DELETE',
       nlEn('Laatste stap: bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Last step: confirm with the 6-digit code from your authenticator app, or a back-up code.'),
       nlEn('Account deactiveren', 'Deactivate account'));
     if (data) {
       try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
-      alert(nlEn('Account gedeactiveerd. De sleutel werkt niet meer.', 'Account deactivated. Its key can no longer be used.'));
+      alert(nlEn('Account gedeactiveerd. De sleutel werkt niet meer.', 'Account deactivated. Its key no longer works.'));
       window.location = '/';
     }
   });
@@ -428,7 +428,12 @@ window.paSecondFactorError = paSecondFactorError;
       .filter(function (t) { return !isNaN(t); });
     if (!ends.length) return null;
     var ahead = ends.filter(function (t) { return t > now; });
-    var at = ahead.length ? Math.min.apply(null, ahead) : Math.max.apply(null, ends);
+    // The LAST end still ahead: the day the account actually stops having
+    // what it paid for. It used to be the nearest one, so after a Firm to
+    // Business upgrade one page said the 5th of one month and the row under it
+    // the 6th of the next (betaaltest 05-10, row 8). What runs out earlier on
+    // one product is said per product, in the lines under it (plan-terms.js).
+    var at = ahead.length ? Math.max.apply(null, ahead) : Math.max.apply(null, ends);
     var days = (at - now) / 86400000;
     return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
   }
@@ -446,15 +451,30 @@ window.paSecondFactorError = paSecondFactorError;
     var warn = document.getElementById('billing-term-warn');
     if (line) line.hidden = true;
     if (warn) warn.hidden = true;
+    if (window.paPlanTerms) window.paPlanTerms.render(document.getElementById('billing-products'), d);
     if (!term) return;
     var when = termDate(term.at);
     if (line) {
+      // A one-off payment is not a subscription (besluit 05-10-2026): no
+      // "cancel", but the day it is paid until and when renewing is possible.
+      // That is today: the checkout sells a renewal of a running term at any
+      // moment, and the new term starts where this one ends
+      // (lib/billing.processPayment, currentTermEnd), so no day is lost.
+      // One sentence, shared with /dashboard (plan-terms.js headline): the
+      // plan that runs now, its own end and what follows. auto_renews true
+      // means a subscription stands behind it and it WILL renew; it used to
+      // print "nothing renews automatically" in exactly that case
+      // (acceptatie 3.1.1, taal 31).
+      var said = !term.ended && window.paPlanTerms && window.paPlanTerms.headline(d);
       line.textContent = term.ended
         ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
-        : nlEn('Loopt af op ', 'Ends on ') + when + nlEn(', er wordt niets automatisch verlengd.', ', nothing renews automatically.');
+        : said || (d.auto_renews
+          ? nlEn('Wordt op ', 'Renews automatically on ') + when + nlEn(' automatisch verlengd. Opzeggen kan tot die dag.', '. You can cancel until that day.')
+          : nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
       line.hidden = false;
     }
-    if (warn && term.warn) {
+    // A plan that renews by itself needs no "renew or fall back" warning.
+    if (warn && term.warn && !d.auto_renews) {
       var text = warn.querySelector('[data-term="text"]');
       if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;
@@ -481,12 +501,11 @@ window.paSecondFactorError = paSecondFactorError;
       const free = isFreeAccount(d, d.current_plan);
       if (!free) {
         document.getElementById('billing-active-badge').classList.remove('hidden');
-        // A customer who pays gets a way to stop paying. What was wrong here was
-        // never the button but the date behind it: cancel used to schedule the
-        // downgrade at now plus 30 days, so someone who had bought a YEAR was
-        // told his plan ended next month. It now schedules on the term he
-        // actually paid for, the same date shown below.
-        document.getElementById('billing-cancel-btn').classList.remove('hidden');
+        // A way to stop paying, only where something would be paid again. On
+        // a one-off payment there is nothing to stop: the button scheduled a
+        // "cancellation" on the day the term ended anyway and mailed about it
+        // (betaaltest 05-10, row 3). The term line says what is true instead.
+        if (d.auto_renews) document.getElementById('billing-cancel-btn').classList.remove('hidden');
       }
       // One calm line about what this plan is. On Community it says whose gift
       // it is and what the paid plans add, with a single way up. On a paid plan
@@ -498,10 +517,11 @@ window.paSecondFactorError = paSecondFactorError;
       // access_until is the end of the term that was paid for and is the honest
       // date on a one-off; next_billing_date only means something once
       // something actually collects again.
+      // One date, in the term line: the day the last paid term ends, which is
+      // access_until. A second "Access until" row stood here with its own
+      // date and disagreed with the line above it after an upgrade (row 8).
       const until = d.access_until || d.next_billing_date;
       if (until) {
-        document.getElementById('billing-next-row').style.display = 'flex';
-        document.getElementById('billing-next').textContent = paramantDate.day(until);
         const note = document.getElementById('billing-renew-note');
         if (note) note.hidden = !!d.auto_renews;
       }
@@ -512,7 +532,7 @@ window.paSecondFactorError = paSecondFactorError;
         document.getElementById('billing-cancel-btn').classList.add('hidden');
       }
     } catch(err) {
-      document.getElementById('billing-loading').textContent = nlEn('Betaalstatus kon niet worden geladen.', 'Could not load billing.');
+      document.getElementById('billing-loading').textContent = nlEn('We konden uw betaalstatus niet laden.', 'Could not load your billing status.');
     }
   }
 
@@ -589,7 +609,7 @@ window.paSecondFactorError = paSecondFactorError;
       histEl.textContent = '';
       rows.forEach(function(e) { histEl.appendChild(historyRow(e)); });
     } catch(err) {
-      histEl.textContent = nlEn('Betaalgeschiedenis kon niet worden geladen.', 'Could not load billing history.');
+      histEl.textContent = nlEn('We konden uw betaalgeschiedenis niet laden.', 'Could not load your billing history.');
     }
   }
 
@@ -600,6 +620,13 @@ window.paSecondFactorError = paSecondFactorError;
       const d = await res.json();
       alert(nlEn('Opzegging gepland. Uw plan gaat terug op ', 'Cancellation scheduled. Your plan downgrades on ') + paramantDate.day(d.scheduled_downgrade_at));
       loadBilling();
+    } else {
+      // 409 (one-off, nothing to cancel) and 503 (relay-main not reachable,
+      // nothing cancelled) both carry a sentence for the customer.
+      let d = null;
+      try { d = await res.json(); } catch { d = null; }
+      const said = d ? nlEn(d.message || '', d.message_en || d.message || '') : '';
+      alert(said || nlEn('Opzeggen lukte nu niet. Er is niets gewijzigd. Probeer het later opnieuw.', 'Cancelling did not work just now. Nothing was changed. Please try again later.'));
     }
   });
 
@@ -653,7 +680,7 @@ window.paSecondFactorError = paSecondFactorError;
         el.appendChild(row);
       });
     } catch (err) {
-      el.textContent = nlEn('Facturen konden niet worden geladen.', 'Could not load invoices.');
+      el.textContent = nlEn('We konden uw facturen niet laden.', 'Could not load your invoices.');
     }
   }
 

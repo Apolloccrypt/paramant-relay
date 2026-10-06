@@ -78,7 +78,7 @@ function validateStep(n) {
     return null; // empty domain = localhost mode, allowed
   }
   if (n === 3) {
-    return EMAIL_RE.test(c.adminEmail) ? null : 'Een geldig e-mailadres van de beheerder is verplicht.';
+    return EMAIL_RE.test(c.adminEmail) ? null : 'Vul een geldig e-mailadres van de beheerder in.';
   }
   if (n === 4) {
     if (c.firstUserEmail && !EMAIL_RE.test(c.firstUserEmail)) {
@@ -267,7 +267,7 @@ function applyConfig() {
       } else {
         // 4xx: validation -- show message and let the user correct an earlier step.
         if (res.status === 401 && res.body && res.body.error === 'setup_token_required') {
-          status.textContent = 'The setup code is not right. Copy it again from the file setup-token next to users.json.';
+          status.textContent = 'De installatiecode klopt niet. Kopieer hem opnieuw uit het bestand setup-token naast users.json.';
           return;
         }
         status.textContent = (res.body && res.body.error)

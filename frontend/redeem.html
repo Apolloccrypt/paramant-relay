@@ -153,12 +153,12 @@
 
     <section id="rd-panel">
       <h1 class="rd-title">Code inwisselen</h1>
-      <p class="rd-lede">Een code geeft u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er valt niets op te zeggen.</p>
+      <p class="rd-lede">Met een code krijgt u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er valt niets op te zeggen.</p>
 
       <!-- No session. Revealed by js/redeem.page.js only after
            /api/user/session/verify has answered, so it never flashes at
            somebody who is already signed in. -->
-      <p class="rd-note" id="rd-signedout" hidden>Een code hoort bij een account, dus u hebt eerst een account nodig. Een Community-account is gratis en vraagt alleen een e-mailadres. Uw code wordt bewaard en weer ingevuld als u hier terugkomt.</p>
+      <p class="rd-note" id="rd-signedout" hidden>Een code hoort bij een account. U hebt dus eerst een account nodig. Een Community-account is gratis en vraagt alleen een e-mailadres. We onthouden uw code en vullen hem weer in als u hier terugkomt.</p>
 
       <!-- The probe could not answer. Not the same event as "you are not signed
            in" and never told as one; the sentence is the shared one from
@@ -199,9 +199,9 @@
       <details class="done-details">
         <summary>Wat een code is</summary>
         <div class="done-details-body">
-          <p>Een code is een cadeau, geen aankoop. Er is geen kaart gevraagd, er is niet betaald en er zit geen abonnement achter. Er valt dus niets op te zeggen en er wordt niets afgeschreven als de periode afloopt.</p>
-          <p>Op de laatste dag gaan de producten terug naar het gratis Community-abonnement en blijven daar gewoon werken. Een week van tevoren krijgt u een e-mail.</p>
-          <p>Een periode die u al betaald heeft, wordt niet vervangen. Het cadeau komt erbovenop, dus u verliest geen dag die u kocht.</p>
+          <p>Een code is een cadeau, geen aankoop. U gaf geen kaart op, u betaalde niets en er zit geen abonnement achter. U hoeft dus niets op te zeggen. Als de periode afloopt, wordt er niets afgeschreven.</p>
+          <p>Op de laatste dag gaan de producten terug naar het gratis Community-plan. Daar blijven ze gewoon werken. Een week van tevoren krijgt u een e-mail.</p>
+          <p>Een periode die u al betaalde, blijft gewoon staan. Het cadeau komt erbovenop, dus u verliest geen dag die u kocht.</p>
         </div>
       </details>
     </div>
@@ -242,12 +242,12 @@
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
-<script src="/js/error-message.js?v=2" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
+<script src="/js/error-message.js?v=3" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
 <!-- Before js/redeem-code.js on purpose: this file installs the gate that
      stops a code from being sent by a browser with no session. -->
 <script src="/js/redeem.page.js?v=3" defer></script>
-<script src="/js/redeem-code.js?v=4" defer></script>
+<script src="/js/redeem-code.js?v=5" defer></script>
 </body>
 </html>

@@ -113,7 +113,7 @@ function passkeyAuthErrorMessage(e) {
   // NotAllowedError and anything else: ambiguous. Give the actionable options.
   return nlEn('Er is op dit apparaat geen passkey gebruikt. Log hierboven in met uw e-mailadres en code, ', 'No passkey was used on this device. Sign in with your email and code above, ')
     + nlEn('of tik op “Mijn passkey staat op een ander apparaat” om in te loggen met de passkey op uw telefoon. ', 'or tap “My passkey is on another device” to sign in with the passkey on your phone. ')
-    + nlEn('Hebt u zelf afgebroken, probeer het dan gewoon opnieuw.', 'If you cancelled, just try again.');
+    + nlEn('Heeft u zelf afgebroken? Probeer het dan gewoon opnieuw.', 'If you cancelled, just try again.');
 }
 
 // ── Registration: account-setup page (/auth/setup/<setup_token>) ─────────────
@@ -124,7 +124,7 @@ function wireSetupPasskey() {
 
   if (!browserSupportsWebAuthn()) {
     btn.disabled = true;
-    setStatus(status, nlEn('Deze browser ondersteunt geen passkeys. Stel hierboven de authenticator-app in.', 'This browser does not support passkeys. Use the authenticator-app setup above.'), true);
+    setStatus(status, nlEn('Deze browser ondersteunt geen passkeys. Stel hierboven de authenticator-app in.', 'This browser does not support passkeys. Set up the authenticator app above.'), true);
     return;
   }
 
@@ -155,7 +155,7 @@ function wireSetupPasskey() {
 
       showRecoveryCodes(Array.isArray(ver.data.recovery_codes) ? ver.data.recovery_codes : []);
     } catch (e) {
-      setStatus(status, e.message || nlEn('Het registreren van de passkey is mislukt.', 'Passkey registration failed.'), true, e.techCode);
+      setStatus(status, e.message || nlEn('Het maken van de passkey is mislukt.', 'Passkey registration failed.'), true, e.techCode);
       btn.disabled = false;
     }
   });
@@ -334,7 +334,7 @@ function wireAccountPasskey() {
       if (r.ok) {
         setStatus(status, nlEn('Passkey verwijderd. U logt er niet meer mee in.', 'Passkey removed. It no longer signs you in.'), false);
       } else if (r.status === 404) {
-        setStatus(status, nlEn('Deze passkey bestaat niet meer, of de functie verwijderen is op deze server nog niet beschikbaar. Er is niets veranderd.', 'This passkey no longer exists, or removing is not available on this server yet. Nothing changed.'), true);
+        setStatus(status, nlEn('Deze passkey bestaat niet meer, of verwijderen kan op deze server nog niet. Er is niets veranderd.', 'This passkey no longer exists, or removing is not available on this server yet. Nothing changed.'), true);
       } else {
         const t = typeof window.paSecondFactorError === 'function' ? window.paSecondFactorError(r.status, body) : nlEn('Verwijderen is niet gelukt. Er is niets veranderd.', 'Removing did not work. Nothing changed.');
         setStatus(status, t, true);
@@ -355,12 +355,12 @@ function wireAccountPasskey() {
 
   btn.addEventListener('click', async () => {
     const totp = (totpEl && totpEl.value || '').trim();
-    if (!/^\d{6}$/.test(totp)) { setStatus(status, nlEn('Vul eerst uw huidige code van 6 cijfers in.', 'Enter your current 6-digit TOTP code first.'), true); if (totpEl) totpEl.focus(); return; }
+    if (!/^\d{6}$/.test(totp)) { setStatus(status, nlEn('Vul eerst uw huidige code van 6 cijfers in.', 'Enter your current 6-digit code first.'), true); if (totpEl) totpEl.focus(); return; }
     btn.disabled = true;
     setStatus(status, nlEn('Uw code wordt gecontroleerd…', 'Verifying your code…'), false);
     try {
       const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
-      if (opt.status === 403) throw new Error(nlEn('Die code is niet geaccepteerd. Probeer de huidige code uit uw authenticator-app.', 'That TOTP code was not accepted. Try the current code from your authenticator.'));
+      if (opt.status === 403) throw new Error(nlEn('Die code is niet geaccepteerd. Probeer de huidige code uit uw authenticator-app.', 'That code was not accepted. Try the current code from your authenticator app.'));
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
 
       setStatus(status, nlEn('Volg de stappen op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);

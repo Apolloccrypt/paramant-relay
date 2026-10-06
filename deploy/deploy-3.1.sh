@@ -18,6 +18,10 @@
 #   bash deploy/deploy-3.1.sh --seller-vat     also write BILLING_SELLER_VAT
 #                                              in step 1e: from this deploy on
 #                                              VAT invoices and reverse charge
+#   bash deploy/deploy-3.1.sh --host-strict    make step 6l (auditd, AIDE,
+#                                              AppArmor) a STOP instead of a
+#                                              warning; combines with a full run
+#                                              and --verify-only
 #   bash deploy/deploy-3.1.sh --nginx-sync     phase 5e only: put the whole repo
 #                                              site conf on the server (backup,
 #                                              nginx -t, reload, checks, and
@@ -39,6 +43,13 @@
 # also writes the btw-id, and from the recreate in phase 4 on every new
 # document is a VAT invoice and a business in another EU country can pay
 # without VAT (#517). Tell the bookkeeper before, not after.
+#
+# Step 6l measures the host promises on /dpa (auditd, AIDE, AppArmor). Until the
+# host state has been measured once and found right, a miss there is a WARN, not
+# a STOP: 6l runs after the containers and the frontend are live, and a stop
+# there skipped phase 7 and its deployed-head marker, so the next run stopped in
+# phase 1a over a host fact the deploy did not change (review-574 N1). The miss
+# is printed in the log and again in the summary. --host-strict makes it a STOP.
 #
 # --verify-only exists for a deploy that did its work and then died in the
 # checks. It gates on the server already being deployed (checkout on
@@ -170,7 +181,7 @@ EXPECTED_HEAD="${PARAMANT_EXPECTED_HEAD:-}"           # explicit override, wins
 # replaces, here the mainline-ancestor test in phase Va.
 VERIFY_HEAD="${PARAMANT_VERIFY_HEAD:-}"
 DEPLOYED_HEAD_FILE="${PARAMANT_DEPLOYED_HEAD_FILE:-$BACKUP_DIR/deployed-head}"
-EXPECT_VERSION="3.1.0"
+EXPECT_VERSION="3.1.1"
 SERVICES="relay-main relay-health relay-finance relay-legal relay-iot admin"
 HOSTS="paramant.app health.paramant.app legal.paramant.app finance.paramant.app iot.paramant.app relay.paramant.app"
 
@@ -230,6 +241,13 @@ REQUIRED_WORKFLOWS="${PARAMANT_REQUIRED_WORKFLOWS:-test.yml csp-inline-check.yml
 # them instead, then judge what they became.
 CI_WAIT_SECONDS="${PARAMANT_CI_WAIT_SECONDS:-900}"   # 15 minutes
 
+# Step 6l. /dpa promises three things about the host, and this is what holds
+# the page to them: auditd active, AIDE installed with a check that ran within
+# this many days (the check is daily, so 2 leaves room for one missed night),
+# AppArmor enabled with at least one profile in enforce mode. The page names
+# this number, and tests/site-claims.test.mjs keeps the two equal.
+HOST_AIDE_MAX_AGE_DAYS="${PARAMANT_AIDE_MAX_AGE_DAYS:-2}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -243,6 +261,8 @@ VERIFY_ONLY=0
 NGINX_SYNC_ONLY=0
 NGINX_PAYLOAD=""
 SELLER_VAT_GO=0
+HOST_STRICT=0
+HOST_UNPROVEN=""
 ROLLBACK_TS=""
 REMOTE_OUT=""
 REMOTE_RC=0
@@ -718,6 +738,38 @@ judge_seller_known() {
   fi
 }
 
+# Step 6l. One line per promise on /dpa, in the log, before any verdict: a
+# deploy that stops on auditd still says what AIDE and AppArmor answered.
+# Returns the number of promises that did not hold. Phase 6 warns on any, and
+# stops only under --host-strict (review-574 N1).
+judge_host_hardening() {   # max age in days
+  local max="$1" fails=0 v age n
+  v="$(remote_field 'host auditd')"
+  if [ "$v" = active ]; then ok "host: auditd is active"
+  else printf '  FAIL  host: auditd is %s, not active\n' "${v:-not reported}"; fails=$((fails + 1)); fi
+
+  v="$(remote_field 'host aide binary')"
+  age="$(remote_field 'host aide last run age days')"
+  if [ "$v" != yes ]; then
+    printf '  FAIL  host: AIDE is not installed (no aide binary)\n'; fails=$((fails + 1))
+  elif [ "$(remote_field 'host aide db')" != yes ]; then
+    printf '  FAIL  host: AIDE is installed but has no database to check against\n'; fails=$((fails + 1))
+  elif ! printf '%s' "$age" | grep -qE '^[0-9]+$'; then
+    printf '  FAIL  host: AIDE is installed but no check run was found (no log, no timer run)\n'; fails=$((fails + 1))
+  elif [ "$age" -gt "$max" ]; then
+    printf '  FAIL  host: the last AIDE check ran %s days ago, more than %s\n' "$age" "$max"; fails=$((fails + 1))
+  else ok "host: AIDE is installed and its last check ran $age day(s) ago (at most $max)"; fi
+
+  v="$(remote_field 'host apparmor enabled')"
+  n="$(remote_field 'host apparmor enforce profiles')"
+  if [ "$v" != yes ]; then
+    printf '  FAIL  host: AppArmor is not enabled\n'; fails=$((fails + 1))
+  elif ! printf '%s' "$n" | grep -qE '^[0-9]+$' || [ "$n" -lt 1 ]; then
+    printf '  FAIL  host: AppArmor is enabled but no profile is in enforce mode (%s)\n' "${n:-not reported}"; fails=$((fails + 1))
+  else ok "host: AppArmor is enabled with $n profile(s) in enforce mode"; fi
+  return "$fails"
+}
+
 # ------------------------------------------------ the starting commit gate --
 
 # sha_eq: two git object names are the same commit when one is a prefix of the
@@ -840,6 +892,7 @@ while [ $# -gt 0 ]; do
     --nginx-sync)     NGINX_SYNC_ONLY=1; shift ;;
     --dry-run)        DRY_RUN=1; shift ;;
     --seller-vat)     SELLER_VAT_GO=1; shift ;;
+    --host-strict)    HOST_STRICT=1; shift ;;
     --rollback)       [ $# -ge 2 ] || { echo "--rollback needs a <TS>" >&2; exit 2; }
                       ROLLBACK_TS="$2"; shift 2 ;;
     -h|--help)        usage 0 ;;
@@ -857,6 +910,10 @@ if [ "$VERIFY_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -e
 fi
 if [ "$NGINX_SYNC_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ] || [ "$VERIFY_ONLY" -eq 1 ] || [ "$SELLER_VAT_GO" -eq 1 ]; }; then
   echo "--nginx-sync is its own run (phase 5e only); combine it with --dry-run and nothing else" >&2
+  exit 2
+fi
+if [ "$HOST_STRICT" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ] || [ "$NGINX_SYNC_ONLY" -eq 1 ]; }; then
+  echo "--host-strict only changes step 6l, which runs in a full deploy and in --verify-only" >&2
   exit 2
 fi
 if [ -n "$ROLLBACK_TS" ] && [ "$SELLER_VAT_GO" -eq 1 ]; then
@@ -887,7 +944,7 @@ MODE="full deploy"
 [ "$DRY_RUN" -eq 1 ] && MODE="$MODE, DRY RUN (nothing is executed on the server)"
 
 hr
-echo "PARAMANT deploy 3.1.0 - deploy/DEPLOY-3.1.md as one command"
+echo "PARAMANT deploy $EXPECT_VERSION - deploy/DEPLOY-3.1.md as one command"
 hr
 printf '  run started   %s\n' "$(date -Is)"
 printf '  mode          %s\n' "$MODE"
@@ -1611,6 +1668,74 @@ EOF
   expect_not 'NOTHEALTHY|UNHEALTHY|FATAL' "every recreated container reached healthy"
   expect_not 'stance .*"recurring":true' "no relay reports recurring:true after the recreate"
   expect_not 'version .*no relay_started line' "every relay logged relay_started"
+}
+
+# ---------------------------------------------------- release tag gate (N2) --
+
+# release_tag_verdict: does the tag the installers pin exist on origin, and does
+# it name the commit we deploy? Pure, so the dry-run test can feed it cases.
+#   $1 tag        what install.sh, frontend/install.sh and install-pi.sh pin
+#   $2 tag sha    the commit origin's tag points at (peeled), empty if absent
+#   $3 deploy sha the commit this run deploys
+release_tag_verdict() {
+  local tag="$1" tagsha="$2" sha="$3"
+  if [ -z "$tag" ]; then
+    printf 'STOP the installers do not agree on one pinned tag (RELAY_VERSION default), so there is no tag to check\n'
+    return 1
+  fi
+  if [ -z "$tagsha" ]; then
+    printf 'STOP tag %s does not exist on origin. Phase 5 puts frontend/install.sh with that pin live, and every curl | bash install and every paramant upgrade would fail. Set it first: git tag -a %s %s -m "Release %s" && git push origin %s\n' \
+      "$tag" "$tag" "$sha" "${tag#v}" "$tag"
+    return 1
+  fi
+  if ! sha_eq "$tagsha" "$sha"; then
+    printf 'STOP tag %s on origin points at %s, not at %s, the commit this run deploys. Move it on purpose: git tag -f -a %s %s -m "Release %s" && git push -f origin %s\n' \
+      "$tag" "${tagsha:0:12}" "${sha:0:12}" "$tag" "$sha" "${tag#v}" "$tag"
+    return 1
+  fi
+  printf 'OK tag %s on origin points at %s, the commit this run deploys\n' "$tag" "${sha:0:12}"
+}
+
+release_tag_gate() {   # step label
+  step "$1. the tag the installers pin exists on origin and names the deploy commit"
+  local sha tag="" t f tagsha=""
+  if [ -n "$DEPLOYED_HEAD" ]; then
+    sha="$DEPLOYED_HEAD"
+  elif sha="$(git rev-parse -q --verify "$DEPLOY_REF^{commit}" 2>/dev/null)"; then
+    :
+  elif [ "$DRY_RUN" -eq 1 ]; then
+    # A shallow CI checkout has no $DEPLOY_REF. Same rule as nginx_sync_prepare:
+    # the dry run reads HEAD and says so; a real run still stops.
+    note "$DEPLOY_REF does not resolve here; this dry run reads the installer pins from HEAD"
+    sha="$(git rev-parse HEAD)"
+  else
+    die "$DEPLOY_REF does not resolve here, so there is no deploy commit to check the tag against. git fetch origin"
+  fi
+  for f in install.sh frontend/install.sh frontend/install-pi.sh; do
+    t="$(git show "$sha:$f" 2>/dev/null | sed -n 's/^RELAY_VERSION="${PARAMANT_VERSION:-\(v[0-9][0-9.]*\)}".*/\1/p' | head -1)"
+    if [ -z "$tag" ]; then tag="$t"; elif [ "$t" != "$tag" ]; then tag=""; break; fi
+    [ -n "$t" ] || { tag=""; break; }
+  done
+  if [ -n "$tag" ] && [ "$tag" != "v$EXPECT_VERSION" ]; then
+    local mism="the installers in ${sha:0:7} pin $tag but this deploy expects v$EXPECT_VERSION; make them agree first"
+    [ "$DRY_RUN" -eq 1 ] || die "$mism"
+    note "$mism (dry run, not a stop)"
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '\n  $ git ls-remote --tags origin %s\n  [dry-run] not executed\n' "${tag:-<tag>}"
+    printf '  SKIP  assert (dry-run): tag %s exists on origin and points at %s\n' "${tag:-<none>}" "${sha:0:7}"
+    return 0
+  fi
+  if [ -n "$tag" ]; then
+    local ls
+    ls="$(git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}" 2>&1)" \
+      || die "git ls-remote --tags origin $tag failed: $ls"
+    tagsha="$(printf '%s\n' "$ls" | awk -v r="refs/tags/$tag^{}" '$2==r{print $1}')"
+    [ -n "$tagsha" ] || tagsha="$(printf '%s\n' "$ls" | awk -v r="refs/tags/$tag" '$2==r{print $1}')"
+  fi
+  local verdict
+  verdict="$(release_tag_verdict "$tag" "$tagsha" "$sha")" || die "${verdict#STOP }"
+  ok "${verdict#OK }"
 }
 
 # =============================================================== PHASE 5 =====
@@ -3330,6 +3455,76 @@ EOF
       *) die "a relay signs with a key /verify does not pin as current; follow RUNBOOK.md, Relay identity key rotation" ;;
     esac
   fi
+
+  # 6l. /dpa says auditd, AIDE and AppArmor. Nothing else in the deploy looked
+  # at the host, so the page stated a server state nobody re-measured (telling
+  # SITE-48-A). Read-only: it starts, stops, writes and updates nothing; the
+  # AIDE database is only stat'ed, never checked or rebuilt here.
+  step "6l. host hardening that /dpa promises: auditd, AIDE, AppArmor (read-only)"
+  remote_soft "host hardening" /var/lib/aide /var/log/aide /sys/module/apparmor/parameters/enabled <<'EOF'
+set -euo pipefail
+aide_db_dir="$1"; aide_log_dir="$2"; aa_param="$3"
+echo "host auditd = $(systemctl is-active auditd 2>/dev/null || true)"
+if command -v aide >/dev/null 2>&1; then
+  echo "host aide binary = yes"
+else
+  echo "host aide binary = no"
+fi
+if [ -e "$aide_db_dir/aide.db" ] || [ -e "$aide_db_dir/aide.db.gz" ]; then
+  echo "host aide db = yes"
+else
+  echo "host aide db = no"
+fi
+# The last check run: the newest of the daily check's log and its systemd run.
+now="$(date +%s)"
+newest=0
+for f in "$aide_log_dir"/*.log "$aide_log_dir"/*.log.0; do
+  [ -f "$f" ] || continue
+  t="$(stat -c %Y "$f" 2>/dev/null || echo 0)"
+  if [ "$t" -gt "$newest" ]; then newest="$t"; fi
+done
+for unit in dailyaidecheck.service aidecheck.service; do
+  ts="$(systemctl show "$unit" -p ExecMainExitTimestamp --value 2>/dev/null || true)"
+  [ -n "$ts" ] || continue
+  t="$(date -d "$ts" +%s 2>/dev/null || echo 0)"
+  if [ "$t" -gt "$newest" ]; then newest="$t"; fi
+done
+if [ "$newest" -gt 0 ]; then
+  echo "host aide last run age days = $(( (now - newest) / 86400 ))"
+else
+  echo "host aide last run age days = none"
+fi
+if aa-status --enabled >/dev/null 2>&1 \
+   || [ "$(cat "$aa_param" 2>/dev/null || true)" = Y ]; then
+  echo "host apparmor enabled = yes"
+else
+  echo "host apparmor enabled = no"
+fi
+n="$(aa-status 2>/dev/null | sed -n 's/^\([0-9][0-9]*\) profiles are in enforce mode.*/\1/p' | head -1 || true)"
+echo "host apparmor enforce profiles = ${n:-unknown}"
+exit 0
+EOF
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): auditd active, AIDE ran within %s days, AppArmor enforcing\n' "$HOST_AIDE_MAX_AGE_DAYS"
+  else
+    local host_fails=0 host_msg=""
+    if [ "$REMOTE_RC" -ne 0 ]; then
+      host_msg="remote step 'host hardening' exited $REMOTE_RC; the host state was not read"
+    else
+      judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS" || host_fails=$?
+      [ "$host_fails" -eq 0 ] \
+        || host_msg="$host_fails of the three host promises on /dpa do not hold (auditd, AIDE, AppArmor); the FAIL lines above say which"
+    fi
+    if [ -n "$host_msg" ]; then
+      [ "$HOST_STRICT" -eq 1 ] && die "$host_msg (--host-strict)"
+      HOST_UNPROVEN="$host_msg"
+      warn "6l host NOT PROVEN: $host_msg"
+      note "this is a warning, not a stop: the release is live and the host state is"
+      note "not something this deploy changed. /dpa says 'we check at every deploy"
+      note "whether auditd, AIDE and AppArmor are active', and this run's answer is no."
+      note "Fix the host (or the page), then confirm with --verify-only --host-strict."
+    fi
+  fi
 }
 
 # =============================================================== PHASE V =====
@@ -3479,13 +3674,21 @@ EOF
   printf '  run TS        %s\n' "$TS"
   printf '  rollback with bash deploy/deploy-3.1.sh --rollback %s\n' "$TS"
   printf '  log           %s\n' "$LOG"
+  if [ -n "$HOST_UNPROVEN" ]; then
+    echo
+    echo "HOST NOT PROVEN (step 6l, a warning, not a stop):"
+    printf '  %s\n' "$HOST_UNPROVEN"
+    echo "  The deploy itself is done and the marker is written. The promise on /dpa"
+    echo "  is that we CHECK auditd, AIDE and AppArmor at every deploy; this check"
+    echo "  said no. Put the host right, then run --verify-only --host-strict."
+  fi
   echo
   echo "Still by hand, on purpose (runbook step 7):"
   echo "  1. watch thirty minutes: docker compose logs -f --tail=200 relay-main"
   echo "  2. mint the ParaSign canary key and set PARASIGN_CANARY_KEY as an"
   echo "     Actions secret, then dispatch product-heartbeat.yml once"
   echo "  3. scripts/check-prod-drift.sh origin/main must print OK"
-  echo "  4. git tag v$EXPECT_VERSION <commit> and push it, put the live date in CHANGELOG.md"
+  echo "  4. put the live date in CHANGELOG.md (tag v$EXPECT_VERSION was checked before phase 5)"
   echo "  5. write the deploy down in the vault, with the billing_config line as logged"
   echo
   echo "BILLING_MODE stays empty. Turning the recurring layer on is a separate"
@@ -3796,9 +3999,13 @@ if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+# Checked once before anything is written, so a missing tag stops a clean run,
+# and again right before phase 5 puts the installers live.
+release_tag_gate "1z"
 phase_2
 phase_3
 phase_4
+release_tag_gate "5-pre"
 phase_5
 phase_6
 phase_7

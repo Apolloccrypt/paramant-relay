@@ -476,7 +476,7 @@ function moneyOf(amount) {
 // what he can check.
 function failedCollectionMail({ order, paidUntil, now, siteUrl, amount }) {
   if (!order || order.error) return null;
-  const plan = planExpiry.bundleLabel(order.bundle) || planExpiry.planLabel(order.product, order.tier);
+  const plan = planExpiry.bundleLabel(order.bundle) || planExpiry.planLabelMail(order.product, order.tier);
   const planNl = planExpiry.bundleLabelNl(order.bundle) || planExpiry.planLabelNl(order.product, order.tier);
   const account = `${String(siteUrl || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '')}/account`;
   const at = paidUntil ? Date.parse(paidUntil) : NaN;
@@ -489,7 +489,7 @@ function failedCollectionMail({ order, paidUntil, now, siteUrl, amount }) {
   const textNl = [
     `De automatische betaling van ${money} voor uw ${planNl} is niet gelukt.`,
     '',
-    'In de meeste gevallen probeert Mollie de betaling automatisch opnieuw, tot vijf keer, een keer per dag. U hoeft dan zelf niets te betalen. Kijk wel of uw rekening of kaart nog geldig is.',
+    'Meestal probeert Mollie de betaling automatisch opnieuw: tot vijf keer, een keer per dag. U hoeft dan zelf niets te betalen. Kijk wel of uw rekening of kaart nog geldig is.',
     '',
     running
       ? `Uw plan loopt tot ${planExpiry.formatDateNl(at)}.`
@@ -502,7 +502,7 @@ function failedCollectionMail({ order, paidUntil, now, siteUrl, amount }) {
   const textEn = [
     `The automatic payment of ${money} for your ${plan} did not go through.`,
     '',
-    'In most cases Mollie tries the payment again automatically, up to five times, once a day. You then do not need to pay yourself. Do check that your bank account or card is still valid.',
+    'Usually Mollie tries the payment again automatically: up to five times, once a day. You do not need to pay yourself. Do check that your bank account or card is still valid.',
     '',
     running
       ? `Your plan runs until ${planExpiry.formatDate(at)}.`

@@ -140,11 +140,11 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -161,11 +161,11 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -211,6 +211,14 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
       <li>Team accounts + SSO</li>
       <li>Admin email preview modal with per-user send actions</li>
     </ul>
+  </section>
+
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.1.1</h2>
+      <span class="release-date">not yet tagged; the tag goes on the merge commit before the site rollout</span>
+    </div>
+    <p class="release-summary">Repair round after 3.1.0: what a buyer reads around paying matches what he gets, the deploy checks the host hardening /dpa promises, and the installer clones the v3.1.1 tag. The full list is in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
   </section>
 
   <!-- ── 3.1.0 and 3.0.0: summarised from CHANGELOG.md in the repository ── -->
@@ -387,6 +395,6 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

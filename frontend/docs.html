@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="description" content="Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <meta property="og:title" content="API-documentatie en zelf hosten · Paramant">
-<meta property="og:description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta property="og:description" content="Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <meta property="og:url" content="https://paramant.app/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="API-documentatie en zelf hosten · Paramant">
-<meta name="twitter:description" content="Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="twitter:description" content="Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <link rel="canonical" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Documentatie van Paramant v3.1.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
+      "description": "Documentatie van Paramant v3.1.1: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
     },
     {
       "@type": "Organization",
@@ -259,7 +259,7 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">NASLAG</span>
     <h1>Documentatie</h1>
     <p class="docs-buyer">Overweegt u Paramant? Uw IT kan hier alles controleren. Abonnementen en prijzen staan op <a href="/pricing">Prijzen</a>.</p>
-    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.1.0. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
+    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.1.1. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Snel starten</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">Bekijk abonnementen en prijzen</a>
@@ -340,7 +340,7 @@ tr:last-child td{border-bottom:none}
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Snel starten</h2>
-    <p>Verstuur uw eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak een gratis account aan</a> (beveiligd met TOTP, sleutel zichtbaar in het dashboard).</p>
+    <p>Verstuur uw eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak een gratis account aan</a> (beveiligd met TOTP; uw sleutel staat in het dashboard).</p>
 
     <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Installeer de SDK (Python 3.10+ of Node 18+; beide gebruiken dezelfde encoder voor wire format v1)</p></div></div>
     <div class="cb">
@@ -383,7 +383,7 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
     <!-- ── Authentication ──────────────────────────────────────── -->
     <h2 id="authentication">Authenticatie</h2>
-    <p>Er zijn twee soorten sleutels. Ze hebben elk een eigen rol en zijn nooit uitwisselbaar.</p>
+    <p>Er zijn twee soorten sleutels, elk met een eigen rol. U kunt ze nooit door elkaar gebruiken.</p>
     <table>
       <tr><th>Sleutel</th><th>Prefix</th><th>Voor wie</th><th>Doel</th></tr>
       <tr><td>pgp_</td><td><code>pgp_</code></td><td>Eindgebruikers</td><td>Bestanden versturen en ontvangen via de API</td></tr>
@@ -519,7 +519,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
     <p>TTL en <code>max_views</code> worden allebei begrensd op het maximum van het abonnement: Community krijgt 1 uur en 1 lezing, Firm 24 uur en tot 10 lezingen, Enterprise 7 dagen en 100 lezingen. Laat u <code>max_views</code> weg, dan wordt de link op elk abonnement bij de eerste lezing gewist. Zo werkt de webapp van Versturen. Het veld <code>hash</code> is de SHA-256 van de <em>opgevulde</em> inhoud, niet van het oorspronkelijke bestand. De SDK berekent dit zelf.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>Telt als één lezing van de link.</strong> Een Community-link heeft één lezing, dus deze aanroep is de enige keer ophalen; een betaalde link kan er meer hebben, tot 10 op Firm. Bij de laatste lezing wordt de buffer van de blob overschreven met willekeurige bytes en uit het RAM verwijderd. Herstellen is niet mogelijk.</p>
+    <p><strong>Telt als één lezing van de link.</strong> Een Community-link heeft één lezing, dus deze aanroep is de enige keer ophalen; een betaalde link kan er meer hebben, tot 10 op Firm. Een lezing telt pas als de hele blob is afgeleverd, dat wil zeggen zodra de relay het laatste byte heeft verstuurd: breekt uw verbinding eerder af, dan staat hij er nog en haalt u hem opnieuw op; de relay levert hem hooguit vijf keer in totaal. Verstuurd betekent hier: aan de verbinding gegeven, niet bij u aangekomen. Het besturingssysteem buffert enkele MB per verbinding, dus een blob tot de standaardgrens van 5 MB is meestal in één keer verstuurd, en een verbinding die na de eerste kilobytes afbreekt, kost de lezing dan al. Wilt u dat een afgebroken download niets kost, gebruik dan de deellink <code>/v2/dl</code> met <code>?claim=</code>: daar telt de lezing pas na uw eigen bevestiging. Na de laatste afgeleverde lezing wordt de buffer van de blob overschreven met willekeurige bytes en uit het RAM verwijderd. Herstellen is dan niet mogelijk.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 
@@ -610,8 +610,8 @@ curl https://paramant.app/v1/envelopes/&lt;id&gt;/receipt \
   ]
 }</pre>
     <p>Het <code>id</code> is een willekeurige reeks van 20 tot 64 tekens zonder voorvoegsel. Elke ondertekenaar krijgt een eigen <code>sign_url</code> naar de gehoste pagina <code>/co-sign</code>. Een ondertekenaar staat op <code>pending</code> tot hij getekend heeft en daarna op <code>signed</code>, in het antwoord op het aanmaken en in <code>GET /v1/envelopes/:id</code> hetzelfde woord.</p>
-    <p>Limiet: 50 nieuwe envelopes per sleutel per klokuur. De teller begint op elk heel uur opnieuw (UTC), dus rond de uurgrens kunnen er kort na elkaar tot 100 bij komen. Een envelope wordt standaard 30 dagen bewaard (in te stellen met <code>ttl_days</code>, maximaal 365). Zolang hij bestaat, bewaart de relay ook de pdf zelf, versleuteld in redis, omdat de ondertekenaars hem moeten kunnen openen en de gestempelde pdf eruit wordt gemaakt. Na het verlopen is hij weg. Webhooks: stel <code>webhook_url</code> in, dan komen <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> en <code>envelope.voided</code> binnen, ondertekend met HMAC-SHA256 in de header <code>X-Paramant-Sig</code>. Een aflevering die mislukt (geen verbinding, of een 5xx of 429 van uw kant) probeert de relay opnieuw na 2 en na 10 seconden, drie pogingen in totaal, met dezelfde body en dezelfde <code>X-Paramant-Delivery</code>, zodat u een herhaling op die id herkent; <code>X-Paramant-Attempt</code> zegt welke poging het is. De events van één envelope gaan in volgorde, één voor één, en elke body draagt een oplopend <code>seq</code> (<code>envelope.sent</code> 1, <code>signer.completed</code> 1 plus het aantal handtekeningen, <code>envelope.completed</code> en <code>envelope.voided</code> het aantal ondertekenaars plus 2). Na drie mislukte pogingen geeft de relay het op, dus controleer de status ook zelf met <code>GET /v1/envelopes/:id</code>. Bewijzen zijn offline te controleren tegen de openbare CT-log; zie <a href="/verify">/verify</a>.</p>
-    <p>Veilig opnieuw proberen: stuur bij <code>POST /v1/envelopes</code> een header <code>Idempotency-Key</code> mee (8 tot 128 tekens uit <code>A-Z a-z 0-9 _ . : -</code>). Komt dezelfde sleutel binnen 24 uur opnieuw van dezelfde API-sleutel, dan krijgt u het eerste <code>201</code>-antwoord terug met <code>Idempotent-Replay: true</code>, zonder tweede envelope en zonder quotum te verbruiken. Alleen een geslaagde <code>201</code> wordt bewaard. De relay controleert de body vóór het uurquotum: <code>400 ambiguous_document</code> (zowel <code>content_base64</code> als <code>url</code>), <code>400 invalid_binding_mode</code> (niet <code>email</code> of <code>open</code>), <code>400 invalid_signer_email</code> (bij <code>email</code>-binding heeft elke ondertekenaar een geldig adres nodig; <code>signer_index</code> noemt de eerste foute) <code>400 invalid_metadata</code> (<code>metadata</code> is geen object) en <code>400 invalid_idempotency_key</code> kosten dus geen aanmaak. Verder: <code>400 missing_signers</code>, <code>400 missing_document</code> (geen <code>content_base64</code> en geen <code>url</code>), <code>400 empty_document</code> (lege <code>content_base64</code>), <code>400 too_many_signers</code> (meer namen dan uw abonnement op één document toelaat; <code>max_signers</code> zegt hoeveel), <code>413 document_too_large</code>, <code>422 not_a_pdf</code> en <code>422 document_unfetchable</code>. Een <code>429 rate_limited</code> draagt <code>Retry-After</code> met de seconden tot het einde van het lopende klokuur. Is het maandquotum handtekeningen van uw abonnement op, dan antwoordt de relay <code>402 monthly_sign_quota_reached</code> met <code>plan</code>, <code>limit</code>, <code>used</code>, <code>reset_date</code> en <code>Retry-After: 86400</code>; er wordt dan niets aangemaakt. Een fout op <code>/v1</code> heeft altijd de vorm <code>{"error": "&lt;code&gt;", "message": "&lt;zin&gt;"}</code>.</p>
+    <p>Limiet: 50 nieuwe envelopes per sleutel in elk willekeurig uur (een schuivend venster, niet het klokuur), dus ook rond het hele uur nooit meer dan 50 binnen zestig minuten. Een envelope wordt standaard 30 dagen bewaard (in te stellen met <code>ttl_days</code>, maximaal 365). Zolang hij bestaat, bewaart de relay ook de pdf zelf, versleuteld in redis, omdat de ondertekenaars hem moeten kunnen openen en de gestempelde pdf eruit wordt gemaakt. Na het verlopen is hij weg. Webhooks: stel <code>webhook_url</code> in, dan komen <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> en <code>envelope.voided</code> binnen, ondertekend met HMAC-SHA256 in de header <code>X-Paramant-Sig</code>. Een aflevering die mislukt (geen verbinding, of een 5xx of 429 van uw kant) probeert de relay opnieuw na 2 en na 10 seconden, drie pogingen in totaal, met dezelfde body en dezelfde <code>X-Paramant-Delivery</code>, zodat u een herhaling op die id herkent; <code>X-Paramant-Attempt</code> zegt welke poging het is. De events van één envelope gaan in volgorde, één voor één, en elke body draagt een oplopend <code>seq</code> (<code>envelope.sent</code> 1, <code>signer.completed</code> 1 plus het aantal handtekeningen, <code>envelope.completed</code> en <code>envelope.voided</code> het aantal ondertekenaars plus 2). Na drie mislukte pogingen geeft de relay het op, dus controleer de status ook zelf met <code>GET /v1/envelopes/:id</code>. Bewijzen zijn offline te controleren tegen de openbare CT-log; zie <a href="/verify">/verify</a>.</p>
+    <p>Veilig opnieuw proberen: stuur bij <code>POST /v1/envelopes</code> een header <code>Idempotency-Key</code> mee (8 tot 128 tekens uit <code>A-Z a-z 0-9 _ . : -</code>). Komt dezelfde sleutel binnen 24 uur opnieuw van dezelfde API-sleutel, dan krijgt u het eerste <code>201</code>-antwoord terug met <code>Idempotent-Replay: true</code>, zonder tweede envelope en zonder quotum te verbruiken. Alleen een geslaagde <code>201</code> wordt bewaard. De relay controleert de body vóór het uurquotum: <code>400 ambiguous_document</code> (zowel <code>content_base64</code> als <code>url</code>), <code>400 invalid_binding_mode</code> (niet <code>email</code> of <code>open</code>), <code>400 invalid_signer_email</code> (bij <code>email</code>-binding heeft elke ondertekenaar een geldig adres nodig; <code>signer_index</code> noemt de eerste foute) <code>400 invalid_metadata</code> (<code>metadata</code> is geen object) en <code>400 invalid_idempotency_key</code> kosten dus geen aanmaak. Verder: <code>400 missing_signers</code>, <code>400 missing_document</code> (geen <code>content_base64</code> en geen <code>url</code>), <code>400 empty_document</code> (lege <code>content_base64</code>), <code>400 too_many_signers</code> (meer namen dan uw abonnement op één document toelaat; <code>max_signers</code> zegt hoeveel), <code>413 document_too_large</code>, <code>422 not_a_pdf</code> en <code>422 document_unfetchable</code>. Een <code>429 rate_limited</code> draagt <code>Retry-After</code> met de seconden tot de oudste aanmaak van het afgelopen uur uit het venster valt. Is het maandquotum handtekeningen van uw abonnement op, dan antwoordt de relay <code>402 monthly_sign_quota_reached</code> met <code>plan</code>, <code>limit</code>, <code>used</code>, <code>reset_date</code> en <code>Retry-After: 86400</code>; er wordt dan niets aangemaakt. Een fout op <code>/v1</code> heeft altijd de vorm <code>{"error": "&lt;code&gt;", "message": "&lt;zin&gt;"}</code>.</p>
 
     <!-- ── Account & billing API ────────────────────────────────── -->
     <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
@@ -671,7 +671,7 @@ curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
   ],
   "envelope_count": 1,
   "envelopes": [
-    { "envelope_id": "env_9f2c...", "status": "completed", "psign": { "...": "full multi-signer .psign proof" } }
+    { "envelope_id": "Us4rFoLj35sU_4cOlPJcs3eMZlw4xjMp", "status": "completed", "psign": { "...": "full multi-signer .psign proof" } }
   ]
 }</pre>
     <p>De CSV-export heeft één kopregel en één regel per auditgebeurtenis: <code>time,event,doc_hash,bytes,device,chain_hash</code> (de <code>.psign</code>-bewijzen van envelopes staan alleen in de JSON-export). <code>chain_valid: false</code> wijst op manipulatie: een auditketen die de Merkle-hercontrole niet doorstond. Envelopestatussen zijn <code>completed</code> (volledig <code>.psign</code>), <code>in_progress</code>, <code>sent</code>, <code>void</code> of <code>expired_or_gone</code> (geen bewijs).</p>
@@ -758,7 +758,7 @@ docker compose up -d
 
 <span class="cm"># 4. Verify</span>
 curl http://localhost:3000/health
-<span class="cm"># → {"ok":true,"version":"3.1.0","sector":"relay"}</span></pre>
+<span class="cm"># → {"ok":true,"version":"3.1.1","sector":"relay"}</span></pre>
     </div>
 
     <h3>Poorten per container</h3>
@@ -862,8 +862,8 @@ paramant upgrade
 
 <span class="cm"># Met de hand: de clone staat vast op een tag, git pull verplaatst hem niet</span>
 cd /opt/paramant
-git fetch --depth 1 origin tag v3.1.0
-git checkout v3.1.0
+git fetch --depth 1 origin tag v3.1.1
+git checkout v3.1.1
 docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>
@@ -889,7 +889,7 @@ docker compose up -d --build
       <tr><td>scripts/paramant-scan.sh</td><td>Relaynodes vinden via het register</td></tr>
       <tr><td>deploy/paramant-admin.py</td><td>Gebruikers en sleutels op uw eigen relay beheren</td></tr>
     </table>
-    <p>De twee Python-scripts kiezen met <code>--relay</code> alleen uit de gehoste sectoren (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>); voor een eigen relay gebruikt u de SDK of de HTTP-API. Ze versleutelen met een eigen transfergeheim (<code>--secret</code> of <code>PARAMANT_TRANSFER_SECRET</code>), nooit met de API-sleutel.</p>
+    <p>De twee Python-scripts nemen met <code>--relay</code> een gehoste sector (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>) of het https-adres van uw eigen relay, bijvoorbeeld <code>--relay https://relay.example.com</code>. Ze versleutelen met een eigen transfergeheim (<code>--secret</code> of <code>PARAMANT_TRANSFER_SECRET</code>), nooit met de API-sleutel.</p>
     <pre><span class="cm"># Example: send a file (the transfer secret is printed once; give it to the receiver)</span>
 python3 scripts/paramant-sender.py --key pgp_xxx --relay health --file scan.dcm
 
@@ -913,7 +913,7 @@ python3 scripts/paramant-receiver.py --key pgp_xxx --relay health --hash &lt;has
     <p>De twee helften draaien verschillende builds van dezelfde Rust-cryptografie. <strong>Sleutelinkapseling met ML-KEM-768 blijft aan de clientkant</strong> (WASM in de browser of de SDK): de relay wisselt nooit sleutels uit en heeft nooit een privésleutel. <strong>ML-DSA-65 draait aan de serverkant</strong>, voor het identiteitssleutelpaar van de relay, ondertekende ontvangstbewijzen en ondertekende tree heads (STH), en om handtekeningen van apparaten en ontvangstbewijzen te controleren. Sinds de M5b-migratie (27 mei 2026) komt die ML-DSA-65 aan de serverkant uit <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: een losse Rust-cryptobibliotheek, klaar voor audit (BUSL-1.1), die de relay gebruikt via de NAPI-binding <code>@paramant/core</code>.</p>
 
     <h2 id="burn">Burn-on-read: wissen na ophalen</h2>
-    <p>Na <code>GET /v2/outbound/:hash</code> overschrijft de relay de buffer van de blob direct met cryptografisch willekeurige bytes en verwijdert hij de vermelding uit het geheugen. Versleutelde inhoud wordt tijdens de overdracht <strong>nooit naar schijf geschreven</strong>.</p>
+    <p>Zodra <code>GET /v2/outbound/:hash</code> de laatste byte heeft afgeleverd, overschrijft de relay de buffer van de blob met cryptografisch willekeurige bytes en verwijdert hij de vermelding uit het geheugen. Breekt de ontvanger de download af voordat de relay de laatste byte aan de verbinding gaf, dan blijft de blob staan en levert de volgende poging hem opnieuw, helemaal. Bij een blob tot een paar MB is die laatste byte door de buffers van het besturingssysteem meestal meteen weg. Versleutelde inhoud wordt tijdens de overdracht <strong>nooit naar schijf geschreven</strong>.</p>
     <p>De CT-log slaat cryptografische hashes op schijf op (Merkle-leafhashes, tree-hashes, apparaathashes), nooit inhoud. Zelfs een volledige schijfkopie van de relayserver laat geen bestandsinhoud zien.</p>
     <p>Wissen in twee stappen: eerst wordt de blob ter plekke met nullen overschreven, daarna wordt de Map-vermelding verwijderd. Zo is er geen kort moment waarop een gedeeltelijke lezing mogelijk is.</p>
 
@@ -1106,7 +1106,7 @@ python3 deploy/paramant-admin.py sync</pre>
 
 <script src="/js/docs.inline1.js?v=2"></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </main>
 <footer>
   <div class="container-lg">

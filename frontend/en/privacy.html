@@ -198,11 +198,11 @@ footer a{color:var(--ink);text-decoration:none}
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -219,11 +219,11 @@ footer a{color:var(--ink);text-decoration:none}
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -297,7 +297,10 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>Nonce registry</strong>: replay-attack protection (SDK sessions)</li>
 <li><strong>Status history</strong> (<code>paramant_status_v1</code>): the last 24 hours of relay health checks your own browser made on the status page</li>
 <li><strong>Key of a document you sent for signing</strong> (<code>paramant.cosign.key.v1:&hellip;</code>): when you send a document for signing on /sign, this browser keeps the key of that encrypted document, so you can open the complete signed document here later. It is your own document; the key is not sent to us. It is wiped when you sign out, when your session runs out, when another account signs in on this browser, when the request is withdrawn, declined or expired, as soon as you open the completed document here, and in any case after 24 hours.</li>
-<li><strong>Signing links of a request you sent</strong> (<code>paramant.cosign.links.v1:&hellip;</code>): each signer's personal link, with the half of the document key that is also in the invitation, so you can give a signer the link again from your dashboard. That half opens nothing without the invited email address signing in. They are not sent to us and are wiped when you sign out, when another account signs in on this browser, and when the request expires (at the latest after eight days).</li>
+<li><strong>Signing links of a request you sent</strong> (<code>paramant.cosign.links.v1:&hellip;</code>): each signer's personal link, with the half of the document key that is also in the invitation, so you can send a signer the invitation again from your dashboard. They are stored encrypted, under a key that belongs to your account and that this browser holds in memory only. That half opens nothing without the invited email address signing in. They are wiped when you sign out, when another account signs in on this browser, when the request is complete or withdrawn, and when the request expires (at the latest after eight days).</li>
+<li><strong>Links of a send by name</strong> (<code>paramant.send.links.v1:&hellip;</code>): each recipient's personal link, so you can send a reminder with the same link from your dashboard. Encrypted the same way. Such a link opens nothing without the code that goes to the recipient's mailbox. Wiped when you sign out, when another account signs in, when everyone has collected, and when the send closes (at the latest after eight days).</li>
+<li><strong>Your half of the key of a document you are asked to sign</strong> (<code>paramant.cosign.share.v1:&hellip;</code>): when you open an invitation to sign, this browser keeps the half of the document key from that invitation link, so a link you have sent again later opens the document here too. It is stored encrypted, under a key that belongs to your account. That half opens nothing without the sign-in of the invited email address. It is not sent to us and is erased when you sign out, when another account signs in on this browser, once you have signed, and when the signing period ends (after eight days at the latest).</li>
+<li><strong>Which request you came from when you made an account</strong> (<code>paramant:signup-return</code>): when you click &ldquo;Create one for free&rdquo; on an invitation to sign, this browser keeps which request and which signer it was, so that you come back to that request after setting up your account. Not the link itself, not the invite token and no key. It is not sent to us, and is wiped once it is used, when you sign out and in any case after 24 hours.</li>
 <li><strong>Authenticator tip seen</strong> (<code>paramant.sha1tip.v1</code>): that you have seen the tip after signing in once, so it does not come back at every sign-in</li>
 <li><strong>Which account signed in here last</strong> (<code>paramant.local.owner</code>): a hash of the email address, not the address itself. When another account signs in here, this browser wipes the previous account's draft and document keys. It is not sent to us.</li>
 <li><strong>Draft of a document you prepared</strong> (in IndexedDB, under the name paramant-sign-draft): if your session on /sign expires halfway, this browser keeps the document, the spot and the recipients, so everything is back after you sign in. All of it is encrypted with a key that belongs to your account and is not stored in this browser, so another account cannot open the draft. It is wiped as soon as you send or sign, when you start over, when you sign out, when another account signs in here, and otherwise after two hours. The document is not sent to us.</li>
@@ -394,6 +397,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

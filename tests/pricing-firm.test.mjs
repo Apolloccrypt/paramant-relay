@@ -138,7 +138,7 @@ test('the Firm card shows 29 excl. btw, 35.09 incl., and the same in both sectio
   assert.equal(firmCards.length, 2, 'Firm covers both products, so its card stands in both tables');
   for (const card of firmCards) {
     assert.ok(card.price.includes(`€${euros(monthlyExcl)}`), `Firm card shows "${card.price}", expected the monthly excl-btw price`);
-    assert.ok(card.note.includes(`charged €${monthlyIncl}/mo incl. 21% btw`), `Firm card note is "${card.note}"`);
+    assert.ok(card.note.includes(`charged €${monthlyIncl}/mo incl. 21% VAT`), `Firm card note is "${card.note}"`);
     assert.ok(card.text.includes(`€${euros(yearlyExcl)} excl.`), 'the Firm card states the yearly excl-btw price');
     // Two months free on the yearly term, stated as the percentage.
     assert.ok(card.text.includes('16.7% off'), 'the Firm card states its yearly discount');
@@ -172,13 +172,14 @@ test('the Firm buttons check out the bundle, and the no-JS fallback is sign-in',
   }
   assert.ok(firm.some((b) => /35\.09\/mo incl/.test(b.label)), 'the monthly Firm button names the amount that will be charged');
 
-  // ParaSign Business is untouched and still sold on its own.
+  // Business is still sold under its ParaSign key, and since 05-10-2026 it is
+  // more than Firm: it carries the ParaSend half of Firm as well.
   const business = buys.filter((b) => b.plan === 'business');
   assert.equal(business.length, 2);
   for (const b of business) {
     assert.equal(b.product, 'parasign');
     const order = catalog.resolveOrder(b);
-    assert.deepEqual(order.grants.map((g) => `${g.product}:${g.tier}`), ['parasign:business']);
+    assert.deepEqual(order.grants.map((g) => `${g.product}:${g.tier}`), ['parasign:business', 'parasend:pro']);
   }
 });
 

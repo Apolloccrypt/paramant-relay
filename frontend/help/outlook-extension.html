@@ -345,7 +345,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <p>Microsoft 365-beheerders kunnen de invoegtoepassing naar alle gebruikers uitrollen, zonder dat ieder zelf hoeft te installeren. In het Microsoft 365-beheercentrum: <strong>Instellingen &rarr; Geïntegreerde apps &rarr; Aangepaste apps uploaden</strong>, kies als type de invoegtoepassing voor Office, geef de manifest-URL <code>https://addin.paramant.app/manifest.xml</code> op en rol uit naar bepaalde gebruikers, groepen of de hele organisatie. Zoeken op Paramant onder <strong>Apps ophalen</strong> werkt nog niet, want de invoegtoepassing staat nog niet in AppSource.</p>
 
-  <p>Gebruikers krijgen de invoegtoepassing na enige tijd, meestal bij de volgende herstart van Outlook. Ieder logt zelf in met een API-sleutel.</p>
+  <p>Gebruikers krijgen de invoegtoepassing na een tijdje, meestal als ze Outlook opnieuw starten. Ieder logt zelf in met een API-sleutel.</p>
 
   <div class="warn"><p>Gebruik in een grote organisatie niet één gedeelde API-sleutel voor iedereen. Dan staan de verzendingen van alle gebruikers onder één account, en als u die sleutel intrekt, kan niemand er meer bij. Gebruik een sleutel per gebruiker of per team.</p></div>
 
@@ -421,6 +421,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

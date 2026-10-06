@@ -21,7 +21,7 @@ dim()  { echo -e "${D}$*${E}"; }
 
 INSTALL_DIR="${PARAMANT_DIR:-/opt/paramant}"
 REPO="https://github.com/Apolloccrypt/paramant-relay"
-RELAY_VERSION="${PARAMANT_VERSION:-v3.1.0}"
+RELAY_VERSION="${PARAMANT_VERSION:-v3.1.1}"
 MIN_RAM_MB=512
 MIN_DISK_GB=4
 

@@ -1,4 +1,4 @@
-# Self-Hosting Guide: PARAMANT Relay v3.1.0
+# Self-Hosting Guide: PARAMANT Relay v3.1.1
 
 **License:** BUSL-1.1 — source available, free for up to 5 active API keys per relay.
 
@@ -13,7 +13,7 @@ curl -fsSL https://paramant.app/install.sh | bash
 # Prompts: domain, Let's Encrypt email, admin token, sectors, license key
 ```
 
-The installer clones release tag `v3.1.0` (override with `PARAMANT_VERSION`) and
+The installer clones release tag `v3.1.1` (override with `PARAMANT_VERSION`) and
 writes a `.env` (mode 600) with everything the compose stack needs:
 `ADMIN_TOKEN`, `REDIS_PASSWORD` and `RELAY_REDIS_URL`
 (`redis://:<password>@redis:6379`), `PARAMANT_TOTP_MASTER_KEY` (32 bytes,
@@ -42,7 +42,7 @@ cp .env.example .env
 nano .env
 docker compose up -d
 curl http://localhost:3001/health
-# {"ok":true,"version":"3.1.0","sector":"health","edition":"community"}
+# {"ok":true,"version":"3.1.1","sector":"health","edition":"community"}
 ```
 
 **Option 3 — Raspberry Pi / arm64:**
@@ -167,7 +167,7 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 
 **TLS:**
 - Handled by **system nginx** (not a Docker container). Install via Certbot / Let's Encrypt or bring your own cert.
-- See `deploy/nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling (the `nginx-selfhost.conf` in the repo root is an older copy; use the one in `deploy/`).
+- See `deploy/nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
 
 **Dockerfile — two-stage build:**
 - Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
@@ -409,8 +409,8 @@ By hand: the Docker image is built from the `relay/` subdirectory in your clone.
 
 ```bash
 cd /path/to/paramant-relay   # wherever you cloned the repo
-git fetch --depth 1 origin tag v3.1.0
-git checkout v3.1.0
+git fetch --depth 1 origin tag v3.1.1
+git checkout v3.1.1
 
 # Build new images (node_modules cached; only relay.js layer is rebuilt)
 docker compose build relay-main relay-health relay-finance relay-legal relay-iot
@@ -574,7 +574,7 @@ Expected output (one entry per registered relay):
     {
       "url": "https://relay.yourdomain.com",
       "sector": "relay",
-      "version": "3.1.0",
+      "version": "3.1.1",
       "edition": "community",
       "pk_hash": "3d9b960c...",
       "verified_since": "2026-04-11T02:14:13Z",
@@ -662,7 +662,9 @@ Only enterprise keys can access `/admin/`.
 After deploying, create your first API key:
 
 ```bash
-export $(grep -v '^#' .env | xargs)
+# The admin script needs ADMIN_TOKEN; read just that one from .env
+# (exporting the whole file through xargs breaks on MAIL_FROM's space and <>).
+export ADMIN_TOKEN="$(grep '^ADMIN_TOKEN=' .env | cut -d= -f2-)"
 
 # Create an enterprise key for yourself (admin)
 python3 deploy/paramant-admin.py add \

@@ -23,6 +23,7 @@ const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
 const { meetDeStand } = require('./lib/stand');
+const beheer = require('./lib/beheer');
 const standIo = require('./lib/stand-io');
 // One user's sessions, without reading everybody else's. See admin/lib/user-sessions.js.
 const userSessions = require('./lib/user-sessions');
@@ -211,7 +212,7 @@ async function sendTrialEmail(to, firstName, key) {
       from: 'PARAMANT <noreply@paramant.app>',
       to,
       subject: 'Your PARAMANT trial API key',
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0c0c0c"><div style="max-width:580px;margin:40px auto;padding:40px;background:#0c0c0c;color:#ededed;font-family:monospace"><h2 style="color:#2d8a5c;margin:0 0 24px;font-size:18px;letter-spacing:.04em">PARAMANT TRIAL KEY</h2>${firstName ? `<p>Hi ${firstName},</p>` : ''}<p>Here's your 30-day trial API key:</p><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:13px;word-break:break-all;margin:16px 0">${key}</pre><h3 style="color:#2d8a5c;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Quick start</h3><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:12px;line-height:1.6"># Upload a file (burn-on-read)\ncurl -X POST https://health.paramant.app/v2/upload \\\n  -H "X-API-Key: ${key}" \\\n  -F "file=@document.pdf"\n\n# Returns a one-time URL\n# Recipient visits once — file is destroyed</pre><p style="color:#aaa;font-size:12px;margin-top:20px">Trial limits: 10 uploads/day &middot; 1h TTL &middot; 5 MB max &middot; ML-KEM-768</p><p style="font-size:12px;margin:8px 0"><a href="https://paramant.app/docs" style="color:#2d8a5c">paramant.app/docs</a></p><hr style="border:none;border-top:1px solid #242424;margin:24px 0"><p style="color:#6e6e6e;font-size:11px;margin:0">PARAMANT &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR &middot; no US CLOUD Act</p></div></body></html>`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0c0c0c"><div style="max-width:580px;margin:40px auto;padding:40px;background:#0c0c0c;color:#ededed;font-family:monospace"><h2 style="color:#2d8a5c;margin:0 0 24px;font-size:18px;letter-spacing:.04em">PARAMANT TRIAL KEY</h2>${firstName ? `<p>Hi ${firstName},</p>` : ''}<p>Here is your 30-day trial API key:</p><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:13px;word-break:break-all;margin:16px 0">${key}</pre><h3 style="color:#2d8a5c;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Quick start</h3><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:12px;line-height:1.6"># Upload a file (burn-on-read)\ncurl -X POST https://health.paramant.app/v2/upload \\\n  -H "X-API-Key: ${key}" \\\n  -F "file=@document.pdf"\n\n# Returns a one-time URL\n# The recipient opens it once, then the file is gone</pre><p style="color:#aaa;font-size:12px;margin-top:20px">Trial limits: 10 uploads/day &middot; 1h TTL &middot; 5 MB max &middot; ML-KEM-768</p><p style="font-size:12px;margin:8px 0"><a href="https://paramant.app/docs" style="color:#2d8a5c">paramant.app/docs</a></p><hr style="border:none;border-top:1px solid #242424;margin:24px 0"><p style="color:#6e6e6e;font-size:11px;margin:0">PARAMANT &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR &middot; no US CLOUD Act</p></div></body></html>`,
   });
   if (!resp.ok) { console.error('[trial] mail failed:', resp.provider, resp.reason, resp.detail || ''); return false; }
   return true;
@@ -302,6 +303,38 @@ app.use(express.json({ limit: '1mb' }));
 // address (lib/client-ip-forward.js). After the body parser, so the handlers
 // run inside the store.
 app.use(clientIpForward.middleware);
+// Twee tellers voor het overzicht van het beheerscherm (lib/beheer.js): elke
+// 429 die deze dienst geeft, en elke mail die niet weg kon. Per uur, drie dagen
+// bewaard, plus de laatste twintig met soort en tijd (nooit een adres of een
+// token: het pad wordt ingekort tot zijn vaste delen; van een mail nooit het
+// onderwerp, alleen een vingerafdruk). Een teller is nooit een
+// poort; lukt het schrijven niet, dan gaat het verzoek gewoon door.
+function _telLog(kind, entry) {
+  let c; try { c = redis(); } catch { return; }
+  beheer.countHit(c, kind);
+  const k = `paramant:admin:tel:${kind}:log`;
+  c.lPush(k, JSON.stringify(entry)).then(() => c.lTrim(k, 0, 19)).then(() => c.expire(k, 3 * 86400)).catch(() => {});
+}
+function _vastPad(p) {
+  return String(p || '').split('?')[0].split('/').map((seg) => (seg.length > 20 || /\d{3,}|[0-9a-f]{12,}/i.test(seg) ? ':id' : seg)).join('/').slice(0, 120);
+}
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    if (res.statusCode === 429) _telLog('http429', { ts: Date.now(), method: req.method, path: _vastPad(req.originalUrl) });
+  });
+  next();
+});
+{
+  const _stuur = mailer.stuur;
+  mailer.stuur = async function stuurGeteld(msg, opts) {
+    let r;
+    try { r = await _stuur.call(this, msg, opts); }
+    catch (e) { _telLog('mail_failed', beheer.mailFailedEntry(msg, 'exception', Date.now())); throw e; }
+    // Geen onderwerp, alleen een vingerafdruk ervan: zie mailFailedEntry.
+    if (!r || !r.ok) _telLog('mail_failed', beheer.mailFailedEntry(msg, r, Date.now()));
+    return r;
+  };
+}
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err)
     return res.status(400).json({ error: 'invalid_json', message: 'Request body must be valid JSON' });
@@ -748,7 +781,7 @@ function parseCookies(req) {
 }
 
 // Call relay internal endpoint (with X-Internal-Auth)
-async function callRelay(endpoint, body, method = "POST", sector = "health") {
+async function callRelay(endpoint, body, method = "POST", sector = "health", extraHeaders = {}) {
   const relayUrl = SECTORS[sector];
   if (!relayUrl) throw new Error(`Unknown sector: ${sector}`);
   const opts = {
@@ -761,6 +794,7 @@ async function callRelay(endpoint, body, method = "POST", sector = "health") {
       // The customer's own address, so the relay's per-IP limits are per
       // customer and not one bucket for everyone (lib/client-ip-forward.js).
       ...clientIpForward.headers(),
+      ...extraHeaders,
     },
     keepalive: false,
   };
@@ -1287,6 +1321,10 @@ api.get("/user/signup/verify/:token", async (req, res) => {
       `paramant:user:meta:${keyVal}`,
       JSON.stringify({ email, created_at: createdAt })
     ).catch(() => {});
+    // De aanmelding in het beheerlog (acceptatie 3.1.1: het log kende alleen
+    // ondertekeningen). Geen adres, geen IP, geen token: wie het is, leest het
+    // paneel uit de accountlijst.
+    try { await logAuditEvent(keyVal, "account_created", { via: "signup" }); } catch {}
 
     try {
       await sendSetupEmail(email, setupToken);
@@ -1365,6 +1403,7 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
     { user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", ...sessionKeyFields(user_id) }, 3600);
 
   setUserCookie(res, sessionToken);
+  try { await logAuditEvent(user_id, "account_activated", { via: "totp" }); } catch {}
 
   res.json({ success: true, email, backup_codes });
 });
@@ -1570,6 +1609,10 @@ api.post("/user/login", async (req, res) => {
     { user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
+  // Only the sign-in that got in is written down: a failed attempt is written
+  // nowhere per account, on purpose, because that would make an address with an
+  // account do more work than one without. Inside the floor below.
+  try { await logAuditEvent(user.key, "user_login", { via: "totp" }); } catch {}
 
   // The success answer is floored too. A sign-in that came back faster than
   // every refusal would be its own oracle: the 200 is visible, but so is the
@@ -1648,6 +1691,7 @@ api.post("/user/login-with-backup", async (req, res) => {
     { user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
+  try { await logAuditEvent(user.key, "user_login", { via: "backup_code" }); } catch {}
   return backupAnswer(200, { success: true, email: user.email });
 });
 
@@ -2326,19 +2370,26 @@ api.post("/user/envelopes/:id/document", authUser, docBody, async (req, res) => 
     }
   });
 
+// The invite token of a co-sign link. The page sends it in the
+// X-Parasign-Invite-Token header, so it stays out of request lines and access
+// logs; ?t= is still read for a page that was loaded before that change.
+function inviteTokenOf(req) {
+  return (req.get("x-parasign-invite-token") || req.query.t || "").toString();
+}
+
 // GET /api/user/envelopes/:id/document -- authenticated recipient delivery.
 // The relay requires the invite capability plus this proxy's verified session
 // email assertion. The browser never sends its fragment key to either server.
 api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
   const id = (req.params.id || "").toString();
   const partyIndex = Number(req.query.p);
-  const token = (req.query.t || "").toString();
+  const token = inviteTokenOf(req);
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
   const emailHash = partyEmailHashAdmin(req.userSession.email);
   try {
-    const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+    const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}`, null, "GET", "health", { "X-Parasign-Invite-Token": token });
     // A relay 429 is "too many requests, try again", not "this document does
     // not exist". It was turned into 404 and the signer read that the document
     // was unavailable while it was there all along (sweep-pdf).
@@ -2350,9 +2401,9 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
     if (!partyView.ok) return res.status(partyView.status === 410 ? 410 : 404).json({ error: "invitation_not_found" });
     const env = (await partyView.json()).envelope;
     if (!env?.party || !emailHash || env.party.email_hash !== emailHash) return res.status(403).json({ error: "recipient_mismatch" });
-    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}`, {
       method: "GET",
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, "X-Parasign-Invite-Token": token, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(30000),
     });
     if (!rr.ok) {
@@ -2377,14 +2428,14 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
 api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
   const id = (req.params.id || "").toString();
   const partyIndex = Number(req.query.p);
-  const token = (req.query.t || "").toString();
+  const token = inviteTokenOf(req);
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
   const emailHash = partyEmailHashAdmin(req.userSession.email);
   try {
-    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}`, {
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, "X-Parasign-Invite-Token": token, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(15000),
     });
     const body = Buffer.from(await rr.arrayBuffer());
@@ -2472,7 +2523,7 @@ api.post("/user/envelopes/:id/invitations", authUser, idempotency.middleware({ r
     }
     let env;
     try {
-      const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+      const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}`, null, "GET", "health", { "X-Parasign-Invite-Token": token });
       if (!partyView.ok) return res.status(400).json({ error: "invalid_invitation" });
       env = (await partyView.json()).envelope;
     } catch {
@@ -2546,7 +2597,7 @@ api.post("/user/envelopes/:id/decline", authUser, async (req, res) => {
     const body = await r.json().catch(() => ({}));
     if (r.status !== 200) return res.status(r.status === 403 ? 403 : r.status === 404 ? 404 : 409).json({ error: body.error || "decline_failed" });
     if (!body.idempotent) {
-      signNotify.afterDecline({ client: redis(), envelopeId: id, sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureDeclinedEmail })
+      signNotify.afterDecline({ client: redis(), envelopeId: id, sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureDeclinedEmail, partyTemplate: emailTemplates.requestStoppedPartyEmail, declinerEmail: req.userSession.email })
         .then((out) => { if (out === "failed") console.warn("[envelopes/decline] sender notification failed"); });
     }
     try { await logAuditEvent(req.userSession.user_id, "parasign_doc_declined", { envelope: id.slice(0, 10) + "…", party: partyIndex }); } catch {}
@@ -2643,7 +2694,7 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
   // exact document hash == the envelope's doc_hash.
   let env;
   try {
-    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}&t=${encodeURIComponent(invite_token)}`, null, "GET");
+    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}`, null, "GET", "health", { "X-Parasign-Invite-Token": String(invite_token) });
     // A relay 429 is a rate limit, not a verdict on who the signer is. It used
     // to come back as 403 not_authorized, which the signing page reads as
     // "this invitation belongs to a different email address": the wrong reason,
@@ -2955,6 +3006,11 @@ function productPlanFields(rec) {
     plan_parasend: rec?.plan_parasend ?? null,
     paid_until_parasign: rec?.paid_until_parasign ?? null,
     paid_until_parasend: rec?.paid_until_parasend ?? null,
+    // Every term still running per product, highest first (relay
+    // _runningTermsView): what lets /account and /dashboard write one line per
+    // product, "Business until the 5th, then Firm until the 5th after".
+    terms_parasign: Array.isArray(rec?.terms_parasign) ? rec.terms_parasign : [],
+    terms_parasend: Array.isArray(rec?.terms_parasend) ? rec.terms_parasend : [],
   };
 }
 
@@ -2992,12 +3048,28 @@ api.get("/user/me", authUser, async (req, res) => {
     const backupCount = await redis()
       .sCard(`paramant:user:backup_codes:${user_id}`)
       .catch(() => 0);
+    // Whether a collection stands behind the plan. Health cannot say (the
+    // Mollie pointers are written on relay-main, see /user/billing/status), so
+    // without this the dashboard printed "nothing renews automatically" to a
+    // customer whose subscription renews (acceptatie 3.1.1, taal 31). Asked
+    // only when something is paid for, best effort: a main that cannot answer
+    // leaves it at what health knows.
+    const fields = productPlanFields(user);
+    let autoRenews = !!user?.auto_renews;
+    if (termEndOf(fields)) {
+      try {
+        const mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+        const mainKey = (mainRes.body?.keys || []).find(k => k.key === user_id);
+        if (mainKey) autoRenews = !!mainKey.auto_renews;
+      } catch (err) { console.error("[user/me] main read failed:", err.message); }
+    }
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.json({
       email,
       label: user?.label || null,
       plan: (user && user.plan) || "standard",
-      ...productPlanFields(user),
+      ...fields,
+      auto_renews: autoRenews,
       // The relay calls it `created`; created_at only exists on older
       // records. Reading only created_at gave null for everyone (ACCT-25).
       created_at: user?.created_at || user?.created || null,
@@ -3547,14 +3619,18 @@ api.post("/user/sends/:id/revoke", authUser, async (req, res) => {
   }
 });
 
-// Send one person a fresh link. The old one stops working at that moment, and
-// the new one goes out by mail, never through this response.
+// A reminder with the same link. The token comes from the sender's browser,
+// which made it and kept it beside the send; this process only passes it on
+// and the relay checks it belongs to this recipient. Never logged, never
+// returned.
 api.post("/user/sends/:id/reinvite", authUser, async (req, res) => {
   const { user_id } = req.userSession;
+  const token = String((req.body || {}).token || "");
+  if (!token || token.length > 128) return res.status(400).json({ error: "link_not_in_browser" });
   try {
     const relayRes = await callRelay("/v2/user/sends/reinvite",
       { user_id, send_id: String(req.params.id || ""),
-        email: String((req.body || {}).email || "") }, "POST");
+        email: String((req.body || {}).email || ""), token }, "POST");
     const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
     return res.status(relayRes.status).json(body);
   } catch (err) {
@@ -3592,6 +3668,12 @@ api.post("/user/documents/:id/cancel", authUser, async (req, res) => {
       signal: AbortSignal.timeout(10000),
     });
     const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    // Withdrawn: the invited parties hear it once (lib/sign-notify.js,
+    // acceptatie 3.1.1 taal #42). Not awaited, like every mail in that family.
+    if (rr.status === 200 && body && body.status === "void") {
+      signNotify.afterWithdraw({ client: redis(), envelopeId: id, sendEmail: emailTemplates.sendEmail, partyTemplate: emailTemplates.requestStoppedPartyEmail })
+        .then((out) => { if (out === "failed") console.warn("[user/documents cancel] party notification failed"); });
+    }
     return res.status(rr.status).json(body);
   } catch (err) {
     console.error("[user/documents cancel]", err.message);
@@ -3658,15 +3740,14 @@ api.get("/user/parasign/inbox", authUser, async (req, res) => {
 // created_at, so the resent link expires at the same moment as the first one and
 // the link already in the reader's mailbox keeps working.
 //
-// WHAT THE RESENT MAIL CARRIES. The document is unlocked by a key that lives in
+// WHY THE SENDER SENDS IT. The document is unlocked by a key that lives in
 // the URL fragment, and no server ever holds it. The first invitation carries
 // half of a split key (#ks=), added in the sender's browser; the relay holds
-// the other half and releases it only to the invited mailbox. This resent mail
-// is built here, from the stored invite token alone, so it carries no key half:
-// it opens the request, not the document. The full link stays in the sender's
-// browser, where the dashboard shows it per signer with a copy button
-// (frontend/js/dashboard.js signerLinksHtml); the sender is told so by mail
-// (relay.js notifySenderLinkRequested).
+// the other half and releases it only to the invited mailbox. A mail built
+// here, from the stored invite token alone, would carry no key half. So the
+// sender is asked by mail (relay.js notifySenderLinkRequested) and resends
+// from the dashboard (frontend/js/dashboard.js resendSignerInvite), the same
+// invitation with the same link, which opens the document on any device.
 //
 // One per envelope per hour, per account. The bucket is keyed on the session
 // account and the envelope together, never on the envelope alone: an id the
@@ -3701,28 +3782,14 @@ api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
     return res.status(502).json({ error: "relay_unreachable" });
   }
 
-  // The signing link, rebuilt from the stored token. Same origin, same path and
-  // same parameters the sender's browser used, minus the fragment nobody has.
-  const inviteUrl = `${new URL(SITE_URL).origin}/co-sign?env=${encodeURIComponent(id)}&p=${encodeURIComponent(invite.party_index)}&t=${encodeURIComponent(invite.invite_token)}`;
-  try {
-    await emailTemplates.sendEmail(email, emailTemplates.signingInviteEmail({
-      inviteUrl,
-      recipientLabel: invite.party_label || "",
-      senderLabel: invite.sender || "",
-      expiresAt: invite.signing_closes_at,
-      envelopeId: id,
-      partyIndex: invite.party_index,
-    }));
-  } catch (err) {
-    console.error("[user/parasign/inbox resend mail]", err.message);
-    return res.status(502).json({ error: "email_delivery_failed" });
-  }
-  // The address is echoed so the page can say where it went, and it is the
-  // reader's own: it came out of their session, not out of the envelope.
-  // sender_notified: the resent link opens the request, not the document (the
-  // key half is not on any server); the sender has been asked for the full
-  // link (COSIGN-46). The page can say so.
-  return res.json({ ok: true, sent_to: email, opens_document: false, sender_notified: !!invite.sender_notified });
+  // NO MAIL TO THE READER FROM HERE. A link rebuilt from the stored token
+  // carries no key half, so it opened the request and not the document, and
+  // only in the browser that had opened it before (COSIGN-46). The relay has
+  // asked the sender instead: a mail with a button to the resend action in
+  // the dashboard, which mails this reader the same invitation as the first
+  // time, built in the sender's browser with half A of the key.
+  if (!invite.sender_notified) return res.status(502).json({ error: "sender_not_reachable" });
+  return res.json({ ok: true, asked_sender: true, sent_to: null });
 });
 
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──
@@ -4228,6 +4295,45 @@ api.post("/user/billing/checkout/:token/confirm", authUser, billingStubGone);
 
 api.post("/user/billing/cancel", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
+  // A ONE-OFF PAYMENT IS NOT A SUBSCRIPTION (besluit 05-10-2026). With nothing
+  // collecting again there is nothing to cancel: the term simply ends. This
+  // route used to write a cancel date equal to that end anyway and mail
+  // "Opzegging gepland ... Bedacht? Beantwoord deze mail, dan zetten we het
+  // terug" about a plan that was never going to renew (betaaltest 05-10, row
+  // 3). The account page shows no button then; this refuses the call too, and
+  // sends no mail. Whether something collects is relay-main's answer, the
+  // same one GET /user/billing/status reads.
+  //
+  // FAIL CLOSED (review 573, L3). When relay-main does not answer, we cannot
+  // tell a one-off payment from a subscription, and this route used to carry
+  // on and mail "uw plan is opgezegd" anyway. Now it stops before it writes a
+  // date or sends a mail, and says so: 503, try again later.
+  const unavailable = () => res.status(503).json({
+    error: "cancel_check_unavailable",
+    message: "We kunnen nu niet nagaan of er een abonnement loopt. Er is niets opgezegd en er is geen mail verstuurd. Probeer het later opnieuw.",
+    message_en: "We cannot check right now whether a subscription is running. Nothing was cancelled and no mail was sent. Please try again later.",
+  });
+  let mainRes;
+  try {
+    mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+  } catch (err) {
+    console.error("[billing] cancel precheck failed:", err.message);
+    return unavailable();
+  }
+  if (!mainRes || mainRes.status < 200 || mainRes.status >= 300 || !Array.isArray(mainRes.body?.keys)) {
+    console.error("[billing] cancel precheck failed: relay-main answered", mainRes && mainRes.status);
+    return unavailable();
+  }
+  {
+    const mainKey = mainRes.body.keys.find(k => k.key === user_id);
+    if (mainKey && !mainKey.auto_renews) {
+      return res.status(409).json({
+        error: "nothing_to_cancel",
+        message: "Dit plan is een eenmalige betaling. Er loopt geen abonnement, dus er is niets op te zeggen: het plan stopt vanzelf op de einddatum.",
+        message_en: "This plan is a one-off payment. No subscription is running, so there is nothing to cancel: the plan stops by itself on its end date.",
+      });
+    }
+  }
   const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
   // "You keep access until the end of your billing period" is a promise about a
@@ -4334,6 +4440,26 @@ api.get("/user/billing/status", authUser, async (req, res) => {
 // reverses one. Both are served by the relay from the same document keyspace,
 // which checks the number belongs to this account.
 const INVOICE_NUMBER_RE = /^(?:PS|CN)-\d{4}-\d{4,}$/;
+
+// What became of the checkout this account started last: paid, open,
+// canceled, failed or expired, straight from Mollie through the relay that
+// created it (relay GET /v2/billing/last-payment). The dashboard asks it when
+// Mollie sends the buyer back, so it can stop saying "being confirmed" about a
+// payment that was cancelled. SECTORS.main for the same reason as the invoices.
+api.get("/user/billing/last-payment", authUser, async (req, res) => {
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/last-payment`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return res.status(r.status === 401 ? 401 : 502).json({ error: "last_payment_unavailable" });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(await r.json());
+  } catch (err) {
+    console.error("[user/billing/last-payment]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
 
 api.get("/user/billing/invoices", authUser, async (req, res) => {
   try {
@@ -4497,13 +4623,117 @@ api.get("/user/billing/history", authUser, async (req, res) => {
 // ─── Telemetry / dashboard endpoints ──────────────────────────────────────────
 const telemetry = require("./lib/telemetry");
 
+// ── Het beheerscherm: wat de eigenaar moet weten ─────────────────────────────
+// lib/beheer.js vertaalt; hieronder wordt alleen opgehaald. Alles achter
+// authMiddleware, niets nieuws publiek. Geen volle sleutel verlaat deze routes:
+// rijen dragen de kid (k_<hex>) als handvat en de sleutel gemaskeerd.
+
+// Alles wat met een liggend streepje begint is server-intern (_full, _account).
+function publicUser(u) {
+  const out = {};
+  for (const [k, v] of Object.entries(u || {})) if (!k.startsWith('_')) out[k] = v;
+  return out;
+}
+
+// Eén accountlijst per paar seconden: overzicht en audit vragen hem tegelijk
+// op bij het openen van het paneel.
+let _usersMemo = { at: 0, p: null };
+function beheerUsers() {
+  if (_usersMemo.p && Date.now() - _usersMemo.at < 4000) return _usersMemo.p;
+  const p = telemetry.getUsersWithTotp(relayFetch, ADMIN_TOKEN);
+  _usersMemo = { at: Date.now(), p };
+  p.catch(() => { _usersMemo = { at: 0, p: null }; });
+  return p;
+}
+
+// Alle documenten die de webhook uitgaf (facturen, betaalbewijzen,
+// creditnota's), nieuwste eerst. Leest de lijst die lib/invoice.js bijhoudt en
+// wijzigt niets.
+async function readDocuments(limit = 2000) {
+  const r = redis();
+  const numbers = (await r.lRange('paramant:billing:invoice:list:all', -limit, -1).catch(() => [])) || [];
+  const out = [];
+  for (let i = 0; i < numbers.length; i += 200) {
+    const chunk = numbers.slice(i, i + 200);
+    const raws = await r.mGet(chunk.map((n) => `paramant:billing:invoice:doc:${n}`)).catch(() => []);
+    for (const raw of raws || []) { try { const d = JSON.parse(raw || 'null'); if (d) out.push(d); } catch { /* onleesbaar document telt niet mee */ } }
+  }
+  out.sort((a, b) => (Date.parse(b.issued_at) || 0) - (Date.parse(a.issued_at) || 0));
+  return out;
+}
+
+// Een document zoals het naar de browser gaat: met wie (e-mail of label) en de
+// kid als klikdoel, zonder account_id (die kan een volle sleutel zijn).
+function docForBrowser(record, credits, now, users) {
+  const row = beheer.documentRow(record, credits, now);
+  const u = (users || []).find((x) => x._account === row.account_id || x._full === row.account_id);
+  delete row.account_id;
+  row.kid = u ? u.key_id : null;
+  if (!row.customer && u) row.customer = u.email || u.label || '';
+  return row;
+}
+
+// Gezondheid, versie en meetwaarden van elke relay.
+async function relaySnapshot() {
+  const out = {};
+  await Promise.all(Object.keys(SECTORS).map(async (s) => {
+    try {
+      const [hRes, mRes] = await Promise.all([
+        relayFetch(s, '/health', 'GET', null, false, ADMIN_TOKEN),
+        relayFetch(s, '/metrics', 'GET', null, true, ADMIN_TOKEN).catch(() => ({ status: 0, text: '' })),
+      ]);
+      if (hRes.status !== 200) { out[s] = { error: 'HTTP ' + hRes.status }; return; }
+      const d = { ...hRes.body };
+      const metrics = beheer.parseMetrics(mRes.text);
+      if (Number.isFinite(metrics.uptime_s)) d.uptime_s = metrics.uptime_s;
+      if (d.blobs_in_flight !== undefined && d.blobs === undefined) d.blobs = d.blobs_in_flight;
+      d.metrics = metrics;
+      out[s] = d;
+    } catch (e) { out[s] = { error: e.message }; }
+  }));
+  // Altijd in dezelfde volgorde, niet in de volgorde waarin ze antwoordden.
+  const ordered = {};
+  for (const s of Object.keys(SECTORS)) ordered[s] = out[s];
+  return ordered;
+}
+
+async function ctStatus(sectors) {
+  const now = Date.now();
+  return Promise.all(Object.entries(sectors).filter(([, d]) => !d.error && d.metrics && Number.isFinite(d.metrics.ct_log)).map(async ([s, d]) => {
+    let client = null; try { client = redis(); } catch { client = null; }
+    if (client) await beheer.sampleCt(client, s, d.metrics.ct_log, now);
+    return {
+      sector: s,
+      size: d.metrics.ct_log,
+      persisted: d.metrics.ct_log_persisted == null ? null : d.metrics.ct_log_persisted === 1,
+      forked: d.metrics.ct_log_forked === 1,
+      growth_24h: client ? await beheer.ctGrowth24h(client, s, d.metrics.ct_log, now) : null,
+    };
+  }));
+}
+
+async function redisMemory() {
+  try { return beheer.parseRedisInfo(await redis().info('memory')); } catch { return null; }
+}
+
+async function lastFailures(kind, n = 20) {
+  try {
+    return (await redis().lRange(`paramant:admin:tel:${kind}:log`, 0, n - 1)).map((x) => { try { return beheer.failureForBrowser(JSON.parse(x)); } catch { return null; } }).filter(Boolean);
+  } catch { return []; }
+}
+
 api.get("/admin/overview", authMiddleware, async (req, res) => {
   try {
-    const [activeSessions, recentAudit, planDist, signupsToday] = await Promise.all([
+    const now = Date.now();
+    const [activeSessions, recentAudit, planDist, signupsToday, users, sectors, docs, redisMem] = await Promise.all([
       telemetry.countActiveSessions(),
       telemetry.getRecentAuditEvents(10),
       telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
       telemetry.countSignupsToday(relayFetch, ADMIN_TOKEN),
+      beheerUsers().catch(() => []),
+      relaySnapshot(),
+      readDocuments().catch(() => null),
+      redisMemory(),
     ]);
     const today = new Date().toISOString().split("T")[0];
     const proUpgrades = recentAudit.filter(e =>
@@ -4511,14 +4741,93 @@ api.get("/admin/overview", authMiddleware, async (req, res) => {
       (e.metadata?.to === "pro" || e.metadata?.to === "enterprise") &&
       new Date(e.ts).toISOString().startsWith(today)
     ).length;
+
+    // Geld: gerekend op de documenten die de webhook uitgaf. Lukte het lezen
+    // niet, dan staat er null en zegt het scherm "niet gemeten", nooit 0.
+    const ym = beheer.ymOf(now);
+    const mrr = docs ? beheer.computeMrr(docs, now) : null;
+    const revenue = docs ? beheer.monthRevenue(docs, ym) : null;
+    const credits = docs ? beheer.creditsByInvoice(docs) : new Map();
+
+    let mails = null; let http429 = null;
+    try { mails = await beheer.read24h(redis(), 'mail_failed', now); } catch { mails = null; }
+    try { http429 = await beheer.read24h(redis(), 'http429', now); } catch { http429 = null; }
+    const relays = Object.entries(sectors).map(([s, d]) => ({
+      sector: s, ok: !d.error, error: d.error || null, version: d.version || null,
+      uptime_s: Number.isFinite(d.uptime_s) ? d.uptime_s : null,
+    }));
+    const ct = await ctStatus(sectors);
+
+    const paidTier = (u) => (u.plan_parasign && !['free', 'community'].includes(u.plan_parasign)) || (u.plan_parasend && u.plan_parasend !== 'community');
+    const whoMap = beheer.buildWhoMap(users);
     res.json({
-      stats: { signups_today: signupsToday, active_sessions: activeSessions, pro_upgrades_today: proUpgrades, revenue_mrr: null },  // not tracked in this panel: Mollie holds it. null, not a 0 that reads as no revenue (ADMIN-05)
-      recent_activity: recentAudit,
+      stats: {
+        signups_today: signupsToday,
+        active_sessions: activeSessions,
+        pro_upgrades_today: proUpgrades,
+        // In centen, netto per maand, berekend uit de lopende betaalde
+        // periodes (lib/beheer.js computeMrr). null alleen als de documenten
+        // niet te lezen waren (ADMIN-05: nooit een 0 die "geen omzet" zegt
+        // terwijl er niet gemeten is).
+        revenue_mrr: mrr ? mrr.mrr_cents : null,
+      },
+      customers: {
+        total: users.length,
+        active: users.filter((u) => u.active).length,
+        on_paid_plan: users.filter((u) => u.active && paidTier(u)).length,
+        paying: mrr ? mrr.paying_accounts.size : null,
+      },
+      revenue: revenue ? {
+        month: ym,
+        net_cents: revenue.net_cents,
+        gross_cents: revenue.gross_cents,
+        documents: revenue.documents,
+        mrr_cents: mrr.mrr_cents,
+        mrr_basis: mrr.basis,
+      } : null,
+      relays,
+      problems: beheer.problems({ relays, mails, http429, ct, redisMem }),
+      measurements: {
+        mails_failed: mails, http429, ct,
+        redis: redisMem ? { used_mb: beheer.mb(redisMem.used_bytes), peak_mb: beheer.mb(redisMem.peak_bytes), max_mb: beheer.mb(redisMem.max_bytes), policy: redisMem.policy } : null,
+      },
+      recent_signups: users.filter((u) => u.created).sort((a, b) => Date.parse(b.created) - Date.parse(a.created)).slice(0, 6).map((u) => ({
+        name: u.email || u.label || 'Zonder e-mailadres', kid: u.key_id, created: u.created,
+        plan_parasign: u.plan_parasign, plan_parasend: u.plan_parasend, active: u.active,
+      })),
+      recent_payments: docs ? docs.slice(0, 6).map((d) => docForBrowser(d, credits, now, users)) : null,
+      // Oude velden blijven, maar als vertaalde rijen zonder volle sleutel.
+      recent_activity: recentAudit.map((e) => beheer.auditRow(e, whoMap)),
       alerts: [],
       plan_distribution: planDist,
     });
   } catch (err) { console.error("[admin/overview]", err.message); res.status(500).json({ error: "internal" }); }
 });
+
+// Details achter twee getallen van het overzicht: welke mails mislukten en
+// waar de 429's vielen. Geen adressen, alleen soort, reden en tijd.
+api.get("/admin/overview/failures", authMiddleware, async (req, res) => {
+  res.json({ mails: await lastFailures('mail_failed'), http429: await lastFailures('http429') });
+});
+
+// Laatste handeling van een klant: de nieuwste regel in zijn audit die niet
+// van de beheerder zelf komt (een "bekeken door jou" is geen klantactiviteit).
+async function lastActivity(fullKey) {
+  try {
+    const evs = await getAuditEvents(fullKey, { limit: 25 });
+    const ev = evs.find((e) => typeof e.event_type === 'string' && !e.event_type.startsWith('admin_'));
+    return ev ? { ts: beheer.eventTimeMs(ev.ts), label: beheer.eventLabel(ev.event_type) } : null;
+  } catch { return null; }
+}
+
+async function usageByAccount() {
+  try {
+    const r = await relayFetch('health', '/v2/admin/usage', 'GET', null, false, ADMIN_TOKEN, true);
+    const map = new Map();
+    for (const a of (r.body && r.body.accounts) || []) map.set(a.account_id, a);
+    return map;
+  } catch { return new Map(); }
+}
 
 api.get("/admin/users", authMiddleware, async (req, res) => {
   try {
@@ -4527,10 +4836,12 @@ api.get("/admin/users", authMiddleware, async (req, res) => {
     // Filters
     const statusFilter = req.query.status || "";
     const planFilter   = req.query.plan   || "";
+    const q = String(req.query.q || '').trim().toLowerCase().slice(0, 100);
     let filtered = allUsers;
     if (statusFilter === "active")  filtered = filtered.filter(u => u.active);
     if (statusFilter === "revoked") filtered = filtered.filter(u => !u.active);
     if (planFilter) filtered = filtered.filter(u => (u.plan || "community") === planFilter);
+    if (q) filtered = filtered.filter(u => [u.email, u.label, u.key_id, u.key].some((v) => String(v || '').toLowerCase().includes(q)));
 
     // Sort
     filtered.sort((a, b) => {
@@ -4546,8 +4857,18 @@ api.get("/admin/users", authMiddleware, async (req, res) => {
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const safePage   = Math.min(page, totalPages);
     const start = (safePage - 1) * pageSize;
-    // _full is the key for server-side matching only; it never goes out.
-    const users = filtered.slice(start, start + pageSize).map(({ _full, ...u }) => u);
+    const slice = filtered.slice(start, start + pageSize);
+    // Laatste handeling en gebruik deze maand, alleen voor de rijen die
+    // getoond worden. _full en _account zijn server-intern; ze gaan nooit mee.
+    const usage = await usageByAccount();
+    const users = await Promise.all(slice.map(async (u) => {
+      const use = usage.get(u._account) || null;
+      return {
+        ...publicUser(u),
+        last_activity: await lastActivity(u._full),
+        usage_month: use ? { transfers: use.usage?.transfers_this_month ?? null, signs: use.usage?.signs_this_month ?? null } : null,
+      };
+    }));
 
     res.json({
       users,
@@ -4581,10 +4902,11 @@ api.get("/admin/user-detail/:key", authMiddleware, async (req, res) => {
     const masked = key.slice(0, 8) + '...' + key.slice(-4);
     const user = allUsers.find(u => u._full === key) || allUsers.find(u => u.key === masked);
     if (!user) return res.status(404).json({ error: "not_found" });
-    delete user._full;
-    const events = await getAuditEvents(key, { limit: 20 });
+    // Elke regel in de audit draagt de volle sleutel als user_id; die gaat
+    // gemaskeerd naar buiten, net als _full en _account.
+    const events = (await getAuditEvents(key, { limit: 20 })).map((e) => ({ ...beheer.scrubKeys(e), user_id: masked }));
     try { await logAuditEvent(key, 'admin_key_viewed', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.json({ ...user, key: masked, audit_events: events });
+    res.json({ ...publicUser(user), key: masked, audit_events: events });
   } catch (err) { console.error("[admin/user-detail]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
@@ -4593,48 +4915,131 @@ api.get("/admin/audit", authMiddleware, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 500);
     const userFilter = req.query.user || null;
     const eventFilter = req.query.event || null;
+    const q = String(req.query.q || '').trim().toLowerCase().slice(0, 100);
     const sinceMs = req.query.since ? new Date(req.query.since).getTime() : 0;
-    const events = [];
+    const untilMs = req.query.until ? new Date(req.query.until).getTime() : 0;
+    const users = await beheerUsers().catch(() => []);
+    const whoMap = beheer.buildWhoMap(users);
+    const rows = [];
     // The event names that really occur, for the panel's filter. It offered a
     // fixed list (signup, login, plan_changed ...) that mostly never matched:
     // the real events are admin_plan_changed, totp_reset_confirmed and so on
     // (ADMIN-27-F).
     const eventTypes = new Set();
     for await (const key of scanKeys(redis(), { MATCH: "paramant:user:audit:*", COUNT: 100 })) {
-      const userId = key.split(":").pop();
-      if (userFilter && !userId.includes(userFilter)) continue;
+      const userId = key.slice("paramant:user:audit:".length);
+      // De filter op gebruiker matcht server-side, ook op de volle sleutel; de
+      // browser krijgt die nooit te zien.
+      if (userFilter && !userId.includes(userFilter)) {
+        const w = whoMap.get(userId);
+        const hay = [w && w.email, w && w.label, w && w.kid].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(String(userFilter).toLowerCase())) continue;
+      }
       const entries = await redis().zRange(key, 0, -1).catch(() => []);
       for (const entry of entries) {
         try {
           const ev = JSON.parse(entry);
-          if (ev.event_type) eventTypes.add(ev.event_type);
-          if (sinceMs && ev.ts < sinceMs) continue;
+          if (typeof ev.event_type === 'string') eventTypes.add(ev.event_type);
+          const ms = beheer.eventTimeMs(ev.ts);
+          if (sinceMs && ms < sinceMs) continue;
+          if (untilMs && ms > untilMs) continue;
           if (eventFilter && ev.event_type !== eventFilter) continue;
-          events.push({ user_id: userId, ...ev });
+          const row = beheer.auditRow({ ...ev, user_id: userId }, whoMap);
+          if (q && !`${row.who} ${row.kid || ''} ${row.summary} ${JSON.stringify(row.metadata)}`.toLowerCase().includes(q)) continue;
+          rows.push(row);
         } catch {}
       }
     }
-    events.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    res.json({ events: events.slice(0, limit), total: events.length, event_types: [...eventTypes].sort() });
+    rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const types = [...eventTypes].sort();
+    res.json({
+      events: rows.slice(0, limit),
+      total: rows.length,
+      event_types: types,
+      event_labels: Object.fromEntries(types.map((t) => [t, beheer.eventLabel(t)])),
+    });
   } catch (err) { console.error("[admin/audit]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
 api.get("/admin/billing", authMiddleware, async (req, res) => {
   try {
-    const [planDist, recentAudit] = await Promise.all([
+    const now = Date.now();
+    const [planDist, recentAudit, users, docs] = await Promise.all([
       telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
       telemetry.getRecentAuditEvents(200),
+      beheerUsers().catch(() => []),
+      readDocuments().catch(() => null),
     ]);
     // stub_mode, mrr_eur and churn_this_month are gone. The first said billing
     // was a stub, which stopped being true when Mollie went live; the other two
-    // were hardcoded zeros, a revenue and a churn figure this route never
-    // counted. Nothing read any of the three: the served admin screen
-    // (admin/public/app.js) renders plan_distribution and recent_checkouts and
-    // says in the tab itself that it shows neither payments nor revenue.
+    // were hardcoded zeros. What replaces them is counted from the documents
+    // the payment webhook issues (lib/invoice.js, lib/credit-note.js): every
+    // number below has a document behind it, and a store that cannot be read
+    // gives null, never a zero.
+    const whoMap = beheer.buildWhoMap(users);
+    const credits = docs ? beheer.creditsByInvoice(docs) : new Map();
+    const ym = beheer.ymOf(now);
+    const prev = new Date(now); prev.setUTCDate(1); prev.setUTCMonth(prev.getUTCMonth() - 1);
+    const mrr = docs ? beheer.computeMrr(docs, now) : null;
+
+    // Abonnementen: wat Mollie zelf opnieuw incasseert (billing-recurring.js
+    // houdt ze bij in één hash), plus elk betaald plan dat nu loopt.
+    const subscriptions = [];
+    try {
+      const h = await redis().hGetAll('paramant:billing:renewals');
+      for (const [member, raw] of Object.entries(h || {})) {
+        const [accountId, line] = member.split('|');
+        let info = {}; try { info = JSON.parse(raw) || {}; } catch {}
+        const u = users.find((x) => x._account === accountId || x._full === accountId);
+        subscriptions.push({
+          who: u ? (u.email || u.label || 'Klant') : 'Account bestaat niet meer',
+          kid: u ? u.key_id : null,
+          line: line || '',
+          amount: info.amount && info.amount.value ? `${info.amount.value} ${info.amount.currency || ''}`.trim() : (typeof info.amount === 'string' ? info.amount : null),
+          interval: info.interval || null,
+          since: info.start_date || null,
+          status_nl: 'Wordt automatisch verlengd',
+        });
+      }
+    } catch { /* geen hash: geen automatische verlengingen */ }
+    const terms = [];
+    for (const u of users) {
+      for (const [product, field] of [['parasign', 'paid_until_parasign'], ['parasend', 'paid_until_parasend']]) {
+        const until = Date.parse(u[field]);
+        if (!Number.isFinite(until)) continue;
+        terms.push({
+          who: u.email || u.label || 'Klant', kid: u.key_id, product,
+          tier: product === 'parasign' ? u.plan_parasign : u.plan_parasend,
+          until: new Date(until).toISOString(),
+          auto_renews: u.auto_renews === true,
+          status_nl: until > now ? (u.auto_renews ? `Loopt, wordt verlengd op ${new Date(until).toISOString().slice(0, 10)}` : `Loopt tot ${new Date(until).toISOString().slice(0, 10)}, stopt daarna`) : `Afgelopen op ${new Date(until).toISOString().slice(0, 10)}`,
+          running: until > now,
+        });
+      }
+    }
+    terms.sort((a, b) => Date.parse(b.until) - Date.parse(a.until));
+
+    let collectionFailed = 0;
+    try { for await (const _ of scanKeys(redis(), { MATCH: 'paramant:billing:collection_failed:*', COUNT: 200 })) collectionFailed++; } catch { collectionFailed = null; }
+
+    const docRows = docs ? docs.slice(0, 200).map((d) => docForBrowser(d, credits, now, users)) : null;
     res.json({
       total_customers: Object.values(planDist).reduce((a, b) => a + b, 0),
       plan_distribution: planDist,
-      recent_checkouts: recentAudit.filter(e => e.event_type === "plan_changed").slice(0, 20),
+      recent_checkouts: recentAudit.filter(e => e.event_type === "plan_changed" || e.event_type === "admin_plan_changed" || e.event_type === "admin_product_plan_changed").slice(0, 20).map((e) => beheer.auditRow(e, whoMap)),
+      revenue: docs ? {
+        this_month: beheer.monthRevenue(docs, ym),
+        last_month: beheer.monthRevenue(docs, beheer.ymOf(prev.getTime())),
+        mrr_cents: mrr.mrr_cents,
+        mrr_basis: mrr.basis,
+        paying_accounts: mrr.paying_accounts.size,
+      } : null,
+      documents: docRows,
+      payments: docRows ? docRows.filter((d) => d.kind !== 'credit_note') : null,
+      refunds: docRows ? docRows.filter((d) => d.kind === 'credit_note') : null,
+      subscriptions,
+      terms,
+      collection_failed: collectionFailed,
     });
   } catch (err) { console.error("[admin/billing]", err.message); res.status(500).json({ error: "internal" }); }
 });
@@ -4695,25 +5100,35 @@ api.delete('/admin/coupons/:code', authMiddleware, async (req, res) => {
 
 api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
   try {
-    const details = {};
-    await Promise.all(Object.keys(SECTORS).map(async s => {
-      try {
-        const [hRes, mRes] = await Promise.all([
-          relayFetch(s, "/health", "GET", null, false, ADMIN_TOKEN),
-          relayFetch(s, "/metrics", "GET", null, true, ADMIN_TOKEN).catch(() => ({ status: 0, text: '' })),
-        ]);
-        if (hRes.status !== 200) { details[s] = { error: "HTTP " + hRes.status }; return; }
-        const d = { ...hRes.body };
-        // extract uptime_s from prometheus metrics
-        const uptimeMatch = (mRes.text || '').match(/paramant_uptime_s\{[^}]*\}\s+([\d.]+)/);
-        if (uptimeMatch) d.uptime_s = parseFloat(uptimeMatch[1]);
-        // normalize blobs field name for frontend
-        if (d.blobs_in_flight !== undefined && d.blobs === undefined) d.blobs = d.blobs_in_flight;
-        details[s] = d;
-      } catch (e) { details[s] = { error: e.message }; }
-    }));
-    res.json({ sectors: details });
+    const sectors = await relaySnapshot();
+    res.json({ sectors, ct: await ctStatus(sectors) });
   } catch (err) { console.error("[admin/relay-detail]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+// Alles over één relay op één plek: gezondheid, meetwaarden, de diepe
+// controle (die schrijft echt weg en pingt redis) en het logboek.
+api.get("/admin/relay-info/:sector", authMiddleware, async (req, res) => {
+  const s = String(req.params.sector || '');
+  if (!Object.prototype.hasOwnProperty.call(SECTORS, s)) return res.status(404).json({ error: 'unknown_sector' });
+  try {
+    const [hRes, mRes, dRes] = await Promise.all([
+      relayFetch(s, '/health', 'GET', null, false, ADMIN_TOKEN).catch((e) => ({ status: 0, body: { error: e.message } })),
+      relayFetch(s, '/metrics', 'GET', null, true, ADMIN_TOKEN).catch(() => ({ status: 0, text: '' })),
+      relayFetch(s, '/v2/health/deep', 'GET', null, false, ADMIN_TOKEN, true).catch(() => ({ status: 0, body: null })),
+    ]);
+    const metrics = beheer.parseMetrics(mRes.text);
+    const ct = (await ctStatus({ [s]: { metrics } }))[0] || null;
+    const h = hRes.status === 200 && hRes.body && typeof hRes.body === 'object' ? hRes.body : null;
+    res.json({
+      sector: s,
+      ok: !!h,
+      error: h ? null : (hRes.body && hRes.body.error) || ('HTTP ' + hRes.status),
+      health: h,
+      metrics,
+      deep: dRes.status === 200 && dRes.body && dRes.body.overall ? { overall: dRes.body.overall, checks: (dRes.body.checks || []).map(beheer.deepCheckNL) } : null,
+      ct,
+    });
+  } catch (err) { console.error("[admin/relay-info]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
 // ── De standpagina ──────────────────────────────────────────────────────────
@@ -5062,7 +5477,7 @@ api.post('/admin/disable-key', authMiddleware, async (req, res) => {
     const meta = await getAdminKeyMeta(key);
     await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
     if (notify && meta.email) {
-      emailTemplates.sendEmail(meta.email, emailTemplates.keyDisabledEmail({ disabledAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }) })).catch(e => console.error('[admin/disable-key] email:', e.message));
+      emailTemplates.sendEmail(meta.email, emailTemplates.keyDisabledEmail({ disabledAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }), disabledAtNl: new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }) })).catch(e => console.error('[admin/disable-key] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_key_disabled', { reason, notify: !!(notify && meta.email), admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.json({ ok: true, reason, email_sent: !!(notify && meta.email) });
@@ -5099,6 +5514,66 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
   } catch (err) { console.error('[admin/delete-account]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 
+// ── De infopagina van één klant ─────────────────────────────────────────────
+// Alles op één plek: sleutels (gemaskeerd), plannen met einddatum, gebruik
+// deze maand, ondertekenverzoeken, betalingen en de audit, vertaald. Leest
+// alleen. De bestandsnamen van ondertekenverzoeken blijven weg: wie wat tekent
+// is van de klant, de beheerder ziet status en aantallen.
+async function klantInfo(key, k, allKeys) {
+  const accountId = k.account_id || key;
+  const now = Date.now();
+  const keys = (allKeys || []).filter((x) => (x.account_id || x.key) === accountId).map((x) => ({
+    kid: x.kid || null,
+    key_masked: beheer.maskKey(x.key),
+    kind: String(x.key || '').startsWith('psk_') ? 'ParaSign-API-sleutel' : 'Accountsleutel',
+    label: x.label || null,
+    active: x.active !== false,
+    primary: !!x.is_primary,
+    scope: x.scope || 'full',
+    created: x.created || null,
+  }));
+  let usage = null;
+  try {
+    const r = await relayFetch('health', `/v2/admin/usage/${encodeURIComponent(accountId)}`, 'GET', null, false, ADMIN_TOKEN, true);
+    if (r.status === 200 && r.body) usage = { month: r.body.month, transfers: r.body.usage?.transfers_this_month ?? null, signs: r.body.usage?.signs_this_month ?? null, limits: r.body.limits || null };
+  } catch { usage = null; }
+  let envelopes = null;
+  try {
+    const idx = `parasign:acct:${accountId}:envelopes`;
+    const [total, ids] = await Promise.all([redis().zCard(idx), redis().zRange(idx, 0, 19, { REV: true })]);
+    const rows = await Promise.all(ids.map(async (id) => {
+      const [status, created, parties, signed, voided, completed] = await redis().hmGet('env:' + id, ['status', 'created_at', 'party_count', 'signed_count', 'voided_at', 'completed_at']);
+      if (!status && !created) return null;
+      const st = status === 'declined' ? 'Geweigerd door een ondertekenaar'
+        : (voided || status === 'void') ? 'Ingetrokken'
+          : (completed || status === 'complete') ? 'Door iedereen getekend' : 'Wacht op ondertekening';
+      return { id: String(id).slice(0, 10) + '…', status: status || null, status_nl: st, created: created || null, parties: Number(parties) || 0, signed: Number(signed) || 0 };
+    }));
+    envelopes = { total, recent: rows.filter(Boolean) };
+  } catch { envelopes = null; }
+  let payments = null;
+  try {
+    const numbers = await redis().lRange(`paramant:billing:invoice:list:${accountId}`, 0, -1);
+    const raws = numbers.length ? await redis().mGet(numbers.map((n) => `paramant:billing:invoice:doc:${n}`)) : [];
+    const recs = raws.map((x) => { try { return JSON.parse(x || 'null'); } catch { return null; } }).filter(Boolean);
+    const credits = beheer.creditsByInvoice(recs);
+    payments = recs.sort((a, b) => (Date.parse(b.issued_at) || 0) - (Date.parse(a.issued_at) || 0)).map((r) => {
+      const row = beheer.documentRow(r, credits, now); delete row.account_id; return row;
+    });
+  } catch { payments = null; }
+  let whoMap = new Map();
+  try { whoMap = beheer.buildWhoMap(await beheerUsers()); } catch { /* zonder kaart: e-mail uit de details */ }
+  let audit = [];
+  try { audit = (await getAuditEvents(key, { limit: 50 })).map((e) => beheer.auditRow({ ...e, user_id: key }, whoMap)); } catch { audit = []; }
+  return {
+    paid_until_parasign: k.paid_until_parasign || null,
+    paid_until_parasend: k.paid_until_parasend || null,
+    auto_renews: k.auto_renews === true,
+    usage_purpose: k.usage_purpose || null,
+    keys, usage, envelopes, payments, audit,
+  };
+}
+
 // ── GET /admin/user-details/:key (rich version) ───────────────────────────────
 api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
   const { key } = req.params;
@@ -5123,8 +5598,12 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
     if (totpActive === 'true') totp_status = 'active';
     else if (totpSecret) totp_status = 'pending';
     try { await logAuditEvent(key, 'admin_user_viewed', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    const info = await klantInfo(key, k, keysRes.body?.keys || []);
     res.json({
-      key_id: key,
+      ...info,
+      // De kid als handvat. Dit veld droeg de volle sleutel naar de browser;
+      // de panelen handelen op de kid en de server zet hem terug (ADMIN-06-H).
+      key_id: k.kid || keyHandle(req, key),
       key_masked: key.slice(0, 8) + '...' + key.slice(-4),
       email: meta.email || k.email || null,
       label: k.label || null,
@@ -5145,7 +5624,7 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
       // `stub: true` on that fallback claimed the billing system was a stub,
       // which it has not been since Mollie went live, and nothing read it.
       billing: billing || { plan: k.plan || 'community' },
-      audit_events: auditEvents,
+      audit_events: auditEvents.map((e) => ({ ...beheer.scrubKeys(e), user_id: key.slice(0, 8) + '...' + key.slice(-4) })),
     });
   } catch (err) { console.error('[admin/user-details]', err.message); res.status(500).json({ error: 'internal' }); }
 });
@@ -5313,8 +5792,8 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
     return res.end();
   }
 
-  // Hard timeout so no command can run away.
-  const TIMEOUT_MS = 60_000;
+  // Hard timeout so no command can run away (a follow gets ten minutes).
+  const TIMEOUT_MS = cliCommands.timeoutFor(cmd, v.values);
   const killGroup = () => {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} }
   };

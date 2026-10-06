@@ -175,7 +175,7 @@ test('the old burn-on-read path still burns a completed download for clients tha
   const got = await clSrv.get(`/v2/dl/${token}/get`);
   assert.equal(got.status, 200);
   assert.ok(got.buf.equals(payload));
-  assert.equal(got.headers['x-burned'], 'true');
+  assert.equal(got.headers['x-burned'], 'on-delivery');
   await new Promise((r) => setTimeout(r, 100));
   const i = await info(token);
   assert.equal(i.status, 404);

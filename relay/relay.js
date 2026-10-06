@@ -174,6 +174,12 @@ const creditNote       = require('./lib/credit-note');        // credit notes (C
 const billingMail      = require('./lib/billing-mail');       // bilingual (NL, then EN) text of the invoice and credit-note mails
 const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
 const billingExport    = require('./lib/billing-export');     // period export of both series, CSV/JSON, for the books
+const { neutralize: _csvNeutralize } = require('./lib/csv-safe');
+// One cell of GET /v2/audit?format=csv: formula guard, then RFC 4180 quoting.
+function _csvAuditCell(v) {
+  const s = _csvNeutralize(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
 const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
 const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
@@ -277,17 +283,20 @@ function modeAllows(p) {
 // from a phishing attempt, and a corporate spam filter will treat it as one.
 // Answering both costs three lines and is the difference between a document
 // that arrives and a ticket at somebody's IT desk.
+// "Paramant bewaart het bestand" read as storage, while /pricing says the
+// file lives in memory and is wiped (acceptatie 3.1.1, taal #37): the footer
+// says how long it waits and that it is gone after.
 function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'een klant van Paramant')
-       + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld; de link '
-       + 'in deze mail opent het en die link bewaren wij niet.'
+       + ' uw adres heeft ingevuld. Het bestand staat versleuteld klaar tot het is opgehaald '
+       + 'of de link verloopt. Daarna is het weg. De link in deze mail opent het. Die link bewaren wij niet.'
        + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
   const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'a Paramant customer')
-       + ' entered your address. Paramant keeps the file encrypted; the link in this '
-       + 'mail opens it, and we do not keep that link.'
+       + ' entered your address. The file waits, encrypted, until it is picked up or the '
+       + 'link expires. Then it is gone. The link in this mail opens it, and we do not keep that link.'
        + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
   const tekst = taal === 'en' ? en
               : taal === 'nl' ? nl
@@ -2273,54 +2282,83 @@ async function notifySenderQuota(envelopeId, accountId) {
   const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
   const r = await mailer.stuur({
     to,
-    subject: 'Een ondertekenaar wacht op uw tegoed',
+    // Both languages in the subject and a link in both halves; "handtekeningen
+    // op" instead of "tegoed", which reads as prepaid credit (acceptatie
+    // 3.1.1, taal #44).
+    subject: 'Een ondertekenaar kan nog niet tekenen: uw handtekeningen voor deze maand zijn op / A signer cannot sign yet: your signatures for this month are used up',
     text: tweetaligTekst('nl',
-      'Iemand probeerde een document te tekenen dat u ter ondertekening verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is niet gezet; het verzoek blijft openstaan.'
-      + '\n\nVerhoog uw plan of wacht tot volgende maand; daarna kan de ondertekenaar met dezelfde link tekenen.'
+      'Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.'
+      + '\n\nKies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.'
       + '\n\n' + base + '/pricing',
-      'Someone tried to sign a document you sent for signing, but your signatures for this month are used up. The signature was not recorded; the request stays open.'
-      + '\n\nUpgrade your plan or wait until next month; then the signer can sign with the same link.'),
+      'Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.'
+      + '\n\nChoose a larger plan or wait until next month. Then the signer can sign with the same link.'
+      + '\n\n' + base + '/en/pricing'),
     html: tweetaligHtml('nl',
-      '<p>Iemand probeerde een document te tekenen dat u ter ondertekening verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is niet gezet; het verzoek blijft openstaan.</p>'
-      + '<p>Verhoog uw plan of wacht tot volgende maand; daarna kan de ondertekenaar met dezelfde link tekenen.</p>'
+      '<p>Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.</p>'
+      + '<p>Kies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.</p>'
       + '<p><a href="' + base + '/pricing">Plannen bekijken</a></p>',
-      '<p>Someone tried to sign a document you sent for signing, but your signatures for this month are used up. The signature was not recorded; the request stays open.</p>'
-      + '<p>Upgrade your plan or wait until next month; then the signer can sign with the same link.</p>'),
+      '<p>Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.</p>'
+      + '<p>Choose a larger plan or wait until next month. Then the signer can sign with the same link.</p>'
+      + '<p><a href="' + base + '/en/pricing">See the plans</a></p>'),
   });
   log('info', 'sender_quota_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);
 }
 
-// A signer asked for the invitation again. The resent mail can only open the
-// request (no document key half reaches a server); the full link is the
-// sender's. Tell the sender, at most once an hour per envelope.
-async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
+// A signer asked for the invitation again. Only the sender's browser holds the
+// link with the key half that opens the document (sign-flow.js
+// rememberSignerLinks); no server has it. So the sender gets a mail with one
+// button, to the resend action for this signer in the dashboard, which builds
+// the invitation again in that browser exactly like the first one. At most
+// once an hour per envelope. The envelope id rides in the button: this mail
+// goes to the owner of the envelope, the one person who already has it.
+async function notifySenderLinkRequested(envelopeId, accountId, partyLabel, partyIndex) {
   const to = senderLabelOf(accountId);
   if (!to || !redisClient || !redisClient.isReady) return false;
   const k = 'paramant:sign:link-request:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
+  // The NX key reserves the hour before the mail goes out, so two requests at
+  // once send one mail. It only stays when the mail was delivered: a failed
+  // mail gives the hour back (review-574 L1), otherwise a retry within the hour
+  // would answer "asked the sender" while nothing went out.
   const first = await redisClient.set(k, '1', { NX: true, EX: 3600 });
   if (first !== 'OK') return true; // told already within the hour
+  const giveBack = async () => { try { await redisClient.del(k); } catch (_) { /* expires within the hour */ } };
   const who = veiligeBestandsnaam(partyLabel || '') || 'Een ondertekenaar';
   const whoEn = veiligeBestandsnaam(partyLabel || '') || 'A signer';
   const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
-  const r = await mailer.stuur({
-    to,
-    subject: 'Een ondertekenaar vraagt de link opnieuw',
-    text: tweetaligTekst('nl',
-      `${who} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.`
-      + '\n\nKopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde: klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat hij daar niet, trek het verzoek dan in en stuur een nieuw verzoek.'
-      + '\n\n' + base + '/dashboard',
-      `${whoEn} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.`
-      + '\n\nCopy the link from your dashboard, in the browser you sent the request from: click this request and choose Copy link next to the signer. Send that link to the signer yourself. If it is not there, withdraw the request and send a new one.'),
-    html: tweetaligHtml('nl',
-      `<p>${escHtml(who)} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.</p>`
-      + '<p>Kopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde: klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat hij daar niet, trek het verzoek dan in en stuur een nieuw verzoek.</p>'
-      + '<p><a href="' + base + '/dashboard">Naar uw dashboard</a></p>',
-      `<p>${escHtml(whoEn)} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.</p>`
-      + '<p>Copy the link from your dashboard, in the browser you sent the request from: click this request and choose Copy link next to the signer. Send that link to the signer yourself. If it is not there, withdraw the request and send a new one.</p>'),
-  });
-  log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
-  return !!(r && r.ok);
+  const knop = base + '/dashboard?herzend=' + encodeURIComponent(String(envelopeId))
+             + '&p=' + encodeURIComponent(String(Number(partyIndex) || 0));
+  const knopHtml = (tekst) => '<p><a href="' + escHtml(knop) + '" style="display:inline-block;padding:11px 18px;'
+             + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">' + tekst + '</a></p>';
+  let r = null;
+  try {
+    r = await mailer.stuur({
+      to,
+      subject: 'Een ondertekenaar vraagt de uitnodiging opnieuw',
+      // Plain words, no "key" and no explanation of where it lives
+      // (acceptatie 3.1.1, taal #12): what to press, where, and the way out.
+      text: tweetaligTekst('nl',
+        `${who} vraagt de uitnodiging om te tekenen opnieuw. Alleen uw eigen browser kan die uitnodiging maken, zodat niemand anders het document kan openen.`
+        + '\n\nOpen deze link in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen:\n' + knop
+        + '\n\nDe ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer. Lukt het niet in die browser? Trek het verzoek dan in en stuur het opnieuw.',
+        `${whoEn} asks for the signing invitation again. Only your own browser can make that invitation, so nobody else can open the document.`
+        + '\n\nOpen this link in the browser you sent the request from and click Send the invitation again:\n' + knop
+        + '\n\nThe signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.'),
+      html: tweetaligHtml('nl',
+        `<p>${escHtml(who)} vraagt de uitnodiging om te tekenen opnieuw. Alleen uw eigen browser kan die uitnodiging maken, zodat niemand anders het document kan openen.</p>`
+        + '<p>Klik op de knop in de browser waarmee u het verzoek verstuurde, en daarna op Uitnodiging opnieuw sturen.</p>'
+        + knopHtml('Uitnodiging opnieuw sturen')
+        + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer. Lukt het niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
+        `<p>${escHtml(whoEn)} asks for the signing invitation again. Only your own browser can make that invitation, so nobody else can open the document.</p>`
+        + '<p>Click the button in the browser you sent the request from, then click Send the invitation again.</p>'
+        + knopHtml('Send the invitation again')
+        + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.</p>'),
+    });
+  } catch (_) { r = null; }
+  const delivered = !!(r && r.ok);
+  if (!delivered) await giveBack();
+  log('info', 'sender_link_request_notice', { delivered });
+  return delivered;
 }
 
 function senderLabelOf(accountId) {
@@ -2365,6 +2403,25 @@ function _termView(v, product) {
   if (entitlements.termsOf(v, product).length === 0) return { tier: now.tier, paidUntil: now.paidUntil };
   const last = entitlements.finalTermOf(v, product);
   return { tier: now.tier, paidUntil: last ? last.paidUntil : null };
+}
+
+// Where the checkout an account started last is remembered (see POST
+// /v2/billing/checkout and GET /v2/billing/last-payment).
+function _lastCheckoutKey(accountId) {
+  return `paramant:billing:last-checkout:${String(accountId).slice(0, 128)}`;
+}
+
+// Every paid term one product holds that still runs, highest tier first, as
+// [{ tier, until (ISO or null), bundle }]. What /account and /dashboard need to
+// say "Business until the 5th, then Firm until the 5th of the month after" in
+// one line per product, instead of two end dates with nothing between them
+// (betaaltest 05-10, row 8).
+function _runningTermsView(v, product) {
+  const now = Date.now();
+  return entitlements.termsOf(v, product)
+    .filter((t) => t.until === null || t.until > now)
+    .sort((a, b) => entitlements.tierRank(product, b.tier) - entitlements.tierRank(product, a.tier))
+    .map((t) => ({ tier: t.tier, until: t.until === null ? null : new Date(t.until).toISOString(), bundle: t.bundle || null }));
 }
 
 function entitlementRecordOf(accountId) {
@@ -2679,7 +2736,7 @@ const envCreateLimits = new Map();        // apiKey  -> { count, resetAt }
 const envViewLimits   = new Map();        // ip      -> { count, resetAt }
 const envSignLimits   = new Map();        // ip      -> { count, resetAt }
 function envCreateRateOk(apiKey) {
-  return rateLimit.fixedWindowAllow(envCreateLimits, apiKey, 50, 3600_000);
+  return rateLimit.slidingWindowAllow(envCreateLimits, apiKey, ENV_CREATE_LIMIT, 3600_000);
 }
 function envViewRateOk(ip) {
   return rateLimit.fixedWindowAllow(envViewLimits, ip, 30, 60_000);
@@ -2707,25 +2764,25 @@ function verifyRateOk(ip) {
 setInterval(() => { const now = Date.now(); for (const [k, v] of verifyLimits) if (now > v.resetAt + 60_000) verifyLimits.delete(k); }, 120_000);
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of envCreateLimits) if (now > v.resetAt + 60_000) envCreateLimits.delete(k);
+  for (const [k, v] of envCreateLimits) if (!Array.isArray(v) || !v.length || now > v[v.length - 1] + 3600_000) envCreateLimits.delete(k);
   for (const [k, v] of envViewLimits)   if (now > v.resetAt + 60_000) envViewLimits.delete(k);
   for (const [k, v] of envSignLimits)   if (now > v.resetAt + 60_000) envSignLimits.delete(k);
 }, 120_000);
 
 // Fleet-wide envelope-create rate limit. The per-process envCreateLimits above
 // only bound ONE relay instance; behind the multi-instance deployment a client
-// got N times the intended 50/hour. This shares the counter in redis: INCR a
-// per-key hourly bucket, EXPIRE it on first hit. Fails OPEN to the per-process
-// limiter when redis is down, so an outage never hard-blocks paying integrators
-// (they still get the local 50/hour cap). The bucket rolls hourly by wall clock.
+// got N times the intended 50/hour. This shares the window in redis. Fails OPEN
+// to the per-process limiter when redis is down, so an outage never hard-blocks
+// paying integrators (they still get the local 50/hour cap).
+// A sliding hour, not the clock hour (matrix API-20-N): the bucket rolled at
+// :00, so 50 creates at 10:59 and 50 more at 11:00 all passed against a docs
+// promise of 50 per hour. Answers { ok, retryAfterMs }.
 const ENV_CREATE_LIMIT = 50;
 async function envCreateRateOkShared(apiKey) {
   if (!redisClient || !redisClient.isReady) return envCreateRateOk(apiKey);
   try {
-    const bucket = Math.floor(Date.now() / 3600_000);
-    const rk = `paramant:rl:envcreate:${bucket}:${apiKey}`;
-    const n = await redisCounter.incrInWindow(redisClient, rk, 3600);
-    return n <= ENV_CREATE_LIMIT;
+    const rk = `paramant:rl:envcreate:sw:${crypto.createHash('sha256').update(String(apiKey)).digest('hex').slice(0, 32)}`;
+    return await rateLimit.slidingWindowAllowRedis(redisClient, rk, ENV_CREATE_LIMIT, 3600_000);
   } catch (e) {
     log('warn', 'env_create_rl_redis_fail', { err: e.message });
     return envCreateRateOk(apiKey);
@@ -2852,6 +2909,96 @@ function zeroBuffer(buf) {
     try { crypto.randomFillSync(buf); } catch {}
     try { buf.fill(0); } catch {}
   }
+}
+
+// ── Burn after delivery, never on the request ───────────────────────────────
+// A download without a claim (old SDKs, scripts, curl) used to be burned when
+// the request came in (/v2/outbound) or on 'finish' (/v2/dl), and a receiver
+// whose line broke lost the file (matrix API-24-K, API-30-K, API-35-K).
+// 'finish' only says the last byte left this process. What tells a complete
+// delivery from a broken one is the socket afterwards: a client that read
+// every byte closes cleanly (FIN) or keeps the connection for its next
+// request; a client that stopped early closes with unread bytes in its
+// buffer, and its kernel answers with a reset (ECONNRESET / EPIPE here).
+// But a reset after 'finish' cannot be told apart from a reader that took
+// every byte and then reset on purpose (SO_LINGER 0): putting the blob back
+// on that reset made burn-after-delivery repeatable without end (review #565,
+// B1). And a reader that stops 16 bytes short already has all the plaintext
+// (one AES-GCM stream, tag at the end). So once the last byte was written the
+// read counts, whatever the socket does next; only a download broken off
+// before 'finish' costs nothing, and those are bounded too (DL_MAX_FETCHES).
+// The bytes are hidden on 'finish' and destroyed after DELIVERY_SETTLE_MS or
+// on close. The one exception is a clean close inside that window on
+// /v2/outbound, which is what a proxy in front of us does when its client gave
+// up: the same key may fetch once more (onCleanCloseEarly), once per blob.
+// The claim mode (?claim= + ack on /v2/dl) stays the exact path.
+// hash -> { entry, key, until, timer }: see onCleanCloseEarly on GET /v2/outbound.
+const outboundRetryHold = new Map();
+const DELIVERY_SETTLE_MS = Math.max(0, parseInt(process.env.DELIVERY_SETTLE_MS || '3000', 10) || 0);
+function afterDelivery(req, res, { onFinish, onDelivered, onAborted, onCleanCloseEarly }) {
+  const sock = req.socket;
+  let state = 'sending'; // sending -> settling -> delivered | aborted
+  let timer = null;
+  const cleanup = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (sock) { sock.removeListener('error', onSockError); sock.removeListener('close', onSockClose); }
+  };
+  const abort = (why) => {
+    if (state === 'delivered' || state === 'aborted') return;
+    const wasSettling = state === 'settling';
+    state = 'aborted'; cleanup();
+    try { onAborted(why, wasSettling); } catch (e) { log('warn', 'delivery_abort_handler_failed', { err: e.message }); }
+  };
+  const deliver = () => {
+    if (state !== 'settling') return;
+    state = 'delivered'; cleanup();
+    try { onDelivered(); } catch (e) { log('warn', 'delivery_handler_failed', { err: e.message }); }
+  };
+  // After 'finish' a reset is a delivery, never an abort (see above).
+  function onSockError(e) { if (state === 'settling') return deliver(); abort((e && e.code) || 'socket_error'); }
+  function onSockClose(hadError) {
+    if (state === 'sending') return abort(hadError ? 'reset' : 'closed_before_finish');
+    if (hadError) return deliver();
+    // A clean close inside the window is what a complete download looks like,
+    // and also what a proxy in front of us does when ITS client gave up: the
+    // proxy had already read every byte, so no reset reaches us. A caller
+    // that can tell its own receiver apart (the API key) may hold the bytes
+    // for a retry instead.
+    if (state === 'settling' && onCleanCloseEarly) {
+      state = 'delivered'; cleanup();
+      try { onCleanCloseEarly(); } catch (e) { log('warn', 'delivery_close_handler_failed', { err: e.message }); }
+      return;
+    }
+    deliver();
+  }
+  if (sock) { sock.on('error', onSockError); sock.on('close', onSockClose); }
+  res.on('finish', () => {
+    if (state !== 'sending') return;
+    state = 'settling';
+    try { if (onFinish) onFinish(); } catch (e) { log('warn', 'delivery_finish_handler_failed', { err: e.message }); }
+    if (!sock || sock.destroyed) return deliver();
+    timer = setTimeout(deliver, DELIVERY_SETTLE_MS);
+    if (timer.unref) timer.unref();
+  });
+  res.on('close', () => { if (!res.writableFinished) abort('closed_before_finish'); });
+}
+// Writes a buffer in pieces, each only after the socket took the last one, so
+// 'finish' cannot fire while a reader that stopped early still has megabytes
+// to go (measured on loopback with one res.end(blob)).
+function writeInPieces(res, blob) {
+  const PIECE = 64 * 1024;
+  let off = 0;
+  const pump = () => {
+    while (off < blob.length) {
+      if (res.destroyed) return;
+      const end = Math.min(blob.length, off + PIECE);
+      const more = res.write(blob.subarray(off, end));
+      off = end;
+      if (!more) { res.once('drain', pump); return; }
+    }
+    res.end();
+  };
+  pump();
 }
 
 // ── HKDF-SHA256 — compatible met Python cryptography library ──────────────────
@@ -3832,6 +3979,12 @@ let _sellerVatWarned = false;
 // produce a second invoice, and a first attempt that lost redis gets a second
 // chance instead of leaving the customer with nothing. Never throws: an
 // entitlement that was granted must not be undone by paperwork.
+// The language an account last bought in, 'nl' or 'en' (acceptatie 3.1.1,
+// betalen punt 5). Set when a checkout starts, read when the invoice for that
+// payment, or a later renewal of it, is issued. Not personal data and not part
+// of the Mollie payload, so the /dpa row for Mollie stays what it is.
+function _buyerLangKey(accountId) { return 'paramant:billing:buyer-lang:' + String(accountId); }
+
 async function _issueInvoiceForPayment(payment, outcome) {
   try {
     const md = (payment && payment.metadata) || {};
@@ -3855,6 +4008,10 @@ async function _issueInvoiceForPayment(payment, outcome) {
       });
     }
     const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+    // The language the buyer bought in (kept at checkout, never sent to
+    // Mollie): the document, its line and its mail follow it.
+    let lang = null;
+    try { lang = redis && md.accountId ? await redis.get(_buyerLangKey(md.accountId)) : null; } catch { lang = null; }
     const out = await invoiceMod.issueDocument({
       payment,
       order: Object.assign({ accountId: md.accountId }, order),
@@ -3862,6 +4019,7 @@ async function _issueInvoiceForPayment(payment, outcome) {
       buyer: await _billingBuyerOf(md.accountId),
       periodEnd: outcome && outcome.paidUntil,
       vat: vatTerms,
+      lang,
     }, redis);
 
     // The invoice exists, so the VIES proof it rests on is kept as long as the
@@ -4509,6 +4667,16 @@ function authByDid(didStr, signature, ctx) {
   return null;
 }
 
+// The invite token of a co-sign link. The page sends it in a header, so it
+// stays out of request lines and access logs. ?t= is still read for a page
+// that was loaded before this change.
+function inviteTokenFrom(req, query) {
+  const h = req && req.headers ? req.headers['x-parasign-invite-token'] : '';
+  const fromHeader = (Array.isArray(h) ? h[0] : h) || '';
+  if (fromHeader) return String(fromHeader);
+  return (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+}
+
 // ── CORS ──────────────────────────────────────────────────────────────────────
 function isAllowedOrigin(origin) {
   if (!origin) return false;
@@ -4523,7 +4691,7 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce, X-Parasign-Invite-Token');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
@@ -4850,6 +5018,7 @@ async function handleRelayRequest(req, res) {
       req, res, method: req.method, path, query, clientIp,
       authHeader: req.headers['authorization'] || '',
       publicOrigin: _publicOrigin,
+      relayId: RELAY_SELF_URL || _publicOrigin,
       apiKeys,
       // The ACCOUNT's right to start new work, asked before every new envelope
       // and not only when a key is minted: the scope on a psk_ key outlives a
@@ -5962,7 +6131,7 @@ async function handleRelayRequest(req, res) {
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
-              + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld en bewaart deze link niet.'
+              + ' uw adres heeft ingevuld. Het bestand staat versleuteld klaar tot het is opgehaald of de link verloopt. Daarna is het weg. Deze link bewaren wij niet.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
                 (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
               + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
@@ -5970,7 +6139,7 @@ async function handleRelayRequest(req, res) {
               + 'to this address, so only somebody who can read this mailbox can collect the '
               + 'file. Available until ' + totEn + '.'
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
-              + ' entered your address. Paramant keeps the file encrypted and does not keep this link.'
+              + ' entered your address. The file waits, encrypted, until it is picked up or the link expires. Then it is gone. We do not keep this link.'
               + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
           html: tweetaligHtml(taal,
                 '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'
@@ -6079,23 +6248,24 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/user/sends/reinvite ──────────────────────────────────────────
-  // A REMINDER, and it carries no new link.
+  // A REMINDER, with the SAME link as the invitation.
   //
-  // It used to mint a fresh token and kill the old one, and that destroyed the
-  // file for the person it was meant to help: the file key is wrapped under the
-  // recipient's own token, and this relay cannot make a new wrapping because it
-  // never holds the file key. They spent their one-time link on bytes that
-  // opened into nothing. Keeping the token instead is not an option either: not
-  // writing it down is why the relay cannot open what it has STORED.
+  // The link is the recipient's own token, and this relay cannot rebuild it:
+  // the file key is wrapped under that token in the sender's browser, and the
+  // token was mailed once and never written down. Minting a fresh one is not
+  // an option either, because this relay never holds the file key to wrap
+  // again. So the reminder is built where the token still lives: the sender's
+  // browser kept it beside the send (parashare.page.js rememberSendLinks) and
+  // hands it back here, exactly the way the invitation did at create time.
+  // The relay checks that it is the token of THIS recipient and mails it.
   //
-  // BE PRECISE ABOUT WHAT THAT PROVES. The relay does see each token for the
-  // moment it mails the invitation (it is the mailer), and the wrapping key is
-  // derived from the token. So this is "not stored", not zero-knowledge: a
-  // relay that kept what it mails could open the file. Real end-to-end for
-  // sends by name needs a recipient key the relay never sees (issue #550: ParaSend
-  // op naam zero-knowledge met ontvangerssleutel).
+  // BE PRECISE ABOUT WHAT THAT PROVES. As with the invitation, the relay sees
+  // the token for the moment it mails it, so this is "not stored", not
+  // zero-knowledge (issue #550). Nothing extra is stored for a reminder.
   //
-  // So this points at the invitation they already have, which still works.
+  // No token from the browser (another browser, storage wiped) means no
+  // reminder: a mail without a working link only sent people looking for the
+  // first one. The dashboard says how to go on instead.
   if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
     if (!_internalOk()) return _internalReject();
     try {
@@ -6112,6 +6282,8 @@ async function handleRelayRequest(req, res) {
       //
       // The seat is taken before the send store is touched, and handed back
       // below if the reminder turns out not to be allowed.
+      const token = typeof input.token === 'string' ? input.token : '';
+      if (!token) { res.writeHead(400); return res.end(J({ error: 'link_not_in_browser' })); }
       const _remH = inviteRateOk(accountVan(userId), apiKeys.get(userId) || null, 1);
       if (!_remH.ok) {
         log('warn', 'reminder_rate_limited', { limit: _remH.limit, used: _remH.used });
@@ -6120,7 +6292,7 @@ async function handleRelayRequest(req, res) {
         return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
                            limit: _remH.limit, retry_after_s: _remH.retry_after_s }));
       }
-      const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
+      const out = await _sendStore().reinvite(sendId, (input.email || '').toString(), token);
       if (!out.ok) {
         inviteRateGeef(accountVan(userId), 1);
         res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
@@ -6133,6 +6305,12 @@ async function handleRelayRequest(req, res) {
       const totEn = mailDatum(out.expires_at || Date.now(), 'en', _remOpt);
       // Awaited, so the dashboard's "reminder sent" is about what happened.
       const wie3 = mailer.veiligeNaam(out.sender_name || '');
+      const base3 = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+      // The same link as the invitation, built the same way (see POST /v2/sends).
+      const link3 = base3 + (taal3 === 'en' ? '/en' : '') + '/ontvang/' + encodeURIComponent(token)
+                  + '?r=' + encodeURIComponent(sectorOfKey(apiKeys.get(userId) || null));
+      const knop3 = (tekst) => '<p><a href="' + link3 + '" style="display:inline-block;padding:11px 18px;'
+                  + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">' + tekst + '</a></p>';
       const bezorgd = await mailer.stuur({
         to: out.email,
         from: mailer.afzenderNamens(undefined, wie3),
@@ -6143,23 +6321,26 @@ async function handleRelayRequest(req, res) {
           : (wie3 ? 'Herinnering van ' + wie3 + ': uw bestand staat nog klaar'
                   : 'Herinnering: er staat nog een bestand voor u klaar'),
         text: tweetaligTekst(taal3,
-              'Er staat nog een bestand voor u klaar.\n\nGebruik de link uit de eerdere mail '
-            + 'van Paramant. Die werkt nog en is nog steeds alleen voor u. '
+              'Er staat nog een bestand voor u klaar.\n\n' + link3
+            + '\n\nDit is dezelfde link als in de eerste mail. Hij is alleen voor u en werkt één keer. '
+            + 'Als u hem opent, sturen we een korte controlecode naar dit adres. '
             + 'Beschikbaar tot ' + tot + '.',
-              'A file is still waiting for you.\n\nUse the link in the earlier mail '
-            + 'from Paramant; it still works and it is still yours alone. '
+              'A file is still waiting for you.'
+            + (taal3 === 'en' ? '\n\n' + link3 : '\n\nUse the link above.')
+            + '\n\nIt is the same link as in the first mail. It is yours alone and works once. '
+            + 'Opening it sends a short code to this address. '
             + 'Available until ' + totEn + '.'),
         html: tweetaligHtml(taal3,
               '<p>Er staat nog een bestand voor u klaar.</p>'
-            + '<p>Gebruik de link uit de eerdere mail van Paramant. Die werkt nog '
-            + 'en is nog steeds alleen voor u.</p>'
-            + '<p style="color:#666;font-size:13px">Beschikbaar tot ' + escHtml(tot) + '. '
-            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.</p>',
+            + knop3('Bestand openen')
+            + '<p style="color:#666;font-size:13px">Dit is dezelfde link als in de eerste mail. '
+            + 'Hij is alleen voor u en werkt één keer. Als u hem opent, sturen we een korte '
+            + 'controlecode naar dit adres.<br>Beschikbaar tot ' + escHtml(tot) + '.</p>',
               '<p>A file is still waiting for you.</p>'
-            + '<p>Use the link in the earlier mail from Paramant. It still works, '
-            + 'and it is still yours alone.</p>'
-            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(totEn) + '. '
-            + 'Cannot find that mail? Ask the sender to send the file again.</p>')
+            + (taal3 === 'en' ? knop3('Open the file') : '<p>Use the button above to open the file.</p>')
+            + '<p style="color:#666;font-size:13px">It is the same link as in the first mail. '
+            + 'It is yours alone and works once. Opening it sends a short code to this address.'
+            + '<br>Available until ' + escHtml(totEn) + '.</p>')
             + VOET(wie3, out.sender_email, taal3),
       });
       if (!bezorgd || !bezorgd.ok) {
@@ -6233,11 +6414,12 @@ async function handleRelayRequest(req, res) {
       // on you any more". A caller who is not the party learns nothing, not even
       // that the id exists.
       if (!invite) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
-      // The resent link opens the REQUEST, never the document: the key half
-      // that opens it lives only in the link the sender's browser built and
-      // must not reach a server that also holds the other half (COSIGN-46).
-      // The safe way back is the sender, so the sender is told, once an hour.
-      const senderNotified = await notifySenderLinkRequested(parasignResendMatch[1], invite.sender_account_id, invite.party_label).catch(() => false);
+      // The key half that opens the document lives only in the link the
+      // sender's browser built and must not reach a server that also holds
+      // the other half (COSIGN-46). So the sender is asked, once an hour, to
+      // send the invitation again from that browser; the admin no longer
+      // mails a link that opens only the request.
+      const senderNotified = await notifySenderLinkRequested(parasignResendMatch[1], invite.sender_account_id, invite.party_label, invite.party_index).catch(() => false);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
       return res.end(J({
         ok: true,
@@ -7584,6 +7766,9 @@ async function handleRelayRequest(req, res) {
       blobDrop(blobHash);
       return gone('exhausted');
     }
+    // Counted like a claimed fetch: a download broken off before the last
+    // byte costs nothing, but not more than DL_MAX_FETCHES times (review #565).
+    td.fetches = (td.fetches || 0) + 1;
     td.in_progress = true;
     const legacyTag = 'legacy:' + crypto.randomBytes(8).toString('hex');
     td.in_progress_by = legacyTag;
@@ -7594,50 +7779,34 @@ async function handleRelayRequest(req, res) {
       'Content-Disposition': 'attachment; filename="paramant-encrypted-payload"',
       'Cache-Control': 'no-store',
       'Content-Length': blob.length,
-      'X-Burned': 'true',
+      // Not 'true' any more: nothing is burned yet. It burns once the whole
+      // body is delivered (afterDelivery), and a broken line keeps the file.
+      'X-Burned': 'on-delivery',
       'X-Hash': blobHash,
       // No proxy buffer in between: nginx would take the whole file at once
       // and 'finish' would mean "nginx has it", not "the client has it".
       'X-Accel-Buffering': 'no',
     });
-    // Burn on 'finish': Node has handed the last byte to the socket. Behind
-    // nginx that means "nginx has it"; X-Accel-Buffering above stops nginx
-    // from buffering the whole response first, so a client that stops reading
-    // holds the relay's write up instead of nginx's disk buffer. Measured
-    // (hertest r2 T4-3): directly against the relay a 5 MB download broken off
-    // after 80 KB no longer burns; through a local nginx it still did, because
-    // the socket buffers on that path swallow a few MB at once. That cannot be known
-    // on this side of TCP; only a claimed download with an ack (?claim=, the
-    // web page and the relay's own confirm page) is exact.
-    res.on('finish', () => {
-      _notifyDownloaded(entry, blobHash, { via: 'link' });
-      dlBurn(token, td, 'downloaded');
-      blobDrop(blobHash);
-      try { blob.fill(0); } catch {}
-    });
-    // Fix 4: on socket error before finish, allow retry
-    res.on('close', () => {
-      if (!td.used) {
+    // Burned once the last byte was written (matrix API-30-K, review #565 B1):
+    // hidden on 'finish' so a second GET answers 410 at once, destroyed after
+    // the settle window. Broken off before 'finish', nothing was hidden.
+    afterDelivery(req, res, {
+      onFinish: () => {
+        td.used = true; td.gone = 'downloaded'; td.claim = null;
+        blobDrop(blobHash, false);
+      },
+      onDelivered: () => {
+        dlMarkGone(token, td, 'downloaded');
         if (td.in_progress_by === legacyTag) td.in_progress = false;
-        log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
-      }
+        _notifyDownloaded(entry, blobHash, { via: 'link' });
+        zeroBuffer(blob);
+      },
+      onAborted: (why) => {
+        if (td.in_progress_by === legacyTag) td.in_progress = false;
+        log('warn', 'dl_aborted_before_delivery', { token: token.slice(0,8), hash: blobHash.slice(0,16), why, fetch: td.fetches });
+      },
     });
-    // In pieces, each one only after the socket took the last (backpressure):
-    // one res.end(blob) let 'finish' fire while a reader that had stopped
-    // after 80 KB still had megabytes to go (measured on loopback).
-    const DL_PIECE = 64 * 1024;
-    let off = 0;
-    const pump = () => {
-      while (off < blob.length) {
-        if (res.destroyed) return;
-        const end = Math.min(blob.length, off + DL_PIECE);
-        const more = res.write(blob.subarray(off, end));
-        off = end;
-        if (!more) { res.once('drain', pump); return; }
-      }
-      res.end();
-    };
-    return pump();
+    return writeInPieces(res, blob);
   }
 
   // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
@@ -8409,7 +8578,7 @@ async function handleRelayRequest(req, res) {
         subject: taal2 === 'en' ? 'Your code to open the file'
                                 : 'Uw controlecode om het bestand te openen',
         text: tweetaligTekst(taal2,
-              'Uw controlecode is ' + vraag.code + '. De code is ' + minuten + ' minuten geldig.'
+              'Uw controlecode is ' + vraag.code + '. De code werkt ' + minuten + ' minuten.'
             + (bestandRuw2 ? '\n\nVoor het bestand: ' + bestandRuw2 : '')
             + (wie2 ? '\nGestuurd door ' + wie2 + ' via Paramant.' : '')
             + '\n\nHeeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders uw link. '
@@ -8424,8 +8593,8 @@ async function handleRelayRequest(req, res) {
             + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
             + (bestand2 ? '<p style="color:#666;font-size:13px">Voor het bestand: <strong>'
                           + bestand2 + '</strong></p>' : '')
-            + '<p style="color:#666;font-size:13px">De code is ' + minuten
-            + ' minuten geldig.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
+            + '<p style="color:#666;font-size:13px">De code werkt ' + minuten
+            + ' minuten.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
             + 'uw link. Geef de code niet door en laat het de afzender weten.</p>',
               '<p>Your code to open the file' + (taal2 === 'en' ? ':' : ' is the one above.') + '</p>'
             + (taal2 === 'en'
@@ -8995,7 +9164,22 @@ async function handleRelayRequest(req, res) {
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
   const outm = path.match(/^\/v2\/outbound\/([a-f0-9]{64})$/);
   if (outm && req.method === 'GET') {
-    const entry = blobStore.get(outm[1]);
+    let entry = blobStore.get(outm[1]);
+    // The same key coming back right after a download whose connection closed
+    // within DELIVERY_SETTLE_MS of the last byte: that download may have been
+    // broken off behind a proxy. It gets the blob once more (matrix API-35-K),
+    // and only once per blob: the download out of the hold is final (review
+    // #565, H1: the hold could be chained without end).
+    if (!entry) {
+      const held = outboundRetryHold.get(outm[1]);
+      if (held && held.key && held.key === apiKey && Date.now() < held.until) {
+        outboundRetryHold.delete(outm[1]);
+        clearTimeout(held.timer);
+        held.entry.views_remaining = (held.entry.views_remaining ?? 0) + 1;
+        if (Date.now() - held.entry.ts < held.entry.ttl) { blobPut(outm[1], held.entry); entry = held.entry; }
+        log('info', 'outbound_retry_after_close', { hash: outm[1].slice(0,16) });
+      }
+    }
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     // Per-key outbound rate limit (finding #12)
@@ -9032,11 +9216,9 @@ async function handleRelayRequest(req, res) {
     if (burned) {
       // Unlisted immediately so a concurrent reader cannot find it, but NOT
       // wiped: `blob` below is the buffer being served. Wiping here handed the
-      // downloader five megabytes of zeroes.
+      // downloader five megabytes of zeroes. It is only destroyed after the
+      // delivery (afterDelivery below); a broken download puts it back.
       blobDrop(outm[1], false);
-      res.on('finish', () => zeroBuffer(blob));
-      res.on('close',  () => zeroBuffer(blob));
-      incMetric('blobs_burned'); stats.burned++;
     }
     incMetric('bytes_out_total', blob.length);
     stats.outbound++; stats.bytes_out += blob.length;
@@ -9044,9 +9226,6 @@ async function handleRelayRequest(req, res) {
       { hash: outm[1].slice(0,16)+'...', bytes: blob.length, views_left: entry.views_remaining });
     log('info', burned ? 'blob_burned' : 'blob_served',
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
-    // ParaSend Pro download notification. Notify the transfer OWNER (the uploader),
-    // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
-    _notifyDownloaded(entry, outm[1], { via: 'api' });
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
@@ -9113,9 +9292,47 @@ async function handleRelayRequest(req, res) {
       if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
       else outHeaders['X-Paramant-Receipt-Deprecated'] = `removed 2026-12-01; GET /v2/transfers/${receiptId}/receipt`;
     }
+    outHeaders['X-Accel-Buffering'] = 'no';
     res.writeHead(200, outHeaders);
-    if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
-    return res.end(blob);
+    // A line broken before the last byte was written loses nothing (matrix
+    // API-24-K, API-35-K): the read only counts, and a burning read only
+    // destroys the blob, once the whole body was written. Socket buffers take
+    // a few MB, so for a blob under ~5 MB that is as a rule straight away. Until then the entry is unlisted, so a second
+    // reader gets 404 as before.
+    const outHash = outm[1];
+    const delivered = () => {
+      if (burned) { zeroBuffer(blob); incMetric('blobs_burned'); stats.burned++; }
+      // ParaSend Pro download notification. Notify the transfer OWNER (the
+      // uploader), whose key is on the blob entry, not the downloader.
+      _notifyDownloaded(entry, outHash, { via: 'api' });
+    };
+    afterDelivery(req, res, {
+      onDelivered: delivered,
+      onCleanCloseEarly: () => {
+        if (!burned || !apiKey || entry.retryHeld) return delivered();
+        entry.retryHeld = true;
+        const timer = setTimeout(() => {
+          const h = outboundRetryHold.get(outHash);
+          if (h && h.entry === entry) { outboundRetryHold.delete(outHash); delivered(); }
+        }, DELIVERY_SETTLE_MS);
+        if (timer.unref) timer.unref();
+        outboundRetryHold.set(outHash, { entry, key: apiKey, until: Date.now() + DELIVERY_SETTLE_MS, timer });
+      },
+      // Broken off before the last byte: the read does not count, but the
+      // blob is served at most DL_MAX_FETCHES times in all, as a /v2/dl link
+      // is (dlExhausted): the last broken read counts (review #565, #573).
+      onAborted: (why) => {
+        entry.aborts = (entry.aborts || 0) + 1;
+        if (entry.aborts >= DL_MAX_FETCHES) {
+          log('warn', 'outbound_aborted_counted', { hash: outHash.slice(0,16), why, aborts: entry.aborts });
+          return delivered();
+        }
+        entry.views_remaining = (entry.views_remaining ?? 0) + 1;
+        if (burned && Date.now() - entry.ts < entry.ttl && !blobStore.has(outHash)) blobPut(outHash, entry);
+        log('warn', 'outbound_aborted_before_delivery', { hash: outHash.slice(0,16), why, restored: burned });
+      },
+    });
+    return writeInPieces(res, blob);
   }
 
   // ── GET /v2/transfers/:receipt_id/receipt ─ the delivery receipt, by reference ─
@@ -9258,7 +9475,7 @@ async function handleRelayRequest(req, res) {
     if (query.format === 'csv') {
         res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="paramant_audit.csv"' });
       return res.end('ts,event,hash,bytes,device,chain_hash\n' +
-        entries.map(e => `${e.ts},${e.event},${e.hash||''},${e.bytes||0},${e.device||''},${e.chain_hash}`).join('\n'));
+        entries.map(e => [e.ts, e.event, e.hash || '', e.bytes || 0, e.device || '', e.chain_hash].map(_csvAuditCell).join(',')).join('\n'));
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, count: entries.length, chain_valid: valid, entries }));
@@ -9299,6 +9516,7 @@ async function handleRelayRequest(req, res) {
       relayIdentity,
       canonicalJSON: parasign.canonicalJSON,
       publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
+      relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
     });
   }
 
@@ -9637,6 +9855,8 @@ async function handleRelayRequest(req, res) {
       // floored it to free. The date is on the record; it just never left.
       paid_until_parasign: sign.paidUntil,
       paid_until_parasend: send.paidUntil,
+      terms_parasign: _runningTermsView(v, 'parasign'),
+      terms_parasend: _runningTermsView(v, 'parasend'),
       // Is there a collection standing behind this account. The account page
       // told every customer auto_renews:false because nothing on this
       // projection could say otherwise, and with BILLING_MODE set that is the
@@ -10098,16 +10318,40 @@ async function handleRelayRequest(req, res) {
         log('warn', 'billing_customer_unverified', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
       }
       const customerId = cust.customerId;
+      // The buyer comes back in the language he bought in. The redirect was
+      // always /dashboard, the Dutch page, so a buyer from /en/pricing read
+      // "Betaling ontvangen" (betaaltest 05-10, row 6). Only 'en' changes it;
+      // anything else is the Dutch default, never a path from the request.
+      const _en = body.lang === 'en';
       const payment = await mollie.createPayment(mode, Object.assign({
         amount: { currency: order.currency, value: vatMod.chargeAmount(order, vatTerms) },
-        description: `Paramant ${billingCatalog.orderLabel(order)} (${order.interval})`,
-        redirectUrl: `${origin}/dashboard?billing=return`,
+        // In the buyer's language (acceptatie 3.1.1, betalen punt 5): a Dutch
+        // buyer read "Paramant Firm (ParaSign Pro and ParaSend Pro) (monthly)".
+        description: _en
+          ? `Paramant ${billingCatalog.orderLabelEn(order)} (${order.interval === 'yearly' ? 'yearly' : 'monthly'})`
+          : `Paramant ${billingCatalog.orderLabelNl(order)} (${order.interval === 'yearly' ? 'per jaar' : 'per maand'})`,
+        redirectUrl: `${origin}${_en ? '/en' : ''}/dashboard?billing=return`,
         webhookUrl: `${origin}/v2/billing/webhook`,
         // A reverse-charged sale adds its terms (lib/vat.metadataOf); a 21%
         // sale adds nothing, so its payload is what it always was.
         metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval, ...vatMod.metadataOf(vatTerms) },
       }, customerId ? { customerId, sequenceType: 'first' } : {}));
       const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
+      // Remember the checkout this account started last, so the dashboard it
+      // returns to can say what actually happened to it (GET
+      // /v2/billing/last-payment). Mollie's redirect carries no payment id,
+      // and without this the dashboard said "being confirmed" and "you get
+      // the plan by itself" after a cancelled or failed payment too
+      // (betaaltest 05-10, row 4). Best effort: a checkout never fails on it.
+      if (redisClient && redisClient.isReady) {
+        redisClient.set(_buyerLangKey(accountId), _en ? 'en' : 'nl').catch(() => { /* the invoice then falls back to Dutch */ });
+      }
+      if (payment && payment.id && redisClient && redisClient.isReady) {
+        redisClient.set(_lastCheckoutKey(accountId), J({
+          id: payment.id, product: order.product, plan: order.plan, interval: order.interval,
+          lang: _en ? 'en' : 'nl', at: new Date().toISOString(),
+        }), { EX: 7 * 86400 }).catch(() => { /* the dashboard then says it does not know */ });
+      }
       log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode, recurring: !!customerId, vat: vatTerms.treatment });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, payment_id: payment && payment.id, checkout_url: checkoutUrl, mode }));
@@ -10116,6 +10360,31 @@ async function handleRelayRequest(req, res) {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'checkout_failed' }));
     }
+  }
+
+  // ── GET /v2/billing/last-payment: what became of the last checkout ─────────
+  // The dashboard asks this when Mollie sends the buyer back. The status comes
+  // from Mollie itself, fetched now with our own key, for the payment this
+  // account started (the id is ours, stored at checkout, never taken from the
+  // request). Read-only: it grants nothing, which stays the webhook's job.
+  if (path === '/v2/billing/last-payment' && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    let last = null;
+    try { last = (redisClient && redisClient.isReady) ? JSON.parse(await redisClient.get(_lastCheckoutKey(accountId)) || 'null') : null; }
+    catch { last = null; }
+    if (!last || !last.id) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, payment: null })); }
+    let status = 'unknown';
+    try {
+      const p = await mollie.getPayment(mollie.billingStance().mode, last.id);
+      if (p && typeof p.status === 'string') status = p.status;
+    } catch (e) {
+      log('warn', 'billing_last_payment_fetch_failed', { account: String(accountId).slice(0, 12), err: e.message, status: e.status });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, payment: {
+      status, product: last.product, plan: last.plan, interval: last.interval, lang: last.lang, started_at: last.at,
+    } }));
   }
 
   // ── POST /v2/billing/webhook — Mollie payment status callback ────────────────
@@ -10938,7 +11207,7 @@ async function handleRelayRequest(req, res) {
       const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
         <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
         <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-          Your API key is ready to claim. The link below reveals it once and expires in 7 days. Save the key in your password manager the moment you see it — it is generated once and cannot be recovered.
+          Your API key is ready. The link below shows it once and works for 7 days. Save the key in your password manager as soon as you see it. It is made once and cannot be recovered.
         </div>
         <p style="color:#888;margin-bottom:24px">Plan: <strong style="color:#ededed">${escHtml((d.plan||'').toUpperCase())}</strong></p>
         <div style="margin-bottom:24px"><a href="${claimUrl}" style="display:inline-block;background:#ededed;color:#0c0c0c;text-decoration:none;padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600">Reveal my API key</a></div>
@@ -10951,7 +11220,7 @@ async function handleRelayRequest(req, res) {
       // whether their key is on its way.
       const resp = await mailer.stuur({
         from: 'PARAMANT <privacy@paramant.app>', to: d.email,
-        subject: 'Claim your PARAMANT API key', html,
+        subject: 'Your PARAMANT API key is ready', html,
       });
       if (resp.ok) {
         log('info', 'welcome_mail_sent', { email: maskEmail(d.email), provider: resp.provider, label: d.label });
@@ -11261,7 +11530,8 @@ async function handleRelayRequest(req, res) {
   // POST /v2/envelopes -- create a new envelope.
   if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
-    if (!(await envCreateRateOkShared(apiKey))) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
+    const _rl = await envCreateRateOkShared(apiKey);
+    if (!_rl.ok) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil((_rl.retryAfterMs || 3600_000) / 1000)) }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable (redis or crypto not ready)' })); }
     try {
@@ -11367,7 +11637,7 @@ async function handleRelayRequest(req, res) {
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const token = inviteTokenFrom(req, query);
     const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
     try {
       const out = await store.getDocumentCapsule(envDocumentMatch[1], pi, token, verifiedEmailHash);
@@ -11503,6 +11773,9 @@ async function handleRelayRequest(req, res) {
         env, meta: null, canonicalJSON: parasign.canonicalJSON,
         sigEngine: registry.getSig(0x0002), relayIdentity,
         publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+        // The same relay_id as GET /v1/envelopes/:id/receipt (review #565, M2):
+        // this relay's own URL, not paramant.app on a self-host.
+        relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
       });
       res.writeHead(200, {
         'Content-Type': 'application/json',
@@ -11524,7 +11797,7 @@ async function handleRelayRequest(req, res) {
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     const partyIndex = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const token = inviteTokenFrom(req, query);
     const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString();
     try {
       const party = await store.getForParty(envParticipantReceiptMatch[1], partyIndex, token);
@@ -11539,6 +11812,9 @@ async function handleRelayRequest(req, res) {
         env, meta: null, canonicalJSON: parasign.canonicalJSON,
         sigEngine: registry.getSig(0x0002), relayIdentity,
         publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+        // The same relay_id as GET /v1/envelopes/:id/receipt (review #565, M2):
+        // this relay's own URL, not paramant.app on a self-host.
+        relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
       });
       res.writeHead(200, {
         'Content-Type': 'application/json',
@@ -11577,7 +11853,7 @@ async function handleRelayRequest(req, res) {
       // (possibly v2) sign-message locally, and gives a passer-by nothing.
       if (query.p !== undefined) {
         const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-        const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+        const token = inviteTokenFrom(req, query);
         const view = await store.getForParty(id, pi, token);
         if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
         res.writeHead(200, { 'Content-Type': 'application/json' });
