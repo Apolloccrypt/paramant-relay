@@ -231,7 +231,7 @@
       <summary>What is checked</summary>
       <ul>
         <li>The receipt is about the file it names and no other</li>
-        <li>The entry it points to really sits in the public transparency log</li>
+        <li>The proof of inclusion holds: the relay signed at the time that the entry was in its transparency log (whether it still shows that entry, you can see in <a href="/en/ct-log">the log</a>)</li>
         <li>The signature over the whole receipt holds, so nothing was altered</li>
         <li>The log snapshot the receipt relies on was signed too</li>
       </ul>
@@ -272,6 +272,6 @@
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 <script type="module" src="/parasign-verify.js?v=20"></script>
-<script type="module" src="/js/receipt-verify.js?v=5"></script>
+<script type="module" src="/js/receipt-verify.js?v=6"></script>
 </body>
 </html>

@@ -461,7 +461,7 @@ data, receipt = gp.receive(hash_)</pre>
     <p>PARAMANT has five sector relays, each tuned to its compliance domain. Pick the sector that matches your use case.</p>
 
     <h3><span class="sector-badge">health</span>Healthcare: NEN 7510, DICOM, HL7 FHIR</h3>
-    <p>Send MRI scans, referral letters, and lab results between care providers. <code>health.paramant.app</code> is designed for NEN 7510 compliance: encrypted in transit, RAM-only, EU jurisdiction, per-access CT log proof.</p>
+    <p>Send MRI scans, referral letters, and lab results between care providers. <code>health.paramant.app</code> is designed for NEN 7510 compliance: encrypted in transit, RAM-only, EU jurisdiction. Every upload becomes an entry in the public CT log; downloads and acknowledgements are recorded in your key’s private audit chain (<code>/v2/audit</code>), not in the CT log.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send DICOM scan to specialist</span>
 from paramant_sdk import GhostPipe
@@ -469,9 +469,9 @@ gp = GhostPipe(api_key="pgp_xxx", device="mri-001", sector="health")
 hash_, proof = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
 
     <h3><span class="sector-badge">legal</span>Legal &amp; Notary: eIDAS, KNB</h3>
-    <p>Send signed deeds and court documents that are cryptographically gone after receipt. The CT log provides tamper-evident proof of delivery without storing content.</p>
+    <p>Send signed deeds and court documents that are cryptographically gone after receipt. The CT log records, tamper-evidently, that the document was handed to the relay, without storing content. The pickup and the burn are recorded in your key’s private audit chain.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
-    <pre><span class="cm"># Signed deed: burn-on-read, CT log entry as proof of delivery</span>
+    <pre><span class="cm"># Signed deed: burn-on-read, CT log entry as proof of hand-over to the relay</span>
 from paramant_sdk import GhostPipe
 gp = GhostPipe(api_key="pgp_xxx", device="notary-01", sector="legal")
 hash_, receipt = gp.send(open("deed.pdf","rb").read())
@@ -488,7 +488,7 @@ while True:
     time.sleep(15)</pre></div>
 
     <h3><span class="sector-badge">finance</span>Finance: NIS2, DORA, ISO 20022</h3>
-    <p>Relay ISO 20022 payment files with a per-transaction Merkle proof for DORA audit trails. <code>finance.paramant.app</code>: EU jurisdiction, no US Cloud Act, no metadata retention.</p>
+    <p>Relay ISO 20022 payment files with a Merkle proof per file sent (every upload becomes an entry in the relay’s CT log) for DORA audit trails. <code>finance.paramant.app</code>: EU jurisdiction, no US Cloud Act, no metadata retention.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send ISO 20022 payment file with CT proof for DORA audit</span>
 from paramant_sdk import GhostPipe
@@ -509,7 +509,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/v2/pickup/:token</td><td>Same route, kept for links created before the switch to POST. Link scanners open every GET link, so a GET that sends mail would fire for each scan; new clients use POST.</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download and burn: uses one read of the link</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery; recorded in your key’s private audit chain, not in the CT log</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live stats: blobs in flight, ACK rate</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Get a one-time WebSocket ticket, valid for 30s</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket push: blob_ready events</td><td>Ticket / Key</td></tr>
@@ -1038,13 +1038,13 @@ python3 deploy/paramant-admin.py sync</pre>
       <li>Burn-on-read: minimises data retention exposure</li>
       <li>Key revocation without downtime, so you can respond to an incident immediately</li>
     </ul>
-    <p><strong>DORA (EU 2022/2554)</strong> applies to financial entities. The finance.paramant.app sector is designed with DORA in mind: per-transaction Merkle proof, no US Cloud Act jurisdiction, ISO 20022 compatible.</p>
+    <p><strong>DORA (EU 2022/2554)</strong> applies to financial entities. The finance.paramant.app sector is designed with DORA in mind: a Merkle proof per file sent, no US Cloud Act jurisdiction, ISO 20022 compatible.</p>
 
     <h2 id="compliance-nen7510">NEN 7510 (Healthcare)</h2>
     <p>NEN 7510 is the Dutch standard for information security in healthcare. The health.paramant.app sector is designed for NEN 7510 compliance:</p>
     <ul>
       <li>Encrypted in transit and at rest (in practice: held in RAM only, never written to disk)</li>
-      <li>Access logging via CT log: cryptographic proof of every access event</li>
+      <li>Uploads in the public CT log; every download and acknowledgement in your key’s private audit chain (<code>/v2/audit</code>)</li>
       <li>Device identity registration (DID): traceable per-device access</li>
       <li>Key-based access control: per-user API keys with revocation</li>
       <li>Hetzner DE: EU GDPR jurisdiction, suitable for patient data routing</li>
@@ -1086,7 +1086,7 @@ python3 deploy/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">What happens after the file is downloaded?</div>
-      <div class="faq-a">The blob buffer is immediately overwritten with random bytes and removed from memory. There is no recovery, no backup, and no second download. The CT log records a cryptographic hash of the event but never the file content.</div>
+      <div class="faq-a">The blob buffer is immediately overwritten with random bytes and removed from memory. There is no recovery, no backup, and no second download. The CT log holds only the hash of the upload; the pickup and the burn are in your key’s private audit chain. Neither holds the file content.</div>
     </div>
 
     <div class="faq-item">

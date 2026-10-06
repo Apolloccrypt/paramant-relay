@@ -438,7 +438,7 @@ data, receipt = gp.receive(hash_)</pre>
     <p>PARAMANT heeft vijf sectorrelays, elk afgestemd op de eigen regelgeving. Kies de sector die bij uw toepassing past.</p>
 
     <h3><span class="sector-badge">health</span>Zorg: NEN 7510, DICOM, HL7 FHIR</h3>
-    <p>Verstuur MRI-scans, verwijsbrieven en labuitslagen tussen zorgverleners. <code>health.paramant.app</code> is ontworpen voor NEN 7510: versleuteld onderweg, alleen in RAM, onder EU-recht, met bewijs in de CT-log voor elke toegang.</p>
+    <p>Verstuur MRI-scans, verwijsbrieven en labuitslagen tussen zorgverleners. <code>health.paramant.app</code> is ontworpen voor NEN 7510: versleuteld onderweg, alleen in RAM, onder EU-recht. Elke upload komt als regel in de openbare CT-log; downloaden en bevestigen leggen we vast in de privé-auditketen van uw sleutel (<code>/v2/audit</code>), niet in de CT-log.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send DICOM scan to specialist</span>
 from paramant_sdk import GhostPipe
@@ -446,7 +446,7 @@ gp = GhostPipe(api_key="pgp_xxx", device="mri-001", sector="health")
 hash_, proof = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
 
     <h3><span class="sector-badge">legal</span>Juridisch en notariaat: eIDAS, KNB</h3>
-    <p>Verstuur ondertekende aktes en processtukken die na ontvangst cryptografisch gewist zijn. De CT-log geeft een manipulatiebestendig bewijs van aflevering, zonder de inhoud op te slaan.</p>
+    <p>Verstuur ondertekende aktes en processtukken die na ontvangst cryptografisch gewist zijn. De CT-log legt manipulatiebestendig vast dat het stuk bij de relay is aangeleverd, zonder de inhoud op te slaan. De ophaling en het wissen staan in de privé-auditketen van uw sleutel.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Signed deed: burn-on-read, CT log entry as proof of delivery</span>
 from paramant_sdk import GhostPipe
@@ -465,7 +465,7 @@ while True:
     time.sleep(15)</pre></div>
 
     <h3><span class="sector-badge">finance</span>Finance: NIS2, DORA, ISO 20022</h3>
-    <p>ISO 20022-betaalbestanden doorgeven met een Merkle-bewijs per transactie voor DORA-audittrails. <code>finance.paramant.app</code>: EU-recht, geen Amerikaanse Cloud Act, geen bewaring van metadata.</p>
+    <p>ISO 20022-betaalbestanden doorgeven met een Merkle-bewijs per verzonden bestand (elke upload wordt een regel in de CT-log van de relay) voor DORA-audittrails. <code>finance.paramant.app</code>: EU-recht, geen Amerikaanse Cloud Act, geen bewaring van metadata.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send ISO 20022 payment file with CT proof for DORA audit</span>
 from paramant_sdk import GhostPipe
@@ -486,7 +486,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/v2/pickup/:token</td><td>Dezelfde route, bewaard voor links die zijn gemaakt vóór de overstap naar POST. Een GET die mail verstuurt, wordt door elke linkscanner afgevuurd, dus nieuwe clients gebruiken POST.</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Downloaden en wissen: telt als één lezing van de link</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Controleren of een blob beschikbaar is, zonder hem te verbruiken</td><td>Sleutel</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Aflevering bevestigen, vertraging vastleggen in de CT-log</td><td>Sleutel</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Aflevering bevestigen; vastgelegd in de privé-auditketen van uw sleutel, niet in de CT-log</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live statistieken: blobs onderweg, ACK-percentage</td><td>Sleutel</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Eenmalig WebSocket-ticket ophalen, 30 seconden geldig</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket-push: blob_ready-events</td><td>Ticket / sleutel</td></tr>
@@ -1015,13 +1015,13 @@ python3 deploy/paramant-admin.py sync</pre>
       <li>Burn-on-read: zo min mogelijk bewaarde gegevens</li>
       <li>Sleutels intrekken zonder onderbreking: direct ingrijpen bij een incident</li>
     </ul>
-    <p><strong>DORA (EU 2022/2554)</strong> geldt voor financiële instellingen. De sector finance.paramant.app is ontworpen met DORA in gedachten: Merkle-bewijs per transactie, geen Amerikaanse Cloud Act, geschikt voor ISO 20022.</p>
+    <p><strong>DORA (EU 2022/2554)</strong> geldt voor financiële instellingen. De sector finance.paramant.app is ontworpen met DORA in gedachten: Merkle-bewijs per verzonden bestand, geen Amerikaanse Cloud Act, geschikt voor ISO 20022.</p>
 
     <h2 id="compliance-nen7510">NEN 7510 (zorg)</h2>
     <p>NEN 7510 is de Nederlandse norm voor informatiebeveiliging in de zorg. De sector health.paramant.app is ontworpen voor NEN 7510:</p>
     <ul>
       <li>Versleuteld onderweg en in opslag (technisch: alleen RAM, nooit schijf)</li>
-      <li>Toegang vastgelegd in de CT-log: cryptografisch bewijs van elke toegang</li>
+      <li>Uploads in de openbare CT-log; elke download en bevestiging in de privé-auditketen van uw sleutel (<code>/v2/audit</code>)</li>
       <li>Registratie van apparaatidentiteit (DID): toegang per apparaat te herleiden</li>
       <li>Toegang op basis van sleutels: API-sleutels per gebruiker, in te trekken</li>
       <li>Hetzner DE: EU-recht en AVG, geschikt voor het doorgeven van patiëntgegevens</li>
@@ -1063,7 +1063,7 @@ python3 deploy/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">Wat gebeurt er nadat het bestand is gedownload?</div>
-      <div class="faq-a">De buffer van de blob wordt direct overschreven met willekeurige bytes en uit het geheugen verwijderd. Er is geen herstel, geen reservekopie en geen tweede download. De CT-log legt een cryptografische hash van de gebeurtenis vast, nooit de inhoud van het bestand.</div>
+      <div class="faq-a">De buffer van de blob wordt direct overschreven met willekeurige bytes en uit het geheugen verwijderd. Er is geen herstel, geen reservekopie en geen tweede download. De CT-log bevat alleen de hash van het uploaden; het ophalen en wissen staan in de privé-auditketen van uw sleutel. Geen van beide bevat de inhoud van het bestand.</div>
     </div>
 
     <div class="faq-item">
