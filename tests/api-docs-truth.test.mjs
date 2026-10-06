@@ -87,7 +87,8 @@ test('API-31-N: the CT examples show the fields the relay sends', () => {
   assert.match(log, /"size":43/);
   assert.doesNotMatch(log, /"tree_size":43/);
   const proof = API.slice(API.indexOf('### GET /v2/ct/proof'), API.indexOf('### GET /v2/sth/consistency'));
-  assert.match(proof, /"index":7,"leaf_hash":"d4e1…","tree_hash":"c7a9…","proof":\[…\],"ts":/);
+  // tree_size since 3.1.2: the proof says which tree it folds to (?tree_size=N).
+  assert.match(proof, /"index":7,"leaf_hash":"d4e1…","tree_size":8,"tree_hash":"c7a9…","proof":\[…\],"ts":/);
 });
 
 test('API-13-F / API-21-N: two error shapes, and 402 in the table and on /docs', () => {

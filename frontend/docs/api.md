@@ -521,17 +521,29 @@ curl "https://relay.paramant.app/v2/ct/log?limit=20&offset=0"
 derived at request time, so it always matches the index `/v2/ct/proof` resolves
 and the leaf position the Merkle tree commits to.
 
+`tree_hash` is the root of the tree at `index + 1` leaves, computed from the
+full tree at request time: the same value `/v2/ct/proof/<index>` returns. Where
+the value stored at append time differs (39 entries from April 2026 on health,
+from an earlier, restarted tree), the entry also carries `stored_tree_hash`
+with that old value and `"from_earlier_tree": true`.
+
 ---
 
 ### GET /v2/ct/proof: Inclusion proof for a specific index
 
 ```bash
 curl "https://relay.paramant.app/v2/ct/proof?index=7"
-# {"ok":true,"index":7,"leaf_hash":"d4e1…","tree_hash":"c7a9…","proof":[…],"ts":"2026-04-15T09:00:00.000Z"}
+# {"ok":true,"index":7,"leaf_hash":"d4e1…","tree_size":8,"tree_hash":"c7a9…","proof":[…],"ts":"2026-04-15T09:00:00.000Z"}
+curl "https://relay.paramant.app/v2/ct/proof/7?tree_size=1523"
 ```
 
-`proof` is the audit path from the leaf to `tree_hash`, the root at the time
-the leaf was appended.
+`proof` is the audit path from the leaf to `tree_hash`, the root of the tree at
+`tree_size` leaves. Without `tree_size` that is `index + 1`, the tree as it stood
+when the leaf was appended. Pass the `tree_size` of a signed tree head
+(`/v2/sth`) to check inclusion straight against that head. Every path is
+computed from the full tree at request time, never from what was stored at
+append time (until 3.1.2, 39 old entries on health served a stored path from an
+earlier, restarted tree).
 
 ---
 
@@ -569,7 +581,18 @@ curl -X POST https://relay.paramant.app/v2/sth/ingest \
 # {"ok":true,"relay_pk_hash":"sha3-256 hex"}
 ```
 
-The relay verifies the ML-DSA-65 signature before storing. Replay attacks are blocked by a 5-minute timestamp window.
+The relay verifies the ML-DSA-65 signature, then checks that the key is pinned
+to `relay_id` (`relay/lib/fleet-pins.js`: the five Paramant relays, plus
+`PEER_STH_PINS`). A pinned name with another key, a pinned key under another
+name, or an unpinned paramant.app name answers 403. A relay that is not pinned
+answers 202 with `"mirrored": false`: its heads are not published below. A
+`relay_id` with a dot at the end (`health.paramant.app.`) answers 403
+(`relay_id_trailing_dot`). A key that was retired for its name (after a key
+rotation) answers 403 (`retired_key`); what it sent before stays mirrored.
+There is no timestamp window: heads carry an hour-rounded timestamp. A head
+this relay already holds (same key, `tree_size` and root) is not stored again:
+200 with `"stored": false, "duplicate": true`. Once a mirror file was compacted
+(`PEER_STH_FILE_MAX`), a head older than everything it still holds answers 409.
 
 ---
 
@@ -595,6 +618,10 @@ curl https://relay.paramant.app/v2/sth/peers
   ]
 }
 ```
+
+Only pinned relays are listed. `latest_ts` and every `received_at` below are
+rounded to the hour: a head is gossiped the moment it is signed, so a precise
+arrival time would give away the time of the leaf.
 
 ---
 
@@ -908,13 +935,13 @@ below live in this repository and run from a clone.
 | `scripts/paramant-sender.py` | encrypt and upload a file, stdin or text; `--watch DIR` sends new files. `--relay` takes a hosted sector or the https URL of your own relay |
 | `scripts/paramant-receiver.py` | fetch and decrypt by hash; `--listen` keeps polling |
 | `scripts/paramant-verify-sth` | fetch `/v2/sth` and `/v2/pubkey`, verify the ML-DSA-65 signature, exit non-zero if invalid |
-| `scripts/paramant-verify-peers` | fetch `/v2/sth/peers` and check that each mirrored head is consistent and that tree sizes only grow |
+| `scripts/paramant-verify-peers` | read-only cross-check of the gossip mirrors: every mirrored head of a pinned relay verified under the pinned key, no size with two roots, and an RFC 9162 consistency proof from each mirrored head to the relay's current head. Unpinned peers are reported, not trusted. Exit 1 on an inconsistency, 3 when a relay did not answer |
 | `deploy/paramant-admin.py` | manage users and keys on your own relay |
 
 ```bash
 node scripts/paramant-verify-sth --relay https://relay.paramant.app
 node scripts/paramant-verify-sth --relay https://health.paramant.app --verbose
-node scripts/paramant-verify-peers --relay https://relay.paramant.app
+node scripts/paramant-verify-peers --fleet
 ```
 
 A delivery receipt has no command of its own: fetch it with

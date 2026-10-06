@@ -149,6 +149,10 @@ async function boot(opts = {}) {
     NATS_URL: '',
     RELAY_SELF_URL: '',
     RELAY_PRIMARY_URL: '',
+    // A test relay never sends heads to, or registers with, paramant.app.
+    // NODE_ENV=test already closes that (relay/lib/fleet-pins.js); this says
+    // it out loud, and holds even for a suite that overrides NODE_ENV.
+    PARAMANT_FLEET_GOSSIP: '0',
     HOST: '127.0.0.1',
     // THE BOOT-TIME BACKGROUND JOBS STAY OUT OF A TEST RUN unless a suite asks
     // for them by name (opts.env wins over this).

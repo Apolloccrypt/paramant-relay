@@ -1,211 +1,272 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * paramant-verify-peers — Cross-relay consistency checker
+ * paramant-verify-peers: does every relay's mirror agree with the relays it
+ * mirrors? Read-only; it only sends GET requests.
  *
- * Fetches the STH from every registered relay, then cross-checks each relay's
- * latest root against what other relays have mirrored via the gossip protocol.
- * Any inconsistency (root mismatch for the same tree size) is flagged as a
- * potential tampering event.
+ * For each relay given (or the five Paramant relays with --fleet):
+ *   1. its own current head (/v2/sth) must verify under the pinned key, and the
+ *      relay must not report `forked`;
+ *   2. for every peer in its public mirror (/v2/sth/peers):
+ *      - a peer whose name is not pinned to its key is pollution, not a fork:
+ *        reported as WARN, never a failure (since 3.1.2 the relay refuses or
+ *        hides those, see relay/lib/fleet-pins.js);
+ *      - for a pinned peer, every mirrored head must verify under the pinned
+ *        key, no tree size may appear with two roots, and the peer itself must
+ *        prove, with an RFC 9162 consistency proof checked here, that its
+ *        current tree extends the mirrored heads.
+ *
+ * That is the real split-view question: did a relay show its neighbours a
+ * tree it later contradicts? The old version sorted heads by a timestamp that
+ * is rounded to the hour and flagged every out-of-order arrival as a rollback,
+ * and it trusted the key that came with each head. On 2026-10-06 it raised
+ * "INCONSISTENCY DETECTED" over 15 impostor keys and could not have told a real
+ * fork from that noise.
+ *
+ * Pins: relay/lib/fleet-pins.js (kept equal to frontend/js/relay-trust-anchors.js
+ * by tests/fleet-pins-match-anchors.test.mjs), plus --pins host=fp,... for a
+ * self-hosted or local fleet.
  *
  * Usage:
- *   paramant-verify-peers --relay https://health.paramant.app
- *   paramant-verify-peers --relay https://health.paramant.app --verbose
+ *   paramant-verify-peers --fleet
+ *   paramant-verify-peers --relay https://health.paramant.app [--relay ...]
+ *   paramant-verify-peers --relay http://127.0.0.1:3001 --pins health.local.test=<fp> \
+ *                         --resolve health.local.test=http://127.0.0.1:3002
+ *   options: --verbose, --json, --sample N (consistency proofs per peer, default 8),
+ *            --resolve host=url (reach a pinned peer somewhere other than its name)
  *
  * Exit codes:
- *   0 — all peer STHs are consistent (or 0 peers registered)
- *   1 — inconsistency detected or verification failed
+ *   0  consistent (warnings about unpinned peers allowed)
+ *   1  inconsistency: a bad signature under a pinned key, two roots for one
+ *      size, a failed consistency proof, a tree that went backwards, or a
+ *      relay that reports itself forked
+ *   3  could not check: a relay or peer did not answer (no verdict)
  */
 
-const https  = require('https');
-const http   = require('http');
+const https = require('https');
+const http = require('http');
+const crypto = require('crypto');
+const path = require('path');
+const fleetPins = require(path.join(__dirname, '..', 'relay', 'lib', 'fleet-pins.js'));
 
-// ── Parse args ────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
-let relayUrl = null;
-let verbose  = false;
+const relays = [];
+let verbose = false;
+let asJson = false;
+let sample = 8;
+let extraPins = '';
+const resolveTo = new Map(); // host -> base URL to reach a pinned peer at
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--relay' && args[i + 1]) { relayUrl = args[++i].replace(/\/$/, ''); }
-  if (args[i] === '--verbose' || args[i] === '-v') verbose = true;
+  const a = args[i];
+  if (a === '--relay' && args[i + 1]) relays.push(args[++i].replace(/\/+$/, ''));
+  else if (a === '--fleet') for (const h of Object.keys(fleetPins.PARAMANT_FLEET)) relays.push('https://' + h);
+  else if (a === '--pins' && args[i + 1]) extraPins += (extraPins ? ',' : '') + args[++i];
+  else if (a === '--resolve' && args[i + 1]) {
+    const [h, u] = args[++i].split(/=(.+)/);
+    if (h && u) resolveTo.set(fleetPins.hostOfRelayId(h), u.replace(/\/+$/, ''));
+  } else if (a === '--sample' && args[i + 1]) sample = Math.max(1, parseInt(args[++i], 10) || 8);
+  else if (a === '--verbose' || a === '-v') verbose = true;
+  else if (a === '--json') asJson = true;
 }
-if (!relayUrl) {
-  console.error('Usage: paramant-verify-peers --relay <url>');
-  console.error('Example: paramant-verify-peers --relay https://health.paramant.app');
-  process.exit(1);
+if (relays.length === 0) {
+  console.error('Usage: paramant-verify-peers --fleet | --relay <url> [--relay <url>] [--pins host=fp,...] [--verbose] [--json]');
+  process.exit(3);
 }
+const PINS = fleetPins.buildPins(extraPins);
 
-function vlog(msg) { if (verbose) console.log('[verbose]', msg); }
+const out = { relays: [], warnings: [], inconsistencies: [], unreachable: [] };
+const vlog = (m) => { if (verbose && !asJson) console.log('  .', m); };
+const say = (m) => { if (!asJson) console.log(m); };
+const warn = (m) => { out.warnings.push(m); say('  WARN  ' + m); };
+const bad = (m) => { out.inconsistencies.push(m); say('  INCONSISTENCY  ' + m); };
+const gone = (m) => { out.unreachable.push(m); say('  UNREACHABLE  ' + m); };
 
-function fetchJson(url, timeoutMs = 5000) {
+function getJson(url, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https://') ? https : http;
-    const req = mod.get(url, { headers: { 'User-Agent': 'paramant-verify-peers/1.0' } }, res => {
+    const req = mod.get(url, { headers: { 'User-Agent': 'paramant-verify-peers/2' } }, (res) => {
       const chunks = [];
-      res.on('data', c => chunks.push(c));
+      res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks).toString()) }); }
-        catch (e) { reject(new Error(`JSON parse error from ${url}: ${e.message}`)); }
+        let body = null;
+        try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch { /* not json */ }
+        resolve({ status: res.statusCode, body });
       });
     });
-    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error(`Timeout fetching ${url}`)); });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('timeout')));
     req.on('error', reject);
   });
 }
 
-// Canonical JSON for STH verification — must match produceSth() in relay.js
-function canonicalJson(sth) {
-  const keys = ['relay_id', 'sha3_root', 'timestamp', 'tree_size', 'version'];
-  return JSON.stringify(Object.fromEntries(keys.map(k => [k, sth[k]])));
+function loadMlDsa() {
+  for (const p of ['@noble/post-quantum/ml-dsa.js',
+    path.join(__dirname, '..', 'relay', 'node_modules', '@noble', 'post-quantum', 'ml-dsa.js'),
+    path.join(__dirname, '..', 'node_modules', '@noble', 'post-quantum', 'ml-dsa.js')]) {
+    try { return require(p).ml_dsa65; } catch { /* next */ }
+  }
+  return null;
 }
 
-async function verifySTHSignature(sth, mlDsa) {
-  if (!sth.signature || !sth.public_key) return false;
-  try {
-    const pkBytes  = Buffer.from(sth.public_key, 'base64');
-    const sigBytes = Buffer.from(sth.signature, 'base64');
-    return mlDsa.verify(sigBytes, Buffer.from(canonicalJson(sth), 'utf8'), pkBytes);
-  } catch { return false; }
+const sha3 = (buf) => crypto.createHash('sha3-256').update(buf).digest('hex');
+const nodeHash = (l, r) => sha3(Buffer.concat([Buffer.from([0x01]), Buffer.from(l, 'hex'), Buffer.from(r, 'hex')]));
+const isPow2 = (n) => n > 0 && (n & (n - 1)) === 0;
+
+// RFC 9162 section 2.1.4.2, the same algorithm as relay/lib/ct-tree.js but
+// written out here, so this tool does not trust the code it audits.
+function verifyConsistency(from, to, oldRoot, newRoot, proof) {
+  if (from === to) return proof.length === 0 && oldRoot === newRoot;
+  if (from === 0 || from > to) return false;
+  let p = proof.slice();
+  if (isPow2(from)) p = [oldRoot].concat(p);
+  if (p.length === 0) return false;
+  let fn = from - 1;
+  let sn = to - 1;
+  while (fn & 1) { fn >>= 1; sn >>= 1; }
+  let fr = p[0];
+  let sr = p[0];
+  for (let i = 1; i < p.length; i++) {
+    const c = p[i];
+    if (sn === 0) return false;
+    if ((fn & 1) || fn === sn) {
+      fr = nodeHash(c, fr);
+      sr = nodeHash(c, sr);
+      if (!(fn & 1)) { while (!(fn & 1) && fn !== 0) { fn >>= 1; sn >>= 1; } }
+    } else {
+      sr = nodeHash(sr, c);
+    }
+    fn >>= 1; sn >>= 1;
+  }
+  return sn === 0 && fr === oldRoot && sr === newRoot;
+}
+
+const canonical = (h) => JSON.stringify(Object.fromEntries(
+  ['relay_id', 'sha3_root', 'timestamp', 'tree_size', 'version'].map((k) => [k, k === 'version' ? (h.version || 1) : h[k]])));
+
+// A head is good when it is signed by pkB64 and that key hashes to the pin.
+function headSigned(mlDsa, h, pkB64, pin) {
+  if (!h || !h.signature || !pkB64) return false;
+  const pk = Buffer.from(pkB64, 'base64');
+  if (sha3(pk) !== pin) return false;
+  try { return mlDsa.verify(Buffer.from(h.signature, 'base64'), Buffer.from(canonical(h), 'utf8'), pk); } catch { return false; }
+}
+
+// Spread n picks over the distinct sizes, always including the largest.
+function pickSizes(sizes, n) {
+  const s = [...new Set(sizes)].sort((a, b) => a - b);
+  if (s.length <= n) return s;
+  const picked = new Set([s[s.length - 1]]);
+  for (let i = 0; picked.size < n && i < n; i++) picked.add(s[Math.floor((i * (s.length - 1)) / Math.max(1, n - 1))]);
+  return [...picked].sort((a, b) => a - b);
+}
+
+async function pubkeyOf(base) {
+  const r = await getJson(base + '/v2/pubkey');
+  return (r.body && r.body.public_key) || null;
+}
+
+async function checkRelay(mlDsa, base) {
+  const pin = PINS.byHost.get(fleetPins.hostOfRelayId(base));
+  const rec = { relay: base, pinned: !!pin, peers: 0, pinned_peers: 0, unpinned_peers: 0 };
+  out.relays.push(rec);
+  say(`Relay ${base}`);
+  let sthR;
+  try { sthR = await getJson(base + '/v2/sth'); } catch (e) { gone(`${base}/v2/sth: ${e.message}`); return; }
+  if (sthR.status === 404) vlog('log is empty, no head yet');
+  else if (sthR.status !== 200 || !sthR.body || !sthR.body.sth) { gone(`${base}/v2/sth answered ${sthR.status}`); return; }
+  else {
+    if (sthR.body.forked) bad(`${base} reports itself forked: ${JSON.stringify(sthR.body.forked)}`);
+    if (pin) {
+      let pk = null;
+      try { pk = await pubkeyOf(base); } catch { /* checked below */ }
+      if (!headSigned(mlDsa, sthR.body.sth, pk, pin)) bad(`${base}: own head does not verify under the pinned key ${pin.slice(0, 16)}`);
+      else vlog(`own head ${sthR.body.sth.tree_size} verifies under the pin`);
+    } else warn(`${base} is not pinned; its own head was not checked against a key`);
+  }
+
+  let peersR;
+  try { peersR = await getJson(base + '/v2/sth/peers'); } catch (e) { gone(`${base}/v2/sth/peers: ${e.message}`); return; }
+  if (peersR.status !== 200) { gone(`${base}/v2/sth/peers answered ${peersR.status}`); return; }
+  const peers = (peersR.body && peersR.body.peers) || [];
+  rec.peers = peers.length;
+  say(`  ${peers.length} mirrored peer(s)`);
+  for (const p of peers) await checkPeer(mlDsa, base, p, rec);
+}
+
+async function checkPeer(mlDsa, base, p, rec) {
+  const id = String(p.relay_pk_hash || '');
+  const short = id.slice(0, 16);
+  let hist;
+  try { hist = await getJson(`${base}/v2/sth/peers/${id}?limit=500`); } catch (e) { gone(`${base} peer ${short}: ${e.message}`); return; }
+  const sths = (hist.body && hist.body.sths) || [];
+  if (sths.length === 0) { vlog(`peer ${short}: no heads`); return; }
+  // Pollution first: a head whose name is not pinned to this key says nothing
+  // about the relay it names.
+  const names = [...new Set(sths.map((s) => s.relay_id))];
+  const verdicts = names.map((n) => [n, fleetPins.classifyPeer(PINS, n, id)]);
+  const notPinned = verdicts.filter(([, v]) => v.verdict !== 'pinned');
+  if (notPinned.length > 0) {
+    rec.unpinned_peers++;
+    warn(`${base} mirrors ${short} as ${notPinned.map(([n, v]) => `${n} (${v.reason || v.verdict})`).join(', ')}: not pinned, pollution, ignored`);
+    if (notPinned.length === names.length) return;
+  }
+  rec.pinned_peers++;
+  const relayName = verdicts.find(([, v]) => v.verdict === 'pinned')[0];
+  const peerBase = resolveTo.get(fleetPins.hostOfRelayId(relayName))
+    || (/^https?:\/\//.test(relayName) ? relayName.replace(/\/+$/, '') : 'https://' + relayName);
+  const own = sths.filter((s) => s.relay_id === relayName);
+
+  // Signatures under the pinned key, not under whatever key came along.
+  let badSigs = 0;
+  for (const s of own) if (!headSigned(mlDsa, s, s.public_key, id)) badSigs++;
+  if (badSigs) bad(`${base} mirror of ${relayName}: ${badSigs} head(s) not validly signed by the pinned key`);
+
+  // One size, one root.
+  const bySize = new Map();
+  for (const s of own) {
+    const r = bySize.get(s.tree_size);
+    if (r && r !== s.sha3_root) bad(`${relayName} signed two roots for tree_size ${s.tree_size}: ${r.slice(0, 16)} and ${String(s.sha3_root).slice(0, 16)} (split view)`);
+    bySize.set(s.tree_size, s.sha3_root);
+  }
+
+  // The peer must prove its current tree extends what it showed.
+  let direct;
+  try { direct = await getJson(peerBase + '/v2/sth'); } catch (e) { gone(`${peerBase}/v2/sth: ${e.message}`); return; }
+  if (direct.status !== 200 || !direct.body || !direct.body.sth) { gone(`${peerBase}/v2/sth answered ${direct.status}`); return; }
+  const cur = direct.body.sth;
+  let curPk = null;
+  try { curPk = await pubkeyOf(peerBase); } catch { /* checked below */ }
+  if (!headSigned(mlDsa, cur, curPk, id)) { bad(`${peerBase}: current head does not verify under the pinned key`); return; }
+  for (const size of pickSizes([...bySize.keys()], sample)) {
+    const root = bySize.get(size);
+    if (size > cur.tree_size) { bad(`${relayName} showed tree_size ${size}, now serves ${cur.tree_size}: the tree went backwards`); continue; }
+    if (size === cur.tree_size) {
+      if (root !== cur.sha3_root) bad(`${relayName} tree_size ${size}: mirrored root ${root.slice(0, 16)} differs from current ${cur.sha3_root.slice(0, 16)}`);
+      else vlog(`${relayName} ${size}: same root as now`);
+      continue;
+    }
+    let c;
+    try { c = await getJson(`${peerBase}/v2/sth/consistency?from=${size}&to=${cur.tree_size}`); } catch (e) { gone(`${peerBase} consistency ${size}: ${e.message}`); continue; }
+    if (c.status !== 200 || !c.body || !Array.isArray(c.body.proof)) { gone(`${peerBase} consistency ${size} answered ${c.status}`); continue; }
+    if (!verifyConsistency(size, cur.tree_size, root, cur.sha3_root, c.body.proof)) {
+      bad(`${relayName}: consistency proof ${size} -> ${cur.tree_size} fails; the mirrored head is not a prefix of the current tree`);
+    } else vlog(`${relayName} ${size} -> ${cur.tree_size}: consistent`);
+  }
 }
 
 async function main() {
-  // 0. Load ML-DSA-65
-  let mlDsa;
-  try {
-    // Try local node_modules, then relay's node_modules as fallback
-    let mod;
-    try {
-      mod = require('@noble/post-quantum/ml-dsa.js');
-    } catch (_) {
-      const path = require('path');
-      mod = require(path.join(__dirname, '../relay/node_modules/@noble/post-quantum/ml-dsa.js'));
-    }
-    mlDsa = mod.ml_dsa65;
-  } catch (e) {
-    console.error(`FAIL: @noble/post-quantum not available — ${e.message}`);
-    console.error('Install with: npm install @noble/post-quantum  (or npm install inside relay/)');
-    process.exit(1);
+  const mlDsa = loadMlDsa();
+  if (!mlDsa) { console.error('FAIL: @noble/post-quantum not available (npm ci in the repo root or in relay/)'); process.exit(3); }
+  for (const r of relays) await checkRelay(mlDsa, r);
+  const verdict = out.inconsistencies.length ? 'INCONSISTENT' : (out.unreachable.length ? 'UNCHECKED' : 'OK');
+  if (asJson) console.log(JSON.stringify({ verdict, ...out }, null, 2));
+  else {
+    say('');
+    say(`Summary: ${out.relays.length} relay(s), ${out.inconsistencies.length} inconsistency(ies), ${out.warnings.length} warning(s), ${out.unreachable.length} unreachable`);
+    say(verdict === 'OK' ? 'RESULT: OK, every pinned peer is consistent'
+      : verdict === 'INCONSISTENT' ? 'RESULT: INCONSISTENCY DETECTED, investigate'
+        : 'RESULT: could not check everything, no verdict');
   }
-
-  // 1. Fetch peer STH summary from local relay
-  vlog(`fetching peer list from ${relayUrl}/v2/sth/peers`);
-  let peersResp;
-  try { peersResp = await fetchJson(`${relayUrl}/v2/sth/peers`); }
-  catch (e) { console.error(`FAIL: could not fetch peer list — ${e.message}`); process.exit(1); }
-
-  const peers = peersResp.body?.peers || [];
-  console.log(`Checking ${peers.length} mirrored peer(s) from ${relayUrl}`);
-
-  if (peers.length === 0) {
-    console.log('OK: No peers registered — gossip protocol is active, awaiting peer relays.');
-    process.exit(0);
-  }
-
-  // 2. Fetch local relay's own STH
-  vlog(`fetching own STH from ${relayUrl}/v2/sth`);
-  let ownSthResp;
-  try { ownSthResp = await fetchJson(`${relayUrl}/v2/sth`); }
-  catch (e) { console.error(`FAIL: could not fetch own STH — ${e.message}`); process.exit(1); }
-  const ownSth = ownSthResp.body?.sth;
-  if (ownSth) vlog(`Own STH: tree_size=${ownSth.tree_size} root=${String(ownSth.sha3_root).slice(0,16)}…`);
-
-  // 3. For each peer, fetch their full history and cross-check
-  let inconsistencies = 0;
-  let checked = 0;
-
-  for (const peer of peers) {
-    const id = peer.relay_pk_hash;
-    const shortId = id.slice(0, 16) + '…';
-    vlog(`fetching history for peer ${shortId} (${peer.relay_id || 'unknown'})`);
-
-    let histResp;
-    try { histResp = await fetchJson(`${relayUrl}/v2/sth/peers/${id}`); }
-    catch (e) {
-      console.log(`  WARN  [${shortId}] Could not fetch history — ${e.message}`);
-      continue;
-    }
-
-    const sths = histResp.body?.sths || [];
-    if (sths.length === 0) {
-      vlog(`  [${shortId}] No STHs stored yet`);
-      continue;
-    }
-
-    const latest = sths[sths.length - 1];
-
-    // 3a. Verify ML-DSA-65 signature on latest STH
-    if (latest.public_key && latest.signature) {
-      const sigOk = await verifySTHSignature(latest, mlDsa);
-      if (!sigOk) {
-        console.log(`  INCONSISTENCY [${shortId}] INVALID ML-DSA-65 signature on latest STH!`);
-        console.log(`    relay_id  : ${latest.relay_id}`);
-        console.log(`    tree_size : ${latest.tree_size}`);
-        console.log(`    root      : ${latest.sha3_root}`);
-        inconsistencies++;
-        continue;
-      }
-      vlog(`  [${shortId}] Signature OK`);
-    } else {
-      vlog(`  [${shortId}] No public_key in stored STH — skipping sig check`);
-    }
-
-    // 3b. Cross-check: fetch this peer's STH directly and compare
-    if (latest.relay_id && (latest.relay_id.startsWith('http://') || latest.relay_id.startsWith('https://'))) {
-      const peerBase = latest.relay_id.replace(/\/$/, '');
-      try {
-        const directResp = await fetchJson(`${peerBase}/v2/sth`);
-        const directSth  = directResp.body?.sth;
-        if (directSth && directSth.tree_size === latest.tree_size && directSth.sha3_root !== latest.sha3_root) {
-          console.log(`  INCONSISTENCY [${shortId}] Root mismatch for tree_size=${latest.tree_size}!`);
-          console.log(`    Mirrored root : ${latest.sha3_root}`);
-          console.log(`    Direct root   : ${directSth.sha3_root}`);
-          inconsistencies++;
-        } else if (directSth) {
-          vlog(`  [${shortId}] Direct check OK (tree_size=${directSth.tree_size})`);
-          checked++;
-        }
-      } catch (e) {
-        vlog(`  [${shortId}] Could not reach peer directly — ${e.message} (using mirrored data only)`);
-        checked++;
-      }
-    } else {
-      vlog(`  [${shortId}] relay_id is not a URL — skipping direct check`);
-      checked++;
-    }
-
-    // 3c. Check for tree_size rollback within each relay_id sequence.
-    // STHs are grouped by relay_id — a different relay_id means a new identity
-    // (relay restarted without persisted keypair) and resets the sequence.
-    // Within a sequence, sort by timestamp so out-of-order gossip receipt doesn't
-    // produce false positives, then verify tree_size is non-decreasing.
-    const byId = new Map();
-    for (const s of sths) {
-      const rid = s.relay_id || 'unknown';
-      if (!byId.has(rid)) byId.set(rid, []);
-      byId.get(rid).push(s);
-    }
-    for (const [rid, seq] of byId) {
-      seq.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-      let maxSize = 0;
-      for (const s of seq) {
-        if (s.tree_size < maxSize) {
-          console.log(`  INCONSISTENCY [${shortId}] tree_size rollback in sequence for ${rid}: ${maxSize} → ${s.tree_size} (append-only violation!)`);
-          inconsistencies++;
-          break;
-        }
-        maxSize = s.tree_size;
-      }
-    }
-  }
-
-  // 4. Report
-  console.log('');
-  console.log(`Summary: ${peers.length} peer(s), ${checked} verified, ${inconsistencies} inconsistency(ies) found`);
-  if (inconsistencies > 0) {
-    console.log('RESULT: INCONSISTENCY DETECTED — investigate immediately');
-    process.exit(1);
-  }
-  console.log('RESULT: OK — all peer STHs consistent');
-  process.exit(0);
+  process.exit(verdict === 'INCONSISTENT' ? 1 : verdict === 'UNCHECKED' ? 3 : 0);
 }
 
-main().catch(e => { console.error('FAIL:', e.message); process.exit(1); });
+main().catch((e) => { console.error('FAIL:', e.message); process.exit(3); });

@@ -1,4 +1,4 @@
-# Deploy runbook: main (3.1.1) to production
+# Deploy runbook: main (3.1.2) to production
 
 > `deploy/deploy-3.1.sh` executes this runbook. One command from the NUC
 > (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
@@ -255,6 +255,17 @@ for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_S
 done
 ```
 
+NODE_ENV of the relay containers (`deploy-3.1.sh` step 1a2, again as 6k0 after
+the recreate and under `--verify-only`). From 3.1.2 a relay with NODE_ENV
+`test`, `development` or `dev`, or with `PARAMANT_FLEET_GOSSIP=0`, sends no tree
+heads to the fleet, so health would stop gossiping. The script stops on it:
+
+```bash
+for s in relay-main relay-health relay-finance relay-legal relay-iot; do
+  printf '%s NODE_ENV=%s\n' "$s" "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$(docker compose ps -q $s)" | sed -n 's/^NODE_ENV=//p')"
+done   # every line empty or production
+```
+
 ### Which commit do we expect here
 
 `41501bb` is where **this runbook** starts: the stand of 8 August, before any
@@ -495,6 +506,16 @@ tar czf /home/paramant/backups/docroot-pre-3.1-$TS.tgz -C /home/paramant app
 cp /etc/nginx/sites-enabled/paramant-public.conf /etc/nginx/backups/paramant-public.conf.pre-3.1-$TS
 ```
 
+The mirror of the other relays' tree heads (`deploy-3.1.sh` step 2c). 3.1.2
+moves heads that are not from a pinned key to `peer-sths/purged/` at its first
+start; it never deletes, but the copy is taken anyway, one tar per relay:
+
+```bash
+for s in relay-main relay-health relay-finance relay-legal relay-iot; do
+  docker cp "$(docker compose ps -q $s):/data/peer-sths" - > /home/paramant/backups/peer-sths-$s-pre-3.1-$TS.tar
+done
+```
+
 ### The nginx conf names are not the same on every server
 
 Step 2b backs up the nginx confs, and it needs their names. Those names differ
@@ -643,7 +664,7 @@ shape:
 `recurring:false` and `mode_source:inferred` are the brake. If it says
 `recurring:true`, `BILLING_MODE` is set somewhere: stop, find it, and do not
 continue until the line reads as above. `relay_started` must say
-`version:"3.1.1"`.
+`version:"3.1.2"`.
 
 Then the rest:
 
@@ -656,24 +677,24 @@ for c in health finance legal admin; do wait_healthy paramant-relay-$c || exit 1
 
 ## Step 5: frontend and nginx (server)
 
-### First: tag v3.1.1 on the merge commit
+### First: tag v3.1.2 on the merge commit
 
 `frontend/install.sh` is what `curl -fsSL https://paramant.app/install.sh | bash`
-runs, and from 3.1.1 on it clones `v3.1.1` (`RELAY_VERSION` default; the same
+runs, and since 3.1.1 it clones the release tag, now `v3.1.2` (`RELAY_VERSION` default; the same
 pin is in `install.sh` and `frontend/install-pi.sh`). The rsync below puts that
 installer live. Without the tag the one-line install stops at
-`git clone --branch v3.1.1` on every new machine. So the tag goes on the merge
-commit of the 3.1.1 PR on `main` **before** step 5, not afterwards in step 7:
+`git clone --branch v3.1.2` on every new machine. So the tag goes on the merge
+commit of the 3.1.2 PR on `main` **before** step 5, not afterwards in step 7:
 
 ```bash
 # [admin], from a checkout of the repo
 git fetch origin main --tags
-C=<merge commit of the 3.1.1 PR on main>
+C=<merge commit of the 3.1.2 PR on main>
 git merge-base --is-ancestor "$C" origin/main && echo "on main"
-git show "$C:package.json" | grep '"version": "3.1.1"'   # the tag is v plus this version
-git tag -a v3.1.1 -m "Release 3.1.1" "$C"
-git push origin v3.1.1
-git ls-remote --tags origin v3.1.1             # must print the tag before step 5
+git show "$C:package.json" | grep '"version": "3.1.2"'   # the tag is v plus this version
+git tag -a v3.1.2 -m "Release 3.1.2" "$C"
+git push origin v3.1.2
+git ls-remote --tags origin v3.1.2             # must print the tag before step 5
 ```
 
 `deploy-3.1.sh` enforces this: before phase 2 (step `1z`, nothing written yet)
@@ -682,7 +703,7 @@ installers pin, runs `git ls-remote --tags origin <tag>`, and stops when the tag
 is missing on origin or names another commit than the one it deploys. The stop
 line carries the exact `git tag -a ... && git push origin ...` to run.
 
-The tag push also starts `docker-publish.yml` (images `3.1.1`). If the server
+The tag push also starts `docker-publish.yml` (images `3.1.2`). If the server
 checkout is not on `$C` after step 3, stop: the tag would name a commit other
 than the one that is deployed.
 
@@ -1076,7 +1097,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://iot.paramant.app/v1/par
 curl -s -o /dev/null -w '%{http_code}\n' https://paramant.app/sign                                   # 200
 
 # 6f. the version the relay reports
-curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.1
+curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.2
 
 # 6g. billing stance on every relay, once more, from the logs
 for c in main health finance legal iot; do printf '%-8s' $c; docker logs paramant-relay-$c 2>&1 | grep '"billing_config"' | tail -1 | grep -o '"recurring":[a-z]*'; done
@@ -1101,7 +1122,7 @@ Once the host is right, confirm with `--verify-only --host-strict`.
 
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without
-`3.1.1`, or a `billing_config` line with `recurring:true`. A
+`3.1.2`, or a `billing_config` line with `recurring:true`. A
 `post-deploy-verify.sh` exit 1 stops the script too, but it is a non-critical
 failure: read the list, fix it, do not roll back on it.
 
@@ -1171,17 +1192,17 @@ passing on an empty search.
 3. **Drift guard** from the NUC: `scripts/check-prod-drift.sh origin/main` must
    print `OK`.
 4. Check the tag from step 5 names the commit that is live, and put the live
-   date in `CHANGELOG.md`. `v3.1.1` was set on the merge commit before the
-   frontend went out (step 5, "First: tag v3.1.1 on the merge commit"); here
+   date in `CHANGELOG.md`. `v3.1.2` was set on the merge commit before the
+   frontend went out (step 5, "First: tag v3.1.2 on the merge commit"); here
    it is compared with `/home/paramant/backups/deployed-head`:
    ```bash
    # [admin]
    C=$(ssh <server> cat /home/paramant/backups/deployed-head)
-   [ "$(git rev-parse 'v3.1.1^{commit}')" = "$C" ] && echo "tag is live commit"
+   [ "$(git rev-parse 'v3.1.2^{commit}')" = "$C" ] && echo "tag is live commit"
    ```
    Then check the installer and upgrade path once from a clean machine (matrix
    SELF-01-A, SELF-12-A, SELF-13-A): `curl -fsSL https://paramant.app/install.sh | bash`
-   reaches "Stack healthy" on `v3.1.1`, and on a v3.1.0 install
+   reaches "Stack healthy" on `v3.1.2`, and on a v3.1.1 install
    `paramant upgrade` moves HEAD to the newest tag.
 5. Write the deploy down in the vault (`Sessies/2026-09/`), with the
    `billing_config` line as it was logged.

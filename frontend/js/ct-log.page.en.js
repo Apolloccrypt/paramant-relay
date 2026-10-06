@@ -116,7 +116,6 @@ function render() {
       : 'n/a';
     var leaf   = trunc(e.leaf_hash   || e.hash || '');
     var tree   = trunc(e.tree_hash   || e.merkle_root || '');
-    var device = trunc(e.device_hash || e.pubkey_hash  || '');
     var proofHtml = '';
     if (e.proof && e.proof.length) {
       proofHtml = '<div class="drow"><span class="dkey">Merkle proof</span>'
@@ -128,14 +127,13 @@ function render() {
       + '<div class="idx">'+esc(String(idx))+'</div>'
       + '<div class="hash leaf">'+esc(leaf)+'</div>'
       + '<div class="hash">'+esc(tree)+'</div>'
-      + '<div class="hash">'+esc(device)+'</div>'
       + '<div class="ts">'+esc(time)+'</div>'
       + '</div>'
       + '<div class="entry-detail" id="d-'+gi+'">'
       + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+esc(e.type)+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+esc(e.leaf_hash||'n/a')+'</span></div>'
       + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+esc(e.tree_hash||'n/a')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+esc(e.device_hash||'n/a')+'</span></div>'
+      + (e.from_earlier_tree ? '<div class="drow"><span class="dkey">Stored tree hash (from an earlier tree)</span><span class="dval">'+esc(e.stored_tree_hash||'n/a')+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+esc(String(idx))+'</span></div>'
       + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : 'n/a')+'</span></div>'
       + proofHtml
@@ -159,7 +157,7 @@ function filterEntries() {
     : allEntries;
   filtered = q ? base.filter(function(e) {
     return (e.leaf_hash||'').includes(q) || (e.tree_hash||'').includes(q)
-        || (e.device_hash||'').includes(q) || String(e.index||'').includes(q);
+        || String(e.index||'').includes(q);
   }) : base;
   page = 0;
   render();
@@ -184,38 +182,71 @@ function clearVerify() {
   document.getElementById('verify-result').style.display = 'none';
 }
 
+// The verdict box. A row in the list is only what the relay sent; "verified"
+// is said only after js/ct-log-verify.js has checked the pinned key, the signed
+// tree head and the inclusion proof in this browser (see that file for why).
+var VT = {
+  key: {t: 'The relay key is the key this site pins', n: 'No pinned key for this relay; not checked', f: 'Key does not match'},
+  sth: {t: 'Signed tree head (STH) checks out under that key', n: 'Signed tree head could not be fetched', f: 'Signature over the tree head does not check out'},
+  inclusion: {t: 'Inclusion proof leads from this entry to the signed root', n: 'Inclusion proof could not be fetched', f: 'Inclusion proof does not hold'},
+  consistency: {t: 'The tree extends the state this browser saw before', n: 'No earlier tree head in this browser, so growth was not checked. It will be on your next visit.', f: 'The tree does not extend the state this browser saw before'}
+};
+var verifyRun = 0;
+
 function verifyHash() {
   var q = document.getElementById('verify-input').value.trim().toLowerCase();
   var el = document.getElementById('verify-result');
   if (!q || q.length < 8) { el.style.display='none'; return; }
 
   var match = allEntries.find(function(e) {
-    return (e.leaf_hash||'').startsWith(q) || (e.device_hash||'').startsWith(q)
-        || (e.tree_hash||'').startsWith(q);
+    return (e.leaf_hash||'').startsWith(q) || (e.tree_hash||'').startsWith(q);
   });
 
   el.style.display = 'block';
+  el.removeAttribute('data-verdict');
   if (!match) {
     el.className = 'verify-result notfound';
     el.innerHTML = '<strong>✗ Not found in log</strong><br>'
-      + '<span style="color:#999;font-size:11px">This hash has no matching entry in the current log window. '
-      + 'If the log was recently reset, older entries may no longer be present.</span>';
+      + '<span class="verify-why">This hash has no matching entry in the part of the log that is loaded (the latest thousand entries).</span>';
     return;
   }
 
-  el.className = 'verify-result found';
-  var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
-             : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
-  el.innerHTML = '<strong>✓ Verified: found at index ' + esc(String(match.index)) + '</strong>'
-    + '<pre>'
-    + 'Matched field : ' + esc(field) + '\n'
-    + 'Index         : ' + esc(String(match.index)) + '\n'
-    + 'Leaf hash     : ' + esc(match.leaf_hash||'n/a') + '\n'
-    + 'Tree hash     : ' + esc(match.tree_hash||'n/a') + '\n'
-    + 'Device hash   : ' + esc(match.device_hash||'n/a') + '\n'
-    + 'Timestamp     : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a') + '\n'
-    + (match.proof && match.proof.length ? 'Merkle proof  : ' + esc(match.proof.join(' → ')) : '')
+  var isLeaf = (match.leaf_hash||'').startsWith(q);
+  var idx = String(match.index);
+  var details = '<pre>'
+    + 'Matched field : ' + esc(isLeaf ? 'leaf_hash' : 'tree_hash') + '\n'
+    + 'Index         : ' + esc(idx) + '\n'
+    + 'Leaf-hash     : ' + esc(match.leaf_hash||'n/a') + '\n'
+    + 'Tree-hash     : ' + esc(match.tree_hash||'n/a') + '\n'
+    + 'Timestamp     : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a')
     + '</pre>';
+  el.className = 'verify-result listed';
+  var run = ++verifyRun;
+  if (!isLeaf) {
+    el.setAttribute('data-verdict', 'unchecked');
+    el.innerHTML = '<strong>' + esc('Found in the list at index {i}, not cryptographically confirmed'.replace('{i}', idx)) + '</strong><br><span class="verify-why">This is a tree hash. Only a leaf hash is checked here against the signed tree.</span>' + details;
+    return;
+  }
+  el.innerHTML = '<strong>' + esc('Found in the list at index {i}. Cryptographic check running…'.replace('{i}', idx)) + '</strong>' + details;
+  import('/js/ct-log-verify.js?v=1').then(function(m) {
+    return m.verifyEntry({ relay: RELAY, index: match.index, leafHash: match.leaf_hash });
+  }).then(function(res) {
+    if (run !== verifyRun) return;
+    var head = res.verdict === 'verified' ? '✓ Verified: index {i} is in the tree this relay signed'
+      : res.verdict === 'failed' ? '✗ Check failed: the relay’s answer does not hold up' : 'Found in the list at index {i}, not cryptographically confirmed';
+    el.className = 'verify-result ' + (res.verdict === 'verified' ? 'found' : res.verdict === 'failed' ? 'notfound' : 'listed');
+    var list = '<ul class="verify-steps">' + res.steps.map(function(s) {
+      var k = s.ok === true ? 't' : s.ok === false ? 'f' : 'n';
+      return '<li data-step="' + esc(s.id) + '" data-ok="' + k + '">' + (k === 't' ? '✓ ' : k === 'f' ? '✗ ' : '– ') + esc(VT[s.id][k]) + '</li>';
+    }).join('') + '</ul>';
+    el.innerHTML = '<strong>' + esc(head.replace('{i}', idx)) + '</strong>' + list
+      + '<span class="verify-why">What this does not prove: that others see the same tree. There is no independent keeper of the tree heads yet.</span>' + details;
+    el.setAttribute('data-verdict', res.verdict);
+  }).catch(function() {
+    if (run !== verifyRun) return;
+    el.innerHTML = '<strong>' + esc('Found in the list at index {i}, not cryptographically confirmed'.replace('{i}', idx)) + '</strong>' + details;
+    el.setAttribute('data-verdict', 'unchecked');
+  });
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────

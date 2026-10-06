@@ -69,6 +69,9 @@ body { min-height:100vh; }
 .verify-result { margin-top:10px; font-size:var(--text-sm); display:none; padding:14px 16px; }
 .verify-result.found { border:1px solid var(--ink-hair); color:var(--ink); }
 .verify-result.notfound { border:1px solid var(--ink-ghost); color:var(--ink-dim); }
+.verify-result.listed { border:1px dashed var(--ink-ghost); color:var(--ink-dim); }
+.verify-result .verify-steps { margin:10px 0 6px; padding-left:0; list-style:none; line-height:1.7; }
+.verify-result .verify-why { display:block; margin-top:6px; color:var(--ink-dim); font-size:var(--text-xs); }
 .verify-result pre { margin-top:10px; color:var(--ink-dim); font-size:var(--text-xs); white-space:pre-wrap; word-break:break-all; line-height:1.7; }
 
 .search-bar { display:flex; gap:0; margin:0 40px 28px; }
@@ -87,10 +90,10 @@ body { min-height:100vh; }
 .tf.active { border-color:var(--ink); color:var(--ink); }
 
 .table-wrap { margin:0 40px 40px; border:1px solid var(--ink-hair); }
-.table-head { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
+.table-head { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
 .table-head span { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
 
-.entry { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:14px 16px;
+.entry { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:14px 16px;
   border-top:1px solid var(--ink-ghost); cursor:pointer; transition:background .1s; }
 .entry:hover { background:var(--ink-ghost); }
 .entry .idx { font-size:var(--text-xs); color:var(--ink-dim); }
@@ -145,8 +148,7 @@ body { min-height:100vh; }
   .relay-table-wrap { margin:0 20px 40px; }
   .table-wrap { margin:0 20px 40px; }
   .table-head, .entry { grid-template-columns:40px 1fr 130px; }
-  .table-head span:nth-child(3), .table-head span:nth-child(4),
-  .entry > *:nth-child(3), .entry > *:nth-child(4) { display:none; }
+  .table-head span:nth-child(3), .entry > *:nth-child(3) { display:none; }
   .relay-table-head, .relay-row { grid-template-columns:1fr 80px 70px; }
   .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
 }
@@ -332,7 +334,7 @@ body { min-height:100vh; }
 <div class="hero">
   <div class="tag">Public audit log</div>
   <h1>Certificate <span>transparency</span></h1>
-  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload, the way HTTPS certificate transparency logs work.</p>
+  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload. The mathematics is the same as in the certificate transparency logs of HTTPS (RFC 6962): a Merkle tree with signed tree heads. The difference is who is watching. HTTPS has several independent logs and monitors; here there is one operator, Paramant, and no independent keeper of the tree heads yet.</p>
 </div>
 
 <div class="tabs">
@@ -398,7 +400,13 @@ body { min-height:100vh; }
     <strong>Persistent log: survives relay restarts</strong>
     <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
     and reloaded on startup. No payload content is ever stored: only cryptographic hashes.
-    The log resets only when the relay volume is deleted.</span>
+    In April 2026 the log did restart, during tests:
+    the tree of <code>health.paramant.app</code> was started again. 39 entries from that time
+    (positions 1 to 34 and 42 to 46) have a stored proof that does not fit the current tree.
+    For five of them (42 to 46) it is proven that this proof comes from the restarted tree; for the other 34
+    that is likely, but not proven. The list below and the inclusion proof use the current tree for all 39
+    and show the old value separately. For every later entry the stored tree head does fit the current tree
+    (independently recomputed on 6 October 2026). Apart from that the log restarts only when the relay volume is deleted.</span>
   </div>
 </div>
 
@@ -437,7 +445,7 @@ body { min-height:100vh; }
 <div class="verify-section">
   <h2>Verify a hash</h2>
   <div class="verify-bar">
-    <input id="verify-input" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." data-input="clearVerify">
+    <input id="verify-input" placeholder="Paste a leaf_hash or tree_hash to check whether it is in the log" data-input="clearVerify">
     <button data-click="verifyHash">VERIFY</button>
   </div>
   <div class="verify-result" id="verify-result"></div>
@@ -459,7 +467,6 @@ body { min-height:100vh; }
     <span>#</span>
     <span>Leaf hash</span>
     <span>Tree hash</span>
-    <span>Device hash</span>
     <span>Timestamp</span>
   </div>
   <div id="entries"><div class="loading">Loading log…</div></div>
@@ -489,7 +496,7 @@ body { min-height:100vh; }
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.en.js?v=1" defer></script>
+<script src="/js/ct-log.page.en.js?v=3" defer></script>
 </main>
 <footer>
   <div class="container-lg">

@@ -12,6 +12,15 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   const _rv = params.get('next') || params.get('return') || nlEn('/dashboard', '/en/dashboard');
   const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
 
+  // Sent here by the nginx gate in front of the send page (the landing's "Probeer
+  // het zelf" under Versturen does exactly that when nobody is signed in). A bare
+  // "Welkom terug" told a first-time visitor nothing; this says why he is here and
+  // offers the free account. Prod check 06-10-2026, kanttekening 2.
+  if (/^\/(en\/)?(parashare|send)(\?|$)/.test(returnUrl)) {
+    const ctx = document.getElementById('login-context');
+    if (ctx) ctx.hidden = false;
+  }
+
   // Non-blocking, dismissible note shown after a successful login when the account's
   // authenticator app produced a SHA-1 code (accepted via dual-verify). Login already
   // succeeded (the session cookie is set); this only nudges toward a SHA-256 app

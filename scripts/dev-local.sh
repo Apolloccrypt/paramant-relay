@@ -31,7 +31,9 @@ node -e "const{createClient}=require('./admin/node_modules/redis');(async()=>{tr
 
 # 1. relay-health: serves /v2/user/webauthn/* + envelope store ----------------
 say "starting relay-health on :3001 ..."
-( cd relay && PORT=3001 SECTOR=health RELAY_MODE=ghost_pipe \
+# PARAMANT_FLEET_GOSSIP=0: a dev relay never sends heads to or registers with
+# paramant.app, whatever its CT log or registry holds (relay/lib/fleet-pins.js).
+( cd relay && PORT=3001 SECTOR=health RELAY_MODE=ghost_pipe PARAMANT_FLEET_GOSSIP=0 \
     ADMIN_TOKEN="$ADMIN_TOKEN" INTERNAL_AUTH_TOKEN="$INTERNAL_AUTH_TOKEN" REDIS_URL="$REDIS_URL" \
     PARAMANT_TOTP_MASTER_KEY="$PARAMANT_TOTP_MASTER_KEY" \
     node relay.js >/tmp/paramant-dev-relay.log 2>&1 ) & RELAY_PID=$!

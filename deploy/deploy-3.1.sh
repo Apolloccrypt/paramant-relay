@@ -181,7 +181,7 @@ EXPECTED_HEAD="${PARAMANT_EXPECTED_HEAD:-}"           # explicit override, wins
 # replaces, here the mainline-ancestor test in phase Va.
 VERIFY_HEAD="${PARAMANT_VERIFY_HEAD:-}"
 DEPLOYED_HEAD_FILE="${PARAMANT_DEPLOYED_HEAD_FILE:-$BACKUP_DIR/deployed-head}"
-EXPECT_VERSION="3.1.1"
+EXPECT_VERSION="3.1.2"
 SERVICES="relay-main relay-health relay-finance relay-legal relay-iot admin"
 HOSTS="paramant.app health.paramant.app legal.paramant.app finance.paramant.app iot.paramant.app relay.paramant.app"
 
@@ -1136,6 +1136,8 @@ EOF
   expect_not 'container [a-z-]+ MISSING' "no service is missing a container"
   expect_not 'unhealthy' "no container reports unhealthy"
 
+  check_relay_node_env "1a2"
+
   step "1b. environment presence (never values)"
   remote "env presence" "$COMPOSE_DIR" <<'EOF'
 set -euo pipefail
@@ -1410,6 +1412,49 @@ EOF
     "every nginx conf slot resolved to a name on the server and was backed up"
   expect_not 'nginxconf [a-z.-]+ ABSENT' \
     "every nginx conf slot has a candidate on the server (set PARAMANT_NGINX_CONFS if they are named differently)"
+
+  # 2c. The mirror of the other relays' tree heads (#576). From 3.1.2 every
+  # relay moves heads that are not from a pinned key to peer-sths/purged/ at
+  # its first start, in phase 4. It only moves, never deletes, and the nightly
+  # backup-full-state.sh copies all of /data, but above it runs as best effort
+  # and nothing asserts it. This copy is asserted: one tar per relay, taken
+  # from the running container, before phase 4 recreates it.
+  step "2c. back up the peer STH mirror (/data/peer-sths) of every relay"
+  remote "peer sths backup" "$COMPOSE_DIR" "$TS" "$BACKUP_DIR" "$SERVICES" <<'EOF'
+set -euo pipefail
+cd "$1"
+TS="$2"; BK="$3"; SVCS="$4"
+mkdir -p "$BK"
+n=0; relays=0
+for svc in $SVCS; do
+  case "$svc" in relay-*) ;; *) continue ;; esac
+  relays=$((relays + 1))
+  cid="$(docker compose ps -q "$svc" 2>/dev/null || true)"
+  if [ -z "$cid" ]; then echo "peersths $svc MISSING container"; continue; fi
+  dir="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cid" | sed -n 's/^PEER_STH_DIR=//p' | head -1)"
+  dir="${dir:-/data/peer-sths}"
+  out="$BK/peer-sths-$svc-pre-3.1-$TS.tar"
+  if docker cp "$cid:$dir" - > "$out" 2>/dev/null </dev/null; then
+    chmod 600 "$out"
+    echo "peersths $svc $dir $(stat -c%s "$out") bytes, $(tar tf "$out" | grep -c '\.jsonl$' || true) mirror files"
+    n=$((n + 1))
+  else
+    rm -f "$out"
+    # A relay that never mirrored anything has no directory: nothing to lose.
+    if docker exec "$cid" test -e "$dir" </dev/null 2>/dev/null; then
+      echo "peersths $svc FAILED to copy $dir"
+    else
+      echo "peersths $svc $dir absent, nothing to back up"
+      n=$((n + 1))
+    fi
+  fi
+done
+echo "relay services = $relays"
+echo "after peer sths backups = $n"
+EOF
+  expect_not 'peersths [a-z-]+ (FAILED|MISSING)' "every relay's /data/peer-sths was copied (or is absent)"
+  expect_count "after peer sths backups" 5 \
+    "one peer-sths backup per relay (five), before phase 4 lets 3.1.2 move polluted mirrors to purged/"
 }
 
 # =============================================================== PHASE 3 =====
@@ -1668,6 +1713,72 @@ EOF
   expect_not 'NOTHEALTHY|UNHEALTHY|FATAL' "every recreated container reached healthy"
   expect_not 'stance .*"recurring":true' "no relay reports recurring:true after the recreate"
   expect_not 'version .*no relay_started line' "every relay logged relay_started"
+}
+
+# ------------------------------------------------ relay NODE_ENV gate (#576) --
+#
+# A relay only gossips its tree heads to the fleet when it is a pinned Paramant
+# relay AND its NODE_ENV is not test, development or dev (relay/lib/
+# fleet-pins.js, mayTalkToParamantFleet, since 3.1.2). Compose sets no NODE_ENV
+# and relay/Dockerfile neither, so on production it should be empty, but nobody
+# had looked (review-576, uitrolaandachtspunt 1). If it is test or dev there,
+# health stops gossiping the moment 3.1.2 starts. PARAMANT_FLEET_GOSSIP=0 does
+# the same on purpose. Read-only.
+#
+# node_env_verdict: reads "nodeenv <svc> <value>" and "fleetgossip <svc>
+# <value>" lines (value "unset" when absent) on stdin. Prints OK or STOP with
+# the reason; returns 1 on STOP.
+node_env_verdict() {
+  local line svc val bad="" seen=0
+  while IFS= read -r line; do
+    case "$line" in
+      "nodeenv "*)
+        svc="$(printf '%s' "$line" | awk '{print $2}')"; val="$(printf '%s' "$line" | awk '{print $3}')"
+        if [ "$val" = "MISSING" ]; then bad="$bad $svc=no-container"; continue; fi
+        seen=$((seen + 1))
+        if printf '%s' "$val" | grep -qiE '^(test|development|dev)$'; then bad="$bad $svc=NODE_ENV:$val"; fi ;;
+      "fleetgossip "*)
+        svc="$(printf '%s' "$line" | awk '{print $2}')"; val="$(printf '%s' "$line" | awk '{print $3}')"
+        if [ "$val" = "0" ]; then bad="$bad $svc=PARAMANT_FLEET_GOSSIP:0"; fi ;;
+    esac
+  done
+  if [ -n "$bad" ]; then
+    printf 'STOP%s: from 3.1.2 a relay with NODE_ENV test/development/dev (or PARAMANT_FLEET_GOSSIP=0) sends no tree heads to the fleet and does not register with it, so the gossip of health.paramant.app goes silent. Remove NODE_ENV (or set it to production) for these relays, recreate them, and run again\n' "$bad"
+    return 1
+  fi
+  if [ "$seen" -eq 0 ]; then
+    printf 'STOP no relay container reported its NODE_ENV, so it is not known whether the fleet keeps gossiping\n'
+    return 1
+  fi
+  printf 'OK NODE_ENV of %s relay container(s) is empty or production, and none has PARAMANT_FLEET_GOSSIP=0\n' "$seen"
+}
+
+check_relay_node_env() {   # step label
+  step "$1. NODE_ENV of the relay containers (read-only; test or dev silences the gossip from 3.1.2)"
+  remote "relay node env" "$COMPOSE_DIR" "$SERVICES" <<'EOF'
+set -euo pipefail
+cd "$1"
+for svc in $2; do
+  case "$svc" in relay-*) ;; *) continue ;; esac
+  cid="$(docker compose ps -q "$svc" 2>/dev/null || true)"
+  if [ -z "$cid" ]; then echo "nodeenv $svc MISSING"; continue; fi
+  envs="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cid")"
+  v="$(printf '%s\n' "$envs" | sed -n 's/^NODE_ENV=//p' | head -1)"
+  g="$(printf '%s\n' "$envs" | sed -n 's/^PARAMANT_FLEET_GOSSIP=//p' | head -1)"
+  echo "nodeenv $svc ${v:-unset}"
+  echo "fleetgossip $svc ${g:-unset}"
+done
+# .env itself, as a count only (compose passes nothing from it that it does
+# not list, but it is the first place someone would put NODE_ENV).
+echo "dotenv NODE_ENV lines = $(grep -c '^NODE_ENV=' .env || true)"
+EOF
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): every relay container has NODE_ENV empty or production, and no PARAMANT_FLEET_GOSSIP=0\n'
+    return 0
+  fi
+  local verdict
+  verdict="$(printf '%s\n' "$REMOTE_OUT" | node_env_verdict)" || die "${verdict#STOP }"
+  ok "${verdict#OK }"
 }
 
 # ---------------------------------------------------- release tag gate (N2) --
@@ -3439,6 +3550,8 @@ EOF
   # multi-party proof red, and nothing above would notice (hertest
   # 2026-10-04). Read from here, over TLS, like 6b. RUNBOOK.md, "Relay
   # identity key rotation", is what to do when this is red.
+  check_relay_node_env "6k0"
+
   step "6k. every relay signs with the key /verify pins (frontend/js/relay-trust-anchors.js)"
   if [ "$DRY_RUN" -eq 1 ]; then
     printf '\n  $ node deploy/check-relay-anchors.mjs   # GET https://<host>/v2/pubkey, five relays\n'

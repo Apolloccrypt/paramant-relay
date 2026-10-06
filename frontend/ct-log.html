@@ -69,6 +69,9 @@ body { min-height:100vh; }
 .verify-result { margin-top:10px; font-size:var(--text-sm); display:none; padding:14px 16px; }
 .verify-result.found { border:1px solid var(--ink-hair); color:var(--ink); }
 .verify-result.notfound { border:1px solid var(--ink-ghost); color:var(--ink-dim); }
+.verify-result.listed { border:1px dashed var(--ink-ghost); color:var(--ink-dim); }
+.verify-result .verify-steps { margin:10px 0 6px; padding-left:0; list-style:none; line-height:1.7; }
+.verify-result .verify-why { display:block; margin-top:6px; color:var(--ink-dim); font-size:var(--text-xs); }
 .verify-result pre { margin-top:10px; color:var(--ink-dim); font-size:var(--text-xs); white-space:pre-wrap; word-break:break-all; line-height:1.7; }
 
 .search-bar { display:flex; gap:0; margin:0 40px 28px; }
@@ -87,10 +90,10 @@ body { min-height:100vh; }
 .tf.active { border-color:var(--ink); color:var(--ink); }
 
 .table-wrap { margin:0 40px 40px; border:1px solid var(--ink-hair); }
-.table-head { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
+.table-head { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
 .table-head span { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
 
-.entry { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:14px 16px;
+.entry { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:14px 16px;
   border-top:1px solid var(--ink-ghost); cursor:pointer; transition:background .1s; }
 .entry:hover { background:var(--ink-ghost); }
 .entry .idx { font-size:var(--text-xs); color:var(--ink-dim); }
@@ -145,8 +148,7 @@ body { min-height:100vh; }
   .relay-table-wrap { margin:0 20px 40px; }
   .table-wrap { margin:0 20px 40px; }
   .table-head, .entry { grid-template-columns:40px 1fr 130px; }
-  .table-head span:nth-child(3), .table-head span:nth-child(4),
-  .entry > *:nth-child(3), .entry > *:nth-child(4) { display:none; }
+  .table-head span:nth-child(3), .entry > *:nth-child(3) { display:none; }
   .relay-table-head, .relay-row { grid-template-columns:1fr 80px 70px; }
   .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
 }
@@ -309,7 +311,7 @@ body { min-height:100vh; }
 <div class="hero">
   <div class="tag">Openbaar auditlog</div>
   <h1>Certificate <span>transparency</span></h1>
-  <p>Registraties van sleutels, overdrachten en aanmeldingen van relays komen allemaal in één Merkle-boom waarin elke wijziging zichtbaar is. Iedereen kan nagaan dat een vermelding in de boom staat, zonder de inhoud te zien. Zo werken ook de certificate transparency-logs van HTTPS.</p>
+  <p>Registraties van sleutels, overdrachten en aanmeldingen van relays komen allemaal in één Merkle-boom waarin elke wijziging zichtbaar is. Iedereen kan nagaan dat een vermelding in de boom staat, zonder de inhoud te zien. De wiskunde is dezelfde als bij de certificate transparency-logs van HTTPS (RFC 6962): een Merkle-boom met ondertekende boomstanden. Het verschil is wie meekijkt. Bij HTTPS zijn er meerdere onafhankelijke logs en monitors; hier is er één beheerder, Paramant, en nog geen onafhankelijke bewaarder van de boomstanden.</p>
 </div>
 
 <div class="tabs">
@@ -375,7 +377,13 @@ body { min-height:100vh; }
     <strong>Blijvend log: overleeft een herstart van de relay</strong>
     <span>Bij elke registratie worden hashes naar schijf geschreven (<code>/data/ct-log.json</code>)
     en bij het opstarten opnieuw ingelezen. Er wordt nooit inhoud opgeslagen, alleen cryptografische hashes.
-    Het log begint alleen opnieuw als het volume van de relay wordt verwijderd.</span>
+    In april 2026 is het log wel opnieuw begonnen, tijdens tests:
+    de boom van <code>health.paramant.app</code> is toen opnieuw gestart. 39 vermeldingen uit die tijd
+    (posities 1 tot en met 34 en 42 tot en met 46) hebben een opgeslagen bewijs dat niet op de huidige boom past.
+    Voor vijf ervan (42 tot en met 46) is aangetoond dat dat bewijs uit de herstarte boom komt; voor de andere 34
+    is dat waarschijnlijk, maar niet aangetoond. De lijst hieronder en het inclusiebewijs rekenen voor alle 39
+    met de huidige boom en tonen de oude waarde apart. Van elke latere vermelding past de opgeslagen boomstand wel op de huidige boom
+    (onafhankelijk nagerekend op 6 oktober 2026). Verder begint het log alleen opnieuw als het volume van de relay wordt verwijderd.</span>
   </div>
 </div>
 
@@ -414,7 +422,7 @@ body { min-height:100vh; }
 <div class="verify-section">
   <h2>Een hash controleren</h2>
   <div class="verify-bar">
-    <input id="verify-input" placeholder="Plak een leaf_hash, device_hash of tree_hash om te controleren of die in het log staat" data-input="clearVerify">
+    <input id="verify-input" placeholder="Plak een leaf_hash of tree_hash om te controleren of die in het log staat" data-input="clearVerify">
     <button data-click="verifyHash">CONTROLEREN</button>
   </div>
   <div class="verify-result" id="verify-result"></div>
@@ -436,7 +444,6 @@ body { min-height:100vh; }
     <span>#</span>
     <span>Leaf-hash</span>
     <span>Tree-hash</span>
-    <span>Apparaat-hash</span>
     <span>Tijdstip</span>
   </div>
   <div id="entries"><div class="loading">Log laden…</div></div>
@@ -466,7 +473,7 @@ body { min-height:100vh; }
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.js?v=4" defer></script>
+<script src="/js/ct-log.page.js?v=6" defer></script>
 </main>
 <footer>
   <div class="container-lg">

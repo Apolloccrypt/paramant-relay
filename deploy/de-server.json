@@ -86,10 +86,10 @@
         "iot.paramant.app"
       ],
       "wat": "draait de versie uit package.json",
-      "verwacht": "3.1.1",
-      "gemeten": "3.1.0",
-      "sinds": "2026-10-05",
-      "reden": "De repo is naar 3.1.1 gezet voor de release; productie draait 3.1.0 tot de uitrol (deploy/DEPLOY-3.1.md, de tag v3.1.1 voor stap 5). Na de uitrol meldt deze poort het verschil als opgelost en hoort deze regel weg."
+      "verwacht": "3.1.2",
+      "gemeten": "3.1.1",
+      "sinds": "2026-10-06",
+      "reden": "De repo is naar 3.1.2 gezet voor de release (PR #576); productie draait 3.1.1 tot de uitrol (deploy/DEPLOY-3.1.md, de tag v3.1.2 voor stap 5). Na de uitrol meldt deze poort het verschil als opgelost en hoort deze regel weg."
     }
   ]
 }

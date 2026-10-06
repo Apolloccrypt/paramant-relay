@@ -796,10 +796,17 @@ rate limit verification, email template security review.
 Before Mission 4, tamper-evidence depended on trusting Paramant's own servers:
 > "Trust Paramant's servers"
 
-After Mission 4, the trust model is:
+The aim was:
 > "Trust that **at least one relay operator is honest**"
 
-This is the same trust model as RFC 6962 Certificate Transparency. Any relay operator running `paramant-verify-peers` becomes an independent auditor.
+Measured on 2026-10-06, that is not where it stands. All five relays are run by
+one operator, the heads are kept only on Paramant's own servers, and there is no
+outside witness yet. The mathematics is the same as RFC 6962 Certificate
+Transparency (Merkle tree, inclusion and consistency proofs, signed heads); the
+trust model is not, because CT relies on many independent logs and monitors.
+What a customer can verify today is that the tree Paramant shows them is
+append-only and contains their entry. Whether everyone is shown the same tree
+needs a witness outside Paramant: see `docs/ontwerp-ct-witness.md`.
 
 ### Signed Tree Heads (STH)
 
@@ -827,10 +834,19 @@ POST /v2/sth/ingest
 Body: { relay_id, sha3_root, timestamp, tree_size, version, signature, public_key, relay_pk_hash }
 ```
 
-- Receiver verifies ML-DSA-65 signature before storing
-- Invalid signatures are logged and rejected (HTTP 400)
-- Valid STHs are stored in `data/peer-sths/{relay_pk_hash}.jsonl`
-- Non-blocking, best-effort — peer failures do not affect the local relay
+- Receiver verifies the ML-DSA-65 signature before storing; invalid signatures are rejected (HTTP 400)
+- The key must be pinned to the `relay_id` (`relay/lib/fleet-pins.js`, the same five keys as
+  `frontend/js/relay-trust-anchors.js`, plus `PEER_STH_PINS` for other fleets). A pinned name
+  with another key, a pinned key under another name, or an unpinned paramant.app name is
+  refused (HTTP 403). An unpinned peer gets HTTP 202 and is never published.
+- Only pinned peers are stored in `data/peer-sths/{relay_pk_hash}.jsonl`. At startup, heads that
+  do not fit their pin are moved to `data/peer-sths/purged/` and logged as `peer_sth_purged`.
+- `received_at` is rounded to the hour, like every public time in the log.
+- A relay only gossips to paramant.app hosts when it is itself a pinned Paramant relay and not
+  running as test or development (`PARAMANT_FLEET_GOSSIP` overrides). Until 3.1.2 local test
+  stacks sent their heads to production, because docker-compose.yml defaults
+  `RELAY_SELF_URL_*` to the production names.
+- Non-blocking, best-effort: peer failures do not affect the local relay
 
 ### Cross-relay verification endpoints
 
@@ -866,19 +882,24 @@ If a relay later claims a different root for a published timestamp, any subscrib
 # Install
 npm install -g @noble/post-quantum  # required for ML-DSA-65
 
-# Verify all peer STHs are consistent
-paramant-verify-peers --relay https://health.paramant.app
+# Check the five production relays (read-only, GET only)
+paramant-verify-peers --fleet
 
-# Exit 0 = all consistent (or 0 peers)
+# Exit 0 = consistent (warnings about unpinned peers allowed)
 # Exit 1 = inconsistency detected
+# Exit 3 = a relay or peer did not answer, no verdict
 ```
 
 The tool:
-1. Fetches the peer STH mirror from the local relay
-2. Verifies ML-DSA-65 signatures on each peer's latest STH
-3. Cross-checks by fetching the STH directly from the peer relay
-4. Checks for tree_size rollbacks (append-only violation)
-5. Reports inconsistencies with full details
+1. Checks each relay's own head under its pinned key, and that it does not report `forked`
+2. Reports mirrored peers that are not pinned to their name as pollution (warning, not failure)
+3. Verifies every mirrored head of a pinned peer under the pinned key
+4. Fails when one tree size appears with two roots (split view)
+5. Asks the peer for RFC 9162 consistency proofs from the mirrored heads to its current head,
+   verified in the script itself, and fails when one does not hold or the tree went backwards
+
+It runs daily against production in `.github/workflows/ct-peers-monitor.yml`. This is still
+Paramant checking Paramant; it is not an independent auditor.
 
 ---
 

@@ -299,7 +299,7 @@ test('a receipt from a relay we do not know is unknown, not forged', async () =>
 
   // Nothing that did get checked may be quietly dropped.
   assert.match(text, /The receipt is about this file and no other/);
-  assert.match(text, /It really is in the public transparency log/);
+  assert.match(text, /The proof of inclusion holds: the relay signed at the time that this entry was in its transparency log/);
   await context.close();
 });
 

@@ -96,6 +96,10 @@ export async function startRelay(opts = {}) {
       MAIL_PROVIDER: 'dryrun',
       ADMIN_TOKEN: 'x'.repeat(40),
       PARAMANT_TOTP_MASTER_KEY: crypto.randomBytes(32).toString('base64'),
+      // Een testrelay praat nooit met de productievloot: geen koppen naar en
+      // geen aanmelding bij paramant.app (relay/lib/fleet-pins.js).
+      NODE_ENV: 'test',
+      PARAMANT_FLEET_GOSSIP: '0',
       ...(opts.env || {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -322,6 +322,10 @@ export function findSilencers(workflows) {
 // ---------------------------------------------------------------------------
 
 export const DECLARED = {
+  'ct-peers-monitor.yml#no-change-trigger': {
+    why: 'the daily cross-check reads the five production relays; a pull request must not depend on production being up. It is a schedule, not a gate; the gate on the monitor itself is relay/test/route-verify-peers-fleet.test.js, which test.yml runs on every change against a booted local fleet, including a forged split view that must turn it red.',
+    visible: 'the daily run goes red on exit 1 (a real inconsistency) with one ::error:: per finding, and prints a ::warning:: when a relay did not answer',
+  },
   'email-blocklist.yml#no-change-trigger': {
     why: 'the weekly update fetches an outside list and opens a pull request for a human to read. It is a schedule, not a gate; the gate on the list is tests/email-blocklist.test.mjs, which test.yml runs on every change.',
     visible: 'the weekly run itself goes red (--leeftijd --streng) when main still carries a source older than 30 days, and every pull request run of test.yml prints a ::warning:: annotation for it without blocking the merge',

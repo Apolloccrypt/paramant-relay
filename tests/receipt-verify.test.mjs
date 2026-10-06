@@ -145,7 +145,7 @@ test('a genuine receipt is confirmed with the network switched off', async () =>
   assert.doesNotMatch(text, /This receipt is genuine/,
     'an unrecognised signer must never be presented as a Paramant receipt');
   assert.match(text, /The receipt is about this file and no other/);
-  assert.match(text, /It really is in the public transparency log/);
+  assert.match(text, /The proof of inclusion holds: the relay signed at the time that this entry was in its transparency log/);
   assert.match(text, /The signature holds/);
   assert.match(text, /The log itself was signed at that moment too/);
 
@@ -156,7 +156,7 @@ test('a genuine receipt is confirmed with the network switched off', async () =>
   assert.match(text, /handed over on 1 September 2026 at 14:22 UTC/);
   assert.ok(text.includes(fixture.blobHash), 'the fingerprint of the file must be on screen in full');
   assert.match(text, /destroyed its copy of the file/);
-  assert.match(text, /entry 5 in a public log that held 5 entries/);
+  assert.match(text, /According to the proof it is entry 5 in the relay’s log, which held 5 entries/);
   assert.doesNotMatch(text, /signature valid|valid: true|blob_hash:/i,
     'the verdict is written for a reader, not for a developer');
 
@@ -238,14 +238,14 @@ test('NL: een echt ontvangstbewijs wordt offline bevestigd, in het Nederlands', 
   assert.doesNotMatch(text, /Dit ontvangstbewijs is echt/,
     'an unrecognised signer must never be presented as a Paramant receipt');
   assert.match(text, /Het ontvangstbewijs gaat over dit bestand en geen ander/);
-  assert.match(text, /Het staat echt in het openbare transparantielogboek/);
+  assert.match(text, /Het bewijs van opname klopt: de relay heeft toen ondertekend dat deze regel in zijn transparantielogboek stond/);
   assert.match(text, /De handtekening klopt, dus/);
   assert.match(text, /Het logboek zelf is op dat moment ook ondertekend/);
   assert.match(text, /Het is ondertekend met een sleutel die deze pagina niet kent/);
   assert.match(text, /overgedragen op 1 september 2026 om 14:22 UTC/);
   assert.ok(text.includes(fixture.blobHash), 'the fingerprint of the file must be on screen in full');
   assert.match(text, /vernietigde zijn kopie van het bestand/);
-  assert.match(text, /regel 5 in een openbaar logboek dat op dat moment 5 regels telde/);
+  assert.match(text, /Volgens het bewijs is het regel 5 in het logboek van de relay, dat op dat moment 5 regels telde/);
   assert.doesNotMatch(text, /handtekening geldig|valid: true|blob_hash:/i);
   assert.doesNotMatch(text, /This receipt|The signature|What was checked/,
     'the Dutch page may not fall back to English sentences');
