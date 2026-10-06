@@ -240,7 +240,7 @@ check_has "$FULL" 'checkout_head = 41501bb'                      "falls back to 
 check_has "$FULL" 'services seen = 6'                            "asserts all six services were seen"
 check_has "$FULL" '"recurring":false'                            "asserts billing_config recurring:false"
 check_has "$FULL" '"mode_source":"inferred"'                     "asserts billing_config mode_source:inferred"
-check_has "$FULL" '"version":"3\.1\.1"'                          "asserts relay_started version 3.1.1"
+check_has "$FULL" '"version":"3\.1\.2"'                          "asserts relay_started version 3.1.2"
 check_has "$FULL" 'after manifest lines = 6'                     "asserts the manifest has six lines"
 check_has "$FULL" 'after tags for this TS = 6'                   "asserts six rollback IMAGES exist, not six lines of text"
 check_has "$FULL" 'after \.env backup bytes >= 1'                "asserts the .env backup has real bytes"
@@ -1883,10 +1883,10 @@ fi
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
 SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx|_seller)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "32" ]; then
-  pass "the scan walked all 32 remote blocks"
+if [ "$SCAN_BLOCKS" = "34" ]; then
+  pass "the scan walked all 34 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 32; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 34; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -3879,6 +3879,72 @@ grep -B1 '^phase_2$' "$SCRIPT" | grep -q 'release_tag_gate "1z"' \
   && pass "the tag gate also runs before phase 2 writes anything" || fail "the tag gate does not run before phase 2"
 grep -q "git ls-remote --tags origin \"refs/tags/\$tag\"" "$SCRIPT" \
   && pass "the gate asks origin, not the local tag list" || fail "the gate does not use git ls-remote on origin"
+
+# ------------------------- #576: relay NODE_ENV gate and peer-sths backup --
+echo ""
+echo "#576. NODE_ENV of the relays is read before the gossip gate can go silent, and /data/peer-sths is backed up before phase 4"
+eval "$(sed -n '/^node_env_verdict()/,/^}/p' "$SCRIPT")"
+if declare -F node_env_verdict >/dev/null; then
+  OKIN=$'nodeenv relay-main unset\nfleetgossip relay-main unset\nnodeenv relay-health production\nfleetgossip relay-health unset\nnodeenv relay-legal unset\nfleetgossip relay-legal 1'
+  T="$(printf '%s\n' "$OKIN" | node_env_verdict)" && grep -q '^OK NODE_ENV of 3 relay' <<< "$T" \
+    && pass "empty or production NODE_ENV passes" || fail "a clean fleet did not pass: $T"
+  T="$(printf '%s\nnodeenv relay-iot test\nfleetgossip relay-iot unset\n' "$OKIN" | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && grep -q 'STOP relay-iot=NODE_ENV:test' <<< "$T" && grep -q 'gossip of health.paramant.app goes silent' <<< "$T" \
+    && pass "NODE_ENV=test stops with the reason" || fail "NODE_ENV=test: rc $R, $T"
+  T="$(printf 'nodeenv relay-health Development\nfleetgossip relay-health unset\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "NODE_ENV=Development stops (case does not matter)" || fail "Development passed: $T"
+  T="$(printf 'nodeenv relay-health unset\nfleetgossip relay-health 0\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && grep -q 'PARAMANT_FLEET_GOSSIP:0' <<< "$T" && pass "PARAMANT_FLEET_GOSSIP=0 stops" || fail "gossip=0 passed: $T"
+  T="$(printf 'nodeenv relay-health MISSING\nnodeenv relay-main unset\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "a relay without a container stops" || fail "a missing container passed: $T"
+  T="$(printf 'nothing here\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "no NODE_ENV lines at all stops (not proven is not green)" || fail "empty output passed: $T"
+else
+  fail "node_env_verdict could not be extracted"
+fi
+grep -q '^\[step\] 1a2\. NODE_ENV of the relay containers' "$FULL" \
+  && pass "phase 1 reads the NODE_ENV of the relays (step 1a2)" || fail "step 1a2 is not in the full dry run"
+grep -q '^\[step\] 2c\. back up the peer STH mirror' "$FULL" \
+  && pass "phase 2 backs up /data/peer-sths (step 2c)" || fail "step 2c is not in the full dry run"
+grep -q '^\[step\] 6k0\. NODE_ENV of the relay containers' "$FULL" \
+  && pass "phase 6 reads NODE_ENV again after the recreate (step 6k0)" || fail "step 6k0 is not in the full dry run"
+VO576="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only 2>&1 )"
+grep -q '^\[step\] 6k0\. NODE_ENV' <<< "$VO576" && pass "--verify-only also reads NODE_ENV" || fail "--verify-only skips the NODE_ENV check"
+PO576="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --preflight-only 2>&1 )"
+grep -q '^\[step\] 1a2\. NODE_ENV' <<< "$PO576" && pass "--preflight-only also reads NODE_ENV" || fail "--preflight-only skips the NODE_ENV check"
+L2=$(grep -n '^\[step\] 2c\.' "$FULL" | head -1 | cut -d: -f1); L4=$(grep -n '^PHASE 4:' "$FULL" | head -1 | cut -d: -f1)
+[ -n "$L2" ] && [ -n "$L4" ] && [ "$L2" -lt "$L4" ] && pass "the peer-sths backup runs before phase 4" || fail "the peer-sths backup does not run before phase 4"
+
+# Run the 2c block itself against a fake docker: five relays and admin, one
+# relay without a mirror directory.
+P2C="$WORK/p2c"
+mkdir -p "$P2C/bk" "$P2C/fakebin" "$P2C/compose" "$P2C/src/peer-sths"
+printf '{"x":1}\n' > "$P2C/src/peer-sths/$(printf 'a%.0s' $(seq 64)).jsonl"
+cat > "$P2C/fakebin/docker" <<FAKE
+#!/usr/bin/env bash
+case "\$1" in
+  compose) [ "\$2" = ps ] && echo "cid-\$4" ;;
+  inspect) [ "\${*: -1}" = cid-relay-iot ] && echo "PEER_STH_DIR=/data/nowhere"; echo "PATH=/usr/bin" ;;
+  cp) case "\$2" in cid-relay-iot:*) exit 1 ;; esac; tar cf - -C "$P2C/src" peer-sths ;;
+  exec) exit 1 ;;
+esac
+FAKE
+chmod +x "$P2C/fakebin/docker"
+extract_remote "peer sths backup" > "$P2C/2c.sh"
+if [ -s "$P2C/2c.sh" ]; then
+  OUT2C="$(cd "$P2C/compose" && PATH="$P2C/fakebin:$PATH" bash "$P2C/2c.sh" "$P2C/compose" T576 "$P2C/bk" "relay-main relay-health relay-finance relay-legal relay-iot admin" 2>&1)"; R=$?
+  [ "$R" -eq 0 ] && grep -q '^after peer sths backups = 5$' <<< "$OUT2C" && grep -q '^relay services = 5$' <<< "$OUT2C" \
+    && pass "2c makes one backup per relay and counts five" || fail "2c: rc $R, $OUT2C"
+  grep -q 'peersths relay-iot /data/nowhere absent' <<< "$OUT2C" \
+    && pass "2c reads PEER_STH_DIR from the container and accepts an absent directory" || fail "2c PEER_STH_DIR: $OUT2C"
+  [ "$(ls "$P2C/bk" | grep -c '^peer-sths-relay-.*-pre-3.1-T576.tar$')" = 4 ] \
+    && tar tf "$P2C/bk/peer-sths-relay-health-pre-3.1-T576.tar" | grep -q '\.jsonl$' \
+    && pass "2c leaves a real tar with the mirror files per relay" || fail "2c tars: $(ls "$P2C/bk")"
+  ! grep -q 'peersths admin' <<< "$OUT2C" && pass "2c skips admin" || fail "2c touched admin"
+  head -1 "$P2C/2c.sh" | grep -q 'set -euo pipefail' && pass "2c runs under set -euo pipefail" || fail "2c lacks set -euo pipefail"
+else
+  fail "could not extract the 'peer sths backup' block"
+fi
 
 # ------------------------------------------------------------------- result --
 echo ""

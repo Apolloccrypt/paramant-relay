@@ -9,6 +9,36 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.2] - unreleased
+
+Tagged `v3.1.2` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+
+**In short.** The public CT log tells the truth about itself. The mirror of
+other relays' tree heads only holds heads from pinned keys (PR #576), the 39
+April 2026 entries on health get a proof and a listed tree hash from the
+current tree, and a customer can check a receipt with `scripts/klant-controle.py`.
+
+### Fixed
+- `/v2/sth/ingest` only mirrors heads from a key pinned to its `relay_id`
+  (`relay/lib/fleet-pins.js`); a name with a dot at the end is refused (403).
+  Exact duplicate heads are not stored again and a mirror file is compacted past
+  `PEER_STH_FILE_MAX`. Retired pins keep the mirror of a rotated key instead of
+  moving it to `purged/` (RUNBOOK.md section 9, `relay/lib/relay-identity-next.js`).
+- `/v2/ct/log` lists `tree_hash` from the full tree, equal to `/v2/ct/proof`;
+  entries whose stored value came from an earlier tree also show it as
+  `stored_tree_hash` with `from_earlier_tree: true`.
+- `scripts/klant-controle.py` finds the leaf through `/v2/ct/proof`, so a receipt
+  older than the 10,000 entries `/v2/ct/log` lists no longer fails falsely.
+- `/ct-log` says what is proven about April 2026: entries 42-46 come from a
+  restarted tree, for 1-34 that is likely.
+
+### Deploy
+- `deploy/deploy-3.1.sh` backs up `/data/peer-sths` of every relay before phase 4
+  (step 2c) and stops when a relay container has `NODE_ENV` test or development
+  or `PARAMANT_FLEET_GOSSIP=0` (steps 1a2 and 6k0), because from 3.1.2 such a
+  relay does not gossip to the fleet.
+
 ## [3.1.1] - unreleased
 
 Tagged `v3.1.1` on the merge commit before the frontend rollout

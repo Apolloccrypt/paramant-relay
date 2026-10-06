@@ -46,7 +46,7 @@ test('the installer clones a 3.1 release, and upgrade moves the tag clone', () =
   // The pin is the tag of this release: v plus the root package.json version
   // (docs/RELEASE.md). All three installers carry it.
   const tag = 'v' + JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
-  assert.equal(tag, 'v3.1.1');
+  assert.equal(tag, 'v3.1.2');
   for (const f of ['install.sh', 'frontend/install.sh', 'frontend/install-pi.sh']) {
     const src = readFileSync(join(ROOT, f), 'utf8');
     assert.ok(src.includes(`RELAY_VERSION="\${PARAMANT_VERSION:-${tag}}"`), `${f} clones ${tag} by default`);

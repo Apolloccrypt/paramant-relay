@@ -76,6 +76,20 @@
       "gemeten": "10485760 bytes",
       "sinds": "2026-09-05",
       "reden": "De repo zegt 12M sinds d8bf7a71 (2026-09-04). Productie weigert alles boven 10485760 bytes, precies 10 MiB, en dat getal staat in geen enkel repobestand. Dat kan ook niet anders: deploy/deploy-3.1.sh installeert deze conf nooit, het patcht de conf die op de server staat op ankerregels, en client_max_body_size is geen van die ankers. De grens komt waarschijnlijk uit het http-blok van de nginx.conf op de server zelf, met de hand gezet en buiten git, net als de vijf limit_req-zones die op 2026-09-04 alsnog in de repo zijn gehaald. Dit verschil verdwijnt pas als de conf wordt geinstalleerd in plaats van gepatcht; stap 3 in deploy/de-server.md."
+    },
+    {
+      "hosts": [
+        "relay.paramant.app",
+        "health.paramant.app",
+        "legal.paramant.app",
+        "finance.paramant.app",
+        "iot.paramant.app"
+      ],
+      "wat": "draait de versie uit package.json",
+      "verwacht": "3.1.2",
+      "gemeten": "3.1.1",
+      "sinds": "2026-10-06",
+      "reden": "De repo is naar 3.1.2 gezet voor de release (PR #576); productie draait 3.1.1 tot de uitrol (deploy/DEPLOY-3.1.md, de tag v3.1.2 voor stap 5). Na de uitrol meldt deze poort het verschil als opgelost en hoort deze regel weg."
     }
   ]
 }
