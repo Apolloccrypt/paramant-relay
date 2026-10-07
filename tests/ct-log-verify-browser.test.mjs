@@ -75,7 +75,7 @@ function relayStub(state) {
     const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body),
       headers: { 'access-control-allow-origin': '*' } });
     const t = state.tree;
-    if (u.pathname === '/health') return json(200, { ok: true, version: '3.1.2' });
+    if (u.pathname === '/health') return json(200, { ok: true, version: '3.1.3' });
     if (u.pathname === '/v2/ct/log') {
       const from = parseInt(u.searchParams.get('from') || '0', 10);
       const limit = parseInt(u.searchParams.get('limit') || '100', 10);

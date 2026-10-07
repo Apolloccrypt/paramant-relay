@@ -9,6 +9,18 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.3] - unreleased
+
+Tagged `v3.1.3` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+`v3.1.2` stays where it is; a published tag is not moved.
+
+### Changed
+- The examples on the landing page are calm and real: no badge, no stamps, no
+  drawn fake UI; one heading, one sentence, one button each (PR #577).
+- `deploy/de-server.json` no longer lists the 3.1.1 version gap, production
+  runs 3.1.2 (PR #578).
+
 ## [3.1.2] - unreleased
 
 Tagged `v3.1.2` on the merge commit before the frontend rollout
