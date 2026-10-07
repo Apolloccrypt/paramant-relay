@@ -8,11 +8,7 @@
 
      the Schiphol sign   (yellow, black type)  says WHERE you are: the step
                                                 you are on, and "Voorbeeld"
-                                                on everything that is a demo
-     the post stamp      (red ring)            says a thing has LEFT: sent,
-                                                signed, sealed
-     the split-flap      (NS board)            shows a CODE you have to read
-                                                over to someone
+                                                on the demo dashboard
 
    Light paper, navy ink and one cobalt accent stay the ground (the light
    theme from before PR #417). Corners are small and depth comes from
@@ -23,9 +19,6 @@
 :root {
   --wp-sign: #FFC917;          /* Schiphol yellow; black on it is 13.9:1 */
   --wp-sign-ink: #111111;
-  --wp-stamp: #B3261E;         /* post stamp red; 6.0:1 on white */
-  --wp-flap: #1B232C;          /* split-flap tile */
-  --wp-flap-ink: #F4F7FA;
   --wp-paper: #FFFFFF;
   --wp-ink: var(--ink-1, #0C1B2A);
   --wp-ink-2: var(--ink-2, #40505F);
@@ -44,8 +37,6 @@
 }
 :root[data-theme="dark"] {
   --wp-paper: #16202B;
-  --wp-stamp: #F08A80;
-  --wp-flap: #070A0E;
   --wp-ok: var(--sig-done, #7FCB9E);
   --wp-tile: #FFC917;
   --wp-tile-ink: #111111;
@@ -60,7 +51,6 @@
   white-space: nowrap;
 }
 .wp-sign::before { content: ""; width: 0; height: 0; border-left: 6px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
-.wp-sign-sm { font-size: 11px; padding: 3px 7px; vertical-align: 3px; margin-right: 6px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    LANDING: the dashboard in a demo state
@@ -164,10 +154,10 @@
 .wp-tile[data-wp-seen] .wp-tile-go { color: var(--wp-ink-2); }
 .wp-tile[data-wp-seen] .wp-tile-go::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--wp-ok); }
 
-/* ── The stage: the dashboard's detail dialog with a mini-flow in it ───────── */
+/* ── The stage: the dashboard's detail dialog, one sentence and one button ── */
 .wp-stage { position: fixed; inset: 0; z-index: 10001; display: grid; place-items: center; padding: 14px; background: rgba(12, 22, 34, .58); }
 .wp-stage[hidden] { display: none !important; }
-.wp-stage .dh-doc-dialog-panel { width: min(640px, 100%); max-height: calc(100dvh - 28px); overflow: auto; border-radius: 12px; background: var(--wp-paper); border: 1px solid var(--wp-line); color: var(--wp-ink); box-shadow: 0 24px 64px -24px rgba(12,27,42,.35); animation: wp-rise .26s var(--wp-enter) both; }
+.wp-stage .dh-doc-dialog-panel { width: min(520px, 100%); max-height: calc(100dvh - 28px); overflow: auto; border-radius: 4px; background: var(--wp-paper); border: 1px solid var(--wp-line-2); color: var(--wp-ink); animation: wp-rise .2s var(--wp-enter) both; }
 .wp-stage .dh-doc-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 20px 14px; border-bottom: 1px solid var(--wp-line); }
 .wp-stage .dh-doc-dialog-head h2 { margin: 0; font: 600 18px/1.3 var(--sans, system-ui, sans-serif); letter-spacing: -.015em; }
 .wp-stage .dh-doc-close { flex: 0 0 auto; width: 44px; height: 44px; margin: -8px -8px 0 0; border: 0; border-radius: 6px; background: transparent; color: var(--wp-ink-2); font-size: 26px; line-height: 1; cursor: pointer; }
@@ -177,140 +167,28 @@
 @media (max-width: 640px) {
   /* a bottom sheet on a phone: the thumb is at the bottom */
   .wp-stage { place-items: end stretch; padding: 0; }
-  .wp-stage .dh-doc-dialog-panel { width: 100%; max-height: 92dvh; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+  .wp-stage .dh-doc-dialog-panel { width: 100%; max-height: 92dvh; border-radius: 4px 4px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
 }
 
-.wp-play { position: relative; display: grid; gap: 16px; align-items: center; min-height: 210px; padding: 16px; border-radius: 8px; background: var(--surface-sunk, #F6F7F9); border: 1px solid var(--wp-line); overflow: hidden; }
-:root:not([data-theme="dark"]) .wp-play { background: #F5F6F8; }
-@media (min-width: 560px) { .wp-play { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+.wp-say { margin: 0; font: 17px/1.5 var(--sans, system-ui, sans-serif); color: var(--wp-ink); max-width: 44ch; }
 
-/* the steps under the stage: the one being shown is on the sign */
-.wp-steps { list-style: none; counter-reset: wp; margin: 16px 0 0; padding: 0; display: grid; gap: 4px; }
-.wp-steps li { counter-increment: wp; position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 6px 0; font: 15px/1.45 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); transition: color .2s var(--wp-ease); }
-.wp-steps li::before { content: counter(wp); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; border: 1px solid var(--wp-line-2); font: 700 12px/1 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); transition: background .2s var(--wp-ease), color .2s var(--wp-ease), border-color .2s var(--wp-ease); }
-.wp-steps li.is-now { color: var(--wp-ink); }
-.wp-steps li.is-now::before { background: var(--wp-tile); border-color: var(--wp-tile); color: var(--wp-tile-ink); }
-.wp-steps li.is-past { color: var(--wp-ink-2); }
-.wp-steps li.is-past::before { content: "\2713"; color: var(--wp-ok); border-color: var(--wp-ok); }
-
-.wp-end { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--wp-line); display: grid; gap: 8px; justify-items: start; }
-.wp-try { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 0 26px; border-radius: 8px; background: var(--wp-accent); color: var(--accent-ink, #FFFFFF); border: 1px solid var(--wp-accent); font: 600 16px/1 var(--sans, system-ui, sans-serif); text-decoration: none; transition: transform .18s var(--wp-ease), box-shadow .3s var(--wp-ease), background .15s; }
+.wp-end { margin-top: 20px; display: grid; gap: 8px; justify-items: start; }
+.wp-try { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 0 26px; border-radius: 4px; background: var(--wp-accent); color: var(--accent-ink, #FFFFFF); border: 1px solid var(--wp-accent); font: 600 16px/1 var(--sans, system-ui, sans-serif); text-decoration: none; transition: background .15s; }
 .wp-try::after { content: "\2192"; transition: transform .18s var(--wp-ease); }
 .wp-try:hover { background: var(--accent-hov, #1A43BE); }
 .wp-try:hover::after { transform: translateX(4px); }
 .wp-try:focus-visible { outline: 3px solid var(--accent-ring, rgba(29,78,216,.32)); outline-offset: 2px; }
-.wp-play-done .wp-end .wp-try, .wp-stage.is-done .wp-try { box-shadow: 0 0 0 4px var(--accent-ring, rgba(29,78,216,.25)); }
 .wp-end-note { margin: 0; font: 14px/1.5 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); }
-.wp-replay { min-height: 44px; padding: 0; border: 0; background: none; font: 600 14px/1 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
-.wp-replay:hover { color: var(--wp-ink); }
 @media (max-width: 640px) { .wp-end .wp-try { width: 100%; } }
 
-/* ── Flow 1: a contract, two signers, initials on every page ──────────────── */
-.wp-pages { display: flex; justify-content: center; gap: 0; padding: 6px 0; }
-.wp-page { position: relative; width: 33%; max-width: 132px; aspect-ratio: 1 / 1.38; padding: 11% 9% 0 9%; background: #FFFFFF; border: 1px solid rgba(12,27,42,.16); border-radius: 2px; box-shadow: 0 10px 20px -14px rgba(12,27,42,.5); display: flex; flex-direction: column; gap: 7%; }
-.wp-page + .wp-page { margin-left: -6%; }
-.wp-page:nth-child(1) { transform: rotate(-4deg) translateY(4px); }
-.wp-page:nth-child(3) { transform: rotate(3deg); z-index: 2; }
-.wp-page i { display: block; height: 4px; border-radius: 1px; background: rgba(12,27,42,.13); }
-.wp-page i.t { width: 58%; height: 6px; background: rgba(12,27,42,.62); }
-.wp-page i.s { width: 70%; }
-.wp-par { position: absolute; bottom: 4%; width: 24px; height: 15px; display: grid; place-items: center; border: 1px dashed rgba(29,78,216,.6); border-radius: 2px; font: 700 8px/1 var(--mono, ui-monospace, monospace); color: transparent; background: rgba(29,78,216,.05); transition: color .25s var(--wp-ease), background .25s var(--wp-ease), border-color .25s; }
-.wp-par.p1 { left: 9%; }
-.wp-par.p2 { left: calc(9% + 28px); }
-.wp-field { position: absolute; left: 9%; width: 70%; height: 15%; border-bottom: 1px solid rgba(12,27,42,.4); background: rgba(29,78,216,.05); outline: 1px dashed rgba(29,78,216,.55); outline-offset: 1px; }
-.wp-field.f1 { top: 38%; }
-.wp-field.f2 { top: 60%; }
-.wp-field svg { width: 100%; height: 100%; overflow: visible; }
-.wp-field path { fill: none; stroke: #173FB3; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 260; stroke-dashoffset: 260; transition: stroke-dashoffset 1s ease-in-out; }
-.wp-seal { position: absolute; right: -14%; top: 6%; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--wp-stamp); color: var(--wp-stamp); font: 800 7.5px/1 var(--mono, ui-monospace, monospace); letter-spacing: .1em; text-transform: uppercase; transform: rotate(-14deg) scale(0); opacity: 0; box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 4px var(--wp-stamp); background: rgba(255,255,255,.7); transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), opacity .15s; }
-/* step 1: the fields appear */
-.wp-play.s1 .wp-par, .wp-play.s2 .wp-par, .wp-play.s3 .wp-par, .wp-play.s4 .wp-par { border-color: rgba(29,78,216,.9); }
-/* step 2: the first signer initials every page, then signs */
-.wp-play.s2 .wp-par.p1, .wp-play.s3 .wp-par.p1, .wp-play.s4 .wp-par.p1 { color: #173FB3; border-style: solid; background: rgba(29,78,216,.10); }
-.wp-play.s2 .wp-page:nth-child(2) .wp-par.p1 { transition-delay: .25s; }
-.wp-play.s2 .wp-page:nth-child(3) .wp-par.p1 { transition-delay: .5s; }
-.wp-play.s2 .f1 path, .wp-play.s3 .f1 path, .wp-play.s4 .f1 path { stroke-dashoffset: 0; }
-.wp-play.s2 .f1 path { transition-delay: .7s; }
-/* step 3: the second signer */
-.wp-play.s3 .wp-par.p2, .wp-play.s4 .wp-par.p2 { color: #173FB3; border-style: solid; background: rgba(29,78,216,.10); }
-.wp-play.s3 .wp-page:nth-child(2) .wp-par.p2 { transition-delay: .25s; }
-.wp-play.s3 .wp-page:nth-child(3) .wp-par.p2 { transition-delay: .5s; }
-.wp-play.s3 .f2 path, .wp-play.s4 .f2 path { stroke-dashoffset: 0; }
-.wp-play.s3 .f2 path { transition-delay: .7s; }
-/* step 4: sealed */
-.wp-play.s4 .wp-seal { transform: rotate(-14deg) scale(1); opacity: 1; }
-
-.wp-people { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.wp-who { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--wp-line); border-radius: 8px; background: var(--wp-paper); transition: border-color .25s var(--wp-ease), box-shadow .25s var(--wp-ease); }
-.wp-who strong { display: block; font: 600 14px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); }
-.wp-ini { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--line-ghost, rgba(12,27,42,.06)); font: 700 12px/1 var(--mono, ui-monospace, monospace); color: var(--wp-ink-2); transition: background .25s, color .25s; }
-.wp-state { position: relative; display: block; font: normal 13px/1.4 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); }
-.wp-state .b { display: none; color: var(--wp-ok); font-weight: 600; }
-.wp-play.s2 .w1, .wp-play.s3 .w2 { border-color: var(--wp-accent); box-shadow: 0 0 0 3px var(--accent-soft, rgba(29,78,216,.08)); }
-.wp-play.s3 .w1 .a, .wp-play.s4 .w1 .a, .wp-play.s4 .w2 .a { display: none; }
-.wp-play.s3 .w1 .b, .wp-play.s4 .w1 .b, .wp-play.s4 .w2 .b { display: inline; }
-.wp-play.s3 .w1 .wp-ini, .wp-play.s4 .wp-ini { background: var(--sig-done-bg, rgba(27,107,69,.12)); color: var(--wp-ok); }
-.wp-state .c { display: none; }
-.wp-play:not(.s2):not(.s3):not(.s4) .w1 .a { display: none; }
-.wp-play:not(.s2):not(.s3):not(.s4) .w1 .c { display: inline; }
-
-/* ── Flow 2: a file, locked, stamped, collected, wiped ───────────────────── */
-.wp-play-send { grid-template-columns: 1fr !important; }
-.wp-lane { display: grid; grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr); align-items: center; gap: 8px; }
-@media (max-width: 420px) { .wp-lane { grid-template-columns: 1fr; } .wp-track { height: 26px; width: 3px; justify-self: center; } }
-.wp-file { position: relative; display: grid; grid-template-columns: 30px 1fr 22px; align-items: center; gap: 10px; padding: 12px; background: #FFFFFF; border: 1px solid rgba(12,27,42,.16); border-radius: 6px; color: #0C1B2A; transition: transform .7s var(--wp-ease), opacity .5s; }
-.wp-file-ic { width: 26px; height: 32px; border-radius: 2px; background: linear-gradient(135deg, transparent 72%, rgba(12,27,42,.25) 72%) , #E8ECF2; border: 1px solid rgba(12,27,42,.2); }
-.wp-file-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 13px/1.3 var(--sans, system-ui, sans-serif); }
-.wp-lock { position: relative; width: 18px; height: 14px; margin-top: 6px; border-radius: 2px; background: rgba(12,27,42,.2); transition: background .3s; }
-.wp-lock::before { content: ""; position: absolute; left: 3px; bottom: 11px; width: 8px; height: 9px; border: 2.4px solid rgba(12,27,42,.3); border-bottom: 0; border-radius: 6px 6px 0 0; transform: translateX(5px); transition: transform .35s var(--wp-ease), border-color .3s; }
-.wp-stamp { position: absolute; right: -8px; top: -14px; padding: 6px 8px; border: 2px solid var(--wp-stamp); border-radius: 50%; color: var(--wp-stamp); font: 800 9px/1 var(--mono, ui-monospace, monospace); letter-spacing: .12em; text-transform: uppercase; transform: rotate(12deg) scale(0); opacity: 0; background: rgba(255,255,255,.85); transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), opacity .15s; }
-.wp-track { height: 3px; background: var(--wp-line-2); position: relative; overflow: hidden; border-radius: 2px; }
-.wp-track i { position: absolute; inset: 0; background: var(--wp-accent); transform: scaleX(0); transform-origin: left; transition: transform .8s var(--wp-ease); }
-.wp-to { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--wp-line); border-radius: 6px; background: var(--wp-paper); }
-.wp-to strong { font: 600 14px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); }
-.wp-to > span { font: 500 11px/1.3 var(--mono, ui-monospace, monospace); letter-spacing: .1em; text-transform: uppercase; color: var(--wp-ink-3); }
-.wp-flap { display: flex; gap: 3px; margin-top: 4px; }
-.wp-flap b { position: relative; display: grid; place-items: center; width: 22px; height: 30px; border-radius: 3px; background: var(--wp-flap); color: transparent; font: 700 16px/1 var(--mono, ui-monospace, monospace); overflow: hidden; }
-.wp-flap b::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0,0,0,.6); }
-.wp-receipt { display: flex; justify-content: space-between; gap: 10px; margin: 0; padding: 10px 12px; border: 1px dashed var(--wp-line-2); border-radius: 4px; font: 600 12px/1.3 var(--mono, ui-monospace, monospace); letter-spacing: .04em; color: var(--wp-ink-2); opacity: .35; transition: opacity .3s, border-color .3s, color .3s; }
-/* step 1: locked in the browser */
-.wp-play-send.s1 .wp-lock, .wp-play-send.s2 .wp-lock, .wp-play-send.s3 .wp-lock { background: var(--wp-accent); }
-.wp-play-send.s1 .wp-lock::before, .wp-play-send.s2 .wp-lock::before, .wp-play-send.s3 .wp-lock::before { transform: none; border-color: var(--wp-accent); }
-/* step 2: stamped and on its way; the code flips in */
-.wp-play-send.s2 .wp-stamp, .wp-play-send.s3 .wp-stamp { transform: rotate(12deg) scale(1); opacity: 1; }
-.wp-play-send.s2 .wp-track i, .wp-play-send.s3 .wp-track i { transform: scaleX(1); }
-.wp-play-send.s2 .wp-flap b, .wp-play-send.s3 .wp-flap b { color: var(--wp-flap-ink); animation: wp-flip .5s var(--wp-ease) both; }
-.wp-play-send.s2 .wp-flap b:nth-child(2) { animation-delay: .08s; } .wp-play-send.s2 .wp-flap b:nth-child(3) { animation-delay: .16s; }
-.wp-play-send.s2 .wp-flap b:nth-child(4) { animation-delay: .24s; } .wp-play-send.s2 .wp-flap b:nth-child(5) { animation-delay: .32s; }
-.wp-play-send.s2 .wp-flap b:nth-child(6) { animation-delay: .40s; }
-@keyframes wp-flip { 0% { transform: scaleY(.1); } 60% { transform: scaleY(1.06); } 100% { transform: none; } }
-/* step 3: collected; the file is gone, the receipt stays */
-.wp-play-send.s3 .wp-file { opacity: .28; transform: scale(.96); }
-.wp-play-send.s3 .wp-receipt { opacity: 1; border-color: var(--wp-ok); color: var(--wp-ok); border-style: solid; }
-
-/* ── Flow 3: a proof, checked on your own device ─────────────────────────── */
-.wp-drop { display: grid; gap: 8px; padding: 14px; border: 2px dashed var(--wp-line-2); border-radius: 8px; background: var(--wp-paper); transition: border-color .3s; }
-.wp-chip { display: block; padding: 9px 11px; border-radius: 4px; background: var(--line-ghost, rgba(12,27,42,.05)); border: 1px solid var(--wp-line); font: 600 13px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); opacity: .25; transform: translateY(-6px); transition: opacity .3s, transform .35s var(--wp-enter); }
-.wp-chip.c2 { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; }
-.wp-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.wp-checks li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center; font: 14px/1.35 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); transition: color .25s; }
-.wp-checks li::before { content: ""; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--wp-line-2); box-sizing: border-box; display: grid; place-items: center; font: 700 13px/1 var(--sans, system-ui, sans-serif); color: #fff; transition: background .25s, border-color .25s; }
-.wp-ok { position: absolute; right: 14px; bottom: 12px; padding: 7px 12px; border: 2.5px solid var(--wp-ok); border-radius: 4px; color: var(--wp-ok); font: 800 15px/1 var(--mono, ui-monospace, monospace); letter-spacing: .16em; text-transform: uppercase; transform: rotate(-8deg) scale(0); opacity: 0; transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), opacity .15s; background: var(--wp-paper); }
-.wp-play-verify.s1 .wp-chip, .wp-play-verify.s2 .wp-chip, .wp-play-verify.s3 .wp-chip { opacity: 1; transform: none; }
-.wp-play-verify.s1 .wp-chip.c2 { transition-delay: .2s; }
-.wp-play-verify.s1 .wp-drop, .wp-play-verify.s2 .wp-drop, .wp-play-verify.s3 .wp-drop { border-color: var(--wp-accent); border-style: solid; }
-.wp-play-verify.s2 .wp-checks li, .wp-play-verify.s3 .wp-checks li { color: var(--wp-ink); }
-.wp-play-verify.s2 .wp-checks li::before, .wp-play-verify.s3 .wp-checks li::before { content: "\2713"; background: var(--wp-ok); border-color: var(--wp-ok); }
-.wp-play-verify.s2 .wp-checks li.k2::before { transition-delay: .35s; }
-.wp-play-verify.s2 .wp-checks li.k3::before { transition-delay: .7s; }
-.wp-play-verify.s2 .wp-checks li.k2 { transition-delay: .35s; }
-.wp-play-verify.s2 .wp-checks li.k3 { transition-delay: .7s; }
-.wp-play-verify.s3 .wp-ok { transform: rotate(-8deg) scale(1); opacity: 1; }
+/* the steps, folded under the button: there for who wants them, once */
+.wp-stage .wp-fold { margin-top: 20px; }
+.wp-how { margin: 0; padding: 0 0 0 22px; display: grid; gap: 6px; font: 15px/1.5 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); }
 
 /* reduced motion: the end state at once, every box kept */
 @media (prefers-reduced-motion: reduce) {
   .wp-tile, .wp-tile-go::after, .wp-stage .dh-doc-dialog-panel,
-  .wp-play *, .wp-steps li, .wp-steps li::before { transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; }
+  .wp-try, .wp-try::after, .wp-fold > summary::before { transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; }
   .wp-tile:hover { transform: none; }
 }
 
@@ -375,16 +253,8 @@ details.ps-info.wp-fold[open] { padding-bottom: 12px; }
 #step-setup .ps-field-label::before { content: counter(wpf); flex: 0 0 auto; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; background: var(--wp-tile); color: var(--wp-tile-ink); border: 1px solid var(--wp-tile); font: 700 12px/1 var(--sans, system-ui, sans-serif); }
 #step-setup .ps-go { min-height: 52px; }
 
-/* the stage on a phone: compact, so the button is near the thumb */
-@media (max-width: 640px) {
-  .wp-play { min-height: 0; padding: 12px; gap: 12px; }
-  .wp-page { max-width: 96px; }
-  .wp-people { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .wp-who { grid-template-columns: 1fr; gap: 6px; padding: 8px 10px; }
-  .wp-ini { width: 28px; height: 28px; font-size: 11px; }
-  .wp-steps li { font-size: 14px; padding: 4px 0; }
-  .wp-stage .dh-doc-dialog-head h2 { font-size: 16px; }
-}
+/* the stage on a phone: a smaller heading */
+@media (max-width: 640px) { .wp-stage .dh-doc-dialog-head h2 { font-size: 16px; } }
 
 /* /dashboard: the work comes up. A smaller heading and shorter start cards,
    so the register rows are on the first screen and not under a hero. */
