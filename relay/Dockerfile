@@ -62,7 +62,7 @@ FROM node:24-alpine3.24@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de68
 # Image version. Default matches relay/package.json; CI passes it explicitly as
 # a build-arg so a tagged build labels itself with the tag it was cut from.
 # tests/version-consistency.test.mjs fails if this default and package.json drift.
-ARG IMAGE_VERSION=3.1.2
+ARG IMAGE_VERSION=3.1.3
 
 LABEL org.opencontainers.image.title="paramant-relay" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \

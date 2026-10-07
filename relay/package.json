@@ -1,6 +1,6 @@
 {
   "name": "paramant-relay",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "main": "relay.js",
   "engines": {
     "node": ">=22 <25"
