@@ -56,6 +56,10 @@ for (const [name, how] of NAMES) {
     await readyOnePage(page, { pages: [{ size: A4 }, { size: A4 }] });
     await page.locator('#ds-allpages').check();
     await clickPage(page, 0, 0.5, 0.8);
+    // The seal must be on the page that was clicked, or page 1 bakes a paraaf
+    // and the name check below fails for a reason that is not the name.
+    const seals = (await uiBoxes(page)).filter((b) => b.kind === 'seal').map((b) => b.page);
+    assert.deepEqual(seals, [0], `the seal sits on page 1 before signing (on: ${JSON.stringify(seals)})`);
     const res = await signAndDownload(page, { name });
     assert.equal(res.error, undefined, `signing as ${name} failed: ${res.error}`);
     const m = await measurePdf(page, res.pdf, SHOTS ? 1 : 0);
