@@ -135,15 +135,35 @@ export async function waitPlaced(page, n) {
   await page.waitForTimeout(200);
 }
 
+// Click at (fx, fy) of page idx's canvas. /sign has html{scroll-behavior:
+// smooth}, so a plain scrollBy animates for ~400 ms. This used to measure after
+// a fixed 150 ms, mid-animation, while the page kept moving up until the click
+// arrived: on a busy CI runner the click landed in the gap between pages (no
+// seal, "Verder" stayed disabled) or on the NEXT page (seal on page 2, paraaf
+// on page 1: "J.V.D.Ü." where the name was expected, 2026-10-06/07). Scroll
+// instantly, and click only once the canvas has stood still for three frames.
 export async function clickPage(page, idx, fx, fy) {
-  const canvas = page.locator(`#ds-pdf-canvas-list .ds-page-wrap[data-page-index="${idx}"] canvas`);
+  const sel = `#ds-pdf-canvas-list .ds-page-wrap[data-page-index="${idx}"] canvas`;
+  const canvas = page.locator(sel);
   await canvas.scrollIntoViewIfNeeded();
-  let box = await canvas.boundingBox();
+  const box = await canvas.boundingBox();
   const vh = page.viewportSize().height;
-  await page.evaluate((dy) => window.scrollBy(0, dy), box.y + box.height * fy - vh * 0.45);
-  await page.waitForTimeout(150);
-  box = await canvas.boundingBox();
-  await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+  await page.evaluate((dy) => window.scrollBy({ top: dy, behavior: 'instant' }), box.y + box.height * fy - vh * 0.45);
+  const pt = await page.evaluate(async ({ sel, fx, fy }) => {
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const el = document.querySelector(sel);
+    let prev = '', still = 0;
+    for (let n = 0; n < 300; n++) {
+      await frame();
+      const r = el.getBoundingClientRect();
+      const cur = `${r.left},${r.top},${r.width},${r.height}`;
+      still = cur === prev ? still + 1 : 0;
+      prev = cur;
+      if (still >= 3) return { x: r.left + r.width * fx, y: r.top + r.height * fy };
+    }
+    throw new Error(`page ${sel} never stood still`);
+  }, { sel, fx, fy });
+  await page.mouse.click(pt.x, pt.y);
 }
 
 // Every marker on the place step, as fractions of its page canvas.
