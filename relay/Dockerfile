@@ -41,7 +41,7 @@ RUN git clone https://github.com/Apolloccrypt/paramant-core.git \
  && cp target/release/libparamant_core_node.so /pkg/paramant-core.node \
  && printf '{\n  "name": "@paramant/core",\n  "version": "0.5.0-alpha.1",\n  "main": "paramant-core.node",\n  "files": ["paramant-core.node"]\n}\n' > /pkg/package.json
 
-FROM node:24-alpine3.24@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS build
+FROM node:24-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS build
 
 RUN apk add --no-cache python3 make g++
 
@@ -57,7 +57,7 @@ RUN node -e "const fs=require('fs');for(const f of ['package.json','package-lock
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 # Lean image: no build tools, no npm, no compilers — only the relay and its deps.
-FROM node:24-alpine3.24@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
+FROM node:24-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
 
 # Image version. Default matches relay/package.json; CI passes it explicitly as
 # a build-arg so a tagged build labels itself with the tag it was cut from.
