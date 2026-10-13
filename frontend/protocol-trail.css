@@ -1,0 +1,81 @@
+/* protocol-trail.css - the narrow list of what protected this job, row by row.
+ *
+ * Built by js/protocol-trail.js. One dot, the ordinary words, and the measured
+ * protocol name after them in small mono. No badges, no heading, no colour
+ * beyond the two states: the row that is happening now and the rows that have
+ * happened. Design-system tokens only, so light and dark follow the theme.
+ */
+
+.pa-trail {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  max-width: 30rem;
+  text-align: left;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.pa-trail:empty { display: none; }
+/* On an end screen the column is centred, and so is the list. */
+.done-state .pa-trail { margin-inline: auto; }
+
+.pa-trail-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  padding: 1px 0;
+  animation: pa-trail-in var(--duration-slow) var(--ease-out);
+}
+
+.pa-trail-dot {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-2);
+  background: transparent;
+}
+.pa-trail-row.is-done .pa-trail-dot {
+  border-color: var(--ok-ink);
+  background: var(--ok-ink);
+}
+.pa-trail-row.is-now .pa-trail-dot {
+  border-color: var(--accent);
+  animation: pa-trail-pulse 1.4s var(--ease-soft) infinite;
+}
+
+.pa-trail-text { color: var(--ink); }
+.pa-trail-row.is-now .pa-trail-text { color: var(--ink-2); }
+
+/* Wraps under the words on a narrow screen, after them on a wide one. */
+.pa-trail-tech {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.pa-trail-tech::before { content: "\00b7\00a0"; }
+.pa-trail-tech[hidden],
+.pa-trail-tech:empty { display: none; }
+
+@keyframes pa-trail-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pa-trail-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
+
+/* Without motion every state is still there: rows simply appear, the current
+ * dot is an open ring that does not pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .pa-trail-row,
+  .pa-trail-row.is-now .pa-trail-dot { animation: none; }
+}
+
+/* Under a verdict on /verify the next paragraph needs room. */
+.ps-result .pa-trail { margin-bottom: var(--space-4); }

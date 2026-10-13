@@ -25,6 +25,15 @@ finance.paramant.app, iot.paramant.app, relay.paramant.app,
 addin.paramant.app {
 	tls /etc/letsencrypt/live/paramant.app/fullchain.pem /etc/letsencrypt/live/paramant.app/privkey.pem
 	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	# The TLS this request really came in over, for the pages that show what
+	# protected a transfer (frontend/js/protocol-trail.js). Measured here because
+	# this is where TLS ends: nginx behind it only sees the hop from Caddy, and a
+	# browser cannot read the TLS version itself. Deferred, so it replaces any
+	# value an upstream might send.
+	header {
+		X-Paramant-Tls "{http.request.tls.version} {http.request.tls.cipher_suite}"
+		defer
+	}
 	encode zstd gzip {
 		match {
 			header Content-Type text/*

@@ -454,6 +454,7 @@ function verifyV3Client(docHashHex) {
   // (against the hash in the proof), so the page can say "the proof is fine,
   // this is not the signed file" in red instead of "forged".
   let sigOk = false;
+  const checks = [];
   if (errors.length === 0 || (docMismatch && errors.length === 1)) {
     try {
       const msg = buildDocSignMessage(
@@ -466,14 +467,20 @@ function verifyV3Client(docHashHex) {
         env.appearance,
       );
       const ok = ml_dsa65.verify(fromB64(env.signer_public_key), msg, fromB64(env.signature || ''));
-      if (!ok) errors.push(t('signerInvalid')); else sigOk = true;
+      if (!ok) errors.push(t('signerInvalid')); else {
+        sigOk = true;
+        // "The signed document" only once a signature is known to hold: a hash
+        // that matches a forged proof is not a signed document.
+        if (docHashHex && signedHash && !docMismatch) checks.push({ key: 'match', tech: DOC_HASH.name });
+        checks.push({ key: 'sigOk', tech: dsaName(env.signer_public_key, env.signature) });
+      }
     } catch { errors.push(t('signerError')); }
   }
   if (env.expires_at && new Date(env.expires_at) < new Date()) {
     errors.push(t('expired', { v: env.expires_at }));
   }
   const wrongFile = docMismatch && sigOk && errors.length === 1;
-  return { valid: errors.length === 0, errors, wrongFile, docHash: signedHash };
+  return { valid: errors.length === 0, errors, wrongFile, docHash: signedHash, checks };
 }
 
 function verifyMultiClient(docHashHex) {
@@ -491,6 +498,9 @@ function verifyMultiClient(docHashHex) {
   const recipe = Number(env.sign_recipe || env.recipe_version) || 1;
   const parties = Array.isArray(env.parties) ? env.parties : [];
   if (!parties.length) errors.push(t('missingParties'));
+  const checks = [];
+  let partiesOk = 0;
+  const partyNames = new Set();
   parties.forEach((party, pos) => {
     const who = partyWho(party, pos);
     if (!party || party.status !== 'signed' || !party.public_key || !party.signature) {
@@ -507,8 +517,17 @@ function verifyMultiClient(docHashHex) {
     try {
       const message = buildDocSignMessage(env.envelope_id, env.document_hash, party.index, party.email_hash || '', recipe, party.public_key, party.appearance);
       if (!ml_dsa65.verify(fromB64(party.public_key), message, fromB64(party.signature))) errors.push(t('partyInvalid', { who }));
+      else { partiesOk++; partyNames.add(dsaName(party.public_key, party.signature)); }
     } catch { errors.push(t('partyError', { who })); }
   });
+  // Every party verified, and the row names the set only when they all used one.
+  if (parties.length && partiesOk === parties.length) {
+    const one = partyNames.size === 1 ? [...partyNames][0] : null;
+    // Same rule as v3: the file is "the signed document" only when every
+    // signature on it held.
+    if (env.document_hash && !docMismatch) checks.push({ key: 'match', tech: DOC_HASH.name });
+    checks.push(parties.length === 1 ? { key: 'sigOk', tech: one } : { key: 'sigsOk', tech: one, n: parties.length });
+  }
   // The notary counter-signature is checked against a relay key this site
   // ships with (js/relay-trust-anchors.js), never against the key printed in
   // the receipt: that key and its hash are written by whoever wrote the file,
@@ -533,6 +552,12 @@ function verifyMultiClient(docHashHex) {
         delete unsigned.notary_signature;
         const message = new TextEncoder().encode(canonicalJSON(unsigned));
         if (!ml_dsa65.verify(pinnedKey, message, fromB64(env.notary_signature || ''))) errors.push(t('notaryInvalid'));
+        else {
+          const m = window.paramantTrail && window.paramantTrail.measure;
+          let name = null;
+          try { name = m ? m.mlDsa(pinnedKey, fromB64(env.notary_signature || '')) : null; } catch { name = null; }
+          checks.push({ key: 'seal2', tech: name });
+        }
       }
     } catch { errors.push(t('notaryError')); }
   }
@@ -545,7 +570,7 @@ function verifyMultiClient(docHashHex) {
   // one is red, without party names or QES as facts (review #555, B1). The
   // proof itself is fine, so it is not called forged either.
   const wrongFile = docMismatch && errors.length === 1;
-  return { valid: errors.length === 0, errors, anchor, test, wrongFile, docHash: env.document_hash };
+  return { valid: errors.length === 0, errors, anchor, test, wrongFile, docHash: env.document_hash, checks };
 }
 
 async function verify() {
@@ -652,11 +677,22 @@ function relayErrors(list) {
 // event loop free between pieces: the page keeps answering and shows progress,
 // and a file larger than one ArrayBuffer can hold is still hashed. Same digest
 // as sha3_256(wholeBytes).
+// The one hash the document is fingerprinted with, and its name, kept in one
+// place so the line that names it cannot drift from the call that ran.
+const DOC_HASH = { name: 'SHA3-256', create: () => sha3_256.create() };
+
+// The checks that passed, as rows of js/protocol-trail.js. Only pushed where a
+// check really came out true; a check that failed or never ran has no row.
+function dsaName(pk, sig) {
+  const m = window.paramantTrail && window.paramantTrail.measure;
+  try { return m ? m.mlDsa(fromB64(pk || ''), fromB64(sig || '')) : null; } catch { return null; }
+}
+
 const SLICE = 8 * 1024 * 1024;
 const PIECE = 1024 * 1024;
 const breathe = () => new Promise((r) => setTimeout(r, 0));
 async function hashFileInSlices(file, onProgress) {
-  const h = sha3_256.create();
+  const h = DOC_HASH.create();
   const total = file.size || 0;
   let lastPct = -1;
   for (let off = 0; off < total; off += SLICE) {
@@ -771,6 +807,13 @@ function wireEmbeddedSave(r) {
   };
 }
 
+function checksTrail(checks) {
+  if (!window.paramantTrail || !Array.isArray(checks) || !checks.length) return null;
+  const trail = window.paramantTrail.create(null);
+  for (const c of checks) trail.step(c.key, 'done', c.tech || null, c.n ? { n: c.n } : null);
+  return trail;
+}
+
 async function renderResult(r) {
   const out = [];
   // A v3 solo proof binds a key, not a person: no reassuring green for a name
@@ -816,11 +859,19 @@ async function renderResult(r) {
     if (idx != null) out.push(t('ctIndex', { idx: esc(String(idx)) }));
   }
   $('vf-result').innerHTML = out.join('');
+  // The checks that passed, under the verdict. Not for an embedded original:
+  // the file the reader chose is then not the one that matched.
+  const trail = checksTrail(r.embedded ? (r.checks || []).filter((c) => c.key !== 'match') : r.checks);
+  const placeTrail = () => {
+    const box = $('vf-result');
+    if (trail && box && box.firstElementChild) box.firstElementChild.after(trail.el);
+  };
+  placeTrail();
   wireEmbeddedSave(r);
   // v1/v2 were checked by the relay already, so the account lookup rides along.
   if (r.valid && !isMulti && !isV3) {
     const attr = await lookupSignerHtml(envelope);
-    if (attr.html || attr.failed) $('vf-result').innerHTML = out.join('') + (attr.html || t('lookupFailed'));
+    if (attr.html || attr.failed) { $('vf-result').innerHTML = out.join('') + (attr.html || t('lookupFailed')); placeTrail(); }
     return;
   }
   // v3 solo is checked offline, and stays offline unless the reader asks: the
@@ -860,6 +911,7 @@ async function renderResult(r) {
       if (attr.revoked) out[0] = t('revokedBanner');
       else if (attr.found && !fpBad) out[0] = t('valid');
       $('vf-result').innerHTML = out.join('') + (attr.html || '');
+      placeTrail();
     });
   }
 }

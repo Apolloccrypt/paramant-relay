@@ -1546,11 +1546,14 @@ class EnvelopeStore {
       // worst a failure here can do is cost one wasted lookup on the next read.
       await this._dropFromPartyIndex(id, pi, h['p' + pi + '_email_hash'] || '');
       try {
-        this.ctAppend('envelope_sign', id, {
+        const ctEntry = this.ctAppend('envelope_sign', id, {
           party_index: pi,
           signer_pk_hash: crypto.createHash('sha3-256').update(Buffer.from(signerPubB64, 'base64')).digest('hex'),
           appearance_hash: appearanceHashHex || undefined,
         });
+        // The leaf this signature became in the public log. Handed back so the
+        // signer's screen can say where, and only when the append happened.
+        if (ctEntry && Number.isInteger(ctEntry.index)) out.ct_index = ctEntry.index;
         if (status === 'complete') this.ctAppend('envelope_complete', id, { signed_count: out.signed_count });
       } catch {}
     }

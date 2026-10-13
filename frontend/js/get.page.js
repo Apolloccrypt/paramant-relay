@@ -430,6 +430,11 @@ async function init() {
 // a large file on a slow line may take minutes, a line that stops sending for
 // a minute is broken.
 const STALL_MS = 60000;
+// What protected this collection, row by row (js/protocol-trail.js). Every
+// protocol name on it is read from the response or the key that did the work.
+let getTrail = null;
+function trailMeasure() { return window.paramantTrail ? window.paramantTrail.measure : null; }
+
 async function fetchSealed(token, onProgress) {
   const ctrl = new AbortController();
   let timer = null;
@@ -438,8 +443,10 @@ async function fetchSealed(token, onProgress) {
   try {
     const r = await fetch(LINK.relay + '/v2/dl/' + token + '/get' + '?claim=' + CLAIM, { signal: ctrl.signal, cache: 'no-store' });
     if (!r.ok) return { status: r.status, reason: await reasonOf(r) };
+    const m = trailMeasure();
+    const tls = m ? m.tls(r) : null;
     const total = Number(r.headers.get('Content-Length')) || 0;
-    if (!r.body || !r.body.getReader) return { status: 200, bytes: new Uint8Array(await r.arrayBuffer()) };
+    if (!r.body || !r.body.getReader) return { status: 200, bytes: new Uint8Array(await r.arrayBuffer()), tls };
     const reader = r.body.getReader();
     const parts = [];
     let got = 0;
@@ -455,7 +462,7 @@ async function fetchSealed(token, onProgress) {
     const out = new Uint8Array(got);
     let off = 0;
     for (const p of parts) { out.set(p, off); off += p.length; }
-    return { status: 200, bytes: out };
+    return { status: 200, bytes: out, tls };
   } catch (e) {
     return { status: 0, reason: ctrl.signal.aborted ? 'stalled' : 'network' };
   } finally {
@@ -474,14 +481,24 @@ function post(token, what) {
 function releaseAll(tokens) {
   for (const tk of tokens) post(tk, 'release').catch(() => {});
 }
+// True only when the relay answered `burned: true` for every block: that is
+// the one moment this page knows the copy on the server is gone.
 async function ackAll(tokens) {
+  let allBurned = tokens.length > 0;
   for (const tk of tokens) {
+    let burned = false;
     for (let i = 0; i < 3; i++) {
-      try { const r = await post(tk, 'ack'); if (r.ok || r.status === 404 || r.status === 410) break; }
+      try {
+        const r = await post(tk, 'ack');
+        if (r.ok) { try { burned = (await r.json()).burned === true; } catch { burned = false; } break; }
+        if (r.status === 404 || r.status === 410) break;
+      }
       catch { /* try again */ }
       await new Promise((res) => setTimeout(res, 800 * (i + 1)));
     }
+    if (!burned) allBurned = false;
   }
+  return allBurned;
 }
 
 function retryable(msg) {
@@ -499,12 +516,14 @@ async function tbDecryptChunk(blob, rawKey) {
   const ct = blob.slice(17, 17 + ctLen);
   const symKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
   const plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, symKey, ct));
+  const m = trailMeasure();
+  const alg = m ? m.aes(symKey) : null;
   // 'PRSH' | metaLen(4 BE) | metaJSON | chunkData
   if (plain[0] !== 0x50 || plain[1] !== 0x52 || plain[2] !== 0x53 || plain[3] !== 0x48) throw new Error('magic');
   const metaLen = new DataView(plain.buffer, 4, 4).getUint32(0, false);
   let meta = null;
   try { meta = JSON.parse(new TextDecoder().decode(plain.slice(8, 8 + metaLen))); } catch { meta = null; }
-  return { data: plain.slice(8 + metaLen), meta };
+  return { data: plain.slice(8 + metaLen), meta, alg };
 }
 
 async function startDownload() {
@@ -518,13 +537,21 @@ async function startDownload() {
     showStep('step-loading');
     setTitle(t('dlTitle'));
     setStatus(t('dlStatus'), 0);
+    if (window.paramantTrail) {
+      if (getTrail) getTrail.clear();
+      getTrail = window.paramantTrail.create(document.getElementById('get-trail'));
+      getTrail.step('fetch', 'now');
+    }
 
     const blobs = [];
+    // One name for the whole collection, or none when the blocks disagreed.
+    let fetchTls;
     for (let i = 0; i < tokens.length; i++) {
       const got = await fetchSealed(tokens[i], (f) => {
         setStatus(t('dlStatus'), Math.max(1, Math.round(((i + f) / tokens.length) * 80)));
       });
       if (got.status !== 200) {
+        if (getTrail) getTrail.settle();
         releaseAll(tokens);
         if (got.status === 404 || got.status === 410) { showGone(got.reason); return; }
         if (got.status === 409) { retryable(t('busy')); return; }
@@ -535,6 +562,12 @@ async function startDownload() {
         return;
       }
       blobs.push(got.bytes);
+      const name = got.tls ? got.tls.name : null;
+      fetchTls = fetchTls === undefined ? name : (fetchTls === name ? name : null);
+    }
+    if (getTrail) {
+      getTrail.step('fetch', 'done', fetchTls || null);
+      getTrail.step('open', 'now');
     }
 
     setTitle(t('decTitle'));
@@ -546,10 +579,12 @@ async function startDownload() {
     let filename;
     let fileData;
     let sizeMismatch = null;
+    let openAlg;
     try {
       if (LINK.kind === 'webapp') {
         const aesKey = await crypto.subtle.importKey('raw', LINK.rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
         const plaintext = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: LINK.iv }, aesKey, blobs[0]));
+        openAlg = trailMeasure() ? trailMeasure().aes(aesKey) : null;
         // Parse header: [uint32-LE nameLen][nameBytes][fileBytes]
         if (plaintext.length < 4) throw new Error('short');
         const nameLen = new DataView(plaintext.buffer).getUint32(0, true);
@@ -562,7 +597,8 @@ async function startDownload() {
         let sealedSize = null;
         let chunkMismatch = false;
         for (let i = 0; i < blobs.length; i++) {
-          const { data, meta } = await tbDecryptChunk(blobs[i], LINK.rawKeys[i]);
+          const { data, meta, alg } = await tbDecryptChunk(blobs[i], LINK.rawKeys[i]);
+          openAlg = openAlg === undefined ? alg : (openAlg === alg ? alg : null);
           if (meta && Number.isFinite(meta.file_size) && sealedSize === null) sealedSize = meta.file_size;
           if (meta && Number.isFinite(meta.chunk_size) && meta.chunk_size !== data.length) chunkMismatch = true;
           // The extension core writes file_name; older senders wrote name.
@@ -585,29 +621,41 @@ async function startDownload() {
         }
       }
     } catch {
+      if (getTrail) getTrail.settle();
       releaseAll(tokens);
       showError(t('decFail'));
       return;
     }
     if (sizeMismatch) {
+      if (getTrail) getTrail.settle();
       releaseAll(tokens);
       showError(t('sizeBad')(formatSize(sizeMismatch.got), formatSize(sizeMismatch.want ?? 0)));
       return;
     }
 
+    if (getTrail) getTrail.step('open', 'done', openAlg || null);
+
     // The file is whole and opened. Only now is the relay copy burned.
-    await ackAll(tokens);
+    const burned = await ackAll(tokens);
     acked = true;
+    if (getTrail && burned) getTrail.step('wiped', 'done', null);
     forgetClaim();
     await deliver(filename, fileData);
   } catch (e) {
     // Never a raw engine message on the receiver's screen (hertest T4-L1).
     // Before the ack nothing is spent; after it, "try again" would be untrue.
+    if (getTrail) getTrail.settle();
     if (!acked) { releaseAll(tokens); showError(t('netFail')); }
     else showError(t('unknown'));
   } finally {
     busyDownloading = false;
   }
+}
+
+function trailToEnd() {
+  if (!getTrail) return;
+  const actions = document.querySelector('#step-done .done-actions');
+  if (actions) actions.parentNode.insertBefore(getTrail.el, actions);
 }
 
 async function deliver(filename, fileData) {
@@ -639,6 +687,7 @@ async function deliver(filename, fileData) {
       savedFile = { name: filename, bytes: fileData, mime: 'application/pdf' };
       const saveBtn = document.getElementById('done-save');
       if (saveBtn) saveBtn.textContent = t('save');
+      trailToEnd();
       showStep('step-done');
       return;
     } catch (e) {
@@ -675,6 +724,7 @@ async function deliver(filename, fileData) {
   // /ontvang already makes on its own done screen.
   savedFile = { name: filename, bytes: fileData };
   document.addEventListener('visibilitychange', dropSavedFile);
+  trailToEnd();
   showStep('step-done');
 
 }
