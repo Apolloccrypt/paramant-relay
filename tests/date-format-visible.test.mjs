@@ -122,7 +122,7 @@ async function open(url, ready) {
   }));
   await page.route('**/api/user/documents**', (route) => json(route, {
     documents: [{ id: 'doc_1', title: 'Payslip August', status: 'signed',
-      created_at: '2026-08-31T09:00:00.000Z', expires_at: '2026-11-30T09:00:00.000Z' }],
+      created_at: '2026-08-31T09:00:00.000Z', expires_at: new Date(Date.now() + 60 * 864e5).toISOString() }],
   }));
   await page.route('**/api/user/dashboard/**', (route) => json(route, {}));
   await page.goto(ORIGIN + url, { waitUntil: 'domcontentloaded' });

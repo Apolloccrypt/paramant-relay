@@ -307,6 +307,19 @@ async function run(job) {
       for (const width of widths) {
         await page.setViewportSize({ width, height:Math.round(WINDOW_HEIGHT / zoom) });
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        // A resize is a style change, and with reduced motion every element
+        // carries `transition-duration: 1ms` (app-2026.css) over the default
+        // `transition-property: all`. Going from 1920 down to 320 therefore
+        // starts some forty transitions on the bar (padding, gap, widths),
+        // and until the frame that ends them the bar keeps its desktop
+        // padding: the hamburger stands at 362 of 320. Locally they are gone
+        // after two frames; on a loaded CI runner they were not, and the
+        // first width of the dark pass (the one that follows 1920) failed on
+        // a different page per attempt (sign-e2e run 38332402714). So the
+        // transitions are run to their end state, which is the layout a
+        // reader sees a millisecond later, instead of hoping the renderer's
+        // clock has moved. Nothing is measured more leniently.
+        await page.evaluate(() => { for (const a of document.getAnimations()) if (a instanceof CSSTransition) a.finish(); });
         // A fault counts when it is still there after the page has had time
         // to settle: resize handlers and fonts can land a frame late, and a
         // one-frame glimpse of a half-laid-out bar is not what a reader sees.
