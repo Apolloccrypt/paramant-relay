@@ -426,7 +426,7 @@ async function stubSign(page, { partyCount = 1, bindingMode = 'email' } = {}) {
     const b = route.request().postDataJSON();
     const n = b.include_requester === false ? b.recipients.length : (b.recipients.length + 1);
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, envelope: {
-      id: ENV_ID, party_count: n, binding_mode: bindingMode, expires_at: '2026-10-20T12:00:00.000Z',
+      id: ENV_ID, party_count: n, binding_mode: bindingMode, expires_at: new Date(Date.now() + 7 * 864e5).toISOString(),
       party_links: Array.from({ length: n }, (_, party_index) => ({ party_index,
         sign_path: `/co-sign?env=${ENV_ID}&p=${party_index}&t=${TOKEN}`, invite_token: TOKEN })) } }) });
   });

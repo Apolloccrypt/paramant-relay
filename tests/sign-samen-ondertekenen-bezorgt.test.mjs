@@ -27,7 +27,7 @@ async function runCosign({ failUpload = false } = {}) {
     const b = route.request().postDataJSON();
     seen.creates.push(b);
     const n = (b.recipients || []).length + 1;
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, envelope: { id: ENV_ID, party_count: n, binding_mode: 'email', expires_at: '2026-10-20T12:00:00.000Z',
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, envelope: { id: ENV_ID, party_count: n, binding_mode: 'email', expires_at: new Date(Date.now() + 7 * 864e5).toISOString(),
       party_links: Array.from({ length: n }, (_, i) => ({ party_index: i, sign_path: `/co-sign?env=${ENV_ID}&p=${i}&t=${String(i).repeat(43)}`, invite_token: String(i).repeat(43) })) } }) });
   });
   await page.route(`**/api/user/sign/submit`, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, signed_count: 1, party_count: 3, status: 'sent', appearance_hash: null }) }));

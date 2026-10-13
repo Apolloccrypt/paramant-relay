@@ -122,7 +122,7 @@ test('/co-sign: een gevraagde paraaf staat klaar en gaat er niet af', async () =
   await page.route('https://health.paramant.app/v2/envelopes/**', (route) => {
     if (new URL(route.request().url()).pathname.endsWith('/view')) return json(route, 200, { ok: true });
     return json(route, 200, { envelope: { id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'o.pdf', recipe_version: 5,
-      created_at: '2026-10-04T12:00:00.000Z', expires_at: '2026-11-03T12:00:00.000Z', status: 'sent', signed_count: 0, party_count: 2,
+      created_at: '2026-10-04T12:00:00.000Z', expires_at: new Date(Date.now() + 29 * 864e5).toISOString(), status: 'sent', signed_count: 0, party_count: 2,
       requested_appearance: requested, requested_for_party: true,
       parties: [{ index: 0, label: 'Pieter', status: 'pending' }, { index: 1, label: 'Marije', status: 'pending' }] } });
   });

@@ -33,7 +33,7 @@ const df = {
   passkeys: { passkeys: [] },
 };
 const dfSend = { id: 'snd_1', status: 'open', total: 2, collected: 0, outstanding: 2, created_at: '2026-10-04T12:32:00.000Z' };
-const dfDoc = { id: 'env_1', file_name: 'contract.pdf', status: 'sent', created_at: '2026-10-04T10:00:00Z', expires_at: '2026-11-04T10:00:00Z', parties: [{ name: 'A', status: 'pending' }], signed_count: 0, party_count: 1 };
+const dfDoc = { id: 'env_1', file_name: 'contract.pdf', status: 'sent', created_at: '2026-10-04T10:00:00Z', expires_at: new Date(Date.now() + 30 * 864e5).toISOString(), parties: [{ name: 'A', status: 'pending' }], signed_count: 0, party_count: 1 };
 
 let dfServer;
 let dfBrowser;
