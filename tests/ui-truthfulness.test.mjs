@@ -1232,8 +1232,10 @@ for (const claim of [
   'The encrypted files sit only there.',
   'For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file.',
   'Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider.',
-  // The sentence that carries the pride. It claims nothing a reader cannot check.
-  'We are Dutch, and we would rather say so than hide behind a Delaware address.',
+  // "We are Dutch, and we would rather say so than hide behind a Delaware
+  // address" carried the pride until 13 October 2026, when Mick read the page
+  // again: "Typische ai taal. Dat werkt niet goed in Nederland." The fact it
+  // stood on is in the card above it, in plain words, and pinned there.
 ]) {
   assert.ok(whyNl.includes(claim), `index.html: "Why Dutch matters" lost the line: ${claim}`);
 }

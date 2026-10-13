@@ -221,8 +221,9 @@ test('VREEMDE-09: de stap Ontvangers zegt maar een keer wie u toevoegt', () => {
 // dialoog zei "voor het tekenen", terwijl een uitnodiging verstuurd wordt.
 test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versturen een gratis account vraagt', () => {
   const cases = [
-    ['index', '/sign?mode=invite', /versturen doet u met een gratis account/, /Voor het versturen maakt u een gratis account/],
-    ['en/index', '/en/sign?mode=invite', /sending needs a free one/, /To send it, you create a free one/],
+    // 13-10-2026: de kop zegt het nu in een korte zin onder de knoppen, met hoofdletter.
+    ['index', '/sign?mode=invite', /versturen doet u met een gratis account/i, /Voor het versturen maakt u een gratis account/],
+    ['en/index', '/en/sign?mode=invite', /sending needs a free account/i, /To send it, you create a free one/],
   ];
   for (const [slug, href, hero, stage] of cases) {
     const html = pg(slug);
@@ -233,4 +234,34 @@ test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versture
     assert.ok(ends.length >= 1, `${slug}: geen dialoog met ${href}`);
     for (const b of ends) assert.match(strip(b), stage, `${slug}: de dialoog zegt niet dat versturen een account vraagt`);
   }
+});
+
+// Review op #588, 13-10-2026: de voorbeeldrijen op de home toonden "gisteren
+// 16:42", een vorm die /dashboard nooit toont. Een document toont
+// paramantDate.day ("12 oktober 2026"), een verzending paramantDate.localMoment
+// ("13 oktober 2026 om 09:12 (CEST)"), zie js/dashboard.js en js/format-date.js.
+// Daarna: een vaste datum veroudert, dus js/home-demo.js rekent elke datum bij
+// het laden terug vanaf vandaag. Hier: de terugval zonder script heeft de
+// notatie van het dashboard, en elke datum draagt data-wp-when, zodat hij niet
+// vast in de markup blijft hangen. tests/home-demo-datum.test.mjs zet de klok
+// en kijkt wat er werkelijk staat.
+test('HOME-DATUM: de voorbeeldrijen op de home gebruiken de datumnotatie van het dashboard, gerekend vanaf vandaag', () => {
+  const cases = [
+    ['index', 'Gemaakt', 'Verstuurd', '[a-z]+', 'om'],
+    ['en/index', 'Created', 'Sent', '[A-Z][a-z]+', 'at'],
+  ];
+  for (const [slug, made, sent, month, at] of cases) {
+    const html = pg(slug);
+    const rows = (cls) => [...html.matchAll(new RegExp(`<span class="${cls}"><strong>[^<]+<\\/strong><span>([\\s\\S]*?)<\\/span><\\/span>`, 'g'))].map((m) => m[1]);
+    const docs = rows('dh-document-name'); const sends = rows('dh-send-name');
+    assert.ok(docs.length >= 1 && sends.length >= 1, `${slug}: geen voorbeeldrijen gevonden`);
+    for (const r of [...docs, ...sends]) {
+      assert.match(r, /<time data-wp-when="(day|moment)" data-wp-ago="\d+"/, `${slug}: "${r}" staat vast in de markup; zonder data-wp-when veroudert hij`);
+    }
+    for (const d of docs.map((r) => strip(r).trim())) assert.match(d, new RegExp(`^${made} \\d{1,2} ${month} \\d{4}$`), `${slug}: "${d}" is niet de dagnotatie van het dashboard`);
+    for (const d of sends.map((r) => strip(r).trim())) assert.match(d, new RegExp(`^${sent} \\d{1,2} ${month} \\d{4} ${at} \\d{2}:\\d{2} \\([A-Z]+\\)$`), `${slug}: "${d}" is niet de tijdnotatie van het dashboard`);
+  }
+  const js = fs.readFileSync(path.join(FE, 'js/home-demo.js'), 'utf8');
+  assert.match(js, /f\.localMoment\(d\)/, 'home-demo.js schrijft een verzending niet meer met paramantDate.localMoment');
+  assert.match(js, /f\.day\(d\)/, 'home-demo.js schrijft een document niet meer met paramantDate.day');
 });

@@ -11,6 +11,29 @@
   var root = document.querySelector('[data-wp-demo]');
   if (!root) return;
 
+  // The example dates, counted back from today (13-10-2026). A date typed into
+  // the markup ages, and an overview whose newest row is three months old looks
+  // abandoned. Each <time data-wp-when> says how many days back it lies
+  // (data-wp-ago) and, for a send, at what time (data-wp-at); it is written
+  // with js/format-date.js, the formatter /dashboard uses: paramantDate.day for
+  // a document ("Gemaakt 12 oktober 2026"), paramantDate.localMoment for a send
+  // ("Verstuurd 13 oktober 2026 om 09:12 (CEST)"). Without script, or without
+  // the formatter, the date in the markup stays.
+  (function fillDates() {
+    var f = window.paramantDate;
+    if (!f || !f.day || !f.localMoment) return;
+    var now = new Date();
+    Array.prototype.forEach.call(root.querySelectorAll('time[data-wp-when]'), function (el) {
+      var ago = Number(el.getAttribute('data-wp-ago')) || 0;
+      var at = /^(\d{1,2}):(\d{2})$/.exec(el.getAttribute('data-wp-at') || '') || [0, 12, 0];
+      var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ago, Number(at[1]), Number(at[2]));
+      // "today at 09:12" before 09:12 would lie in the future: then it was yesterday.
+      if (d > now) d.setDate(d.getDate() - 1);
+      el.setAttribute('datetime', d.toISOString());
+      el.textContent = el.getAttribute('data-wp-when') === 'moment' ? f.localMoment(d) : f.day(d);
+    });
+  })();
+
   // The stages sit in the hero's markup, inside .home-state, which is its own
   // stacking context (z-index 2). Moved to <body> they cover the nav as a
   // dialog should, instead of opening underneath it.
