@@ -71,7 +71,7 @@ test('b+d. /co-sign: het kruisje dekt de getypte naam niet af, en de naam komt z
   await page.route('https://health.paramant.app/v2/envelopes/**', (route) => {
     if (new URL(route.request().url()).pathname.endsWith('/view')) return json(route, 200, { ok: true });
     return json(route, 200, { envelope: { id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'o.pdf', recipe_version: 5,
-      created_at: '2026-10-04T12:00:00.000Z', expires_at: '2026-11-03T12:00:00.000Z', status: 'sent', signed_count: 0, party_count: 1,
+      created_at: '2026-10-04T12:00:00.000Z', expires_at: new Date(Date.now() + 29 * 864e5).toISOString(), status: 'sent', signed_count: 0, party_count: 1,
       parties: [{ index: 0, label: 'Pieter Partner', status: 'pending' }] } });
   });
   await page.route(`**/api/user/envelopes/${ENV_ID}/document*`, (r) => r.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(fixture.capsule) }));
