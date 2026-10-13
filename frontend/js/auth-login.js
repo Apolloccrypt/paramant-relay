@@ -7,10 +7,46 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   const submitBtn = document.getElementById('submit-btn');
 
   const params = new URLSearchParams(window.location.search);
+  // The first sign-in after making an account (test with a stranger,
+  // 13-10-2026). /signup?next= keeps the way back in this browser
+  // (js/signup-next.js); a sign-in without a ?next= of its own takes it, once,
+  // and puts it in the address so passkey.js reads the same thing.
+  const NEXT_KEY = 'paramant:signup-next';
+  if (!params.get('next') && !params.get('return')) {
+    let rec = null;
+    try { rec = JSON.parse(localStorage.getItem(NEXT_KEY) || 'null'); localStorage.removeItem(NEXT_KEY); } catch (e) { rec = null; }
+    const now = Date.now();
+    if (rec && typeof rec.path === 'string' && /^\/(?![\/\\])[^\s\\]*$/.test(rec.path) && rec.path.length <= 512
+        && Number(rec.exp) > now && Number(rec.exp) <= now + 864e5) {
+      params.set('next', rec.path);
+      try { history.replaceState(history.state, '', location.pathname + '?' + params.toString() + location.hash); } catch (e) { /* the default route then */ }
+    }
+  }
   // Honour both the nginx gate's ?next= and legacy ?return= links. Local paths
   // only (leading single slash, no // or /\) so it can't become an open redirect.
+  // No whitespace, control character or backslash anywhere either: the URL
+  // parser drops a tab or newline, so ?next=/%09/evil.example became
+  // //evil.example after the sign-in (review PR 586, 13-10-2026).
   const _rv = params.get('next') || params.get('return') || nlEn('/dashboard', '/en/dashboard');
-  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
+  const returnUrl = /^\/(?![\/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
+  const hasNext = returnUrl === _rv && !!(params.get('next') || params.get('return'));
+
+  // No account yet: "Account maken" on this page keeps the way back
+  // (login.html linked a bare /signup, so a visitor sent here from /pricing or
+  // /sign lost his place the moment he chose to make an account).
+  if (hasNext) {
+    const signup = nlEn('/signup', '/en/signup') + '?next=' + encodeURIComponent(returnUrl);
+    const keepWayBack = function () {
+      document.querySelectorAll('a[href="/signup"], a[href="/en/signup"], a[href^="/signup?next="], a[href^="/en/signup?next="]').forEach(function (a) {
+        if (a.getAttribute('href') !== signup) a.setAttribute('href', signup);
+      });
+    };
+    keepWayBack();
+    // nav-auth.js draws the bar again once it knows the session; its
+    // "Account maken" keeps the way back too.
+    const bar = document.getElementById('nav-auth');
+    if (bar && window.MutationObserver) new MutationObserver(keepWayBack).observe(bar, { childList: true, subtree: true });
+  }
 
   // Sent here by the nginx gate in front of the send page (the landing's "Probeer
   // het zelf" under Versturen does exactly that when nobody is signed in). A bare

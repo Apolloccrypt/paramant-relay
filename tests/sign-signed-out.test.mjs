@@ -120,6 +120,11 @@ ok('the send button asks for the session instead of promising to send',
 ok('and it says the prepared document does not survive signing in',
   /is niet geüpload/i.test(await out.locator('#ds-recipients-hint').innerText()),
   await out.locator('#ds-recipients-hint').innerText());
+// A request needs someone to go to: the button checks that before the sign-in
+// (test with a stranger, 13-10-2026), so fill one person in first.
+await out.locator('#ds-add-recipient').click();
+await out.locator('[data-field="label"]').nth(0).fill('Signer Demo');
+await out.locator('[data-field="email"]').nth(0).fill('demo@example.com');
 await out.locator('#ds-recipients-continue').click();
 await out.waitForURL(/\/auth\/login\?next=%2Fsign|\/auth\/login\?next=\/sign/, { timeout: 15000 }).catch(() => {});
 ok('pressing it goes to the sign-in and back to /sign', /\/auth\/login\?next=(\/|%2F)sign(%3Fherstel%3D1)?$/.test(out.url()), out.url());

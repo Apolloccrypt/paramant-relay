@@ -229,12 +229,13 @@ main#main-content .btn { width: 100%; justify-content: center; }
   <p id="signup-error-msg"></p>
 </div>
 
-<section class="section-lg">
+<section class="section-lg" id="step1">
   <div class="eyebrow"><span class="bar"></span>stap 1 van 5</div>
   <h1>Maak uw <em>account</em>.</h1>
   <p class="lede">
     Wij sturen een link om te bevestigen dat u het bent. U hoeft geen wachtwoord te bedenken.
   </p>
+  <p class="small mt-2" id="signup-next-note" role="note" hidden></p>
   <p class="small mt-2">
     Een Community-account is gratis, voor altijd en zonder betaalkaart. U krijgt 2 handtekeningen per maand. Versleutelde bestanden die u verstuurt, verdwijnen na de eerste keer openen.
     <a href="/pricing">Bekijk de plannen</a>.
@@ -275,7 +276,7 @@ main#main-content .btn { width: 100%; justify-content: center; }
   </form>
 
   <p class="footer-text mt-4">
-    Al een account? <a href="/auth/login">Inloggen</a>
+    Al een account? <a href="/auth/login" data-signup-login>Inloggen</a>
   </p>
 </section>
 
@@ -298,10 +299,11 @@ main#main-content .btn { width: 100%; justify-content: center; }
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
-<script src="/js/signup.inline1.js?v=4"></script>
+<script src="/js/signup.inline1.js?v=5"></script>
 
 <script src="/js/signup.inline2.js?v=3"></script>
 <script src="/js/signup.inline3.js?v=6"></script>
+<script type="module" src="/js/signup-page-next.js?v=1"></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/en/signup" hreflang="en" lang="en">This page in English</a></span>

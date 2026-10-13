@@ -74,14 +74,40 @@ async function open1(key, box) {
   return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: box.iv }, key, box.ct));
 }
 
+// A visitor who is not signed in yet has no account key (test with a
+// stranger, 13-10-2026). His draft was simply not stored, so "Inloggen om te
+// versturen" lost the document, the spot and the recipients it promised to
+// keep. Such a draft is now sealed with a key made in this browser: AES-GCM,
+// non-extractable, kept in the same database under its own name, never in the
+// draft record. That protects nothing against someone at this browser, and it
+// is not meant to: it is the visitor's own document in his own browser. The
+// record says `anon`; it is only put back by a signed-in page reached through
+// /sign?herstel=1 (the road back from the sign-in or the signup), and it goes
+// with the draft: once restored, on sign-out, and after two hours.
+const ANON = 'anon-key';
+async function anonKey(create) {
+  let k = null;
+  try { k = await tx('readonly', (s) => s.get(ANON)); } catch { k = null; }
+  if (k && typeof k === 'object' && k.type === 'secret') return k;
+  if (!create) return null;
+  k = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  await tx('readwrite', (s) => s.put(k, ANON));
+  return k;
+}
+
 // meta: plain JSON (hash, name, placement, recipients, ...). bytes: Uint8Array.
-// Without an account key nothing is stored (returns false).
+// Without an account key the draft is sealed with this browser's key (above).
 export async function saveDraft(meta, bytes, key = accountKey) {
-  if (!key) return false;
+  let anon = false;
+  if (!key) {
+    try { key = await anonKey(true); anon = true; } catch { return false; }
+    if (!key) return false;
+  }
   const now = Date.now();
   const m = await seal(key, enc.encode(JSON.stringify(meta || {})));
   const b = bytes && bytes.length ? await seal(key, bytes) : null;
   const rec = { v: 2, savedAt: now, expiresAt: now + DRAFT_TTL_MS, m, b };
+  if (anon) rec.anon = true;
   await tx('readwrite', (s) => s.put(rec, KEY));
   return true;
 }
@@ -94,12 +120,18 @@ export async function loadDraft(now = Date.now(), key = accountKey) {
   if (!rec) return null;
   if (rec.v !== 2 || !(now < rec.expiresAt) || !(now - rec.savedAt < DRAFT_TTL_MS)) { await clearDraft(); return null; }
   if (!key) return null;
+  // A draft made before the sign-in opens with this browser's key, and only
+  // once there is an account to hand it to.
+  if (rec.anon) {
+    key = await anonKey(false);
+    if (!key) { await clearDraft(); return null; }
+  }
   let meta, bytes = null;
   try {
     meta = JSON.parse(dec.decode(await open1(key, rec.m)));
     if (rec.b) bytes = await open1(key, rec.b);
   } catch { await clearDraft(); return null; }
-  return { meta: meta || {}, bytes, savedAt: rec.savedAt };
+  return { meta: meta || {}, bytes, savedAt: rec.savedAt, anon: !!rec.anon };
 }
 
 export async function hasDraft(now = Date.now()) {
@@ -110,5 +142,5 @@ export async function hasDraft(now = Date.now()) {
 }
 
 export async function clearDraft() {
-  try { await tx('readwrite', (s) => s.delete(KEY)); } catch { /* nothing to wipe */ }
+  try { await tx('readwrite', (s) => { s.delete(ANON); return s.delete(KEY); }); } catch { /* nothing to wipe */ }
 }

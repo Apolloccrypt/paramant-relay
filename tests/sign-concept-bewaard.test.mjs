@@ -137,7 +137,7 @@ await p2.route('**/api/user/session/verify', (r) => json(r, 200, { authenticated
 await p2.route('**/api/user/sign-draft-key', (r) => json(r, 200, { key: currentKey }));
 await p2.goto(`${ORIGIN}/sign`, { waitUntil: 'domcontentloaded' });
 await p2.evaluate(async (k) => {
-  const m = await import('/js/sign-draft.js?v=4');
+  const m = await import('/js/sign-draft.js?v=5');
   await m.loadAccountKey(async () => new Response(JSON.stringify({ key: k })));
   await m.saveDraft({ docName: 'van-A.pdf', recipients: [{ label: 'Piet', email: 'piet@example.com' }] }, new TextEncoder().encode('%PDF geheim'));
 }, keyA);
@@ -149,13 +149,92 @@ const other = await p2.evaluate(() => new Promise((resolve) => {
   r.onsuccess = () => { try { const g = r.result.transaction('kv').objectStore('kv').get('current'); g.onsuccess = () => resolve({ left: !!g.result, offered: !!document.getElementById('ds-draft-offer'), recip: [...document.querySelectorAll('[data-field="email"]')].map((i) => i.value) }); } catch { resolve({ left: false }); } };
 }));
 const expired = await p2.evaluate(async (k) => {
-  const m = await import('/js/sign-draft.js?v=4');
+  const m = await import('/js/sign-draft.js?v=5');
   await m.loadAccountKey(async () => new Response(JSON.stringify({ key: k })));
   await m.saveDraft({ docName: 'oud.pdf' }, new TextEncoder().encode('x'));
   const later = Date.now() + 25 * 3600 * 1000;
   return { has: await m.hasDraft(later), load: await m.loadDraft(later), after: await m.hasDraft() };
 }, keyB);
 await ctx2.close();
+
+// ── Uitgelogd, de vreemde (13-10-2026). Wie nog geen account had, kreeg
+// "Inloggen om te versturen", en na het inloggen stond er niets meer klaar:
+// zonder accountsleutel werd het concept niet bewaard. En met een lege naam of
+// e-mail ging de knop gewoon door naar de inlogpagina.
+const anonCtx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+const anonPage = await anonCtx.newPage();
+let anonSignedIn = false;
+await anonPage.route('**/api/**', (r) => (anonSignedIn ? json(r, 200, { ok: true }) : json(r, 401, { error: 'unauthorized' })));
+await anonPage.route('**/api/user/session/verify', (r) => json(r, 200, { authenticated: anonSignedIn, email: anonSignedIn ? 'demo@example.com' : undefined }));
+await anonPage.route('**/api/user/sign-draft-key', (r) => (anonSignedIn ? json(r, 200, { key: keyA }) : json(r, 401, { error: 'unauthorized' })));
+await anonPage.goto(`${ORIGIN}/sign?mode=invite`, { waitUntil: 'domcontentloaded' });
+await loadPdfLibs(anonPage);
+await anonPage.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 600 && !(window.PDFLib && window.pdfjsLib); i++) await sleep(20);
+  const doc = await window.PDFLib.PDFDocument.create();
+  doc.addPage([595, 842]).drawText('Overeenkomst Acme', { x: 60, y: 760, size: 16 });
+  const t = new DataTransfer();
+  t.items.add(new File([await doc.save()], 'acme.pdf', { type: 'application/pdf' }));
+  const input = document.getElementById('ds-doc-input');
+  input.files = t.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await anonPage.locator('#step-place:not([hidden])').waitFor({ timeout: 30000 });
+await anonPage.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="0"] canvas').waitFor({ timeout: 30000 });
+await anonPage.waitForTimeout(400);
+await anonPage.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="0"]').click({ position: { x: 200, y: 300 } });
+await anonPage.locator('#ds-place-continue').click();
+await anonPage.locator('#step-recipients:not([hidden])').waitFor({ timeout: 20000 });
+const anonButton = await anonPage.locator('#ds-recipients-continue').innerText();
+// Nobody added yet, then a row with only an address: both stay on the page.
+await anonPage.locator('#ds-recipients-continue').click();
+await anonPage.waitForTimeout(400);
+const anonEmpty = { url: anonPage.url(), hint: await anonPage.locator('#ds-recipients-hint').innerText().catch(() => '') };
+await anonPage.locator('#ds-add-recipient').click();
+await anonPage.locator('[data-field="email"]').nth(0).fill('demo@example.com');
+await anonPage.locator('#ds-recipients-continue').click();
+await anonPage.waitForTimeout(400);
+const anonNoName = { url: anonPage.url(), hint: await anonPage.locator('#ds-recipients-hint').innerText().catch(() => '') };
+await anonPage.locator('[data-field="label"]').nth(0).fill('Signer Demo');
+await anonPage.locator('#ds-recipients-continue').click();
+await anonPage.waitForURL(/\/auth\/login/, { timeout: 15000 }).catch(() => {});
+const anonLoginUrl = anonPage.url();
+const anonStored = await anonPage.evaluate(() => new Promise((resolve) => {
+  const r = indexedDB.open('paramant-sign-draft');
+  r.onsuccess = () => {
+    try {
+      const g = r.result.transaction('kv').objectStore('kv').get('current');
+      g.onsuccess = () => {
+        const v = g.result;
+        const latin = (u8) => (u8 ? new TextDecoder('latin1').decode(u8) : '');
+        const all = v ? latin(v.b && v.b.ct) + latin(v.m && v.m.ct) : '';
+        resolve({ has: !!v, anon: !!(v && v.anon), plain: /%PDF|Acme|demo@example/.test(all),
+          keyInRecord: v ? Object.values(v).some((x) => x instanceof CryptoKey) : null });
+      };
+      g.onerror = () => resolve({ has: false });
+    } catch { resolve({ has: false }); }
+  };
+  r.onerror = () => resolve({ has: false });
+}));
+// Plain /sign does not offer a draft made before the sign-in; /sign?herstel=1,
+// signed in, puts it back.
+anonSignedIn = true;
+await anonPage.goto(`${ORIGIN}/sign`, { waitUntil: 'domcontentloaded' });
+await anonPage.waitForTimeout(2000);
+const anonOfferedPlain = await anonPage.locator('#ds-draft-offer').count();
+await anonPage.goto(`${ORIGIN}/sign?herstel=1`, { waitUntil: 'domcontentloaded' });
+const anonBack = await anonPage.locator('#step-recipients:not([hidden])').waitFor({ timeout: 30000 }).then(() => true, () => false);
+const anonRestored = await anonPage.evaluate(() => ({
+  labels: [...document.querySelectorAll('[data-field="label"]')].map((i) => i.value),
+  emails: [...document.querySelectorAll('[data-field="email"]')].map((i) => i.value),
+}));
+await anonPage.waitForTimeout(500);
+const anonLeft = await anonPage.evaluate(() => new Promise((resolve) => {
+  const r = indexedDB.open('paramant-sign-draft');
+  r.onsuccess = () => { try { const t = r.result.transaction('kv').objectStore('kv'); const a = t.get('current'); const b = t.get('anon-key'); b.onsuccess = () => resolve({ draft: !!a.result, key: !!b.result }); } catch { resolve({ draft: false, key: false }); } };
+}));
+await anonCtx.close();
 
 
 test('een verlopen sessie biedt inloggen aan zonder dat het werk verloren gaat', () => {
@@ -199,4 +278,25 @@ test('een concept vervalt', () => {
   assert.equal(expired.has, false);
   assert.equal(expired.load, null);
   assert.equal(expired.after, false, 'een verlopen concept wordt bij het lezen gewist');
+});
+
+test('uitgelogd: lege ontvangers gaan niet door naar de inlogpagina', () => {
+  assert.match(anonButton, /Inloggen om te versturen/);
+  assert.doesNotMatch(anonEmpty.url, /auth\/login/);
+  assert.match(anonEmpty.hint, /minstens één persoon/);
+  assert.doesNotMatch(anonNoName.url, /auth\/login/);
+  assert.match(anonNoName.hint, /heeft een naam nodig/);
+  assert.match(anonLoginUrl, /\/auth\/login\?next=(%2F|\/)sign(%3F|\?)herstel(%3D|=)1$/);
+});
+
+test('uitgelogd: het concept wordt bewaard, versleuteld, en komt na het inloggen terug op /sign?herstel=1', () => {
+  assert.ok(anonStored.has, 'zonder account werd er niets bewaard');
+  assert.equal(anonStored.anon, true);
+  assert.equal(anonStored.plain, false, 'het document en de ontvangers staan niet leesbaar in IndexedDB');
+  assert.equal(anonStored.keyInRecord, false, 'de sleutel staat niet in het concept zelf');
+  assert.equal(anonOfferedPlain, 0, 'een gewone /sign biedt het concept van voor het inloggen niet aan');
+  assert.ok(anonBack, 'terug op de stap Ontvangers');
+  assert.deepEqual(anonRestored.labels, ['Signer Demo']);
+  assert.deepEqual(anonRestored.emails, ['demo@example.com']);
+  assert.deepEqual(anonLeft, { draft: false, key: false }, 'concept en browsersleutel zijn weg na het terugzetten');
 });

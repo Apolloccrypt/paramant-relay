@@ -213,7 +213,9 @@ function wireSetupPasskey() {
 function safeNext() {
   const q = new URLSearchParams(window.location.search);
   const want = q.get('next') || q.get('return') || nlEn('/dashboard', '/en/dashboard');
-  return /^\/(?![\/\\])/.test(want) ? want : nlEn('/dashboard', '/en/dashboard');
+  // No whitespace, control character or backslash anywhere: the URL parser
+  // drops a tab or newline, so /%09/evil.example became //evil.example.
+  return /^\/(?![\/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(want) ? want : nlEn('/dashboard', '/en/dashboard');
 }
 
 // ── Login: /auth/login (email-first passkey sign-in) ─────────────────────────
@@ -405,7 +407,7 @@ function wireDiscoverablePasskey() {
 
   const _rp = new URLSearchParams(window.location.search), _rv = _rp.get('next') || _rp.get('return') || nlEn('/dashboard', '/en/dashboard');
   // Local paths only (leading single slash) — never an off-site open redirect.
-  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
+  const returnUrl = /^\/(?![\/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
