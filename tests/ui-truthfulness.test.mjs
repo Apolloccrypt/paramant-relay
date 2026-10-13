@@ -1616,7 +1616,12 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // 13 October 2026: /about opens as a story. The plain-language opening and
   // the line that says who it is for are the subtitle and the founder's first
   // paragraph, both before the word post-quantum.
-  assert.match(aboutHero, /Secure file transfer and signing, for practices and offices\./,
+  // The subtitle is a plain sentence, not the homepage title: that title
+  // ("Veilig versturen en laten tekenen, voor praktijken en kantoren") is the
+  // line copy/homepage-mens drops as AI language, so it cannot be the source.
+  // The words follow the old /about lede ("Met Paramant verstuurt u documenten
+  // en laat u ze tekenen").
+  assert.match(aboutHero, /With Paramant you send documents and get them signed, as a practice or an office\./,
     'about.html must say who it is for in the hero');
   assert.match(aboutHero, /a way to get a document signed and send a file/,
     'about.html must open in plain language, before the word post-quantum');
