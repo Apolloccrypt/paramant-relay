@@ -4860,6 +4860,10 @@ function setHeaders(res, req) {
   const allowOrigin = isAllowedOrigin(origin) ? origin : 'https://paramant.app';
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
+  // X-Paramant-Tls is set by the TLS edge (deploy/caddy/Caddyfile), not here.
+  // Exposed so a page on paramant.app can name the connection its own upload
+  // or download went over (frontend/js/protocol-trail.js).
+  res.setHeader('Access-Control-Expose-Headers', 'X-Paramant-Tls');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce, X-Parasign-Invite-Token');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
@@ -8925,7 +8929,7 @@ async function handleRelayRequest(req, res) {
         // it with the token from its own URL; we never had the means to.
         'X-Paramant-Key': got.wrapped_key || '',
         'Access-Control-Expose-Headers':
-          'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key',
+          'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key, X-Paramant-Tls',
       });
 
       // THE CLAIM IS ONLY REAL WHEN THE BYTES ARRIVED.
@@ -12471,6 +12475,7 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status,
         signed_at: out.signed_at, appearance: out.appearance, appearance_hash: out.appearance_hash,
+        ...(Number.isInteger(out.ct_index) ? { ct_index: out.ct_index } : {}),
         ...(_quotaField ? { quota: _quotaField } : {}) }));
     } catch (e) {
       if (redisOutage503(e, res)) return;

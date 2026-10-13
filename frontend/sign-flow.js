@@ -13,7 +13,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=23';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=24';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
@@ -4177,6 +4177,8 @@ async function doSign() {
     // PRF key: unlock with one passkey tap. TOTP fallback: the signer was already
     // produced (in memory) when the code was entered, so just use it.
     const signer = ephemeralSigner || await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname });
+    const trail = startSignTrail();
+    if (trail) trail.step('sign', 'now');
     ephemeralSigner = null;   // consumed — `signer` owns it now and disposes below
     const appearance = { version: 1, fields: [] };
     let sigB64;
@@ -4190,13 +4192,23 @@ async function doSign() {
         signerPublicKey: signKey.pk_b64,
         appearance,
       });
-      sigB64 = toB64(await signer.sign(message));
+      const sigBytes = await signer.sign(message);
+      sigB64 = toB64(sigBytes);
+      // The set is read from the key and the signature that were just made.
+      if (trail) trail.step('sign', 'done', window.paramantTrail.measure.mlDsa(signer.publicKey, sigBytes));
     } finally {
       signer.dispose();   // zeroize — the secret never outlives this block
     }
 
     status(L('Uw handtekening wordt vastgelegd...', 'Recording your signature...'));
+    if (trail) trail.step('send', 'now');
     const submitted = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance });
+    if (trail) {
+      const tls = window.paramantTrail.measure.parseTls(submitted.tlsHeader);
+      trail.step('send', 'done', tls ? tls.name : null, tls && tls.suite ? { title: tls.suite } : null);
+      // The leaf the relay wrote for this signature, when it says which.
+      if (Number.isInteger(submitted.ct_index)) trail.step('log', 'done', window.paramantTrail.logIndex(submitted.ct_index));
+    }
 
     // 4) v3 .psign receipt. The authoritative, CT-logged signature record is the
     //    relay envelope; this file points at it (envelope_id + party 0).
@@ -4244,6 +4256,7 @@ async function doSign() {
     if (cosignWithOthers) await shareCosignDocument(env, mp, stampedBytes || state.doc.bytes, docHashForEnvelope);
     showDone();
   } catch (e) {
+    if (signTrail) signTrail.settle();
     // Zeroize any unconsumed ephemeral secret (error before it was handed to the signer).
     if (ephemeralSigner) { try { ephemeralSigner.dispose(); } catch { /* best-effort */ } ephemeralSigner = null; }
     $('ds-sign-status').className = 'ds-banner err';
@@ -4459,8 +4472,23 @@ function renderTotpSha1Note(afterEl) {
   afterEl.parentNode.insertBefore(note, afterEl.nextSibling);
 }
 
+// What protected this signature, row by row (js/protocol-trail.js). Shown
+// under the signing status while it happens and on the end screen after.
+let signTrail = null;
+function startSignTrail() {
+  if (signTrail) signTrail.clear();
+  signTrail = window.paramantTrail ? window.paramantTrail.create($('ds-sign-trail')) : null;
+  return signTrail;
+}
+function signTrailToEnd() {
+  if (!signTrail) return;
+  const actions = document.querySelector('#step-done .done-actions');
+  if (actions) actions.parentNode.insertBefore(signTrail.el, actions);
+}
+
 function showDone() {
   setActive('step-done');
+  if (state.signingMode !== 'invite') signTrailToEnd();
   clearDraft();   // sent or signed: the kept draft has done its job
   const r = state.result;
   // Say what the proof covers before the reader draws his own conclusion from

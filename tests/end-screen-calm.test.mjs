@@ -18,6 +18,8 @@
 //   1. Nothing on the face of the screen is written in algorithm. The names are
 //      not deleted, they are one fold down under "What made this safe", and the
 //      fold is closed. This test reads the screen with the <details> cut out.
+//      The one exception is the measured name in the protocol trail, see
+//      faceText below.
 //   2. Exactly one button carries the loud paint. Every other way out is a
 //      quiet line under it. A screen with two primaries is a screen that has
 //      not decided what it wants the reader to do.
@@ -77,7 +79,12 @@ async function faceText(page, sel) {
     const root = document.querySelector(s);
     if (!root) return '';
     const clone = root.cloneNode(true);
-    clone.querySelectorAll('details, script, style').forEach((n) => n.remove());
+    // One exception to rule 1, asked for on 13 October 2026: the small mono
+    // name after a row of the protocol trail (js/protocol-trail.js). It is
+    // measured from the call that did the work, never typed, and
+    // tests/protocol-trail.test.mjs holds it to that. The words of the row
+    // stay under this check.
+    clone.querySelectorAll('details, script, style, .pa-trail-tech').forEach((n) => n.remove());
     // Mirror what is actually painted: walk the live tree and drop the text of
     // anything the browser is not showing.
     const liveHidden = [...root.querySelectorAll('*')].filter((el) => {

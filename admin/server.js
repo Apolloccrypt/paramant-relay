@@ -2797,6 +2797,8 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
       signed_at: body.signed_at,
       appearance: body.appearance,
       appearance_hash: body.appearance_hash,
+      // Where the relay wrote this signature in the public log, when it did.
+      ...(Number.isInteger(body.ct_index) ? { ct_index: body.ct_index } : {}),
       quota: body.quota,
     });
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }

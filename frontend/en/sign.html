@@ -552,6 +552,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <meta name="theme-color" content="#FFFFFF">
 <link rel="stylesheet" href="/app-2026.css?v=12">
 <link rel="stylesheet" href="/done-state.css?v=1">
+<link rel="stylesheet" href="/protocol-trail.css?v=1">
 <link rel="stylesheet" href="/werkplek.css?v=2">
 <script src="/js/theme.js?v=6"></script>
 </head>
@@ -945,6 +946,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <button class="btn btn-primary" id="ds-sign-now" type="button">Sign this document</button>
     </div>
     <div class="ds-banner" id="ds-sign-status" hidden role="status" aria-live="polite"></div>
+    <div id="ds-sign-trail"></div>
 
     <!-- Authenticator-code (TOTP) fallback: shown only when one-tap passkey
          signing isn't available (provider can't do WebAuthn-PRF, e.g. Proton Pass,
@@ -1083,6 +1085,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=10" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=80"></script>
+<script src="/js/protocol-trail.js?v=1" defer></script>
+<script type="module" src="/sign-flow.js?v=81"></script>
 </body>
 </html>

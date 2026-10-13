@@ -806,6 +806,41 @@ async function relayFetch(url, opts) {
   return r;
 }
 
+// ── What protected this send, row by row (js/protocol-trail.js) ──
+// One list per send, moved from the progress card to the end screen when the
+// send is done. Every protocol name on it is measured from the call that did
+// the work; see the note at the top of protocol-trail.js.
+let sendTrail = null;
+let sendTls = undefined;   // undefined: nothing measured yet; null: blocks disagreed
+function startTrail(hostId) {
+  sendTls = undefined;
+  if (!window.paramantTrail) { sendTrail = null; return null; }
+  sendTrail = window.paramantTrail.create($(hostId));
+  return sendTrail;
+}
+// Every block went over the same kind of connection, or the row names none.
+function trailSent(response) {
+  if (!sendTrail) return;
+  const m = window.paramantTrail.measure.tls(response);
+  const name = m ? m.name : null;
+  sendTls = sendTls === undefined ? name : (sendTls === name ? name : null);
+  sendTrail.step('send', 'done', sendTls, m && m.suite && sendTls ? { title: m.suite } : null);
+}
+// The relay's own answer: kept under a download token, and the leaf it wrote
+// in the public log. A block without a proof gets no log row.
+function trailStored(ud) {
+  if (!sendTrail) return;
+  if (ud && ud.download_token) sendTrail.step('kept', 'done', null);
+  const idx = ud && ud.merkle_proof ? ud.merkle_proof.leaf_index : null;
+  if (Number.isInteger(idx)) sendTrail.step('log', 'done', window.paramantTrail.logIndex(idx));
+}
+function trailToEnd(stepId) {
+  if (!sendTrail) return;
+  const step = $(stepId);
+  const actions = step && step.querySelector('.done-actions');
+  if (actions) actions.parentNode.insertBefore(sendTrail.el, actions);
+}
+
 // ── Relay discovery: try all sectors in parallel, pick first valid ──
 // It used to fold two different failures into one null: "a sector answered and
 // refused this key" and "not one sector answered". The first is about the key,
@@ -1422,6 +1457,7 @@ async function confirmFingerprint() {
   try { ws.send(JSON.stringify({ type: 'packet', chatHash: sessionToken, seq: 0, payload: JSON.stringify({ type: 'fingerprint_ok' }) })); } catch(e) { console.warn('WS send failed (non-fatal):', e.message); }
 
   showStep('step-encrypting');
+  startTrail('enc-trail');
 
   try {
     const CHUNK_PLAIN = 4.5 * 1024 * 1024;
@@ -1481,11 +1517,18 @@ async function confirmFingerprint() {
         const payload = concat(META_MAGIC, u32be(metaBytes.length), metaBytes, chunkData);
 
         // ML-KEM-768 + ECDH P-256 + AES-256-GCM via Rust/WASM (crypto-bridge.js)
+        if (sendTrail) sendTrail.step('seal', 'now');
         const padded = await window._cryptoBridge.encryptBlob(
           payload,
           hexToU8(receiverPubs.kyber_pub),
           hexToU8(receiverPubs.ecdh_pub)
         );
+        // The names come from the sealed block itself, not from this comment.
+        if (sendTrail) {
+          const h = window.paramantTrail.measure.hybrid(padded);
+          sendTrail.step('seal', 'done', h ? h.name : null);
+          sendTrail.step('send', 'now');
+        }
 
         const mbUp = Math.round((i * CHUNK_PLAIN) / 1024 / 1024);
         $('enc-status').textContent = (totalFiles > 1 ? t('fileNofM')(fileIndex+1, totalFiles) : '') +
@@ -1505,6 +1548,8 @@ async function confirmFingerprint() {
           const qe = new Error(ud.error); qe.quota = ud; throw qe;
         }
         if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
+        trailSent(ur);
+        trailStored(ud);
         tokens.push(ud.download_token);
         chunkHashes[i] = hash;
         if (streaming) {
@@ -1598,9 +1643,11 @@ async function confirmFingerprint() {
       filename: 'paramant-receipt-' + new Date().toISOString().slice(0, 10) + '.json',
       data: proofs.length ? { kind: 'paramant-ct-inclusion', sent_utc: new Date().toISOString(), entries: proofs } : null,
     });
+    trailToEnd('step-done');
     showStep('step-done');
 
   } catch(e) {
+    if (sendTrail) sendTrail.settle();
     if (e && e.quota && window.paQuotaUpgrade) {
       // Quota reached is a purchase moment, not an error dump. Server JSON only.
       $('enc-status').className = 'status-line';
@@ -1881,7 +1928,13 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
   const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', key));
   const iv = crypto.getRandomValues(new Uint8Array(12));
+  if (sendTrail) sendTrail.step('seal', 'now');
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
+  // The name is read back from the key that just did the sealing.
+  if (sendTrail) {
+    sendTrail.step('seal', 'done', window.paramantTrail.measure.aes(key));
+    sendTrail.step('send', 'now');
+  }
 
   // ONE seal, cut into blocks that fit the wire. The relay stores blocks and
   // /v2/sends concatenates them back into exactly these bytes, so the receiver
@@ -1921,6 +1974,8 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
       const qe = new Error(ud.error); qe.quota = ud; throw qe;
     }
     if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
+    trailSent(ur);
+    if (i === 0) trailStored(ud);
     hashes.push(hash);
     if (i === 0) { eersteToken = ud.download_token; eersteAntwoord = ud; }
   }
@@ -1990,6 +2045,7 @@ async function createLink() {
   }
 
   showStep('step-sealing');
+  startTrail('seal-trail');
   setSealProgress(0);
   // The rows of THIS send. sentLinks also holds earlier links of the session.
   const nieuw = [];
@@ -2036,6 +2092,7 @@ async function createLink() {
         nieuw[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
       rememberSendLinks(verzending, sealed);
       setSealProgress(100);
+      trailToEnd('step-done');
       return toonVerzending(verzending, files[0].name);
     }
 
@@ -2051,9 +2108,11 @@ async function createLink() {
             entries: nieuw.filter(r => r.proof).map(r => ({ file: r.name, chunk: 1, proof: r.proof })) }
         : null,
     });
+    trailToEnd('step-link');
     showStep('step-link');
     refreshSentLinks();
   } catch (e) {
+    if (sendTrail) sendTrail.settle();
     if (e && e.quota && window.paQuotaUpgrade) {
       $('seal-status').className = 'status-line';
       $('seal-status').innerHTML = window.paQuotaUpgrade.html(e.quota);

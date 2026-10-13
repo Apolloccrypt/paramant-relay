@@ -546,6 +546,12 @@ async function _postJSON(url, body, extraHeaders) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) }, body: JSON.stringify(body || {}), credentials: 'include' });
   let data = null; try { data = await r.json(); } catch { /* non-JSON */ }
   if (!r.ok) { const e = new Error((data && data.error) || ('http_' + r.status)); e.status = r.status; e.data = data; throw e; }
+  // The connection this answer came over, as the TLS edge reported it
+  // (X-Paramant-Tls, deploy/caddy/Caddyfile). Not enumerable, so it never
+  // rides along when a caller spreads or serialises the answer.
+  if (data && typeof data === 'object') {
+    try { Object.defineProperty(data, 'tlsHeader', { value: r.headers.get('X-Paramant-Tls'), enumerable: false }); } catch { /* frozen answer */ }
+  }
   return data;
 }
 // Create the envelope. Self-sign/co-sign include the requester as party 0;

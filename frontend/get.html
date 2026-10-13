@@ -41,6 +41,7 @@
 <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/done-state.css?v=1">
+<link rel="stylesheet" href="/protocol-trail.css?v=1">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
@@ -223,6 +224,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <div class="progress-indeterminate" id="indeterminate-bar" style="margin:14px 0 0"></div>
       <div class="progress-wrap" id="progress-wrap" hidden><div class="progress-bar" id="pbar"></div></div>
       <div class="status-line" id="status-msg">Starten...</div>
+      <div id="get-trail"></div>
     </div>
   </div>
 </div>
@@ -320,6 +322,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
-<script src="/js/get.page.js?v=12" defer></script>
+<script src="/js/protocol-trail.js?v=1" defer></script>
+<script src="/js/get.page.js?v=13" defer></script>
 </body>
 </html>
