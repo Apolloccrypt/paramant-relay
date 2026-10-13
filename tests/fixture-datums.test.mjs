@@ -36,14 +36,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VENSTER_DAGEN = 60;
 const SLEUTEL = /\b(?:sign_expires_at|session_expires_at|expires_at|expiresAt)\b["']?\s*:\s*["'](\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z?)?)["']/g;
 
-// Twee fixtures die op een andere tak al relatief zijn gemaakt (b7cfcfde op
-// fix/campagne-vreemde-route). Ze hier wijzigen geeft een mergeconflict. Zodra
-// die tak landt staat er geen vaste datum meer en doet deze uitzondering niets.
-const WACHT_OP_ANDERE_TAK = new Set([
-  'tests/cosign-r5-terugweg-en-token.test.mjs',
-  'tests/cosign-randgevallen-eerlijk.test.mjs',
-]);
-
 function bestanden(dir) {
   const uit = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -82,7 +74,7 @@ test(`geen testfixture heeft een vaste verloopdatum in de komende ${VENSTER_DAGE
   const fouten = [];
   for (const abs of bestanden(path.join(ROOT, 'tests'))) {
     const rel = path.relative(ROOT, abs).split(path.sep).join('/');
-    if (rel === zelf || WACHT_OP_ANDERE_TAK.has(rel)) continue;
+    if (rel === zelf) continue;
     for (const { regel, datum } of tijdbommen(fs.readFileSync(abs, 'utf8'))) {
       fouten.push(`${rel}:${regel}  ${datum}`);
     }
