@@ -149,7 +149,7 @@ test('the Firm card shows 29 excl. btw, 35.09 incl., and the same in both sectio
   assert.equal(amountOf(firmCards[0]), amountOf(firmCards[1]));
 });
 
-test('the Firm buttons check out the bundle, and the no-JS fallback is sign-in', async () => {
+test('the Firm buttons check out the bundle, and the no-JS fallback is the free account', async () => {
   const page = await openPricing();
   const sections = await readCards(page);
   await page.close();
@@ -167,7 +167,9 @@ test('the Firm buttons check out the bundle, and the no-JS fallback is sign-in',
     assert.deepEqual(order.grants.map((g) => `${g.product}:${g.tier}`), ['parasign:pro', 'parasend:pro']);
     // The href is the no-JS fallback and must never be a metadata-less payment
     // link: an unattributable payment is money in with nothing granted.
-    assert.ok(b.href.startsWith('/en/auth/login'), `Firm button falls back to ${b.href}`);
+    // Since 13-10-2026 that fallback is the free account, not the sign-in: a
+    // visitor without a session nearly always has no account yet.
+    assert.ok(b.href.startsWith('/en/signup?next=/en/pricing'), `Firm button falls back to ${b.href}`);
     assert.ok(!/mollie\.com/.test(b.href));
   }
   assert.ok(firm.some((b) => /35\.09\/mo incl/.test(b.label)), 'the monthly Firm button names the amount that will be charged');

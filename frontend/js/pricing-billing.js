@@ -125,6 +125,28 @@
     } catch (e) { /* private mode: the visitor just clicks again, no worse than before */ }
   }
 
+  /* The plan in the way back: product.plan.interval, three words from the
+   * button itself. Only a value that matches a button on this page is ever
+   * used, so the parameter cannot ask for anything the page does not offer. */
+  function intentCode(btn) {
+    return [btn.getAttribute('data-billing-product'), btn.getAttribute('data-billing-plan'),
+      btn.getAttribute('data-billing-interval')].join('.');
+  }
+
+  function takeIntentFromUrl() {
+    var q = new URLSearchParams(location.search);
+    var code = q.get('koop');
+    if (!code) return null;
+    q.delete('koop');
+    try {
+      var rest = q.toString();
+      history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    } catch (e) { /* the address keeps it; harmless */ }
+    var parts = String(code).split('.');
+    if (parts.length !== 3) return null;
+    return { product: parts[0], plan: parts[1], interval: parts[2] };
+  }
+
   function takeIntent() {
     var raw = null;
     try { raw = sessionStorage.getItem(INTENT); sessionStorage.removeItem(INTENT); }
@@ -211,11 +233,16 @@
             msg === 'token_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
             msg.indexOf('checkout_http_403') === 0) {
           rememberIntent(btn);
-          /* The sign-in page in the language of this page. It was always the
-           * Dutch one, also from /en/pricing (betaaltest 05-10, row 6). */
-          var back = encodeURIComponent(location.pathname + location.search);
-          if (NL) window.location.href = '/auth/login?next=' + back;
-          else window.location.href = '/en/auth/login?next=' + back;
+          /* Signed out is, for nearly everyone who gets here, "no account
+           * yet". Sending them to the sign-in put a stranger on "Welkom
+           * terug" (test with a stranger, 13-10-2026). So the way out is the
+           * free account, in the language of this page, and the way back
+           * names the plan: ?koop= survives the two mails of the signup, where
+           * this tab's sessionStorage does not. Who already has an account
+           * signs in from the signup page, with the same way back. */
+          var back = encodeURIComponent(location.pathname + '?koop=' + intentCode(btn));
+          if (NL) window.location.href = '/signup?next=' + back;
+          else window.location.href = '/en/signup?next=' + back;
           return;
         }
         if (msg === 'checkout_http_409') {
@@ -234,7 +261,25 @@
    * once, because takeIntent clears the store as it reads. A failure here shows
    * the same inline error as a normal click, so a visitor is never left on a
    * page that silently did nothing. */
+  /* Back from making an account, in another tab: the choice comes from the
+   * address (?koop=). That address can be shared and pasted, so it does not
+   * press the button by itself: it points at the plan, says so, and the buyer
+   * presses once. A checkout is never started by a link alone. */
+  var fromUrl = takeIntentFromUrl();
   var pending = takeIntent();
+  if (!pending && fromUrl) {
+    var chosen = buttonFor(fromUrl);
+    if (chosen) {
+      var say = document.createElement('div');
+      say.setAttribute('role', 'status');
+      say.id = 'billing-resume-note';
+      say.style.cssText = 'margin-top:.6rem;font-size:.85rem;color:#334155';
+      say.textContent = NL ? 'Uw account staat klaar. Klik op de knop hierboven om dit plan af te rekenen.'
+        : 'Your account is ready. Click the button above to pay for this plan.';
+      if (chosen.parentNode) chosen.parentNode.insertBefore(say, chosen.nextSibling);
+      try { chosen.scrollIntoView({ block: 'center' }); chosen.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
+    }
+  }
   if (pending) {
     var target = buttonFor(pending);
     if (target) {
