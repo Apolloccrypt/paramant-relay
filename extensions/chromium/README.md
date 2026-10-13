@@ -48,14 +48,16 @@ npm test             # vitest — core crypto + upload, incl. a round-trip decry
 ## Sign in
 
 Use your **API key** from the Paramant dashboard. The extension auto-detects which relay
-sector the key belongs to. Email + authenticator (TOTP) sign-in is gated behind a server
-capability flag and only appears once the relay advertises it.
+sector the key belongs to. Email + authenticator (TOTP) sign-in appears when the relay
+advertises it; uploads on such a session use a 15-minute ParaSend session token
+(POST /api/user/parasend/token) on the health relay, never an API key.
 
 ## Settings (options page)
 
 - **Default expiry**: 1 hour to 7 days (the relay caps this to your plan's ceiling).
-- **Link format**: a formatted block or a plain single-line link.
-- **Relay**: blank to auto-detect, or a self-hosted relay URL.
+- **Link format**: a formatted block, or one plain line with the file name and the full URL.
+- **Relay**: blank to auto-detect, or one of the Paramant relays. A self-hosted relay is
+  refused: the receiver opens links on paramant.app/get, which only fetches from Paramant relays.
 - **Transfer history**: a local list (name, size, time). It never leaves the browser and
   never contains keys or links.
 

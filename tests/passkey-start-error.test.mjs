@@ -28,28 +28,37 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PASSKEY_JS = path.join(ROOT, 'frontend', 'js', 'passkey.js');
 const LOGIN_HTML = path.join(ROOT, 'frontend', 'auth', 'login.html');
+const LOGIN_HTML_EN = path.join(ROOT, 'frontend', 'en', 'auth', 'login.html');
 
 const source = fs.readFileSync(PASSKEY_JS, 'utf8');
 const loginHtml = fs.readFileSync(LOGIN_HTML, 'utf8');
+const loginHtmlEn = fs.readFileSync(LOGIN_HTML_EN, 'utf8');
 
-// Lift the shipped builder, constants and all, and hand back a callable.
-function loadFailureBuilder() {
+// Lift the shipped builder, constants and all, and hand back a callable. The
+// file serves the Dutch page and its English copy under /en/, and picks its
+// words with nlEn() on <html lang>, so the builder is lifted once per language
+// with that switch and a document that says which one.
+function loadFailureBuilder(lang) {
   const from = source.indexOf('const PASSKEY_START_FALLBACK');
   assert.notEqual(from, -1, 'frontend/js/passkey.js must define PASSKEY_START_FALLBACK');
   const marker = '\n}\n';
   const to = source.indexOf(marker, source.indexOf('function passkeyStartFailure'));
   assert.notEqual(to, -1, 'frontend/js/passkey.js must define passkeyStartFailure');
   const block = source.slice(from, to + marker.length);
-  return new Function(`${block}\nreturn passkeyStartFailure;`)();
+  const sw = source.match(/function nlEn\(nl, en\) \{[^\n]*\}/);
+  assert.ok(sw, 'frontend/js/passkey.js must define nlEn');
+  return new Function('document', `${sw[0]}\n${block}\nreturn passkeyStartFailure;`)({ documentElement: { lang } });
 }
 
-const passkeyStartFailure = loadFailureBuilder();
+const passkeyStartFailure = loadFailureBuilder('nl');
+const passkeyStartFailureEn = loadFailureBuilder('en');
 const RAW_CODE = /^could_not_start \(\d+/;
 
 test('the message a customer reads is a sentence, never the raw code', () => {
+  for (const build of [passkeyStartFailure, passkeyStartFailureEn])
   for (const [status, serverError] of [[400, 'invalid_email'], [400, null], [429, 'rate_limited'],
     [500, 'internal'], [502, 'relay_unreachable'], [503, null]]) {
-    const e = passkeyStartFailure(status, serverError);
+    const e = build(status, serverError);
     assert.doesNotMatch(e.message, RAW_CODE, `${status}/${serverError}: the code may not be the message`);
     assert.ok(e.message.length > 40, `${status}/${serverError}: too short to say anything: ${e.message}`);
     assert.match(e.message, /[.]$/, `${status}/${serverError}: must be a finished sentence`);
@@ -57,12 +66,28 @@ test('the message a customer reads is a sentence, never the raw code', () => {
 });
 
 test('every message names something the customer can do next', () => {
-  const NEXT_STEP = /another device|6-digit code|try again|Reload this page|setup link/i;
+  const NEXT_STEP = /ander apparaat|code van 6 cijfers|probeer het opnieuw|Laad deze pagina opnieuw|instellink/i;
   for (const [status, serverError] of [[400, 'invalid_email'], [400, 'unforeseen'], [429, 'rate_limited'],
     [500, 'internal'], [502, 'relay_unreachable']]) {
     const e = passkeyStartFailure(status, serverError);
     assert.match(e.message, NEXT_STEP, `${status}/${serverError} leaves the customer nowhere: ${e.message}`);
   }
+});
+
+test('the English copy names a next step as well', () => {
+  const NEXT_STEP = /another device|6-digit code|try again|Reload this page|setup link/i;
+  for (const [status, serverError] of [[400, 'invalid_email'], [400, 'unforeseen'], [429, 'rate_limited'],
+    [500, 'internal'], [502, 'relay_unreachable']]) {
+    const e = passkeyStartFailureEn(status, serverError);
+    assert.match(e.message, NEXT_STEP, `${status}/${serverError} leaves the customer nowhere: ${e.message}`);
+  }
+  const e = passkeyStartFailureEn(418, 'something_new');
+  assert.match(e.message, /My passkey is on another device/, 'the English fallback must name the cross-device route');
+  assert.match(e.message, /6-digit code/, 'and the code route');
+  const c = passkeyStartFailureEn(500, 'internal', 'create');
+  assert.doesNotMatch(c.message, /another device|6-digit code/);
+  assert.match(c.message, /Reload this page|authenticator app/);
+  assert.equal(passkeyStartFailureEn(400, 'invalid_email').techCode, 'could_not_start (400 invalid_email)');
 });
 
 test('the technical code survives, alongside the sentence and not instead of it', () => {
@@ -76,9 +101,9 @@ test('an unforeseen failure points at the exit that is known to still work', () 
   // The report is exactly this case: the primary call failed and the
   // cross-device link worked. A generic answer has to say so.
   const e = passkeyStartFailure(418, 'something_new');
-  assert.match(e.message, /My passkey is on another device/,
+  assert.match(e.message, /Mijn passkey staat op een ander apparaat/,
     'the fallback must name the cross-device route');
-  assert.match(e.message, /6-digit code/, 'and the code route');
+  assert.match(e.message, /code van 6 cijfers/, 'and the code route');
 });
 
 test('creating a passkey is not offered the sign-in exits', () => {
@@ -86,15 +111,18 @@ test('creating a passkey is not offered the sign-in exits', () => {
   // 6-digit field, so pointing at them sends somebody looking for a button
   // that is not on the page.
   const e = passkeyStartFailure(500, 'internal', 'create');
-  assert.doesNotMatch(e.message, /another device|6-digit code/);
-  assert.match(e.message, /Reload this page|authenticator app/);
+  assert.doesNotMatch(e.message, /ander apparaat|code van 6 cijfers/);
+  assert.match(e.message, /Laad deze pagina opnieuw|authenticator-app/);
 });
 
 test('the sentence quotes the label that is actually on the login page', () => {
-  const quoted = passkeyStartFailure(418, null).message.match(/“([^”]+)”/);
-  assert.ok(quoted, 'the fallback quotes a control by name');
-  assert.ok(loginHtml.includes(`>${quoted[1]}<`),
-    `/auth/login has no control labelled "${quoted[1]}"`);
+  for (const [build, html, page] of [[passkeyStartFailure, loginHtml, '/auth/login'],
+    [passkeyStartFailureEn, loginHtmlEn, '/en/auth/login']]) {
+    const quoted = build(418, null).message.match(/“([^”]+)”/);
+    assert.ok(quoted, 'the fallback quotes a control by name');
+    assert.ok(html.includes(`>${quoted[1]}<`),
+      `${page} has no control labelled "${quoted[1]}"`);
+  }
 });
 
 test('no start failure is rendered as a bare code anywhere in passkey.js', () => {

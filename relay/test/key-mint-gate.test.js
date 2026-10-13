@@ -110,7 +110,7 @@ test('every mint block checks a cap, records the key, and re-runs the enforcemen
   for (const s of siteLines()) {
     if (isLoader(s.text)) continue;
     const block = enclosing(s.n);
-    if (!/ACCOUNT_KEY_LIMIT/.test(block)) offenders.push(`relay.js:${s.n} no cap check`);
+    if (!/ACCOUNT_KEY_LIMIT|accountKeyCap\(/.test(block)) offenders.push(`relay.js:${s.n} no cap check`);
     if (!/_mutateUsersJson/.test(block)) offenders.push(`relay.js:${s.n} not written to users.json`);
     if (!/applyKeyLimitEnforcement\(\)/.test(block)) offenders.push(`relay.js:${s.n} no enforcement pass after the mint`);
   }
@@ -136,7 +136,7 @@ test('mintParasignKey is the single generator and it carries the cap itself', ()
   const start = SRC.indexOf('function mintParasignKey(');
   assert.ok(start > 0, 'mintParasignKey not found');
   const body = SRC.slice(start, SRC.indexOf('\nfunction ', start + 10));
-  assert.match(body, /ACCOUNT_KEY_LIMIT/, 'mintParasignKey does not check the per-account cap');
+  assert.match(body, /ACCOUNT_KEY_LIMIT|accountKeyCap\(/, 'mintParasignKey does not check the per-account cap');
   assert.match(body, /LICENSE_MAX_KEYS/, 'mintParasignKey does not check the relay-total cap');
   assert.match(body, /applyKeyLimitEnforcement\(\)/, 'mintParasignKey does not re-run the enforcement pass');
   assert.match(body, /account_key_limit/, 'mintParasignKey has no typed refusal for the caller to turn into a 402');
@@ -177,6 +177,6 @@ test('self-test: the block walker really finds an enclosing block', () => {
   assert.ok(s, 'the /v2/admin/keys mint was not found; it is the reference shape');
   const block = enclosing(s.n);
   assert.ok(block.length > 400, `the reference mint sliced to ${block.length} chars`);
-  assert.match(block, /ACCOUNT_KEY_LIMIT/);
+  assert.match(block, /ACCOUNT_KEY_LIMIT|accountKeyCap\(/);
   assert.match(block, /applyKeyLimitEnforcement\(\)/);
 });

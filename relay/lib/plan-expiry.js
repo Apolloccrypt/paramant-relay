@@ -66,6 +66,13 @@ const WARN_WINDOW_MS = WARN_DAYS * DAY_MS;
 // long enough that a mail saying so is news about nothing.
 const ENDED_GRACE_MS = 7 * DAY_MS;
 
+// A term that renews by itself (a Mollie subscription collects on the day it
+// ends) gets its "it has ended" mail only when the collection has had time to
+// land: a card is paid in seconds, a SEPA direct debit takes days. A renewal
+// that lands moves paid_until on, and then no mail is owed at all. Shorter than
+// ENDED_GRACE_MS, so a renewal that never comes still gets its mail.
+const RENEWAL_HOLD_MS = 5 * DAY_MS;
+
 // When a finished period is dropped from the index. Well past ENDED_GRACE_MS,
 // so a pruned entry is never one that still had a mail owing.
 const PRUNE_AFTER_MS = 30 * DAY_MS;
@@ -104,7 +111,7 @@ const FLOOR_NAME = 'Community';
 const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']);
 
-// "3 October 2026". UTC and hand-built rather than toLocaleDateString: the
+// "3 October 2026". Hand-built rather than toLocaleDateString: the
 // same date has to read the same in a mail from any container, and Intl data is
 // not something a slim container image is guaranteed to carry.
 //
@@ -113,10 +120,43 @@ const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'J
 // ended last December reads exactly like one that ends this December. The
 // browser side writes the same string from frontend/js/format-date.js, so the
 // date in this mail and the date on /account are one date.
+//
+// Dutch time since acceptatie 3.1.1 ronde 2, like the other mails and the
+// site: a term that ends at 23:30 UTC ends the next day in Amsterdam, and the
+// site said one day while this mail said the other. Only the zone comes from
+// Intl; the month stays our own table. Without zone data it falls back to UTC.
+const NL_DAY = (() => {
+  try { return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: 'numeric', day: 'numeric' }); } catch { return null; }
+})();
+function amsterdamParts(d) {
+  if (NL_DAY) {
+    try {
+      const p = {};
+      for (const part of NL_DAY.formatToParts(d)) p[part.type] = part.value;
+      if (p.year && p.month && p.day) return { y: Number(p.year), m: Number(p.month), d: Number(p.day) };
+    } catch { /* UTC below */ }
+  }
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+}
+
 function formatDate(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  const p = amsterdamParts(d);
+  return `${p.d} ${MONTHS[p.m - 1]} ${p.y}`;
+}
+
+// The Dutch twin of formatDate: "3 oktober 2026". Same rule, same reason:
+// Dutch time and a hand-built month table, so the Dutch half of a mail reads the same from
+// every container whatever Intl data the image carries.
+const MONTHS_NL = Object.freeze(['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+  'juli', 'augustus', 'september', 'oktober', 'november', 'december']);
+
+function formatDateNl(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const p = amsterdamParts(d);
+  return `${p.d} ${MONTHS_NL[p.m - 1]} ${p.y}`;
 }
 
 function memberOf(accountId, product) {
@@ -149,17 +189,66 @@ function planLabel(product, tier) {
   return `${p} ${t}`;
 }
 
+// The Dutch site names the products by what they do: Versturen and
+// Ondertekenen. The tier names stay as they are on /pricing.
+const PRODUCT_NAME_NL = Object.freeze({ parasign: 'Ondertekenen', parasend: 'Versturen' });
+
+// In a mail the customer reads the plan name /pricing sells (acceptatie
+// 3.1.1, taal #4 and #47): the tier key 'pro' is Firm on both products, and a
+// term on one product says what it is for. "Ondertekenen Pro" and
+// "Ondertekenen firm" were names that stand nowhere on the site.
+const TIER_NAME_MAIL = Object.freeze({ pro: 'Firm', firm: 'Firm', business: 'Business', enterprise: 'Enterprise' });
+const PRODUCT_FOR_NL = Object.freeze({ parasign: 'ondertekenen', parasend: 'versturen' });
+const PRODUCT_FOR_EN = Object.freeze({ parasign: 'signing', parasend: 'sending' });
+
+function planLabelNl(product, tier) {
+  const t = TIER_NAME_MAIL[String(tier || '').toLowerCase()] || tier;
+  const p = PRODUCT_FOR_NL[product] || PRODUCT_NAME_NL[product] || product;
+  return `${t}-plan voor ${p}`;
+}
+
+// The English twin, for the English half of a mail. planLabel() above stays
+// as it is: the billing history and the exports read it.
+function planLabelMail(product, tier) {
+  const t = TIER_NAME_MAIL[String(tier || '').toLowerCase()] || tier;
+  const p = PRODUCT_FOR_EN[product] || PRODUCT_NAME[product] || product;
+  return `${t} plan for ${p}`;
+}
+
 // What a BUNDLE is called in a mail, and what it actually contains. A Firm
 // customer paid once for two products, so telling him "your ParaSend Pro ends"
 // names something he never bought under that name, and telling him twice is
 // worse. The bundle name comes first and the products it covers follow, so the
 // sentence is both the name on his invoice and the thing he loses.
 const BUNDLE_LABEL = Object.freeze({
-  firm: 'Paramant Firm plan (ParaSign Pro and ParaSend Pro)',
+  firm: 'Firm plan for sending and signing',
+  business: 'Business plan for sending and signing',
 });
 
 function bundleLabel(bundle) {
   return BUNDLE_LABEL[bundle] || null;
+}
+
+const BUNDLE_LABEL_NL = Object.freeze({
+  firm: 'Firm-plan voor versturen en ondertekenen',
+  business: 'Business-plan voor versturen en ondertekenen',
+});
+
+function bundleLabelNl(bundle) {
+  return BUNDLE_LABEL_NL[bundle] || null;
+}
+
+// Every customer mail about money, plans and codes is bilingual: the Dutch text
+// first, the English text below it, unchanged. The subject is "Dutch / English"
+// in the same order. One helper per half so all those mails share one shape.
+const MAIL_SEPARATOR = '----------------------------------------';
+
+function bilingualSubject(nl, en) {
+  return `${nl} / ${en}`;
+}
+
+function bilingualText(nl, en) {
+  return [nl, '', MAIL_SEPARATOR, '', en].join('\n');
 }
 
 // ── The two mails ────────────────────────────────────────────────────────────
@@ -167,51 +256,178 @@ function bundleLabel(bundle) {
 // being told when it stops and that nothing happens to his card unless he says
 // so. That last half is the point: on a one-off payment "your plan ends" reads
 // as a threat of a charge unless it says otherwise.
-function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
+//
+// `renewal` is set when a subscription will collect for this term (see
+// billing-recurring.renewalFor). Then "nothing is charged automatically" is
+// false, and the mail says what will happen instead: the date, the amount when
+// known, and where to cancel before it.
+//
+// `recurring` is the billing stance (BILLING_MODE set). Then a plan is a
+// subscription, and a term that ends without one ended because the customer
+// cancelled: "every plan here is a one-off payment" is no longer true, so the
+// "ended" mail says only what is.
+function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal, recurring }) {
   const date = formatDate(paidUntil);
   if (!date) return null;
-  const plan = bundleLabel(bundle) || planLabel(product, tier);
+  const dateNl = formatDateNl(paidUntil);
+  const plan = bundleLabel(bundle) || planLabelMail(product, tier);
+  const planNl = bundleLabelNl(bundle) || planLabelNl(product, tier);
   const pricing = `${String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '')}/pricing`;
+  if (renewal) return renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, pricing });
   if (kind === 'ended') {
-    const subject = `Your ${plan} has ended`;
+    const subjectNl = `Uw ${planNl} is afgelopen`;
+    const subjectEn = `Your ${plan} has ended`;
+    const textNl = [
+      `Uw ${planNl} is afgelopen op ${dateNl}. Uw account staat nu op ${FLOOR_NAME}.`,
+      '',
+      recurring
+        ? 'Er is niets afgeschreven. Voor dit plan liep geen automatische verlenging meer, dus er wordt ook niets meer geïncasseerd.'
+        : 'Er is niets afgeschreven. Elk plan is hier een eenmalige betaling voor de periode die u koopt. Er wordt dus niets vanzelf verlengd en niets geïncasseerd zonder dat u zelf betaalt.',
+      '',
+      `U kunt op elk moment een nieuwe maand of een nieuw jaar kopen: ${pricing}`,
+      '',
+      'Paramant',
+    ].join('\n');
     const text = [
       `Your ${plan} ended on ${date}, and your account is now on ${FLOOR_NAME}.`,
       '',
-      'Nothing was charged. Every plan here is a one-off payment for the term you buy, so nothing renews by itself and nothing is collected without you.',
+      recurring
+        ? 'Nothing was charged. No automatic renewal was running for this plan any more, so nothing more will be collected.'
+        : 'Nothing was charged. Every plan here is a one-off payment for the term you buy, so nothing renews by itself and nothing is collected without you.',
       '',
       `You can buy another month or another year at any time: ${pricing}`,
       '',
       'Paramant',
     ].join('\n');
-    return { subject, text, html: htmlBody(subject, text, pricing) };
+    return {
+      subject: bilingualSubject(subjectNl, subjectEn),
+      text: bilingualText(textNl, text),
+      html: htmlBody([[HEAD.endedNl, textNl], [HEAD.endedEn, text]], pricing),
+    };
   }
-  const subject = `Your ${plan} ends on ${date}`;
-  const text = [
-    `Your ${plan} ends on ${date}.`,
+  const subjectNl = `Uw ${planNl} loopt af op ${dateNl}`;
+  const subjectEn = `Your ${plan} ends on ${date}`;
+  const textNl = [
+    `Uw ${planNl} loopt af op ${dateNl}.`,
     '',
-    `Renew for another month or year, or let it fall back to ${FLOOR_NAME}; nothing is charged automatically.`,
+    `U kunt verlengen met een maand of een jaar. Doet u niets, dan gaat uw account terug naar ${FLOOR_NAME}. Er wordt niets automatisch afgeschreven.`,
     '',
-    `Your plans and prices are here: ${pricing}`,
+    `Plannen en prijzen vindt u hier: ${pricing}`,
     '',
     'Paramant',
   ].join('\n');
-  return { subject, text, html: htmlBody(subject, text, pricing) };
+  const text = [
+    `Your ${plan} ends on ${date}.`,
+    '',
+    `You can renew for a month or a year. If you do nothing, your account goes back to ${FLOOR_NAME}, and nothing is charged automatically.`,
+    '',
+    `Plans and prices are here: ${pricing}`,
+    '',
+    'Paramant',
+  ].join('\n');
+  return {
+    subject: bilingualSubject(subjectNl, subjectEn),
+    text: bilingualText(textNl, text),
+    html: htmlBody([[HEAD.endsNl, textNl], [HEAD.endsEn, text]], pricing),
+  };
+}
+
+const PERIOD_NL = Object.freeze({ monthly: 'een maand', yearly: 'een jaar' });
+const PERIOD_EN = Object.freeze({ monthly: 'a month', yearly: 'a year' });
+
+// The two mails for a term that a subscription will renew. Neither may say that
+// nothing is charged: the warning says what will be collected and when, and the
+// "ended" mail (sent only after RENEWAL_HOLD_MS, see runSweep) says the renewal
+// has not come in, and that it still counts if it does.
+function renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, pricing }) {
+  const base = String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const account = `${base}/account`;
+  const money = renewal.amount ? `${renewal.currency || 'EUR'} ${renewal.amount}` : null;
+  const periodNl = PERIOD_NL[renewal.interval] || null;
+  const periodEn = PERIOD_EN[renewal.interval] || null;
+  if (kind === 'ended') {
+    const subjectNl = `Uw ${planNl} is afgelopen`;
+    const subjectEn = `Your ${plan} has ended`;
+    const textNl = [
+      `Uw ${planNl} liep tot ${dateNl}. De automatische verlenging is niet binnengekomen, dus uw account staat nu op ${FLOOR_NAME}.`,
+      '',
+      `Komt de betaling alsnog binnen, dan loopt uw plan vanzelf door. U kunt ook zelf opnieuw betalen: ${pricing}`,
+      '',
+      'Paramant',
+    ].join('\n');
+    const text = [
+      `Your ${plan} ran until ${date}. The automatic renewal has not come in, so your account is now on ${FLOOR_NAME}.`,
+      '',
+      `If the payment still comes in, your plan carries on by itself. You can also pay again yourself: ${pricing}`,
+      '',
+      'Paramant',
+    ].join('\n');
+    return {
+      subject: bilingualSubject(subjectNl, subjectEn),
+      text: bilingualText(textNl, text),
+      html: htmlBody([[HEAD.endedNl, textNl], [HEAD.endedEn, text]], pricing),
+    };
+  }
+  const subjectNl = `Uw ${planNl} wordt op ${dateNl} verlengd`;
+  const subjectEn = `Your ${plan} renews on ${date}`;
+  const textNl = [
+    `Uw ${planNl} loopt tot ${dateNl}.`,
+    '',
+    money && periodNl
+      ? `Op die dag wordt uw plan automatisch met ${periodNl} verlengd en wordt ${money} afgeschreven.`
+      : 'Op die dag wordt uw plan automatisch verlengd en wordt de volgende periode afgeschreven.',
+    '',
+    `Wilt u dat niet, zeg dan vóór ${dateNl} op via ${account}. Wat u al betaald heeft, houdt u tot die dag.`,
+    '',
+    'Paramant',
+  ].join('\n');
+  const text = [
+    `Your ${plan} runs until ${date}.`,
+    '',
+    money && periodEn
+      ? `On that day your plan renews automatically for ${periodEn}, and ${money} is collected.`
+      : 'On that day your plan renews automatically, and the next period is collected.',
+    '',
+    `If you do not want that, cancel before ${date} at ${account}. What you have already paid for stays yours until that day.`,
+    '',
+    'Paramant',
+  ].join('\n');
+  return {
+    subject: bilingualSubject(subjectNl, subjectEn),
+    text: bilingualText(textNl, text),
+    html: htmlBody([[HEAD.renewsNl, textNl], [HEAD.renewsEn, text]], account),
+  };
 }
 
 const escHtml = (s) => String(s === null || s === undefined ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-function htmlBody(subject, text, pricing) {
-  const paragraphs = text.split('\n\n')
-    .filter((p) => p && p !== 'Paramant')
-    .map((p) => `<p style="margin:0 0 16px;line-height:1.6">${escHtml(p)}</p>`)
-    .join('\n');
+// Short headings for the HTML. The subject used to stand as the heading and
+// again as the first sentence: three times the same long line (acceptatie
+// 3.1.1, taal #48). The subject and the first sentence stay; the heading says
+// what kind of mail this is.
+const HEAD = Object.freeze({
+  endsNl: 'Uw plan loopt bijna af', endsEn: 'Your plan ends soon',
+  endedNl: 'Uw plan is afgelopen', endedEn: 'Your plan has ended',
+  renewsNl: 'Uw plan wordt verlengd', renewsEn: 'Your plan renews',
+});
+
+// sections: [[heading, text], ...], Dutch first. Each heading is that
+// language's subject; a thin rule separates the languages. The one link sits
+// at the bottom, since both halves point at the same page.
+function htmlBody(sections, link) {
+  const blocks = sections.map(([heading, text]) => {
+    const paragraphs = String(text || '').split('\n\n')
+      .filter((p) => p && p !== 'Paramant')
+      .map((p) => `<p style="margin:0 0 16px;line-height:1.6">${escHtml(p).replace(/\n/g, '<br>')}</p>`)
+      .join('\n');
+    return `<h1 style="font-size:18px;margin:0 0 16px">${escHtml(heading)}</h1>\n${paragraphs}`;
+  });
   return [
     '<div style="font-family:system-ui,-apple-system,\'Segoe UI\',sans-serif;color:#0B3A6A;max-width:520px">',
-    `<h1 style="font-size:18px;margin:0 0 16px">${escHtml(subject)}</h1>`,
-    paragraphs,
-    `<p style="margin:0"><a href="${escHtml(pricing)}" style="color:#0B3A6A">${escHtml(pricing)}</a></p>`,
+    blocks.join('\n<hr style="border:0;border-top:1px solid #d5dde6;margin:24px 0">\n'),
+    `<p style="margin:0"><a href="${escHtml(link)}" style="color:#0B3A6A">${escHtml(link)}</a></p>`,
     '</div>',
   ].join('\n');
 }
@@ -274,12 +490,14 @@ async function seedIndex(redis, records) {
     if (!rec || !accountId) continue;
     seen++;
     for (const product of entitlements.PRODUCTS) {
-      const tier = rec[entitlements.PRODUCT_PLAN_FIELD[product]];
-      const paidUntil = rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]];
-      if (!paidUntil) continue;
+      // The day the product falls to its floor, and what was bought for it.
+      // With a Business month over a Pro year that is the end of the year: the
+      // end of the month is not an end the customer has to act on.
+      const last = entitlements.finalTermOf(rec, product);
+      if (!last) continue;
       const r = await upsertExpiry(redis, {
-        accountId, product, tier, paidUntil, email: rec.email,
-        bundle: rec[entitlements.PRODUCT_BUNDLE_FIELD[product]] || null,
+        accountId, product, tier: last.tier, paidUntil: last.paidUntil, email: rec.email,
+        bundle: last.bundle || null,
       });
       if (r.indexed) indexed++;
     }
@@ -316,6 +534,12 @@ async function releaseLock(redis, token) {
 //              consume the marker.
 //   log        (level, event, fields)
 //   siteUrl    base for the /pricing link
+//   renewalOf  optional (accountId, product, bundle) -> renewal | null: does a
+//              subscription collect for this term? relay.js passes
+//              billing-recurring.renewalFor. Without it every term is treated as
+//              a one-off, which is what BILLING_MODE empty means.
+//   recurring  optional, true when BILLING_MODE is set (mollie.billingStance):
+//              the "ended" mail then stops explaining plans as one-off payments.
 //
 // Returns { ran, warned, ended, skipped, missing, pruned, reason }.
 async function runSweep(deps) {
@@ -390,17 +614,36 @@ async function runSweep(deps) {
         continue;
       }
 
+      // Does a subscription collect for this term? The answer decides what the
+      // mail may promise. When it cannot be read, no mail this sweep: a wrong
+      // "nothing is charged" is worse than a mail six hours later.
+      let renewal = null;
+      if (typeof d.renewalOf === 'function') {
+        try { renewal = await d.renewalOf(accountId, product, meta.bundle || null); }
+        catch (e) {
+          log('warn', 'plan_expiry_renewal_unknown', { account: String(accountId).slice(0, 12), product, kind, err: e.message });
+          out.skipped++;
+          continue;
+        }
+      }
+      // A renewing term is not over until its collection has had time to land.
+      if (kind === 'ended' && renewal && now - at < RENEWAL_HOLD_MS) { out.skipped++; continue; }
+      // The subscription names the bundle even when the index entry lost it:
+      // a Firm renewal is one collection, so it is one mail with one amount,
+      // not a mail per product that each quote the whole price.
+      const bundle = meta.bundle || (renewal && bundleLabel(renewal.line) ? renewal.line : null);
+
       // Reserve BEFORE sending. Under the lock this only guards against a
       // repeat inside one sweep, but it is also what makes a crash between the
       // send and the write impossible to turn into a second mail. The
       // reservation is given back below when the mail did not actually leave.
       // Keyed on the BUNDLE when there is one, so the two index entries a Firm
       // term leaves behind produce ONE mail and not two about the same term.
-      const key = noticeKey(kind, accountId, meta.bundle || product, meta.paid_until);
+      const key = noticeKey(kind, accountId, bundle || product, meta.paid_until);
       const reserved = await redis.set(key, String(now), { NX: true, EX: NOTICE_TTL_S });
       if (!(reserved === 'OK' || reserved === true)) { out.skipped++; continue; }
 
-      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl, bundle: meta.bundle });
+      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl, bundle, renewal, recurring: d.recurring === true });
       let sent = false;
       try {
         sent = !!(typeof sendEmail === 'function' && await sendEmail({
@@ -424,6 +667,7 @@ async function runSweep(deps) {
       if (kind === 'ended') out.ended++; else out.warned++;
       log('info', 'plan_expiry_mail_sent', {
         account: String(accountId).slice(0, 12), product, tier, kind, paid_until: meta.paid_until,
+        renews: !!renewal,
       });
     }
   } catch (e) {
@@ -489,9 +733,10 @@ function startPlanExpiryPlanner(deps) {
 
 module.exports = {
   INDEX_ZSET, META_HASH, LOCK_KEY, NOTICE_PREFIX,
-  WARN_DAYS, WARN_WINDOW_MS, ENDED_GRACE_MS, PRUNE_AFTER_MS,
+  WARN_DAYS, WARN_WINDOW_MS, ENDED_GRACE_MS, RENEWAL_HOLD_MS, PRUNE_AFTER_MS,
   NOTICE_TTL_S, SWEEP_INTERVAL_MS, LOCK_TTL_MS, DEFAULT_SITE_URL,
-  formatDate, memberOf, parseMember, noticeKey, planLabel, bundleLabel, BUNDLE_LABEL, expiryMail,
+  formatDate, formatDateNl, memberOf, parseMember, noticeKey, planLabel, bundleLabel, BUNDLE_LABEL, expiryMail,
+  planLabelNl, planLabelMail, bundleLabelNl, BUNDLE_LABEL_NL, bilingualSubject, bilingualText, htmlBody, MAIL_SEPARATOR,
   upsertExpiry, forgetAccount, seedIndex,
   acquireLock, releaseLock, runSweep, startPlanExpiryPlanner,
 };

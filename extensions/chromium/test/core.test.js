@@ -127,16 +127,20 @@ describe('encryptChunk → parashare receiver', () => {
 // ── Share URL ────────────────────────────────────────────────────────────────────
 
 describe('buildShareUrl', () => {
-  it('matches the ?t&n&c&r#k= shape and parses back', () => {
+  it('matches the ?t&c&r#k= shape, parses back, and carries no file name', () => {
     const url = buildShareUrl({ tokens: ['t1', 't2'], name: 'a b €.pdf', chunks: 2, relay: 'https://legal.paramant.app', keys: ['k1', 'k2'] });
-    expect(url.startsWith('https://paramant.app/parashare?')).toBe(true);
+    // The public receiving page, never the sender's /parashare behind the login.
+    expect(url.startsWith('https://paramant.app/get?')).toBe(true);
+    expect(url).not.toMatch(/\/parashare/);
     const [base, frag] = url.split('#');
     expect(frag).toBe('k=k1,k2');
     const sp = new URLSearchParams(base.split('?')[1]);
     expect(sp.get('t')).toBe('t1,t2');
     expect(sp.get('c')).toBe('2');
     expect(sp.get('r')).toBe('https://legal.paramant.app');
-    expect(decodeURIComponent(sp.get('n'))).toBe('a b €.pdf');
+    // Hertest T4-9: the name stays inside the seal, never in the URL.
+    expect(sp.get('n')).toBe(null);
+    expect(url).not.toMatch(/a%20b|%E2%82%AC|\.pdf/);
   });
 });
 
@@ -195,6 +199,45 @@ describe('sealAndUploadChunk', () => {
     mockRelay(async () => new Response(JSON.stringify({ error: 'Max 5MB on trial' }), { status: 413 }));
     await expect(sealAndUploadChunk({ relay: 'r', apiKey: 'k', chunkU8: randomBytes(10), fileMeta: {}, relayMeta: {}, ttlMs: 1000 }))
       .rejects.toThrow(/Max 5MB/);
+  });
+
+  it('translates a 402 monthly_transfer_quota_reached into a structured upgrade error, not upload_failed', async () => {
+    let calls = 0;
+    mockRelay(async () => {
+      calls++;
+      return new Response(
+        JSON.stringify({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: 'community', limit: 10 }),
+        { status: 402 });
+    });
+    let caught;
+    try {
+      await sealAndUploadChunk({ relay: 'r', apiKey: 'k', chunkU8: randomBytes(10), fileMeta: {}, relayMeta: {}, ttlMs: 1000 });
+    } catch (e) { caught = e; }
+    expect(caught, 'a 402 must throw').toBeDefined();
+    expect(calls).toBe(1);                       // never retried; retrying only re-hits the cap
+    expect(caught.code).toBe('quota_reached');   // not 'upload_failed'
+    expect(caught.status).toBe(402);
+    expect(caught.plan).toBe('community');
+    expect(caught.limit).toBe(10);
+    expect(caught.dimension).toBe('transfers_month');
+    expect(caught.upgradeUrl).toBe('https://paramant.app/pricing');
+    // The message is UI-ready: human, carries the limit, and points at upgrading.
+    expect(caught.message).toMatch(/limit reached/i);
+    expect(caught.message).toContain('10');
+    expect(caught.message).toContain('paramant.app/pricing');
+    expect(caught.message).not.toMatch(/upload_failed/);
+  });
+
+  it('a non-quota 402 still surfaces as a plain failure (no false upgrade melding)', async () => {
+    mockRelay(async () => new Response(JSON.stringify({ error: 'some_other_402' }), { status: 402 }));
+    let caught;
+    try {
+      await sealAndUploadChunk({ relay: 'r', apiKey: 'k', chunkU8: randomBytes(10), fileMeta: {}, relayMeta: {}, ttlMs: 1000 });
+    } catch (e) { caught = e; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('upload_failed');
+    expect(caught.code).not.toBe('quota_reached');
+    expect(caught.message).toMatch(/some_other_402/);
   });
 });
 

@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
-const aliases = { '/': '/index.html', '/account': '/account.html' };
+const aliases = { '/': '/index.html', '/account': '/account.html', '/en/account': '/en/account.html' };
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -77,7 +77,10 @@ const HISTORY = [
   },
 ];
 
-async function account({ history, status = 200 }) {
+// /account is Dutch since 23 September 2026 and /en/account is its English
+// copy on the same script, so the two sentences that carry the outcome are
+// checked on both.
+async function account({ history, status = 200, route = '/account' }) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   await page.route('**/api/**', (route) => json(route, {}));
   await page.route('**/api/user/billing/status', (route) => json(route, {
@@ -92,11 +95,11 @@ async function account({ history, status = 200 }) {
     email: 'demo@example.com', plan: 'pro', api_key_masked: 'pgp_demo...abcd',
     created_at: '2026-01-01T00:00:00.000Z', sessions: [], backup_codes_remaining: 0,
   }));
-  await page.goto(ORIGIN + '/account', { waitUntil: 'domcontentloaded' });
+  await page.goto(ORIGIN + route, { waitUntil: 'domcontentloaded' });
   // The block starts on a loading line, so "done" is when that line is gone.
   await page.waitForFunction(() => {
     const el = document.getElementById('billing-history');
-    return el && !/Loading/i.test(el.textContent || '');
+    return el && !/Loading|wordt geladen/i.test(el.textContent || '');
   }, null, { timeout: 10000 });
   const state = await page.evaluate(() => {
     const el = document.getElementById('billing-history');
@@ -114,12 +117,15 @@ async function account({ history, status = 200 }) {
 // ── an account that has never paid ───────────────────────────────────────────
 const empty = await account({ history: [] });
 ok('nothing has happened: the block says so and says nothing else',
-  empty.text === 'No billing events yet.', empty.text);
+  empty.text === 'Nog geen betaalgebeurtenissen.', empty.text);
+const emptyEn = await account({ history: [], route: '/en/account' });
+ok('nothing has happened, in English on /en/account',
+  emptyEn.text === 'No billing events yet.', emptyEn.text);
 
 // ── an account that paid, was refunded, and ran out ──────────────────────────
 const full = await account({ history: HISTORY });
 ok('every event is a row', full.rows.length === HISTORY.length, `${full.rows.length} rows`);
-ok('the block is no longer empty', !full.text.includes('No billing events yet'), full.text);
+ok('the block is no longer empty', !full.text.includes('Nog geen betaalgebeurtenissen'), full.text);
 
 ok('the payment is there, with its invoice number and its total',
   full.rows.some((r) => r.left.includes('PS-2026-0001')
@@ -172,7 +178,10 @@ ok('a label is rendered as text and never as markup',
 // ── the API is down ──────────────────────────────────────────────────────────
 const down = await account({ history: [], status: 502 });
 ok('an unreachable API says so rather than claiming nothing ever happened',
-  down.text.includes('unavailable') && !down.text.includes('No billing events yet'), down.text);
+  down.text.includes('niet beschikbaar') && !down.text.includes('Nog geen betaalgebeurtenissen'), down.text);
+const downEn = await account({ history: [], status: 502, route: '/en/account' });
+ok('an unreachable API says so on /en/account too',
+  downEn.text.includes('unavailable') && !downEn.text.includes('No billing events yet'), downEn.text);
 
 await browser.close();
 server.close();

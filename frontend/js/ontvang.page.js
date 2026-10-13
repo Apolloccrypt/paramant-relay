@@ -8,6 +8,84 @@ const RELAY_SECTORS = {
   iot:     'https://iot.paramant.app',
 };
 
+// Two languages, one file. The page says which one it is in <html lang>:
+// /ontvang is Dutch, /en/ontvang is English.
+const LANG = (document.documentElement.lang || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
+const T = {
+  nl: {
+    badLink: 'Deze link is ongeldig of onvolledig.',
+    libFail: 'De versleuteling kon niet laden. Ververs de pagina en probeer het opnieuw. Ga niet verder zonder deze versleuteling.',
+    restoring: 'Sleutels worden hersteld...',
+    genKem: 'Sleutels worden gemaakt (ML-KEM-768)...',
+    genEcdh: 'Sleutels worden gemaakt (ECDH P-256)...',
+    keysReady: 'Sleutels klaar. Verbinding maken...',
+    inUse: 'Deze link is al in gebruik. Vraag de afzender om een nieuwe.',
+    waitFp: 'Klaar. Wacht tot de afzender de controlecode bevestigt.',
+    fpOkTitle: 'Controlecode bevestigd. Bestand komt binnen...',
+    fpOkStatus: 'De afzender heeft de controlecode bevestigd. Het bestand wordt voor u verzegeld.',
+    peerLeft: 'De verbinding met de afzender is verbroken.',
+    senderRejected: 'De afzender zag een andere controlecode dan u en is gestopt. Er is niets verstuurd en niets ontvangen. Vraag de afzender om een nieuwe link.',
+    senderGone: 'De afzender heeft deze sessie niet afgemaakt: er kwam in tien minuten geen bestand. Er is niets ontvangen en niets gewist. Is de afzender er nog? Druk dan op Opnieuw proberen. Zo niet, vraag dan om een nieuwe link.',
+    keygenFail: 'Sleutels maken is mislukt: ',
+    dlChunk: (i, n) => `Deel ${i} van ${n} wordt gedownload...`,
+    notAnnounced: (i) => 'De afzender heeft deel ' + i + ' nooit aangemeld',
+    dlFail: (i, st) => 'Downloaden van deel ' + i + ' is mislukt (' + st + '). Het is verlopen of al opgehaald.',
+    decChunk: (i, n) => `Deel ${i} van ${n} wordt ontsleuteld...`,
+    bridge: 'De versleuteling is nog niet klaar',
+    saving: 'Bestand wordt opgeslagen...',
+    haveFile: 'U hebt het bestand.',
+    savedLine: (name) => name + ' staat op uw apparaat. Onze kopie is voorgoed vernietigd.',
+    decFail: 'Ontsleutelen is mislukt: ',
+    vaultRecv: (n) => 'Map wordt ontvangen: ' + n + ' bestanden...',
+    vaultStep: (i, n) => 'Map: ' + i + ' van ' + n + ' gedownload',
+    haveFiles: 'U hebt de bestanden.',
+    savedFiles: (n) => n + ' bestanden staan op uw apparaat. Onze kopieën zijn voorgoed vernietigd.',
+    burnLine: (b) => 'blok ' + b.chunk + '  hash ' + b.hash + '...  gewist ' + b.ts,
+  },
+  en: {
+    badLink: 'This link is invalid or incomplete.',
+    libFail: 'The encryption could not load. Refresh the page and try again. Do not continue without this encryption.',
+    restoring: 'Restoring your keys...',
+    genKem: 'Making keys (ML-KEM-768)...',
+    genEcdh: 'Making keys (ECDH P-256)...',
+    keysReady: 'Keys ready. Connecting...',
+    inUse: 'This link is already in use. Ask the sender for a new one.',
+    waitFp: 'Ready. Waiting for the sender to confirm the check code.',
+    fpOkTitle: 'Check code confirmed. File on its way...',
+    fpOkStatus: 'The sender confirmed the check code. The file is being sealed for you.',
+    peerLeft: 'The connection to the sender was lost.',
+    senderRejected: 'The sender saw a different check code from yours and stopped. Nothing was sent and nothing was received. Ask the sender for a new link.',
+    senderGone: 'The sender did not finish this session: no file arrived in ten minutes. Nothing was received and nothing was deleted. Is the sender still there? Then press Try again. If not, ask for a new link.',
+    keygenFail: 'Making the keys failed: ',
+    dlChunk: (i, n) => `Downloading part ${i} of ${n}...`,
+    notAnnounced: (i) => 'The sender never announced part ' + i,
+    dlFail: (i, st) => 'Downloading part ' + i + ' failed (' + st + '). It has expired or was already fetched.',
+    decChunk: (i, n) => `Decrypting part ${i} of ${n}...`,
+    bridge: 'The encryption is not ready yet',
+    saving: 'Saving file...',
+    haveFile: 'You have the file.',
+    savedLine: (name) => name + ' is saved on your device. Our copy has been permanently destroyed.',
+    decFail: 'Decryption failed: ',
+    vaultRecv: (n) => 'Receiving folder: ' + n + ' files...',
+    vaultStep: (i, n) => 'Vault: ' + i + '/' + n + ' downloaded',
+    haveFiles: 'You have the files.',
+    savedFiles: (n) => n + ' files are saved on your device. Our copies have been permanently destroyed.',
+    burnLine: (b) => 'block ' + b.chunk + '  hash ' + b.hash + '...  wiped ' + b.ts,
+  },
+};
+function t(k) { return T[LANG][k]; }
+
+// The language switch keeps the session in the address, so a reader who
+// switches lands on the same hand-over in the other language.
+function langSwitch() {
+  const a = document.getElementById('lang-switch-link');
+  if (!a) return;
+  const p = location.pathname;
+  const naar = LANG === 'en' ? (p.replace(/^\/en(?=\/|$)/, '') || '/') : '/en' + p;
+  a.href = naar + location.search + location.hash;
+}
+langSwitch();
+
 function $(id) { return document.getElementById(id); }
 function showStep(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -50,10 +128,15 @@ const params = new URLSearchParams(location.search);
 const sessionToken = params.get('s');
 const RELAY_API = RELAY_SECTORS[params.get('r')] || RELAY_SECTORS.health;
 const tokenValid = !!sessionToken && /^inv_[a-zA-Z0-9]{32}$/.test(sessionToken);
-if (!tokenValid) {
+if (!sessionToken) {
+  // No link at all: somebody typed /ontvang or followed a menu. Nothing went
+  // wrong, so this is an empty state with one way forward, not an error with
+  // a "Try again" that would only reload the same empty page.
+  showStep('step-empty');
+} else if (!tokenValid) {
   // A bad link is a bad link whether or not the crypto library ever arrives, so
   // say so now instead of waiting on a signal that may never come.
-  showError('Invalid or missing session token');
+  showError(t('badLink'));
 }
 
 // ── State ──
@@ -73,12 +156,12 @@ async function init() {
   try {
     await window.ready.within('mlkem', 20000, 'ML-KEM-768 library');
   } catch {
-    showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
+    showError(t('libFail'));
     return;
   }
   // Loaded, but is it the real thing? Refuse to fall back to weaker crypto.
   if (typeof ml_kem768 === 'undefined' || !ml_kem768?.keygen) {
-    showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
+    showError(t('libFail'));
     return;
   }
   try {
@@ -88,7 +171,7 @@ async function init() {
     let kyberPubHex, ecdhPubHex;
 
     if (cached) {
-      $('keygen-status').textContent = 'Restoring keypair...';
+      $('keygen-status').textContent = t('restoring');
       $('keygen-progress').style.width = '60%';
       const kp = JSON.parse(cached);
       kyberPubHex = kp.kyberPubHex;
@@ -103,13 +186,13 @@ async function init() {
       myPrivateKey_ECDH_RAW = b64urlToU8(kp.ecdhSecJwk.d);
     } else {
       // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
-      $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
+      $('keygen-status').textContent = t('genKem');
       $('keygen-progress').style.width = '40%';
           const { publicKey: kyberPub, secretKey: kyberSec } = await new Promise(resolve => setTimeout(() => resolve(ml_kem768.keygen()), 50));
       myPrivateKey_MLKEM = kyberSec;
 
       // Generate ECDH P-256 keypair
-      $('keygen-status').textContent = 'Generating ECDH P-256 keypair...';
+      $('keygen-status').textContent = t('genEcdh');
       $('keygen-progress').style.width = '70%';
       const ecdhPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
       myPrivateKey_ECDH = ecdhPair.privateKey;
@@ -130,7 +213,7 @@ async function init() {
     }
 
     $('keygen-progress').style.width = '100%';
-    $('keygen-status').textContent = 'Keypair ready - connecting to relay...';
+    $('keygen-status').textContent = t('keysReady');
 
     const fp = await genFingerprint(kyberPubHex, ecdhPubHex);
 
@@ -156,10 +239,10 @@ async function init() {
         signal: AbortSignal.timeout(8000)
       });
       if (reg.status === 409) {
-        $('fp-status').textContent = 'This link is already in use. Ask the sender for a new one.';
+        $('fp-status').textContent = t('inUse');
         return;
       }
-      $('fp-status').textContent = 'Ready - waiting for sender to verify fingerprint';
+      $('fp-status').textContent = t('waitFp');
     } catch(e) { console.warn('pubkey register failed', e); }
 
     // Connect WebSocket (best-effort — ontvanger heeft geen API key, kan falen)
@@ -182,15 +265,15 @@ async function init() {
         }
 
         if (payload?.type === 'fingerprint_ok') {
-          $('fp-title').textContent = 'Fingerprint confirmed - receiving file...';
-          $('fp-status').textContent = 'Sender confirmed fingerprint - file is being encrypted for you';
+          $('fp-title').textContent = t('fpOkTitle');
+          $('fp-status').textContent = t('fpOkStatus');
         }
 
         // ook via HTTP polling afgehandeld hieronder
 
         if (msg.type === 'peer_left') {
           if (!$('step-done').classList.contains('active')) {
-            showError('Sender disconnected');
+            showError(t('peerLeft'));
           }
         }
       } catch(err) {
@@ -261,6 +344,21 @@ async function init() {
       );
     }, 1000);
 
+    // A dead or abandoned session link used to wait forever behind "waiting for
+    // the sender" (hertest T4-14). The relay keeps no record of an invitation
+    // the receiver could ask about, so the honest bound is time: ten minutes
+    // without a file is a session the sender did not finish. Try again reloads
+    // and waits again with the same keys (kept in sessionStorage).
+    const SENDER_WAIT_MS = 10 * 60 * 1000;
+    setTimeout(() => {
+      if (_transferClaimed) return;
+      _transferClaimed = true;
+      clearInterval(pollManifest);
+      clearInterval(pollTransfer);
+      try { if (ws) ws.close(); } catch (_) { /* already closed */ }
+      showError(t('senderGone'));
+    }, SENDER_WAIT_MS);
+
     const pollTransfer = setInterval(async () => {
       if (_transferClaimed) return;
       try {
@@ -269,6 +367,17 @@ async function init() {
         });
         if (r.ok) {
           const d = await r.json();
+          // The sender compared the codes and said no (see REJECT_READY in
+          // parashare.page.js): zero blocks, an all-zero token.
+          if (d.kyber_pub === 'file|0|0' && /^0{48}$/.test(d.ecdh_pub || '')) {
+            if (_transferClaimed) return;
+            _transferClaimed = true;
+            clearInterval(pollTransfer);
+            clearInterval(pollManifest);
+            try { if (ws) ws.close(); } catch (_) { /* already closed */ }
+            showError(t('senderRejected'));
+            return;
+          }
           if (d.ecdh_pub && d.kyber_pub) {
             if (_transferClaimed) return;
             _transferClaimed = true;
@@ -303,7 +412,7 @@ async function init() {
     }, 2000);
 
   } catch(e) {
-    showError('Keypair generation failed: ' + e.message);
+    showError(t('keygenFail') + e.message);
   }
 }
 
@@ -313,6 +422,27 @@ async function init() {
 // sealing block 1 and the relay never holds more than a few blocks of the file.
 // Without it this loop reads a token list that is complete before it starts,
 // which is what made the relay hold a whole 500 MB file at once.
+// Claim mode for the blocks of a live send. One id per page; the relay only
+// lets the holder ack, and a release frees the block for a retry at once.
+const DL_CLAIM = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+let dlBusy = null;
+function dlRelease(tok) {
+  const body = JSON.stringify({ claim: DL_CLAIM });
+  try { if (navigator.sendBeacon && navigator.sendBeacon(`${RELAY_API}/v2/dl/${tok}/release`, body)) return; } catch (_) { /* fall back */ }
+  fetch(`${RELAY_API}/v2/dl/${tok}/release`, { method: 'POST', body, keepalive: true, cache: 'no-store' }).catch(() => {});
+}
+async function dlAck(tok) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch(`${RELAY_API}/v2/dl/${tok}/ack`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claim: DL_CLAIM }), cache: 'no-store' });
+      if (r.ok || r.status === 404 || r.status === 410) return;
+    } catch (_) { /* try again */ }
+    await new Promise((res) => setTimeout(res, 800 * (i + 1)));
+  }
+}
+addEventListener('pagehide', () => { if (dlBusy) dlRelease(dlBusy); });
+
 async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
   showStep('step-receiving');
   const tokens = msg.tokens ? msg.tokens.split(',') : [];
@@ -327,22 +457,29 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     for (let i = 0; i < totalChunks; i++) {
       const pct = Math.round(10 + (i / totalChunks) * 75);
       $('recv-progress').style.width = pct + '%';
-      $('recv-status').textContent = `Downloading chunk ${i+1}/${totalChunks}...`;
+      $('recv-status').textContent = t('dlChunk')(i+1, totalChunks);
 
       const tok = await awaitToken(i);
-      if (!tok) throw new Error('Chunk ' + (i+1) + ' was never announced by the sender');
-      const r = await fetch(`${RELAY_API}/v2/dl/${tok}/get`, {
-        signal: AbortSignal.timeout(60000)
+      if (!tok) throw new Error(t('notAnnounced')(i+1));
+      // Claimed, not burned on read (hertest T4-3): the relay keeps the block
+      // until this page has decrypted it and acks below. A broken download or a
+      // closed tab gives it back (see dlRelease) instead of losing the block.
+      dlBusy = tok;
+      const r = await fetch(`${RELAY_API}/v2/dl/${tok}/get?claim=${DL_CLAIM}`, {
+        signal: AbortSignal.timeout(60000), cache: 'no-store'
       });
-      if (!r.ok) throw new Error('Download failed for chunk ' + (i+1) + ': ' + r.status + ' - blob expired or already burned');
+      if (!r.ok) throw new Error(t('dlFail')(i+1, r.status));
       const burnHash = r.headers.get('X-Hash') || r.headers.get('X-Paramant-Hash') || '';
       burnedHashes.push({ chunk: i+1, hash: burnHash.slice(0,16), ts: new Date().toISOString() });
       const raw = new Uint8Array(await r.arrayBuffer());
 
-      $('recv-status').textContent = `Decrypting chunk ${i+1}/${totalChunks} with ML-KEM-768...`;
+      $('recv-status').textContent = t('decChunk')(i+1, totalChunks);
 
-      if (!window._cryptoBridge) throw new Error('WASM crypto bridge not ready');
+      if (!window._cryptoBridge) throw new Error(t('bridge'));
       const plainPadded = await window._cryptoBridge.decryptBlob(raw, kyberSec, ecdhPrivRaw);
+      // Decrypted, so this block has arrived whole: only now is it burned.
+      await dlAck(tok);
+      dlBusy = null;
 
       // Strip metadata header: META_MAGIC(4) | metaLen(4) | meta | chunkData
       const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
@@ -380,7 +517,7 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     }
 
     $('recv-progress').style.width = '100%';
-    $('recv-status').textContent = 'Saving file...';
+    $('recv-status').textContent = t('saving');
 
     let totalSize = 0;
     let savedBlob = null;
@@ -408,8 +545,8 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
       // down under "What made this safe".
       const sizeStr = totalSize > 0 ? ' (' + formatSize(totalSize) + ')' : '';
       window.paramantDone.fill('step-done', {
-        title: 'You have the file.',
-        line: fileName + sizeStr + ' is saved on your device. Our copy has been permanently destroyed.',
+        title: t('haveFile'),
+        line: t('savedLine')(fileName + sizeStr),
       });
       offerSaveAgain(savedBlob, fileName);
       renderBurnReceipt(burnedHashes);
@@ -429,15 +566,16 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     document.addEventListener('visibilitychange', _burnOnHide);
 
   } catch(e) {
+    if (dlBusy) { dlRelease(dlBusy); dlBusy = null; }
     if (fileWriter) { try { await fileWriter.abort(); } catch(_) {} fileWriter = null; }
-    showError('Decryption failed: ' + e.message);
+    showError(t('decFail') + e.message);
   }
 }
 
 
 async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
   showStep('step-receiving');
-  $('recv-status').textContent = 'Receiving vault — ' + vaultFiles.length + ' files...';
+  $('recv-status').textContent = t('vaultRecv')(vaultFiles.length);
 
   const burnedHashes = [];
 
@@ -447,12 +585,12 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
       { tokens: vf.tokens.join(','), file_name: 'download', total_chunks: vf.tokens.length, ttl_ms, _vaultIdx: fi, _vaultTotal: vaultFiles.length },
       kyberSec, ecdhPriv, { silent: fi < vaultFiles.length - 1 }
     );
-    $('recv-status').textContent = 'Vault: ' + (fi+1) + '/' + vaultFiles.length + ' downloaded';
+    $('recv-status').textContent = t('vaultStep')(fi+1, vaultFiles.length);
   }
 
   window.paramantDone.fill('step-done', {
-    title: 'You have the files.',
-    line: vaultFiles.length + ' files are saved on your device. Our copies have been permanently destroyed.',
+    title: t('haveFiles'),
+    line: t('savedFiles')(vaultFiles.length),
   });
   // Each file in a vault saved itself as it arrived; there is no single blob
   // left to hand over again, so the screen keeps the dashboard as its one
@@ -471,6 +609,20 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
 // nothing to hand over again the dashboard link takes that place instead, so
 // the screen is never a dead end and never has two loud buttons.
 let savedFile = null;
+// The receiver usually has no account here: the quiet link goes to the site.
+// Only a visitor who IS signed in gets their overview (hertest r2 T4-L2).
+(async function dashboardOnlyWhenSignedIn() {
+  try {
+    const r = await fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' });
+    const d = r.ok ? await r.json() : null;
+    const dash = $('done-dashboard');
+    if (dash && d && d.authenticated) {
+      const en = /^en\b/i.test(document.documentElement.lang || '');
+      dash.setAttribute('href', en ? '/en/dashboard' : '/dashboard');
+      dash.textContent = en ? 'Open your dashboard' : 'Naar uw overzicht';
+    }
+  } catch { /* stays the link to the site */ }
+})();
 function offerSaveAgain(blob, name) {
   const btn = $('done-save');
   const dash = $('done-dashboard');
@@ -494,15 +646,17 @@ function renderBurnReceipt(burnedHashes) {
   if (!el) return;
   if (!burnedHashes || !burnedHashes.length) { el.hidden = true; return; }
   el.textContent = burnedHashes
-    .map(b => 'block ' + b.chunk + '  hash ' + b.hash + '...  wiped ' + b.ts)
+    .map(b => t('burnLine')(b))
     .join('\n');
   el.hidden = false;
 }
 
 // Bytes into something a person reads. Same rounding as /get.
 function formatSize(n) {
-  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
-  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  const nl = !/^en\b/i.test(document.documentElement.lang || '');
+  const one = (x) => { const v = x.toFixed(1); return nl ? v.replace('.', ',') : v; };
+  if (n >= 1024 * 1024) return one(n / 1024 / 1024) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
   return n + ' B';
 }
 

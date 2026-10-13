@@ -143,16 +143,27 @@ const WACHT = Number(process.env.METING_WACHT_MS || 1500);
 // De grens meten zonder een byte te uploaden. nginx vergelijkt Content-Length
 // met client_max_body_size voordat hij de body leest, dus alleen de kop sturen
 // is genoeg: 413 betekent boven de grens, stilte betekent eronder.
-export function kopProbe(host, lengte) {
+//
+// De wachttijd loopt pas vanaf het moment dat de kop verstuurd is. Liep hij al
+// tijdens de TLS-handdruk, dan las een trage verbinding als "eronder": op
+// 2026-10-01 meldde CI daardoor dat finance.paramant.app 12M toeliet, terwijl
+// hij lokaal en in elke andere meting op 12M al 413 gaf. Een handdruk die niet
+// lukt is een fout, geen stilte.
+const HANDDRUK = Number(process.env.METING_HANDDRUK_MS || 10000);
+
+export function kopProbe(host, lengte, { port = 443, handdruk = HANDDRUK } = {}) {
   return new Promise((klaar) => {
     let af = false;
-    const gedaan = (v) => { if (!af) { af = true; klaar(v); } };
-    const s = tls.connect({ host, port: 443, servername: host, ALPNProtocols: ['http/1.1'] }, () => {
+    let t = null;
+    const gedaan = (v) => { if (!af) { af = true; clearTimeout(t); klaar(v); } };
+    const s = tls.connect({ host, port, servername: host, ALPNProtocols: ['http/1.1'] }, () => {
+      clearTimeout(t);
       s.write(`POST /__meting HTTP/1.1\r\nHost: ${host}\r\nContent-Length: ${lengte}\r\n`
-        + `Content-Type: application/octet-stream\r\nConnection: close\r\n\r\n`);
+        + `Content-Type: application/octet-stream\r\nConnection: close\r\n\r\n`,
+      () => { if (!af) t = setTimeout(() => { s.destroy(); gedaan('wacht'); }, WACHT); });
     });
     let buf = '';
-    const t = setTimeout(() => { s.destroy(); gedaan('wacht'); }, WACHT);
+    t = setTimeout(() => { s.destroy(); gedaan('fout: geen handdruk binnen ' + handdruk + ' ms'); }, handdruk);
     s.on('data', (d) => {
       buf += d;
       if (buf.includes('\r\n')) { clearTimeout(t); s.destroy(); gedaan(Number(buf.split(' ')[1])); }
@@ -179,11 +190,23 @@ export async function meetGrens(host, verwacht) {
 // ongebreidelde zoektocht over zes hosts liep in de sabotagetoets van
 // 2026-09-05 buiten de tijd van de test, en een poort die bij een verschil
 // blijft hangen in plaats van rood te worden is geen poort.
+// De stappengrens moet het bereik AAN KUNNEN, anders is het antwoord een
+// benadering die zich voordoet als een getal. Met twintig stappen over 1 KiB
+// tot 64 MiB blijft er ongeveer 64 byte onzekerheid, en dan levert dezelfde
+// server per meting een ander getal: op 05-09 kwam er 10485760 uit en op 22-09
+// 10485728, tweeendertig byte lager. Dat las als drift op een server waar
+// niemand iets had veranderd, en het hield een hele CI-baan rood.
+//
+// Halveren kost log2(boven - onder) stappen om op de byte uit te komen. Die
+// som staat hieronder in plaats van een rond getal, met vijf stappen marge,
+// zodat een groter bereik de meting niet stilletjes weer vaag maakt. Het
+// verschil is een handvol extra verbindingen per host.
 export async function zoekGrens(host, onder = 1024, boven = 64 * 1024 * 1024) {
   if (await kopProbe(host, onder) === 413) return { grens: null, opmerking: 'weigert al op ' + onder };
   if (await kopProbe(host, boven) !== 413) return { grens: null, opmerking: 'accepteert nog op ' + boven };
+  const nodig = Math.ceil(Math.log2(Math.max(2, boven - onder))) + 5;
   let stappen = 0;
-  while (onder < boven - 1 && stappen < 20) {
+  while (onder < boven - 1 && stappen < nodig) {
     const mid = Math.floor((onder + boven) / 2);
     if (await kopProbe(host, mid) === 413) boven = mid; else onder = mid;
     stappen += 1;

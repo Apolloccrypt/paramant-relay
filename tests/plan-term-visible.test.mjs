@@ -24,7 +24,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
-const aliases = { '/': '/index.html', '/dashboard': '/dashboard.html', '/account': '/account.html', '/pricing': '/pricing.html' };
+const aliases = { '/': '/index.html', '/dashboard': '/dashboard.html', '/account': '/account.html', '/pricing': '/pricing.html',
+  '/en/dashboard': '/en/dashboard.html', '/en/account': '/en/account.html' };
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -51,15 +52,17 @@ const json = (route, body, status = 200) =>
 // The three terms under test, as an ISO paid_until the pages have to read.
 function term(days) { return new Date(Date.now() + days * DAY).toISOString(); }
 // The one notation the site shows, mirrored from frontend/js/format-date.js:
-// day, month in full, year, in UTC, and never a slash.
-function readable(iso) {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+// day, month in full, year, on Dutch time, and never a slash.
+// The Dutch pages write the month in Dutch (format-date.js reads <html lang>),
+// the English copies under /en in English. Same shape either way.
+function readable(iso, lang = 'en') {
+  return new Date(iso).toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' });
 }
 
 // ── /account ─────────────────────────────────────────────────────────────────
 // Its billing block hangs on one call. Everything else on the page is stubbed
 // to something harmless so nothing else can fail the run.
-async function account(paidUntil) {
+async function account(paidUntil, prefix = '', extra = {}) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   // Playwright tries the most recently added route first, so the catch-all is
   // registered before the two that matter, not after.
@@ -76,13 +79,14 @@ async function account(paidUntil) {
     next_billing_date: null,
     auto_renews: false,
     cancellation_scheduled_at: null,
+    ...extra,
   }));
   await page.route('**/api/user/billing/history', (route) => json(route, { history: [] }));
   await page.route('**/api/user/account', (route) => json(route, {
     email: 'demo@example.com', plan: 'pro', api_key_masked: 'pgp_demo...abcd',
     created_at: '2026-01-01T00:00:00.000Z', sessions: [], backup_codes_remaining: 0,
   }));
-  await page.goto(ORIGIN + '/account', { waitUntil: 'domcontentloaded' });
+  await page.goto(ORIGIN + prefix + '/account', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const el = document.getElementById('billing-content');
     return el && !el.classList.contains('hidden');
@@ -103,7 +107,7 @@ async function account(paidUntil) {
 }
 
 // ── /dashboard ───────────────────────────────────────────────────────────────
-async function dashboard(paidUntil) {
+async function dashboard(paidUntil, prefix = '') {
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   await page.route('**/api/**', (route) => json(route, {}));
   await page.route('**/api/user/me', (route) => json(route, {
@@ -122,7 +126,7 @@ async function dashboard(paidUntil) {
   }));
   await page.route('**/api/user/documents**', (route) => json(route, { documents: [] }));
   await page.route('**/api/user/dashboard/overview', (route) => json(route, {}));
-  await page.goto(ORIGIN + '/dashboard', { waitUntil: 'domcontentloaded' });
+  await page.goto(ORIGIN + prefix + '/dashboard', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const el = document.getElementById('dh-term-line');
     return el && !el.hidden;
@@ -142,41 +146,80 @@ async function dashboard(paidUntil) {
   return state;
 }
 
-for (const [name, run] of [['account', account], ['dashboard', dashboard]]) {
+// Both pages are Dutch since 23 September 2026, with an English copy under /en/
+// on the same script. The same four states are held in both languages.
+const COPY = {
+  nl: {
+    lang: 'nl',
+    ends: (d) => `Firm betaald tot ${d}. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.`,
+    ended: (d) => `Afgelopen op ${d}, nu op Community.`,
+    noCharge: /Er wordt niets automatisch afgeschreven\./, renew: 'Verlengen', pricing: '/pricing',
+  },
+  en: {
+    lang: 'en',
+    ends: (d) => `Firm paid until ${d}. Nothing renews automatically. You can renew from today without losing a day.`,
+    ended: (d) => `Ended on ${d}, now on Community.`,
+    noCharge: /Nothing is charged automatically\./, renew: 'Renew', pricing: /^\/(en\/)?pricing$/,
+  },
+};
+// /account and /dashboard write the same sentence since acceptatie 3.1.1
+// (js/plan-terms.js headline): the plan, the day it is paid until, that nothing
+// renews by itself, and that renewing today loses no day.
+const samePricing = (want, href) => (typeof want === 'string' ? href === want : want.test(href || ''));
+for (const [name, run, prefix, base] of [['account', account, '', COPY.nl], ['dashboard', dashboard, '', COPY.nl],
+  ['en/account', account, '/en', COPY.en], ['en/dashboard', dashboard, '/en', COPY.en]]) {
+  const copy = base;
   // Far out: the date is stated, and nothing shouts. A warning band on a term
   // with six weeks left is noise, and noise is what makes the real one invisible.
   const far = term(40);
-  const farState = await run(far);
+  const farState = await run(far, prefix);
   ok(`${name}: a term far out shows the date and says nothing renews`,
-    farState.line === `Ends on ${readable(far)}, nothing renews automatically.`, JSON.stringify(farState));
+    farState.line === copy.ends(readable(far, copy.lang)), JSON.stringify(farState));
   ok(`${name}: a term far out carries no warning band`, farState.warn === null, JSON.stringify(farState));
 
   // Inside the last seven days: the same date, plus one calm amber line with the
   // one action that changes anything.
   const close = term(3);
-  const closeState = await run(close);
+  const closeState = await run(close, prefix);
   ok(`${name}: a term inside seven days still states the date`,
-    closeState.line === `Ends on ${readable(close)}, nothing renews automatically.`, JSON.stringify(closeState));
+    closeState.line === copy.ends(readable(close, copy.lang)), JSON.stringify(closeState));
   ok(`${name}: a term inside seven days raises the warning`,
-    closeState.warnVisible && closeState.warn.includes(readable(close)), JSON.stringify(closeState));
+    closeState.warnVisible && closeState.warn.includes(readable(close, copy.lang)), JSON.stringify(closeState));
   ok(`${name}: the warning says nothing is charged automatically`,
-    /Nothing is charged automatically\./.test(closeState.warn || ''), closeState.warn || '');
+    copy.noCharge.test(closeState.warn || ''), closeState.warn || '');
   ok(`${name}: the warning offers Renew, and it goes to /pricing`,
-    closeState.cta && closeState.cta.text === 'Renew' && closeState.cta.href === '/pricing',
+    closeState.cta && closeState.cta.text === copy.renew && samePricing(copy.pricing, closeState.cta.href),
     JSON.stringify(closeState.cta));
 
   // After the term. This is the case the page used to render as "Pro plan,
   // active" while every gate answered 402.
   const gone = term(-2);
-  const goneState = await run(gone);
+  const goneState = await run(gone, prefix);
   ok(`${name}: an ended term says so, and says where the account landed`,
-    goneState.line === `Ended on ${readable(gone)}, now on Community.`, JSON.stringify(goneState));
+    goneState.line === copy.ended(readable(gone, copy.lang)), JSON.stringify(goneState));
   ok(`${name}: an ended term drops the warning band`, goneState.warn === null, JSON.stringify(goneState));
 
   // House style. An em-dash in customer copy is a style failure everywhere in
   // this repo, and this text is generated rather than written into the HTML.
   ok(`${name}: no em-dash in the term copy`,
     ![farState.line, closeState.line, closeState.warn, goneState.line].some((s) => s && s.includes('\u2014')), '');
+}
+
+// auto_renews true means a subscription stands behind the term and it WILL
+// renew. /account printed "nothing renews automatically" in exactly that case
+// (acceptatie 3.1.1, taal 31). Both values, both languages.
+for (const [prefix, lang] of [['', 'nl'], ['/en', 'en']]) {
+  const far = term(40);
+  const close = term(3);
+  const renewing = await account(far, prefix, { auto_renews: true });
+  const want = lang === 'nl'
+    ? `Firm wordt op ${readable(far, 'nl')} automatisch verlengd. Opzeggen kan tot die dag.`
+    : `Firm renews automatically on ${readable(far, 'en')}. You can cancel until that day.`;
+  ok(`${lang} account, auto_renews true: says it renews, never that nothing renews`, renewing.line === want, JSON.stringify(renewing));
+  const closeRenewing = await account(close, prefix, { auto_renews: true });
+  ok(`${lang} account, auto_renews true: no "renew or fall back" band`, closeRenewing.warn === null, JSON.stringify(closeRenewing));
+  const oneOff = await account(far, prefix, { auto_renews: false });
+  ok(`${lang} account, auto_renews false: says nothing renews`, /niets automatisch verlengd|Nothing renews automatically/.test(oneOff.line || '') && !/automatisch verlengd\. Opzeggen|renews automatically on/.test(oneOff.line || ''), JSON.stringify(oneOff));
 }
 
 await browser.close();

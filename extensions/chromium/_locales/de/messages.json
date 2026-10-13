@@ -1,6 +1,6 @@
 {
   "extName":        { "message": "Paramant: Verschlüsselte Anhänge", "description": "Extension name" },
-  "extDesc":        { "message": "Senden Sie Gmail- und Outlook-Anhänge als verschlüsselte Links, die nach einmaligem Download verschwinden, über das Post-Quanten-Relay von Paramant.", "description": "Extension description" },
+  "extDesc":        { "message": "Gmail- und Outlook-Anhänge als verschlüsselte Links senden, die nach einmaligem Download verschwinden. Über das Relay von Paramant.", "description": "Extension description" },
 
   "btn_label":      { "message": "Paramant" },
   "btn_aria":       { "message": "Verschlüsselten Anhang über Paramant senden" },
@@ -8,6 +8,8 @@
   "err_network":    { "message": "Netzwerkfehler. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut." },
   "err_upload":     { "message": "Upload fehlgeschlagen. Bitte erneut versuchen." },
   "err_incomplete": { "message": "Upload nicht abgeschlossen. Bitte erneut versuchen." },
+  "err_quota":      { "message": "Monatliches Transferlimit erreicht. Upgraden Sie Ihren Tarif, um mehr zu senden." },
+  "cta_upgrade":    { "message": "Tarif upgraden" },
   "success_inserted": { "message": "Verschlüsselter Link eingefügt" },
 
   "link_title":     { "message": "Verschlüsselter Anhang über Paramant" },
@@ -42,7 +44,8 @@
   "opt_format_block":   { "message": "Formatierter Block" },
   "opt_format_plain":   { "message": "Einfacher Link" },
   "opt_relay_title":    { "message": "Relay (erweitert)" },
-  "opt_relay_hint":     { "message": "Leer lassen, um das Relay für Ihren API-Schlüssel automatisch zu erkennen. Nur einstellen, wenn Sie ein eigenes Relay betreiben." },
+  "opt_relay_hint":     { "message": "Leer lassen, um das Relay für Ihren API-Schlüssel automatisch zu erkennen. Sie können hier ein Paramant-Relay festlegen oder Ihr eigenes Relay (https://relay.beispiel.de). Bei einem eigenen Relay öffnet der Empfänger den Link auf diesem Relay; es muss die Paramant-Seiten daher selbst ausliefern (SERVE_FRONTEND=true, die Voreinstellung von install.sh)." },
+  "opt_relay_selfhost": { "message": "Geben Sie das Relay als https://-Adresse ohne Pfad ein, zum Beispiel https://relay.beispiel.de." },
   "opt_relay_url":      { "message": "Relay-URL" },
   "opt_history_title":  { "message": "Übertragungsverlauf" },
   "opt_history_hint":   { "message": "Eine lokale Liste gesendeter Dateien (Name, Größe, Zeit). Sie verlässt diesen Browser nie und enthält nie Schlüssel oder Links." },

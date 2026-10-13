@@ -4,8 +4,9 @@
 //
 // Security: the filename comes from the user's disk and the URL carries a key fragment, so
 // both are untrusted. Everything interpolated into HTML is escaped, and the href is
-// restricted to the https paramant.app origins we mint. A crafted filename must never
-// become live markup in the sender's mailbox.
+// restricted to the receive links we mint: a paramant.app origin, or the /get page of a
+// self-hosted relay (paramant-core receiveBaseFor), always https. A crafted filename must
+// never become live markup in the sender's mailbox.
 
 const ALLOWED_URL = /^https:\/\/(paramant\.app|[a-z0-9-]+\.paramant\.app)\//i;
 
@@ -16,7 +17,13 @@ export function escapeHtml(s) {
 }
 
 function safeUrl(url) {
-  return ALLOWED_URL.test(url) ? url : '#';
+  if (ALLOWED_URL.test(url)) return url;
+  // A self-hosted relay: https, no user info, and exactly its /get page.
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'https:' && !u.username && !u.password && u.pathname === '/get') return u.href;
+  } catch { /* not a URL */ }
+  return '#';
 }
 
 const DEFAULT_STRINGS = {
@@ -39,10 +46,13 @@ export function buildLinkHtml({ url, filename, expiresAt, format = 'block', t })
   const href = escapeHtml(safeUrl(url));
   const meta = fillEscaped(tr('link_meta'), { expiry: formatExpiry(expiresAt) });
 
+  // 'plain' is for a receiver whose mail client shows no HTML. The link text is
+  // the URL itself, so it survives a conversion to plain text; a file name as
+  // link text vanished there and left no link at all (fase 1, EXT-08-A).
   if (format === 'plain') {
     return (
       `<div style="font-family:Arial,sans-serif;font-size:13px;margin:8px 0">` +
-        `🔒 <a href="${href}" style="color:#1D4ED8;font-weight:600;text-decoration:none">${name}</a> ` +
+        `&#128274; ${name}: <a href="${href}" style="color:#1D4ED8">${href}</a> ` +
         `<span style="color:#6B7280;font-size:11px">(${meta})</span>` +
       `</div>`
     );

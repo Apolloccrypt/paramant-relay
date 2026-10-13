@@ -1,3 +1,73 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
+
+// ── A fresh second factor for actions that change the account ───────────────
+// Renewing back-up codes, a new authenticator app, deactivating the account
+// and removing a passkey ask for the current 6-digit code (or a back-up code)
+// on the server (admin freshSecondFactor). One inline panel under the button
+// that was pressed, never a browser prompt. Resolves to { totp } or
+// { backup_code }, or null when cancelled. Also used by js/passkey.js.
+function paAskSecondFactor(anchor, text, confirmLabel) {
+  return new Promise(function(resolve) {
+    var old = document.getElementById('sf-panel');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var wrap = document.createElement('div');
+    wrap.id = 'sf-panel';
+    wrap.setAttribute('role', 'group');
+    wrap.style.cssText = 'margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:6px';
+    var p = document.createElement('p');
+    p.className = 'small'; p.style.margin = '0 0 8px'; p.textContent = text;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    var input = document.createElement('input');
+    input.type = 'text'; input.id = 'sf-code'; input.autocomplete = 'one-time-code'; input.maxLength = 20;
+    input.placeholder = nlEn('Code of back-upcode', 'Code or back-up code');
+    input.setAttribute('aria-label', nlEn('Code van 6 cijfers of een back-upcode', '6-digit code or a back-up code'));
+    input.style.maxWidth = '190px';
+    var ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'btn btn-small'; ok.id = 'sf-confirm'; ok.textContent = confirmLabel;
+    var cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'btn btn-small btn-secondary'; cancel.id = 'sf-cancel'; cancel.textContent = nlEn('Annuleren', 'Cancel');
+    var err = document.createElement('p');
+    err.className = 'small'; err.id = 'sf-error'; err.style.margin = '6px 0 0'; err.hidden = true;
+    row.appendChild(input); row.appendChild(ok); row.appendChild(cancel);
+    wrap.appendChild(p); wrap.appendChild(row); wrap.appendChild(err);
+    var host = anchor && anchor.parentNode ? anchor : document.body;
+    if (host === document.body) document.body.appendChild(wrap);
+    else host.parentNode.insertBefore(wrap, host.nextSibling);
+    input.focus();
+    function done(v) { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); resolve(v); }
+    function onOk() {
+      var v = (input.value || '').trim();
+      if (/^\d{6}$/.test(v)) return done({ totp: v });
+      if (/^[A-Za-z0-9]{3,8}(-[A-Za-z0-9]{3,8}){1,3}$/.test(v)) return done({ backup_code: v.toUpperCase() });
+      err.hidden = false;
+      err.textContent = nlEn('Vul de code van 6 cijfers uit uw authenticator-app in, of een back-upcode.', 'Enter the 6-digit code from your authenticator app, or a back-up code.');
+      input.focus();
+    }
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', function() { done(null); });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+      if (e.key === 'Escape') done(null);
+    });
+  });
+}
+window.paAskSecondFactor = paAskSecondFactor;
+
+// What a refused account action means, in words (admin freshSecondFactor and
+// the routes behind it). Never "nothing happens".
+function paSecondFactorError(status, body) {
+  var code = body && body.error;
+  if (code === 'invalid_second_factor' || code === 'invalid_totp') return nlEn('Die code klopt niet. Er is niets veranderd.', 'That code did not match. Nothing changed.');
+  if (code === 'second_factor_required') return nlEn('Vul eerst de code van 6 cijfers of een back-upcode in. Er is niets veranderd.', 'Enter the 6-digit code or a back-up code first. Nothing changed.');
+  if (status === 429) return nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.');
+  if (status === 401) return nlEn('Uw sessie is verlopen. Log opnieuw in en probeer het nog eens. Er is niets veranderd.', 'Your session has expired. Sign in again and retry. Nothing changed.');
+  if (status >= 500) return nlEn('Er is een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Something went wrong on our side. Nothing changed. Please try again shortly.');
+  return nlEn('Dit is niet gelukt. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work. Nothing changed. Please try again shortly.');
+}
+window.paSecondFactorError = paSecondFactorError;
 
 (function() {
   // Plan resolution, the same shape js/dashboard.js uses, because a customer
@@ -89,7 +159,15 @@
     try {
       const res = await fetch('/api/user/account', { credentials: 'include' });
       if (!res.ok) {
-        show('state-unauth');
+        // Only a 401 means signed out. A 429 from an empty nginx bucket, or a
+        // 5xx, told a signed-in customer "U bent niet ingelogd" (hertest r2 R2-a).
+        // 503 with authenticated:null (admin/server.js) is an outage, never "signed out".
+        if (res.status === 401 || res.status === 403) { show('state-unauth'); return; }
+        show('state-busy');
+        if (res.status !== 429) {
+          var bt = document.getElementById('acct-busy-text');
+          if (bt) bt.firstChild.textContent = nlEn('Door een storing bij ons laadt uw account even niet. U bent nog ingelogd. ', 'Your account will not load just now because of a fault on our side. You are still signed in. ');
+        }
         return;
       }
       const data = await res.json();
@@ -102,8 +180,8 @@
       document.getElementById('plan').textContent = planName(data, data.plan);
       var planChip = document.getElementById('plan-chip');
       if (planChip) planChip.textContent = planName(data, data.plan);
-      document.getElementById('label').textContent = data.label || '—';
-      document.getElementById('created').textContent = paramantDate.day(data.created_at, 'Unknown');
+      document.getElementById('label').textContent = data.label || '-';
+      document.getElementById('created').textContent = paramantDate.day(data.created_at, nlEn('Onbekend', 'Unknown'));
       document.getElementById('backup-count').textContent = data.backup_codes_remaining;
 
       const sessionsList = document.getElementById('sessions-list');
@@ -116,10 +194,10 @@
         // self/stored DOM XSS.
         const labelEl = document.createElement('div');
         labelEl.className = 'info-label';
-        labelEl.textContent = (s.ip_masked || '') + (s.current ? ' (this session)' : '');
+        labelEl.textContent = (s.ip_masked || '') + (s.current ? nlEn(' (deze sessie)', ' (this session)') : '');
         const valueEl = document.createElement('div');
         valueEl.className = 'info-value';
-        valueEl.textContent = (s.user_agent_short || '') + ' · last seen ' + paramantDate.moment(s.last_seen);
+        valueEl.textContent = (s.user_agent_short || '') + nlEn(' · laatst gezien ', ' · last seen ') + paramantDate.moment(s.last_seen);
         el.appendChild(labelEl);
         el.appendChild(valueEl);
         sessionsList.appendChild(el);
@@ -130,7 +208,7 @@
         const ms = expiresAt - new Date();
         const min = Math.max(0, Math.ceil(ms / 60000));
         document.getElementById('session-timer').textContent =
-          min > 60 ? Math.round(min / 60) + 'h' : min + 'm';
+          min > 60 ? Math.round(min / 60) + nlEn(' uur', 'h') : min + nlEn(' min', 'm');
       }
       updateTimer();
       setInterval(updateTimer, 30000);
@@ -218,7 +296,7 @@
         keyRowFilled = true;
         el.textContent = maskKey(key);
       }).catch(function() {
-        el.textContent = 'Unavailable';
+        el.textContent = nlEn('Niet beschikbaar', 'Unavailable');
       });
     });
   }
@@ -228,15 +306,15 @@
     const original = btn.textContent;
     let key;
     try { key = await accountKey(); }
-    catch (e) { btn.textContent = 'Failed'; setTimeout(function(){ btn.textContent = original; }, 2000); return; }
+    catch (e) { btn.textContent = nlEn('Mislukt', 'Failed'); setTimeout(function(){ btn.textContent = original; }, 2000); return; }
     const ok = await Promise.resolve(_copyText(key));
     if (ok) {
-      btn.textContent = 'Copied!';
+      btn.textContent = nlEn('Gekopieerd', 'Copied');
     } else {
       // Last-resort path for Safari/WebKit with VPN extensions that block writes entirely.
       // Show the key so the user can select + ⌘-C manually.
       document.getElementById('api-key').textContent = key;
-      btn.textContent = 'Shown — ⌘-C';
+      btn.textContent = nlEn('Getoond, kopieer met ⌘-C', 'Shown, ⌘-C');
     }
     setTimeout(function(){ btn.textContent = original; }, 2500);
   });
@@ -245,57 +323,87 @@
     try {
       document.getElementById('api-key').textContent = await accountKey();
     } catch (e) {
-      document.getElementById('api-key').textContent = 'Unavailable';
+      document.getElementById('api-key').textContent = nlEn('Niet beschikbaar', 'Unavailable');
     }
   });
 
+  async function accountAction(btn, url, method, ask, confirmLabel) {
+    var factor = await paAskSecondFactor(btn, ask, confirmLabel);
+    if (!factor) return null;
+    btn.disabled = true;
+    try {
+      var res = await fetch(url, {
+        method: method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(factor),
+      });
+      var body = await res.json().catch(function() { return {}; });
+      if (!res.ok) { alert(paSecondFactorError(res.status, body)); return null; }
+      return body;
+    } catch (e) {
+      alert(nlEn('Paramant is niet bereikbaar. Er is niets veranderd. Controleer uw verbinding en probeer het opnieuw.', 'We could not reach Paramant. Nothing changed. Check your connection and try again.'));
+      return null;
+    } finally { btn.disabled = false; }
+  }
+
   document.getElementById('regen-backup').addEventListener('click', async function() {
-    if (!confirm('Regenerate backup codes? Current codes will be invalid.')) return;
-    const res = await fetch('/api/user/account/backup-codes/regenerate', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      const data = await res.json();
-      alert('New codes:\n\n' + data.backup_codes.join('\n') + '\n\nSave these now. They will not be shown again.');
+    var data = await accountAction(this, '/api/user/account/backup-codes/regenerate', 'POST',
+      nlEn('Alle codes vernieuwen: de huidige back-upcodes vervallen. Bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Renew all codes: the current back-up codes stop working. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Codes vernieuwen', 'Renew codes'));
+    if (data && Array.isArray(data.backup_codes)) {
+      alert(nlEn('Nieuwe codes:\n\n', 'New codes:\n\n') + data.backup_codes.join('\n') + nlEn('\n\nBewaar ze nu. U ziet ze hierna niet meer.', '\n\nSave these now. They will not be shown again.'));
+      loadAccount();
     }
   });
 
   document.getElementById('reset-totp').addEventListener('click', async function() {
-    if (!confirm('This will send a new setup email. Your current authenticator will be invalidated.')) return;
-    const res = await fetch('/api/user/account/totp/reset', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      alert('Setup email sent. Check your inbox.');
-      window.location = '/auth/login';
+    var data = await accountAction(this, '/api/user/account/totp/reset', 'POST',
+      nlEn('We sturen u een nieuwe instelmail. Uw huidige authenticator-app werkt daarna niet meer. Bevestig met de huidige code van 6 cijfers, of een back-upcode.', 'We send you a new setup email. Your current authenticator app stops working after that. Confirm with the current 6-digit code, or a back-up code.'),
+      nlEn('Instelmail sturen', 'Send setup email'));
+    if (data) {
+      alert(nlEn('De instelmail is verstuurd. Kijk in uw inbox.', 'Setup email sent. Check your inbox.'));
+      window.location = nlEn('/auth/login', '/en/auth/login');
     }
   });
 
   document.getElementById('sign-out').addEventListener('click', async function() {
     await fetch('/api/user/logout', { method: 'POST', credentials: 'include' });
+    try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
     window.location = '/';
   });
 
   document.getElementById('sign-out-all').addEventListener('click', async function() {
-    await fetch('/api/user/account/sessions/revoke-others', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    alert('Other sessions signed out.');
+    // A 503 (relay or session store down, admin/server.js) is not "done" and
+    // not "signed out" either: say what happened and leave the session alone.
+    var res = null;
+    try {
+      res = await fetch('/api/user/account/sessions/revoke-others', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (e) { res = null; }
+    if (!res || !res.ok) {
+      var st = res ? res.status : 0;
+      if (st === 401) { show('state-unauth'); return; }
+      alert(st === 429
+        ? nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.')
+        : nlEn('Er is een storing bij ons. De andere sessies zijn nog actief en u bent nog ingelogd. Probeer het zo opnieuw.', 'Something went wrong on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
+      return;
+    }
+    alert(nlEn('De andere sessies zijn uitgelogd.', 'Other sessions signed out.'));
     loadAccount();
   });
 
   document.getElementById('delete-account').addEventListener('click', async function() {
-    const answer = prompt('Type DEACTIVATE to confirm account deactivation:');
-    if (answer !== 'DEACTIVATE') return;
-    const res = await fetch('/api/user/account', {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      alert('Account deactivated. Its key can no longer be used.');
+    const answer = prompt(nlEn('Weet u het zeker? Typ DEACTIVEREN om uw account te deactiveren:', 'Are you sure? Type DEACTIVATE to deactivate your account:'));
+    if (answer !== nlEn('DEACTIVEREN', 'DEACTIVATE')) return;
+    var data = await accountAction(this, '/api/user/account', 'DELETE',
+      nlEn('Laatste stap: bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Last step: confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Account deactiveren', 'Deactivate account'));
+    if (data) {
+      try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
+      alert(nlEn('Account gedeactiveerd. De sleutel werkt niet meer.', 'Account deactivated. Its key no longer works.'));
       window.location = '/';
     }
   });
@@ -320,7 +428,12 @@
       .filter(function (t) { return !isNaN(t); });
     if (!ends.length) return null;
     var ahead = ends.filter(function (t) { return t > now; });
-    var at = ahead.length ? Math.min.apply(null, ahead) : Math.max.apply(null, ends);
+    // The LAST end still ahead: the day the account actually stops having
+    // what it paid for. It used to be the nearest one, so after a Firm to
+    // Business upgrade one page said the 5th of one month and the row under it
+    // the 6th of the next (betaaltest 05-10, row 8). What runs out earlier on
+    // one product is said per product, in the lines under it (plan-terms.js).
+    var at = ahead.length ? Math.max.apply(null, ahead) : Math.max.apply(null, ends);
     var days = (at - now) / 86400000;
     return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
   }
@@ -338,17 +451,32 @@
     var warn = document.getElementById('billing-term-warn');
     if (line) line.hidden = true;
     if (warn) warn.hidden = true;
+    if (window.paPlanTerms) window.paPlanTerms.render(document.getElementById('billing-products'), d);
     if (!term) return;
     var when = termDate(term.at);
     if (line) {
+      // A one-off payment is not a subscription (besluit 05-10-2026): no
+      // "cancel", but the day it is paid until and when renewing is possible.
+      // That is today: the checkout sells a renewal of a running term at any
+      // moment, and the new term starts where this one ends
+      // (lib/billing.processPayment, currentTermEnd), so no day is lost.
+      // One sentence, shared with /dashboard (plan-terms.js headline): the
+      // plan that runs now, its own end and what follows. auto_renews true
+      // means a subscription stands behind it and it WILL renew; it used to
+      // print "nothing renews automatically" in exactly that case
+      // (acceptatie 3.1.1, taal 31).
+      var said = !term.ended && window.paPlanTerms && window.paPlanTerms.headline(d);
       line.textContent = term.ended
-        ? 'Ended on ' + when + ', now on Community.'
-        : 'Ends on ' + when + ', nothing renews automatically.';
+        ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
+        : said || (d.auto_renews
+          ? nlEn('Wordt op ', 'Renews automatically on ') + when + nlEn(' automatisch verlengd. Opzeggen kan tot die dag.', '. You can cancel until that day.')
+          : nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
       line.hidden = false;
     }
-    if (warn && term.warn) {
+    // A plan that renews by itself needs no "renew or fall back" warning.
+    if (warn && term.warn && !d.auto_renews) {
       var text = warn.querySelector('[data-term="text"]');
-      if (text) text.textContent = 'Your plan ends on ' + when + '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.';
+      if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;
     }
   }
@@ -356,7 +484,7 @@
   async function loadBilling() {
     try {
       const res = await fetch('/api/user/billing/status', { credentials: 'include' });
-      if (!res.ok) { document.getElementById('billing-loading').textContent = 'Billing unavailable.'; return; }
+      if (!res.ok) { document.getElementById('billing-loading').textContent = nlEn('Betaalstatus niet beschikbaar.', 'Billing unavailable.'); return; }
       const d = await res.json();
       document.getElementById('billing-loading').style.display = 'none';
       document.getElementById('billing-content').classList.remove('hidden');
@@ -373,12 +501,11 @@
       const free = isFreeAccount(d, d.current_plan);
       if (!free) {
         document.getElementById('billing-active-badge').classList.remove('hidden');
-        // A customer who pays gets a way to stop paying. What was wrong here was
-        // never the button but the date behind it: cancel used to schedule the
-        // downgrade at now plus 30 days, so someone who had bought a YEAR was
-        // told his plan ended next month. It now schedules on the term he
-        // actually paid for, the same date shown below.
-        document.getElementById('billing-cancel-btn').classList.remove('hidden');
+        // A way to stop paying, only where something would be paid again. On
+        // a one-off payment there is nothing to stop: the button scheduled a
+        // "cancellation" on the day the term ended anyway and mailed about it
+        // (betaaltest 05-10, row 3). The term line says what is true instead.
+        if (d.auto_renews) document.getElementById('billing-cancel-btn').classList.remove('hidden');
       }
       // One calm line about what this plan is. On Community it says whose gift
       // it is and what the paid plans add, with a single way up. On a paid plan
@@ -390,21 +517,22 @@
       // access_until is the end of the term that was paid for and is the honest
       // date on a one-off; next_billing_date only means something once
       // something actually collects again.
+      // One date, in the term line: the day the last paid term ends, which is
+      // access_until. A second "Access until" row stood here with its own
+      // date and disagreed with the line above it after an upgrade (row 8).
       const until = d.access_until || d.next_billing_date;
       if (until) {
-        document.getElementById('billing-next-row').style.display = 'flex';
-        document.getElementById('billing-next').textContent = paramantDate.day(until);
         const note = document.getElementById('billing-renew-note');
         if (note) note.hidden = !!d.auto_renews;
       }
       renderTerm(d);
       if (d.cancellation_scheduled_at) {
         document.getElementById('billing-cancel-row').style.display = 'flex';
-        document.getElementById('billing-cancel-date').textContent = 'Downgrade scheduled ' + paramantDate.day(d.cancellation_scheduled_at);
+        document.getElementById('billing-cancel-date').textContent = nlEn('Terug naar een lager plan op ', 'Downgrade scheduled ') + paramantDate.day(d.cancellation_scheduled_at);
         document.getElementById('billing-cancel-btn').classList.add('hidden');
       }
     } catch(err) {
-      document.getElementById('billing-loading').textContent = 'Could not load billing.';
+      document.getElementById('billing-loading').textContent = nlEn('We konden uw betaalstatus niet laden.', 'Could not load your billing status.');
     }
   }
 
@@ -418,15 +546,18 @@
   // document number, a description and an amount that all come from the server,
   // and this page has no business putting any of them through innerHTML.
   function historyLabel(e) {
+    // label_nl since 2026-10-05: the Dutch page printed the English labels
+    // ("Credit note for invoice", "Cancellation scheduled", "Gift: ...").
+    if (e.label_nl && nlEn('nl', 'en') === 'nl') return e.label_nl;
     if (e.label) return e.label;
     // A row from an older API, or an event this page does not know by name. The
     // event name is not pretty, and it is at least true.
     if (e.event_type === 'plan_changed') {
       var m = e.metadata || {};
-      return 'Plan changed from ' + (m.from || 'unknown') + ' to ' + (m.to || 'unknown');
+      return nlEn('Plan gewijzigd van ', 'Plan changed from ') + (m.from || nlEn('onbekend', 'unknown')) + nlEn(' naar ', ' to ') + (m.to || nlEn('onbekend', 'unknown'));
     }
-    if (e.event_type === 'plan_cancellation_scheduled') return 'Cancellation scheduled';
-    return e.event_type || 'Billing event';
+    if (e.event_type === 'plan_cancellation_scheduled') return nlEn('Opzegging gepland', 'Cancellation scheduled');
+    return e.event_type || nlEn('Betaalgebeurtenis', 'Billing event');
   }
 
   function historyRow(e) {
@@ -452,13 +583,13 @@
       amount.textContent = (e.currency || 'EUR') + ' ' + e.amount;
       right.appendChild(amount);
     } else if (e.detail) {
-      right.appendChild(document.createTextNode(e.detail));
+      right.appendChild(document.createTextNode(nlEn(e.detail_nl || e.detail, e.detail)));
     }
     if (e.document) {
       right.appendChild(document.createTextNode(' '));
       const link = document.createElement('a');
       link.href = '/api/user/billing/invoices/' + encodeURIComponent(e.document) + '.pdf';
-      link.textContent = 'Download PDF';
+      link.textContent = nlEn('PDF downloaden', 'Download PDF');
       right.appendChild(link);
     }
     row.appendChild(left);
@@ -471,24 +602,31 @@
     if (!histEl) return;
     try {
       const res = await fetch('/api/user/billing/history', { credentials: 'include' });
-      if (!res.ok) { histEl.textContent = 'Billing history unavailable right now.'; return; }
+      if (!res.ok) { histEl.textContent = nlEn('Betaalgeschiedenis is nu niet beschikbaar.', 'Billing history unavailable right now.'); return; }
       const d = await res.json();
       const rows = (d && d.history) || [];
-      if (rows.length === 0) { histEl.textContent = 'No billing events yet.'; return; }
+      if (rows.length === 0) { histEl.textContent = nlEn('Nog geen betaalgebeurtenissen.', 'No billing events yet.'); return; }
       histEl.textContent = '';
       rows.forEach(function(e) { histEl.appendChild(historyRow(e)); });
     } catch(err) {
-      histEl.textContent = 'Could not load billing history.';
+      histEl.textContent = nlEn('We konden uw betaalgeschiedenis niet laden.', 'Could not load your billing history.');
     }
   }
 
   document.getElementById('billing-cancel-btn').addEventListener('click', async function() {
-    if (!confirm('Cancel your plan? You keep access until the end of your billing period.')) return;
+    if (!confirm(nlEn('Uw plan opzeggen? U houdt toegang tot het einde van de betaalde periode.', 'Cancel your plan? You keep access until the end of your billing period.'))) return;
     const res = await fetch('/api/user/billing/cancel', { method: 'POST', credentials: 'include' });
     if (res.ok) {
       const d = await res.json();
-      alert('Cancellation scheduled. Your plan downgrades on ' + paramantDate.day(d.scheduled_downgrade_at));
+      alert(nlEn('Opzegging gepland. Uw plan gaat terug op ', 'Cancellation scheduled. Your plan downgrades on ') + paramantDate.day(d.scheduled_downgrade_at));
       loadBilling();
+    } else {
+      // 409 (one-off, nothing to cancel) and 503 (relay-main not reachable,
+      // nothing cancelled) both carry a sentence for the customer.
+      let d = null;
+      try { d = await res.json(); } catch { d = null; }
+      const said = d ? nlEn(d.message || '', d.message_en || d.message || '') : '';
+      alert(said || nlEn('Opzeggen lukte nu niet. Er is niets gewijzigd. Probeer het later opnieuw.', 'Cancelling did not work just now. Nothing was changed. Please try again later.'));
     }
   });
 
@@ -501,10 +639,10 @@
     if (!el) return;
     try {
       const res = await fetch('/api/user/billing/invoices', { credentials: 'include' });
-      if (!res.ok) { el.textContent = 'Invoices unavailable right now.'; return; }
+      if (!res.ok) { el.textContent = nlEn('Facturen zijn nu niet beschikbaar.', 'Invoices unavailable right now.'); return; }
       const d = await res.json();
       const rows = (d && d.invoices) || [];
-      if (rows.length === 0) { el.textContent = 'No invoices yet. One is issued for every payment.'; return; }
+      if (rows.length === 0) { el.textContent = nlEn('Nog geen facturen. Bij elke betaling komt er een.', 'No invoices yet. One is issued for every payment.'); return; }
       el.textContent = '';
       rows.forEach(function(inv) {
         const row = document.createElement('div');
@@ -521,11 +659,11 @@
         // says which invoice it belongs to.
         if (inv.kind === 'credit_note') {
           left.appendChild(document.createTextNode(
-            ' · ' + (inv.partial ? 'partial credit for ' : 'credit for ') + inv.credit_for));
+            ' · ' + (inv.partial ? nlEn('gedeeltelijke creditering van ', 'partial credit for ') : nlEn('creditering van ', 'credit for ')) + inv.credit_for));
         } else if (inv.kind !== 'invoice') {
-          left.appendChild(document.createTextNode(' · receipt'));
+          left.appendChild(document.createTextNode(nlEn(' · ontvangstbewijs', ' · receipt')));
         }
-        if (inv.reversed_at) left.appendChild(document.createTextNode(' · reversed'));
+        if (inv.reversed_at) left.appendChild(document.createTextNode(nlEn(' · teruggedraaid', ' · reversed')));
         const right = document.createElement('div');
         right.className = 'info-value';
         const amount = document.createElement('span');
@@ -535,14 +673,14 @@
         right.appendChild(document.createTextNode(' '));
         const link = document.createElement('a');
         link.href = '/api/user/billing/invoices/' + encodeURIComponent(inv.number) + '.pdf';
-        link.textContent = 'Download PDF';
+        link.textContent = nlEn('PDF downloaden', 'Download PDF');
         right.appendChild(link);
         row.appendChild(left);
         row.appendChild(right);
         el.appendChild(row);
       });
     } catch (err) {
-      el.textContent = 'Could not load invoices.';
+      el.textContent = nlEn('We konden uw facturen niet laden.', 'Could not load your invoices.');
     }
   }
 
@@ -571,7 +709,7 @@
       const msg = document.getElementById('billing-profile-msg');
       const btn = document.getElementById('billing-profile-save');
       btn.disabled = true;
-      msg.textContent = 'Saving...';
+      msg.textContent = nlEn('Opslaan...', 'Saving...');
       try {
         const res = await fetch('/api/user/billing/profile', {
           method: 'POST',
@@ -584,10 +722,10 @@
           }),
         });
         msg.textContent = res.ok
-          ? 'Saved. New invoices will carry these details.'
-          : 'Could not save. Try again.';
+          ? nlEn('Opgeslagen. Nieuwe facturen krijgen deze gegevens.', 'Saved. New invoices will carry these details.')
+          : nlEn('Opslaan lukte niet. Probeer het opnieuw.', 'Could not save. Try again.');
       } catch (err) {
-        msg.textContent = 'Could not save. Try again.';
+        msg.textContent = nlEn('Opslaan lukte niet. Probeer het opnieuw.', 'Could not save. Try again.');
       }
       btn.disabled = false;
     });

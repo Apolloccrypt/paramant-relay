@@ -111,9 +111,13 @@ function visible(html) {
 // Same as seo-contract.test.mjs: everything under frontend/ that is public.
 const PRIVATE = new Set([
   '404', 'account', 'admin', 'all-systems-go', 'claim', 'co-sign', 'dashboard',
-  'developer', 'get', 'ontvang', 'request-key', 'setup', 'parashare', 'iot',
+  'developer', 'get', 'ontvang', 'request-key', 'setup', 'parashare', 'en/parashare', 'iot',
+  'en/get', 'en/ontvang', 'en/ophalen',
   'auth/backup', 'auth/login', 'auth/request-reset', 'auth/reset-confirm',
   'auth/setup', 'billing/checkout', 'signup/verified',
+  'en/account', 'en/claim', 'en/dashboard', 'en/request-key',
+  'en/auth/backup', 'en/auth/login', 'en/auth/request-reset', 'en/auth/reset-confirm',
+  'en/auth/setup', 'en/billing/checkout', 'en/signup/verified',
 ]);
 function publicPages(dir = path.join(ROOT, 'frontend'), prefix = '') {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -128,6 +132,15 @@ const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'e
 const TENS = { 30: 'thirty', 40: 'forty', 50: 'fifty', 60: 'sixty' };
 const word = (n) => (n <= 20 ? WORDS[n] : `${TENS[n - (n % 10)]}${n % 10 ? '-' + WORDS[n % 10] : ''}`);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
+// Dutch number words, for the Dutch pages.
+const WOORDEN = ['nul', 'één', 'twee', 'drie', 'vier', 'vijf', 'zes', 'zeven', 'acht', 'negen', 'tien',
+  'elf', 'twaalf', 'dertien', 'veertien', 'vijftien', 'zestien', 'zeventien', 'achttien', 'negentien', 'twintig'];
+const TIENTALLEN = { 30: 'dertig', 40: 'veertig', 50: 'vijftig', 60: 'zestig' };
+const woord = (n) => {
+  const w = n <= 20 ? WOORDEN[n] : TIENTALLEN[n];
+  assert.ok(w, `woord(${n}): extend WOORDEN/TIENTALLEN`);
+  return w;
+};
 
 // 1 ── The parameter sets. Site says ML-KEM-768 (FIPS 203) and ML-DSA-65
 // (FIPS 204). The core registers exactly those two unconditionally.
@@ -176,7 +189,7 @@ test('the algorithm counts on the site are what bootstrap.js registers, and the 
   const env = read('.env.example');
   assert.match(env, /^#\s*CRYPTO_MODE=core/m, '.env.example documents core as the default; if that changes, so must the pages');
 
-  for (const slug of ['security', 'crypto-agility']) {
+  for (const slug of ['en/security', 'en/crypto-agility']) {
     const text = visible(page(slug)) + page(slug); // meta descriptions count too
     assert.match(text, new RegExp(`\\b${kems} KEMs\\b`), `${slug}: must state ${kems} KEMs`);
     assert.match(text, new RegExp(`\\b${sigs} signature`), `${slug}: must state ${sigs} signatures`);
@@ -188,6 +201,20 @@ test('the algorithm counts on the site are what bootstrap.js registers, and the 
     assert.doesNotMatch(text, /\d+ (KEMs|signatures)[^.]*loaded in production/i,
       `${slug}: must not claim the extended set is loaded in production; the default mode is core`);
     assert.match(text, /default core mode loads ML-KEM-768 and ML-DSA-65/,
+      `${slug}: must say what the default mode actually loads`);
+  }
+  // The Dutch pages, same claims.
+  for (const slug of ['security', 'crypto-agility']) {
+    const text = visible(page(slug)) + page(slug);
+    assert.match(text, new RegExp(`\\b${kems} KEMs\\b`), `${slug}: must state ${kems} KEMs`);
+    assert.match(text, new RegExp(`\\b${sigs} signature-algoritmen`), `${slug}: must state ${sigs} signature-algoritmen`);
+    for (const m of text.matchAll(/\b(\d+) (KEMs|signature-algoritmen|handtekeningalgoritmen)\b/g)) {
+      const want = m[2] === 'KEMs' ? kems : sigs;
+      assert.equal(Number(m[1]), want, `${slug}: says "${m[0]}", bootstrap.js registers ${want}`);
+    }
+    assert.doesNotMatch(text, /\d+ (KEMs|signature-algoritmen)[^.]*geladen in productie/i,
+      `${slug}: must not claim the extended set is loaded in production; the default mode is core`);
+    assert.match(text, /De standaardmodus core laadt ML-KEM-768 en ML-DSA-65/,
       `${slug}: must say what the default mode actually loads`);
   }
 });
@@ -231,12 +258,23 @@ test('the 5 MB block size on the site is the relay default', () => {
   for (const slug of ['privacy', 'security', 'vs']) {
     if (!visible(page(slug)).includes(`${mb} MB`)) problems.push(`${slug}: must state the ${mb} MB block size`);
   }
-  // A page may state either number, but only those two. Anything else is a
-  // figure the relay does not enforce.
+  // DRIE getallen, niet twee, en het derde is er sinds september 2026 bij.
+  //
+  // Een verzending naar genodigden heeft een eigen plafond: niemand staat aan
+  // de andere kant te wachten, dus het hele bestand blijft in de opslag tot de
+  // laatste ophaalt, verzegeld als base64 en daarmee een derde groter dan
+  // zichzelf. Dat getal komt uit SEND_MAX_MB in lib/send.js, net zoals de
+  // andere twee uit de code komen: de test leest ze, hij kent ze niet uit het
+  // hoofd.
+  const send = read('relay/lib/send.js');
+  const sendMb = Number(/SEND_MAX_MB \|\| '(\d+)'/.exec(send)[1]);
   for (const slug of publicPages()) {
     for (const hit of visible(page(slug)).matchAll(/(\d+) MB (file limit|per file|file size limit)/g)) {
       const n = Number(hit[1]);
-      if (n !== mb && n !== fileMb) problems.push(`${slug}: claims "${hit[0]}", and the relay enforces ${mb} MB per block and ${fileMb} MB per file`);
+      if (n !== mb && n !== fileMb && n !== sendMb) {
+        problems.push(`${slug}: claims "${hit[0]}", and the relay enforces ${mb} MB per block, `
+          + `${fileMb} MB per file and ${sendMb} MB for a send to named recipients`);
+      }
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
@@ -252,7 +290,7 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   const hours = (ms) => ms / 3_600_000;
   const free = hours(ttl('community')), pro = hours(ttl('pro')), ent = hours(ttl('enterprise'));
   assert.equal(free, 1); assert.equal(pro, 24); assert.equal(ent, 7 * 24);
-  const pricing = visible(page('pricing'));
+  const pricing = visible(page('en/pricing'));
   assert.ok(pricing.includes(`${free} hour link expiry`), `pricing: Community must say ${free} hour link expiry`);
   assert.ok(pricing.includes(`${pro} hour link expiry`), `pricing: Firm must say ${pro} hour link expiry`);
   assert.ok(pricing.includes(`${ent / 24} day link expiry`), `pricing: Enterprise must say ${ent / 24} day link expiry`);
@@ -262,14 +300,21 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   // the ParaSend price table sells Community, Pro and Enterprise, so a link
   // lifetime hung on Business offered a plan a ParaSend buyer cannot buy.
   // Block 40 sweeps the whole site for that shape.
-  const priv = visible(page('privacy'));
+  const priv = visible(page('en/privacy'));
   // The tiers.js row is 'pro'; the plan it is SOLD under has been Firm since
   // 6 September 2026, and the pages name the plan a reader can buy.
   assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Firm, ${ent / 24} days for Enterprise`), 'privacy: retention line must match tiers.js');
   assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Firm blobs after ${pro} hours. Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
   const WORD = { 1: 'one', 24: 'twenty-four', 7: 'seven' };
-  assert.ok(visible(page('terms')).includes(`${WORD[free]} hour on Community, ${WORD[pro]} hours on Firm and ${WORD[ent / 24]} days on Enterprise`),
+  assert.ok(visible(page('en/terms')).includes(`${WORD[free]} hour on Community, ${WORD[pro]} hours on Firm and ${WORD[ent / 24]} days on Enterprise`),
     'terms: the time-to-live sentence must match tiers.js');
+  // Dutch privacy and terms.
+  const privNl = visible(page('privacy'));
+  assert.ok(privNl.includes(`${free} uur voor Community, ${pro} uur voor Firm, ${ent / 24} dagen voor Enterprise`), 'privacy (nl): retention line must match tiers.js');
+  assert.ok(privNl.includes(`Blobs op het Community-plan verlopen na maximaal ${free} uur. Firm-blobs na ${pro} uur. Enterprise-blobs na ${ent / 24} dagen.`), 'privacy (nl): expiry paragraph must match tiers.js');
+  const WOORD = { 1: 'één', 24: 'vierentwintig', 7: 'zeven' };
+  assert.ok(visible(page('terms')).includes(`${WOORD[free]} uur op Community, ${WOORD[pro]} uur op Firm en ${WOORD[ent / 24]} dagen op Enterprise`),
+    'terms (nl): the time-to-live sentence must match tiers.js');
 });
 
 // 6 ── The authentication numbers on the security page. Session cookie
@@ -285,15 +330,28 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
 // refused. So the page may claim exactly one hard limit, the per-IP one.
 test('the authentication numbers on the security page are the ones the code enforces', () => {
   const srv = read('admin/server.js');
-  const sec = visible(page('security'));
+  const sec = visible(page('en/security'));
+  const secNl = visible(page('security'));
 
-  const maxAge = Number(/paramant_user_session=\$\{token\}[^`]*Max-Age=(\d+)/.exec(srv)[1]);
-  assert.equal(maxAge, 3600);
-  assert.match(sec, /Sessions last one hour/);
+  // The session slides: one hour idle, twelve at most (admin/lib/session-client.js).
+  // "Sessions last one hour" was true of the cookie, which was the bug: it
+  // ended an hour after login however active the person was.
+  const lib = read('admin/lib/session-client.js');
+  assert.equal(Number(/const USER_SESSION_IDLE_S = (\d+);/.exec(lib)[1]), 3600);
+  assert.match(srv, /paramant_user_session=\$\{token\}[^`]*Max-Age=\$\{/);
+  assert.match(sec, /A session ends after one hour without activity, and after twelve hours at most/);
+  assert.match(secNl, /Een sessie loopt af na een uur zonder activiteit, en na twaalf uur in elk geval/);
 
   const step = Number(/Math\.floor\(now \/ 1000 \/ (\d+)\)/.exec(read('relay/lib/totp.js'))[1]);
   assert.equal(step, 30);
-  assert.match(sec, /TOTP codes expire thirty seconds after issue/);
+  // Fase 2 (SITE-40): the relay accepts the step before and after
+  // (matchTotpSlot, window = 1), so "expires thirty seconds after issue" was
+  // untrue. The page now names the step and the tolerance.
+  const totpWindow = Number(/window = (\d+)/.exec(read('relay/lib/totp.js'))[1]);
+  assert.equal(totpWindow, 1, 'relay/lib/totp.js changed its tolerance; rewrite the TOTP sentence on /security');
+  assert.match(sec, /A TOTP code belongs to a thirty-second time step\. To absorb a clock that is slightly off, the server also accepts the code of the step before and after/);
+  assert.match(secNl, /Een TOTP-code hoort bij een tijdvak van dertig seconden\. Om een klok die iets afwijkt op te vangen, accepteert de server ook de code van het tijdvak ervoor en erna/);
+  assert.doesNotMatch(sec, /TOTP codes expire thirty seconds after issue/);
 
   // /auth/login: per-IP fixed window.
   const fn = srv.slice(srv.indexOf('function checkLoginRateLimit'));
@@ -311,6 +369,13 @@ test('the authentication numbers on the security page are the ones the code enfo
     `security: the per-IP login limit must read ${perIp} per ${winMin} minutes`);
   assert.match(sec, new RegExp(`past ${WORDS[powAt]} inside ${WORDS[winMin]} minutes the next attempt has to carry a proof-of-work`),
     `security: the per-email threshold must read ${powAt} and must be described as a cost, not a refusal`);
+  // Dutch: the window is written as "kwartier", so it must be 15 minutes.
+  assert.equal(winMin, 15, 'security (nl): the page says "per kwartier"; change it if the window changes');
+  assert.match(secNl, new RegExp(`beperkt tot ${WOORDEN[perIp]} per IP-adres per kwartier`),
+    `security (nl): the per-IP login limit must read ${perIp} per ${winMin} minutes`);
+  assert.match(secNl, new RegExp(`Na ${WOORDEN[powAt]} binnen een kwartier moet de volgende poging een proof-of-work meesturen`),
+    `security (nl): the per-email threshold must read ${powAt} and must be described as a cost, not a refusal`);
+  assert.doesNotMatch(secNl, /per e-mail(adres)? per/i, 'security (nl): there is no per-email refusal to advertise');
 
   // The page must not sell the per-email counter as a limit again, and the
   // handler must not implement one. A refusal keyed on an address is a lockout
@@ -323,6 +388,7 @@ test('the authentication numbers on the security page are the ones the code enfo
 
   assert.doesNotMatch(srv, /consecutive failures|lockout_minutes|LOCKOUT_MS/i, 'no login lockout is implemented; if one is added, put the sentence back with its numbers');
   assert.doesNotMatch(sec, /consecutive failures|account locks/i, 'security: must not promise an account lockout the code does not implement');
+  assert.doesNotMatch(secNl, /opeenvolgende mislukte|account (wordt|raakt) (vergrendeld|geblokkeerd)/i, 'security (nl): must not promise an account lockout the code does not implement');
 });
 
 // 7 ── The audits. One table on /docs#audits is the source; press, trust and
@@ -330,20 +396,26 @@ test('the authentication numbers on the security page are the ones the code enfo
 // must agree with that row. Nobody says "fully resolved" while that same
 // document still carries findings marked in-progress or open.
 test('the audit numbers on press, trust and the DPA match the audit table on /docs', () => {
-  const docs = page('docs');
-  assert.match(docs, /<h2 id="audits">/, '/docs#audits must exist: trust and the DPA link to it');
-  const table = docs.slice(docs.indexOf('<h2 id="audits">'), docs.indexOf('</table>', docs.indexOf('<h2 id="audits">')));
-  const rows = [...table.matchAll(/<tr><td>(Apr 2026)<\/td><td>[^<]*<\/td><td>([^<]*)<\/td>/g)];
-  const audits = rows.length;
-  let total = 0, critical = 0;
-  for (const [, , findings] of rows) {
-    const m = /(\d+) total/.exec(findings);
-    if (m) { total += Number(m[1]); continue; }
-    const parts = [...findings.matchAll(/(\d+)([CHML])/g)];
-    assert.ok(parts.length, `unreadable findings cell: ${findings}`);
-    for (const [, n, sev] of parts) { total += Number(n); if (sev === 'C') critical += Number(n); }
-  }
+  // The English table says "14 total", the Dutch one "14 in totaal"; both are read.
+  const tally = (slug, totalRe) => {
+    const docs = page(slug);
+    assert.match(docs, /<h2 id="audits">/, `/${slug}#audits must exist: trust and the DPA link to it`);
+    const table = docs.slice(docs.indexOf('<h2 id="audits">'), docs.indexOf('</table>', docs.indexOf('<h2 id="audits">')));
+    const rows = [...table.matchAll(/<tr><td>(Apr 2026)<\/td><td>[^<]*<\/td><td>([^<]*)<\/td>/g)];
+    let total = 0, critical = 0;
+    for (const [, , findings] of rows) {
+      const m = totalRe.exec(findings);
+      if (m) { total += Number(m[1]); continue; }
+      const parts = [...findings.matchAll(/(\d+)([CHML])/g)];
+      assert.ok(parts.length, `unreadable findings cell: ${findings}`);
+      for (const [, n, sev] of parts) { total += Number(n); if (sev === 'C') critical += Number(n); }
+    }
+    return { rows, audits: rows.length, total, critical };
+  };
+  const { rows, audits, total, critical } = tally('en/docs', /(\d+) total/);
   assert.equal(audits, 3); assert.equal(total, 40); assert.equal(critical, 4);
+  const nl = tally('docs', /(\d+) in totaal/);
+  assert.deepEqual([nl.audits, nl.total, nl.critical], [audits, total, critical], 'docs (nl): the audit table must add up to the English one');
 
   const md = read('docs/security-audit-2026-04.md');
   const summary = /\*\*Summary:\*\*\s*(\d+) critical · (\d+) high · (\d+) medium · (\d+) low/.exec(md);
@@ -351,21 +423,31 @@ test('the audit numbers on press, trust and the DPA match the audit table on /do
   const williamsRow = rows.find((r) => /C ·/.test(r[2]))[2];
   assert.equal(williamsRow.replace(/\s/g, ''), `${summary[1]}C·${summary[2]}H·${summary[3]}M·${summary[4]}L`, 'the /docs row for Williams must equal the summary in docs/security-audit-2026-04.md');
 
-  const press = visible(page('press'));
+  const press = visible(page('en/press'));
   assert.match(press, new RegExp(`${cap(word(total))} findings across ${word(audits)} audits, including ${critical} critical`),
     `press: must read "${cap(word(total))} findings across ${word(audits)} audits, including ${critical} critical"`);
-  assert.match(visible(page('trust')), new RegExp(`${cap(word(audits))} external security audits in April 2026`));
+  assert.match(visible(page('en/trust')), new RegExp(`${cap(word(audits))} external security audits in April 2026`));
+  const pressNl = visible(page('press'));
+  assert.match(pressNl, new RegExp(`In april 2026 hebben ${woord(audits)} externe beveiligingsaudits`),
+    `press (nl): must say ${audits} audits in April 2026`);
+  assert.match(pressNl, new RegExp(`Samen ${woord(total)} bevindingen, waarvan ${critical} kritiek`),
+    `press (nl): must read "Samen ${woord(total)} bevindingen, waarvan ${critical} kritiek"`);
+  assert.match(visible(page('trust')), new RegExp(`In april 2026 hebben ${woord(audits)} externe beveiligingsaudits`));
 
   // Finding rows only, not the legend that explains the symbols.
   const unresolved = (md.match(/^\| \S+ \|.*\| [⚙●] \|/gm) || []).length;
   if (unresolved > 0) {
     for (const slug of ['press', 'trust', 'dpa', 'security', 'index']) {
-      assert.doesNotMatch(visible(page(slug)), /fully resolved|all findings (were )?resolved/i,
+      assert.doesNotMatch(visible(page(`en/${slug}`)), /fully resolved|all findings (were )?resolved/i,
         `${slug}: docs/security-audit-2026-04.md still lists ${unresolved} finding(s) in progress or open`);
+      assert.doesNotMatch(visible(page(slug)), /volledig opgelost|alle bevindingen (zijn )?opgelost/i,
+        `${slug} (nl): docs/security-audit-2026-04.md still lists ${unresolved} finding(s) in progress or open`);
     }
   }
-  for (const slug of ['trust', 'dpa']) {
-    assert.match(page(slug), /href="\/docs#audits"/, `${slug}: the audit link must point at the table that exists`);
+  for (const slug of ['trust', 'dpa', 'en/trust', 'en/dpa']) {
+    // An English page links to the English docs (tests/en-links-blijven-engels.test.mjs).
+    const want = slug.startsWith('en/') ? /href="\/en\/docs#audits"/ : /href="\/docs#audits"/;
+    assert.match(page(slug), want, `${slug}: the audit link must point at the table that exists`);
   }
 });
 
@@ -387,9 +469,11 @@ test('the audit numbers on press, trust and the DPA match the audit table on /do
 // visitor's browser. There is still no 60-second multi-location probe and the
 // CT log still holds no uptime data.
 test('the SLA figures are consistent across pages and the measurement described exists', () => {
-  const sla = page('sla');
+  const sla = page('en/sla');
+  const slaNl = page('sla');
   const ent = /<div class="tier">Enterprise<\/div>\s*<div class="uptime">([\d.]+%)<\/div>/.exec(sla)[1];
-  const pricing = visible(page('pricing'));
+  assert.equal(/<div class="tier">Enterprise<\/div>\s*<div class="uptime">([\d.]+%)<\/div>/.exec(slaNl)[1], ent, 'sla (nl): the Enterprise uptime must equal the English page');
+  const pricing = visible(page('en/pricing'));
   const quoted = [...pricing.matchAll(/(\d{2}\.\d{1,2}%) SLA|SLA (\d{2}\.\d{1,2}%)/g)].map((m) => m[1] || m[2]);
   assert.ok(quoted.length >= 2, 'pricing must quote the Enterprise SLA');
   for (const q of quoted) assert.equal(q, ent, `pricing quotes ${q}, the SLA page commits to ${ent}`);
@@ -493,6 +577,11 @@ test('the SLA figures are consistent across pages and the measurement described 
   assert.equal(sectors, 5, 'status.inline1.js must list the five relays');
   assert.match(status, /fetch\(s\.url \+ '\/health'/, 'status.inline1.js must fetch GET /health per sector');
   assert.match(page('status'), /status\.inline1\.js/, '/status must load that script');
+  // The English twin that /en/status loads.
+  const statusEn = read('frontend/js/status.inline1.en.js');
+  assert.equal((statusEn.match(/^\s*\{ id: '[a-z]+',\s*label:/gm) || []).length, sectors, 'status.inline1.en.js must list the same relays');
+  assert.match(statusEn, /fetch\(s\.url \+ '\/health'/, 'status.inline1.en.js must fetch GET /health per sector');
+  assert.match(page('en/status'), /status\.inline1\.en\.js/, '/en/status must load the English twin');
 
   // The paragraph may only describe those two things, and it may not
   // over-promise. Under-promising is safe and is currently the case: the
@@ -509,9 +598,31 @@ test('the SLA figures are consistent across pages and the measurement described 
   assert.match(plain, /a transfer sent and read back, a document signed and its signature verified/);
   assert.match(plain, new RegExp(`fetches GET /health on all ${word(sectors)} relays from your own browser`));
   assert.match(visible(sla), /measured from your (own )?browser/);
+
+  // The Dutch /sla, same claims.
+  const nl = visible(slaNl).replace(/<[^>]+>/g, '');
+  assert.doesNotMatch(nl, /elke 60 seconden|meerdere EU-locaties|drie opeenvolgende controles/, 'sla (nl): describes a probe that does not exist');
+  assert.doesNotMatch(nl, /beschikbaarheidsgegevens[^.]*Certificate Transparency/i, 'sla (nl): the CT log holds key and transfer commitments, not uptime');
+  assert.match(nl, /heartbeat-workflow/, 'sla (nl): the page must name the workflow that actually holds the schedule');
+  assert.doesNotMatch(nl, /product-heartbeat-workflow/, 'sla (nl): product-heartbeat.yml has no schedule any more');
+  if (gated) {
+    assert.match(nl, /Zodra hij is ingeschakeld, draait hij elk uur/, 'sla (nl): the hourly job is gated off, so the page must not claim it is running');
+    assert.match(nl, /Hij staat uit tot de inloggegevens ervoor klaarstaan/, 'sla (nl): the page must say why it is not running');
+    assert.doesNotMatch(nl, /workflow[^.]*draait elk uur en/, 'sla (nl): describes a monitor that is switched off as though it were running');
+  } else {
+    assert.doesNotMatch(nl, /Zodra hij is ingeschakeld|staat uit tot/, 'sla (nl): the gate is gone, so the page must stop saying the check is switched off');
+  }
+  assert.match(nl, /Een run die mislukt, opent een issue in de repository/);
+  assert.match(nl, /De vier sectorrelays \(health, legal, finance, IoT\) worden alleen benaderd om te bevestigen dat een uitgefaseerde route daar geweigerd blijft, dus hun beschikbaarheid wordt niet gemeten/,
+    'sla (nl): the page must say both what the run does at those hosts and what it does not measure');
+  assert.doesNotMatch(nl, /geautomatiseerde HTTP-gezondheidscontroles/i, 'sla (nl): /status is a reading taken in one visitor browser');
+  assert.match(nl, /hoofdrelay \(\s*relay\.paramant\.app\s*\)/);
+  assert.match(nl, /een overdracht versturen en teruglezen, een document ondertekenen en de handtekening verifiëren/);
+  assert.match(nl, new RegExp(`roept vanuit uw eigen browser GET /health aan op alle ${woord(sectors)} relays`));
+  assert.match(nl, /gemeten vanuit uw (eigen )?browser/);
 });
 
-// 8b ── TLS. /dpa row: "TLS 1.3 minimum on all relay endpoints", in an article
+// 44 ── TLS. /dpa row: "TLS 1.3 minimum on all relay endpoints", in an article
 // 28 agreement customers sign electronically. Until 5 September 2026 every
 // nginx config in the repository allowed TLS 1.2 as well, and the Outlook
 // add-in vhost named no protocols at all and so inherited the host default,
@@ -527,7 +638,6 @@ test('every TLS-terminating server block in the repository is TLS 1.3 only', () 
   const CONFS = [
     'deploy/nginx-paramant-public.conf',
     'deploy/nginx-selfhost.conf',
-    'nginx-selfhost.conf',
     'deploy/nginx/addin.paramant.app.conf',
   ];
   const problems = [];
@@ -549,10 +659,12 @@ test('every TLS-terminating server block in the repository is TLS 1.3 only', () 
       }
     }
   }
-  assert.ok(terminators >= 9, `expected at least 9 TLS-terminating blocks, found ${terminators}; a config was renamed or dropped and this block stopped looking at it`);
+  // Eight since the root nginx-selfhost.conf went (SELF-14-N, 2026-10-05).
+  assert.ok(terminators >= 8, `expected at least 8 TLS-terminating blocks, found ${terminators}; a config was renamed or dropped and this block stopped looking at it`);
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
   // And the page still says it, so retiring the promise retires the test.
-  assert.match(read('frontend/dpa.html'), /TLS 1\.3 minimum on all relay endpoints/);
+  assert.match(read('frontend/en/dpa.html'), /TLS 1\.3 minimum on all relay endpoints/);
+  assert.match(read('frontend/dpa.html'), /Minimaal TLS 1\.3 op alle relay-endpoints/);
 });
 
 // 9 ── IP logging. The deploy configuration in the repository switches nginx
@@ -564,34 +676,28 @@ test('every TLS-terminating server block in the repository is TLS 1.3 only', () 
 test('the IP-logging row says what the deploy configuration does and promises no retention', () => {
   const conf = read('deploy/nginx-paramant-live.conf').replace(/#.*$/gm, '');
   assert.doesNotMatch(conf, /access_log\s+(?!off;)/, 'nginx-paramant-live.conf now writes an access log; rewrite the IP-logging row on /security');
-  // Every block that serves the docroot or proxies to a relay or the admin,
-  // plus :8090.
+  // Every block that serves the docroot or proxies to a relay or the admin.
   //
-  // :8090 used to be excluded, with a comment saying it "only fronts the
-  // Outlook add-in via an external host". That was wrong twice over. Its
-  // /outlook/* aliases duplicate the :8081 block and are served for real from
-  // addin.paramant.app; what the block actually does is answer for
-  // "location /dicom/" in the public block, which reaches it over
-  // 127.0.0.1:8090. So it serves the site, and it belongs in this sweep.
-  // It matches neither half of the filter on its own (it uses alias, and its
-  // catch-all proxies to an external https upstream), hence the third arm.
+  // :8090 used to be swept too: it answered for "location /dicom/" and so
+  // served the site. Both were retired together in 2026-10 (H2): the Fly host
+  // behind :8090 no longer resolves. If either comes back, it comes back with
+  // the other and with access_log off, so the pairing is held here.
   //
   // The doesNotMatch above does not cover this: it fires on an access_log
   // pointed at a file, and DELETING the line leaves nothing to match. The
   // sweep below is what makes a missing line fail.
   const blocks = conf.split(/^server \{/m).slice(1)
     .filter((b) => /root \/home\/paramant|proxy_pass http:\/\/127\.0\.0\.1:|listen 127\.0\.0\.1:8090/.test(b));
-  assert.ok(blocks.length >= 7, 'nginx-paramant-live.conf must carry the site, relay and :8090 server blocks');
+  assert.ok(blocks.length >= 6, 'nginx-paramant-live.conf must carry the site and relay server blocks');
   for (const b of blocks) {
     assert.match(b, /^\s*access_log off;/m, `the server block on ${/listen\s+([^;]+)/.exec(b)?.[1]} logs requests; rewrite the IP-logging row on /security`);
   }
-  const dicomBlock = blocks.find((b) => /listen 127\.0\.0\.1:8090/.test(b));
-  assert.ok(dicomBlock, 'the :8090 block backs location /dicom/; if it was retired, retire the /dicom/ proxy with it');
-  assert.match(dicomBlock, /^\s*access_log off;/m,
-    'the :8090 block serves /dicom/ and must switch access logging off like every other block in this file');
+  const dicomBlock = blocks.some((b) => /listen 127\.0\.0\.1:8090/.test(b));
+  const dicomProxy = /location\s+\/dicom\/\s*\{[^}]*proxy_pass/.test(conf);
+  assert.equal(dicomBlock, dicomProxy, 'the :8090 block and "location /dicom/" come and go together: one without the other is a 502 or a dead block');
   const rotation = fs.readdirSync(path.join(ROOT, 'deploy')).filter((f) => /logrotate/i.test(f));
-  const sec = visible(page('security'));
-  const row = /IP logging<\/td><td>(.*?)<\/td>/s.exec(page('security'))?.[1] || '';
+  const sec = visible(page('en/security'));
+  const row = /IP logging<\/td><td>(.*?)<\/td>/s.exec(page('en/security'))?.[1] || '';
   assert.match(row, /access_log off<\/code> on every server block that serves the site and the relays in <code>deploy\/nginx-paramant-live\.conf/,
     'security: the IP-logging row must cite the config that switches logging off');
   assert.doesNotMatch(sec, /Nginx access logs, for|follow the server's log rotation/, 'security: must not describe access logs as existing');
@@ -599,7 +705,20 @@ test('the IP-logging row says what the deploy configuration does and promises no
     assert.doesNotMatch(sec, /Retention:\s*\d+ days/, 'security: no retention config in deploy/, so no retention number on the page');
     assert.match(sec, /No separate retention period is promised/);
   }
-  assert.match(sec, /Not linked to transfer content/);
+  // Fase 2 (SITE-35): the edge in front of nginx does log, and /privacy says
+  // so. The row names it instead of claiming the transfer is never in a log.
+  assert.match(row, /The edge \(Caddy\) in front of nginx does write an access log/);
+  // The Dutch row.
+  const secNl = visible(page('security'));
+  const rowNl = /IP-logging<\/td><td>(.*?)<\/td>/s.exec(page('security'))?.[1] || '';
+  assert.match(rowNl, /access_log off<\/code> op elk serverblok dat de site en de relays bedient in <code>deploy\/nginx-paramant-live\.conf/,
+    'security (nl): the IP-logging row must cite the config that switches logging off');
+  assert.doesNotMatch(secNl, /toegangslogs van Nginx, voor|volgen de logrotatie van de server/i, 'security (nl): must not describe access logs as existing');
+  if (rotation.length === 0) {
+    assert.doesNotMatch(secNl, /Bewaartermijn:\s*\d+ dagen/, 'security (nl): no retention config in deploy/, so no retention number on the page');
+    assert.match(secNl, /Er wordt geen aparte bewaartermijn beloofd/);
+  }
+  assert.match(rowNl, /De edge \(Caddy\) die voor nginx staat, schrijft wel een toegangslog/);
 });
 
 // 10 ── "10 encrypted CLI tools" on the homepage is the developer catalogue.
@@ -666,10 +785,15 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
 
   const problems = [];
   const says = (where, text, phrase) => { if (!text.includes(phrase)) problems.push(`${where}: must state "${phrase}"`); };
-  says('index', visible(page('index')), `${transfers} transfers a month`);
-  says('index', visible(page('index')), `${mb} MB per file`);
-  says('docs', visible(page('docs')), `${transfers} transfers a month`);
-  says('docs', visible(page('docs')), `${mb} MB per file`);
+  says('index', visible(page('en/index')), `${transfers} transfers a month`);
+  says('index', visible(page('en/index')), `files up to ${mb} MB`);
+  says('docs', visible(page('en/docs')), `${transfers} transfers a month`);
+  says('docs', visible(page('en/docs')), `${mb} MB per file`);
+  // The Dutch pages.
+  says('index (nl)', visible(page('index')), `${transfers} verzendingen per maand`);
+  says('index (nl)', visible(page('index')), `bestanden tot ${mb} MB`);
+  says('docs (nl)', visible(page('docs')), `${transfers} overdrachten per maand`);
+  says('docs (nl)', visible(page('docs')), `${mb} MB per bestand`);
   const apiMd = read('frontend/docs/api.md');
   says('docs/api.md', apiMd, `${transfers} transfers a month`);
   says('docs/api.md', apiMd, `${mb} MB per file`);
@@ -694,6 +818,9 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
     for (const m of visible(page(slug)).matchAll(/\d+\s*uploads?\s*(?:\/|\s+(?:per|an|a)\s+)(?:hour|day)/gi)) {
       problems.push(`${slug}: claims "${m[0]}", which is the retired /v2/anon-inbound rate, not a tier limit`);
     }
+    for (const m of visible(page(slug)).matchAll(/\d+\s*(?:uploads?|overdrachten|verzendingen)\s*(?:\/|\s+per\s+)(?:uur|dag)/gi)) {
+      problems.push(`${slug}: claims "${m[0]}", which is the retired /v2/anon-inbound rate, not a tier limit`);
+    }
   }
   for (const m of apiMd.matchAll(/\d+\s*uploads?\s*(?:\/|\s+(?:per|an|a)\s+)(?:hour|day)/gi)) {
     problems.push(`docs/api.md: claims "${m[0]}", which is the retired /v2/anon-inbound rate, not a tier limit`);
@@ -708,8 +835,8 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
 // test stayed green. This reads each number out of the /pricing tier card that
 // owns it and requires /about to say the same.
 test('the tier block on /about repeats the numbers /pricing charges for', () => {
-  const pricing = page('pricing');
-  const about = page('about');
+  const pricing = page('en/pricing');
+  const about = page('en/about');
 
   // The two product blocks, split on their own headings, then the tier cards
   // inside each one, keyed by the tier name /pricing prints. #336 renamed both
@@ -789,7 +916,7 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
   // security.html kept "ParaSign Free and ParaSend Free cost &euro;0" through a
   // review. The three pages of this round are checked together; the sitewide
   // sweep lives in tests/ui-truthfulness.test.mjs.
-  for (const slug of ['about', 'security', 'trust']) {
+  for (const slug of ['en/about', 'security', 'trust']) {
     assert.doesNotMatch(page(slug), /Para(Sign|Send) Free/,
       `${slug}: the free plan is called Community, which is what /pricing prints on the card`);
   }
@@ -953,11 +1080,12 @@ test('the rate limits the IoT page quotes are the ones the configuration sets', 
   const iot = visible(page('help/iot-integration'));
   const problems = [];
   const says = (phrase, why) => { if (!iot.includes(phrase)) problems.push(`help/iot-integration: must say "${phrase}" (${why})`); };
-  says(`${api.rate} requests a minute`, 'the general API zone rate');
-  says('per IP address, not per API key', 'the zone is keyed on the client address');
-  says(`${community} downloads an hour`, 'the Community outbound_per_hour');
-  says(`${pro} an hour`, 'the Pro outbound_per_hour');
-  if (/\d+\s*uploads? per minute/i.test(iot)) problems.push('help/iot-integration: the per-minute figure is a request rate per IP, not an upload rate per key');
+  // The page is Dutch since 2026-09-23; the numbers are pinned in its words.
+  says(`${api.rate} verzoeken per minuut`, 'the general API zone rate');
+  says('per IP-adres, niet per API-sleutel', 'the zone is keyed on the client address');
+  says(`${community} downloads per uur`, 'the Community outbound_per_hour');
+  says(`${pro} per uur`, 'the Pro outbound_per_hour');
+  if (/\d+\s*uploads? per (?:minute|minuut)/i.test(iot)) problems.push('help/iot-integration: the per-minute figure is a request rate per IP, not an upload rate per key');
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
 
@@ -985,7 +1113,10 @@ test('no page promises an account lockout, and the login limits are the enforced
   }
 
   const LOCKOUT = [/consecutive fail/i, /accounts? (?:are|is) (?:temporarily )?locked/i,
-                   /the lock lifts/i, /request an early unlock/i, /account locks/i];
+                   /the lock lifts/i, /request an early unlock/i, /account locks/i,
+                   // Dutch counterparts
+                   /opeenvolgende mislukte/i, /accounts? (?:wordt|worden) (?:tijdelijk )?(?:vergrendeld|geblokkeerd)/i,
+                   /de vergrendeling (?:wordt )?opgeheven/i, /eerder (?:laten )?ontgrendelen/i, /account raakt (?:vergrendeld|geblokkeerd)/i];
   const problems = [];
   for (const slug of publicPages()) {
     const text = visible(page(slug));
@@ -996,17 +1127,18 @@ test('no page promises an account lockout, and the login limits are the enforced
   }
   // And the page that used to promise it now states what the code does.
   const help = visible(page('help/session-issues'));
-  if (!help.includes('There is no account lock')) problems.push('help/session-issues: must say there is no account lock');
-  for (const phrase of [`${perIp} attempts from one IP address`, `${winMin} minutes`]) {
+  // help/session-issues is Dutch since 2026-09-23, so its sentences are pinned in Dutch.
+  if (!help.includes('Er is geen accountblokkade')) problems.push('help/session-issues: must say there is no account lock');
+  for (const phrase of [`${perIp} pogingen vanaf één IP-adres`, `${winMin} minuten`]) {
     if (!help.includes(phrase)) problems.push(`help/session-issues: must state "${phrase}"`);
   }
   // The per-email number is no longer a refusal, so the page states it as the
   // point where an attempt starts costing work. Naming it as a second limit
   // would put the lockout back in the reader's head.
-  if (!help.includes(`past ${word(perEmail)} inside ${word(winMin)} minutes`)) {
+  if (!help.includes(`na ${woord(perEmail)} binnen ${woord(winMin)} minuten`)) {
     problems.push(`help/session-issues: must state the ${perEmail}-failure threshold as a cost, not a limit`);
   }
-  if (/for one email address/.test(help)) {
+  if (/for one email address|voor één e-mailadres/.test(help)) {
     problems.push('help/session-issues: there is no per-email refusal to state any more');
   }
 
@@ -1036,14 +1168,15 @@ test('no page promises an account lockout, and the login limits are the enforced
   const neverCleared = !/clearEmailFailures|del\(\s*emailKey/.test(body);
   const shared = emailKeyed && beforeAuth && neverCleared;
 
-  const CAVEAT = 'attempts someone else makes on your address count against you too';
+  const CAVEAT = 'pogingen die iemand anders op uw adres doet, tellen ook voor u mee';
   if (shared) {
     if (!help.includes(CAVEAT)) {
       problems.push(`help/session-issues: the ${perEmail}-per-address counter is spent by anyone who knows the address, and the page must say so`);
     }
     // And no page may deny it, in any of the shapes that denial takes.
     const DENIES = [/nobody can lock you out/i, /no ?one can lock you out/i,
-                    /cannot be locked out by/i, /only your own attempts count/i];
+                    /cannot be locked out by/i, /only your own attempts count/i,
+                    /niemand kan u (?:dus )?buitensluiten/i, /alleen uw eigen pogingen tellen/i];
     for (const slug of publicPages()) {
       const text = visible(page(slug));
       for (const re of DENIES) {
@@ -1055,11 +1188,17 @@ test('no page promises an account lockout, and the login limits are the enforced
     problems.push('help/session-issues: the per-address counter is no longer shared, so drop the caveat');
   }
   // /dpa quotes the same limiter in its access-control row.
-  const dpa = visible(page('dpa'));
+  const dpa = visible(page('en/dpa'));
   const perMin = /per-IP rate limiting \((\d+) attempts?\/min\)/.exec(dpa);
   if (perMin) problems.push(`dpa: says ${perMin[1]} attempts a minute; checkLoginRateLimit is ${perIp} per ${winMin} minutes`);
   if (!dpa.includes(`${perIp} attempts per ${winMin} minutes`)) {
     problems.push(`dpa: the access-control row must state ${perIp} attempts per ${winMin} minutes`);
+  }
+  const dpaNl = visible(page('dpa'));
+  const perMinNl = /rate limiting per IP-adres \((\d+) pogingen?(?:\/min| per minuut)\)/.exec(dpaNl);
+  if (perMinNl) problems.push(`dpa (nl): says ${perMinNl[1]} attempts a minute; checkLoginRateLimit is ${perIp} per ${winMin} minutes`);
+  if (!dpaNl.includes(`${perIp} pogingen per ${winMin} minuten`)) {
+    problems.push(`dpa (nl): the access-control row must state ${perIp} pogingen per ${winMin} minuten`);
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
@@ -1078,17 +1217,27 @@ test('the session cookie described on /security is the cookie admin/server.js se
   assert.ok(set, 'admin/server.js must set the session cookie from a template literal');
   const attrs = set[1];
   const sameSite = /SameSite=(\w+)/.exec(attrs)[1];
-  const maxAge = Number(/Max-Age=(\d+)/.exec(attrs)[1]);
   const bits = Number(/const sessionToken = crypto\.randomBytes\((\d+)\)/.exec(srv)[1]) * 8;
-  assert.equal(maxAge, 3600);
-  // Sliding, because every authenticated read pushes the Redis TTL back out.
-  assert.match(srv, /expire\(`paramant:user:session:\$\{token\}`,\s*3600\)/,
-    'the session TTL must be refreshed on use for "sliding" to be true');
+  // The lifetime is lib/session-client.js: one hour idle, twelve hours at most.
+  const lib = read('admin/lib/session-client.js');
+  assert.equal(Number(/const USER_SESSION_IDLE_S = (\d+);/.exec(lib)[1]), 3600, 'the idle hour moved; update /security with it');
+  assert.equal(/const USER_SESSION_MAX_AGE_MS = ([\d\s*]+);/.exec(lib)[1].replace(/\s/g, ''), '12*3600*1000', 'the twelve-hour cap moved; update /security with it');
+  assert.match(attrs, /Max-Age=\$\{/, 'the cookie lifetime comes from the caller, so it can slide');
+  // Sliding, because every authenticated read pushes the Redis TTL back out
+  // AND re-issues the cookie with the same lifetime. A record that slides under
+  // a cookie that does not is how people were logged out after an hour of work.
+  assert.match(srv, /expire\(key, lifetime\);\s*setUserCookie\(res, token, lifetime\);/,
+    'the session TTL and the cookie must be refreshed together for "sliding" to be true');
 
-  const sec = visible(page('security'));
+  const sec = visible(page('en/security'));
   const problems = [];
-  for (const phrase of [`${bits}-bit session token`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'one-hour sliding expiry']) {
+  for (const phrase of [`${bits}-bit session token`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'one-hour sliding expiry', 'twelve hours at most']) {
     if (!sec.includes(phrase)) problems.push(`security: the session row must say "${phrase}"`);
+  }
+  // Dutch: "verloopt na een uur zonder activiteit" is the sliding expiry.
+  const secNl = visible(page('security'));
+  for (const phrase of [`sessietoken van ${bits} bits`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'verloopt na een uur zonder activiteit', 'na twaalf uur in elk geval']) {
+    if (!secNl.includes(phrase)) problems.push(`security (nl): the session row must say "${phrase}"`);
   }
   // Nowhere may the site claim an attribute value the code does not set.
   for (const slug of publicPages()) {
@@ -1175,13 +1324,21 @@ test('the Argon2id row says what relay.js uses Argon2id for', () => {
 
   const problems = [];
   const ROW = /<tr><td>Argon2id<\/td><td>([^<]*)<\/td>/;
-  for (const slug of ['security', 'docs']) {
+  for (const slug of ['en/security', 'en/docs']) {
     const m = ROW.exec(page(slug));
     if (!m) { problems.push(`${slug}: the crypto table must still carry the Argon2id row`); continue; }
     const role = m[1];
     if (/encryption|encrypt|derive/i.test(role)) problems.push(`${slug}: Argon2id is described as "${role}"; it hashes a password and never encrypts or derives`);
     if (!/hash/i.test(role)) problems.push(`${slug}: the Argon2id row must say it is a hash`);
     if (!/optional/i.test(role)) problems.push(`${slug}: the Argon2id row must say the module is optional`);
+  }
+  for (const slug of ['security', 'docs']) {
+    const m = ROW.exec(page(slug));
+    if (!m) { problems.push(`${slug}: the crypto table must still carry the Argon2id row`); continue; }
+    const role = m[1];
+    if (/versleutel|afleid|encrypt|derive/i.test(role)) problems.push(`${slug}: Argon2id is described as "${role}"; it hashes a password and never encrypts or derives`);
+    if (!/hash/i.test(role)) problems.push(`${slug}: the Argon2id row must say it is a hash`);
+    if (!/optionele module/i.test(role)) problems.push(`${slug}: the Argon2id row must say the module is optional`);
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
@@ -1199,7 +1356,7 @@ test('the 5 MB padding claim matches audit finding 5 and what ParaShare sends', 
   // the test reads one report and the visitor reads another.
   assert.equal(read('frontend/docs/security-audit-2026-04.md'), audit,
     'frontend/docs/security-audit-2026-04.md must be byte-identical to docs/security-audit-2026-04.md');
-  for (const slug of ['security', 'trust']) {
+  for (const slug of ['security', 'trust', 'en/security', 'en/trust']) {
     assert.match(page(slug), /href="\/docs\/security-audit-2026-04\.md"/,
       `${slug}: must still link the published report this row is bounded by`);
   }
@@ -1212,14 +1369,20 @@ test('the 5 MB padding claim matches audit finding 5 and what ParaShare sends', 
 
   const problems = [];
   const ABSOLUTE = /(?:cannot|can not|can't)\s+(?:infer|determine|tell)[^.]{0,40}\b(?:size|type|content)/i;
+  const ABSOLUUT = /(?:kan|kunnen)\s+(?:niet|nooit)\s+(?:afleiden|bepalen|zien|achterhalen)[^.]{0,40}\b(?:grootte|type|inhoud)|(?:grootte|type|inhoud)[^.]{0,40}\b(?:kan|kunnen)\s+(?:niet|nooit)\s+(?:worden\s+)?(?:afgeleid|bepaald|gezien|achterhaald)/i;
   for (const slug of publicPages()) {
     const text = visible(page(slug));
-    const m = ABSOLUTE.exec(text);
+    const m = ABSOLUTE.exec(text) || ABSOLUUT.exec(text);
     if (m) problems.push(`${slug}: "${m[0].trim()}" is finding 5, an accepted leak, stated as impossible`);
   }
   // The two pages that explain the padding carry the bound.
-  for (const slug of ['security', 'docs']) {
+  for (const slug of ['en/security', 'en/docs']) {
     if (!/block count|number of blocks|chunk count/i.test(visible(page(slug)))) {
+      problems.push(`${slug}: the padding section must say the block count of a multi-block transfer is visible`);
+    }
+  }
+  for (const slug of ['security', 'docs']) {
+    if (!/Het aantal blokken is dus zichtbaar/.test(visible(page(slug)))) {
       problems.push(`${slug}: the padding section must say the block count of a multi-block transfer is visible`);
     }
   }
@@ -1251,9 +1414,12 @@ test('the hourly ceiling a paid plan buys is outbound_per_hour, and no page sell
   assert.doesNotMatch(relay, /ANON_RPH[^;]*plan/, 'the anonymous per-IP rate must not read a plan');
 
   const problems = [];
-  const idx = visible(page('index'));
-  if (!idx.includes(`up to ${pro} retrievals an hour through the API instead of ${community}`)) {
-    problems.push(`index: the paid-plan line must say up to ${pro} retrievals an hour instead of ${community}`);
+  // The English homepage sold this number in a tier list until acceptance
+  // 3.1.1 gave it the same four cards as the Dutch one, which names no hourly
+  // figure. /en/parasend is the page that sells it now.
+  const idx = visible(page('en/parasend'));
+  if (!idx.includes(`Up to ${pro} retrievals an hour through the API`)) {
+    problems.push(`en/parasend: the Firm card must say up to ${pro} retrievals an hour through the API`);
   }
   for (const slug of publicPages()) {
     const m = /no IP rate limit|IP rate limit (?:is )?(?:lifted|removed)/i.exec(visible(page(slug)));
@@ -1300,7 +1466,7 @@ test('no page a visitor can open loads anything from a third party, which is wha
   };
   // Reachable without an account: every public page, plus the two share-link
   // landing pages that PRIVATE excludes from the sitemap but not from a visitor.
-  const reachable = [...new Set([...publicPages(), 'ontvang', 'parashare'])].sort();
+  const reachable = [...new Set([...publicPages(), 'ontvang', 'en/ontvang', 'parashare', 'en/parashare'])].sort();
   assert.ok(reachable.includes('ontvang') && reachable.includes('parashare'),
     'the two share-link landing pages must be in the scan');
 
@@ -1322,9 +1488,11 @@ test('no page a visitor can open loads anything from a third party, which is wha
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 
   // And the two pages that make the promise still make it.
-  assert.match(visible(page('parasend')), /No third-party requests/, 'parasend: the promise must still be on the page');
-  assert.match(visible(page('parasend')), /No fonts, CDNs, analytics or pixels/, 'parasend: name what is not loaded');
-  assert.match(visible(page('pricing')), /No tracking\./, 'pricing: the free tier line must still say No tracking.');
+  assert.match(visible(page('en/parasend')), /No third-party requests/, 'en/parasend: the promise must still be on the page');
+  assert.match(visible(page('en/parasend')), /No fonts, CDNs, analytics or pixels/, 'en/parasend: name what is not loaded');
+  assert.match(visible(page('parasend')), /Geen verzoeken aan derden/, 'parasend: the promise must still be on the page');
+  assert.match(visible(page('parasend')), /Geen lettertypen, CDN's, analytics of pixels/, 'parasend: name what is not loaded');
+  assert.match(visible(page('en/pricing')), /No tracking\./, 'pricing: the free tier line must still say No tracking.');
 });
 
 // 23 ── The BUSL conversion. LICENSE is the operative grant; /license quotes it
@@ -1346,6 +1514,9 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   const human = `${Number(d[3])} ${MONTHS[Number(d[2]) - 1]} ${d[1]}`;
+  const MAANDEN = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+    'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+  const mens = `${Number(d[3])} ${MAANDEN[Number(d[2]) - 1]} ${d[1]}`;
 
   // The copy that ships with a self-hosted relay must not grant something else.
   assert.match(read('deploy/LICENSE'), new RegExp(`^Change Date:\\s*${iso}\\s*$`, 'm'),
@@ -1353,11 +1524,16 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
   assert.match(read('deploy/LICENSE'), new RegExp(`^Change License:\\s*${esc(name)}\\s*$`, 'm'),
     'deploy/LICENSE states a different Change License than LICENSE');
 
-  const licPage = page('license');
-  assert.match(licPage, new RegExp(`Change Date:\\s+${iso}`), 'license: the licence box must quote the Change Date in LICENSE');
-  assert.match(licPage, new RegExp(`Change License:\\s+${esc(name)}`), 'license: the licence box must quote the Change License in LICENSE');
+  const licPage = page('en/license');
+  const licNl = page('license');
+  for (const [where, src] of [['license', licPage], ['license (nl)', licNl]]) {
+    assert.match(src, new RegExp(`Change Date:\\s+${iso}`), `${where}: the licence box must quote the Change Date in LICENSE`);
+    assert.match(src, new RegExp(`Change License:\\s+${esc(name)}`), `${where}: the licence box must quote the Change License in LICENSE`);
+  }
   assert.ok(visible(licPage).includes(`On ${human} the entire codebase will be released under the ${name}.`),
     `license: the prose must say ${human} and ${name}`);
+  assert.ok(visible(licNl).includes(`Op ${mens} wordt de volledige codebase vrijgegeven onder de ${name}.`),
+    `license (nl): the prose must say ${mens} and ${name}`);
   // The head copies: description, og, twitter and the JSON-LD all carry the
   // sentence, and seo-contract only pins them to each other, so all four can be
   // wrong together.
@@ -1367,8 +1543,16 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
     assert.equal(h[1], name, 'license: a head copy names a different licence than LICENSE');
     assert.equal(h[2], iso, 'license: a head copy names a different date than LICENSE');
   }
-  assert.ok(visible(page('terms')).includes(`converts to the ${name} on ${human}.`),
+  const headsNl = [...licNl.matchAll(/Op (\d{4}-\d{2}-\d{2}) gaat de licentie over naar de ([^"<]+?)\.(?=[\s"<]|$)/g)];
+  assert.ok(headsNl.length >= 4, `license (nl): expected the conversion sentence in every head copy, found ${headsNl.length}`);
+  for (const h of headsNl) {
+    assert.equal(h[2], name, 'license (nl): a head copy names a different licence than LICENSE');
+    assert.equal(h[1], iso, 'license (nl): a head copy names a different date than LICENSE');
+  }
+  assert.ok(visible(page('en/terms')).includes(`converts to the ${name} on ${human}.`),
     `terms: the licence sentence must say ${name} and ${human}`);
+  assert.ok(visible(page('terms')).includes(`gaat op ${mens} over in de ${name}.`),
+    `terms (nl): the licence sentence must say ${name} and ${mens}`);
 
   // The three fields that decide who may run this in production, and they are
   // the ones the review found saying three different things. LICENSE grants
@@ -1396,7 +1580,9 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
   const flat = (src) => src.replace(/\s+/g, ' ').trim();
   const boxMatch = /<div class="license-box">([\s\S]*?)<\/div>/.exec(licPage);
   assert.ok(boxMatch, 'license: the full licence text box must still be on the page');
-  const copies = [['deploy/LICENSE', read('deploy/LICENSE')], ['license (box)', boxMatch[1]]];
+  const boxNl = /<div class="license-box">([\s\S]*?)<\/div>/.exec(licNl);
+  assert.ok(boxNl, 'license (nl): the full licence text box must still be on the page');
+  const copies = [['deploy/LICENSE', read('deploy/LICENSE')], ['license (box)', boxMatch[1]], ['license (nl box)', boxNl[1]]];
   for (const [where, src] of copies) {
     for (const key of ['Licensor', 'Licensed Work']) {
       assert.equal(licenseField(src, key, where), licenseField(lic, key, 'LICENSE'),
@@ -1420,6 +1606,9 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
     for (const m of visible(page(slug)).matchAll(/\bnon-commercial\b[^.<]*/g)) {
       grantProblems.push(`${slug}: says "non-commercial${m[0].slice(14, 60)}"; LICENSE grants commercial production use within the Additional Use Grant`);
     }
+    for (const m of visible(page(slug)).matchAll(/\bniet-commerci[eë]le?\b[^.<]*/gi)) {
+      grantProblems.push(`${slug}: says "${m[0].slice(0, 60)}"; LICENSE grants commercial production use within the Additional Use Grant`);
+    }
   }
   assert.deepEqual(grantProblems, [], `\n  ${grantProblems.join('\n  ')}\n`);
 
@@ -1431,6 +1620,9 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
       if (m[1] !== iso) problems.push(`${slug}: quotes Change Date ${m[1]}, LICENSE says ${iso}`);
     }
     for (const m of text.matchAll(/(?:converts to|released under) the ([A-Za-z0-9][A-Za-z0-9. ]*?(?:License|licence)(?: \d+(?:\.\d+)*)?)/g)) {
+      if (m[1] !== name) problems.push(`${slug}: names "${m[1]}" as the conversion licence, LICENSE says ${name}`);
+    }
+    for (const m of text.matchAll(/(?:over (?:naar|in)|vrijgegeven onder) de ([A-Za-z0-9][A-Za-z0-9. ]*?(?:License|licentie)(?: \d+(?:\.\d+)*)?)/g)) {
       if (m[1] !== name) problems.push(`${slug}: names "${m[1]}" as the conversion licence, LICENSE says ${name}`);
     }
   }
@@ -1448,7 +1640,14 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
   const views = (t) => Number(/max_views:\s*(\d+)/.exec(tiers.slice(tiers.indexOf(`${t}:`)))[1]);
   const comm = views('community');
   assert.equal(comm, 1, 'community no longer burns on the first read; rewrite the burn-on-read paragraph on /privacy');
-  const priv = visible(page('privacy'));
+  const priv = visible(page('en/privacy'));
+  const privNl = visible(page('privacy'));
+  assert.ok(privNl.includes('Op het Community-plan wordt het na de eerste download permanent en onherroepelijk vernietigd'),
+    'privacy (nl): burn-on-read must be attributed to the plan that has it');
+  assert.ok(privNl.includes(`tot ${views('pro')} op Firm en ${views('enterprise')} op Enterprise`),
+    'privacy (nl): the reads a paid link allows must be the max_views in tiers.js');
+  assert.doesNotMatch(privNl, /relayserver en wordt na de eerste download permanent en onherroepelijk vernietigd/,
+    'privacy (nl): must not state burn-on-read as a property of every plan');
   assert.ok(priv.includes('On the Community plan it is permanently and irreversibly destroyed after the first download'),
     'privacy: burn-on-read must be attributed to the plan that has it');
   // Business dropped from the reads sentence on 2026-09-04: tiers.js carries a
@@ -1470,7 +1669,7 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
     'every tier in tiers.js must still carry a positive view_ttl_ms; if a plan lost its timer, /press may say so');
   const denials = [];
   for (const slug of publicPages()) {
-    const m = /not on a timer|destroyed on download, not on a timer/.exec(visible(page(slug)));
+    const m = /not on a timer|destroyed on download, not on a timer|niet op een timer|niet na een vaste tijd/.exec(visible(page(slug)));
     if (m) denials.push(`${slug}: says "${m[0]}", and tiers.js gives every plan a view_ttl_ms`);
   }
   assert.deepEqual(denials, [], `\n  ${denials.join('\n  ')}\n`);
@@ -1492,9 +1691,19 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
   // three tiers and Business is not one of them, so /press may not put a link
   // lifetime on it. The tiers.js business row is a server-side ceiling only.
   const sentence = `${span('community')} on Community, ${span('pro')} on Firm, ${span('enterprise')} on Enterprise`;
-  const press = visible(page('press'));
+  const press = visible(page('en/press'));
   assert.ok(press.includes(sentence),
     `press: the expiry bullet must say "${sentence}", the ceilings tiers.js sets, instead of denying the timer`);
+  const DUUR = { 1: 'een', 7: 'zeven', 24: 'vierentwintig' };
+  const duur = (t) => {
+    const h = hours(t);
+    const [n, unit] = h <= 24 ? [h, 'uur'] : [h / 24, 'dag'];
+    assert.ok(DUUR[n], `tiers.js now sets a ${t} ceiling of ${h} hours, which this block cannot spell in Dutch; add it to DUUR and to /press`);
+    return `${DUUR[n]} ${unit === 'dag' && n !== 1 ? 'dagen' : unit}`;
+  };
+  const zin = `${duur('community')} op Community, ${duur('pro')} op Firm, ${duur('enterprise')} op Enterprise`;
+  assert.ok(visible(page('press')).includes(zin),
+    `press (nl): the expiry bullet must say "${zin}", the ceilings tiers.js sets`);
 });
 
 // 25 ── The sub-processor lists. /dpa is signed by customers and named two
@@ -1522,32 +1731,44 @@ test('every third party the server code calls is named on /privacy and /dpa', ()
   assert.ok(external.length >= 2, `only ${external.length} external hosts found; the scan stopped seeing the calls it exists for`);
   // The vendor is the registrable name in the host: api.resend.com -> resend.
   const vendors = [...new Set(external.map((h) => h.split('.').slice(-2)[0]))];
-  const priv = visible(page('privacy'));
-  const dpa = visible(page('dpa'));
-  const subs = priv.slice(priv.indexOf('<h2>Subprocessors</h2>'));
-  const table = dpa.slice(dpa.indexOf('id="subprocessors"'), dpa.indexOf('</table>', dpa.indexOf('id="subprocessors"')));
-  assert.ok(subs.length > 200 && table.length > 200, 'the sub-processor sections must still be findable on both pages');
   const problems = [];
-  for (const v of vendors) {
-    const re = new RegExp(`\\b${v}\\b`, 'i');
-    if (!re.test(subs)) problems.push(`privacy: the code calls ${v}, and the sub-processor list does not name it`);
-    if (!re.test(table)) problems.push(`dpa: the code calls ${v}, and the sub-processor table does not name it`);
+  // English copies under en/, Dutch at the plain path, each with its own heading.
+  for (const [lang, pre, heading] of [['en', 'en/', '<h2>Subprocessors</h2>'], ['nl', '', '<h2>Subverwerkers</h2>']]) {
+    const priv = visible(page(`${pre}privacy`));
+    const dpa = visible(page(`${pre}dpa`));
+    const at = priv.indexOf(heading);
+    const subs = at < 0 ? '' : priv.slice(at);
+    const table = dpa.slice(dpa.indexOf('id="subprocessors"'), dpa.indexOf('</table>', dpa.indexOf('id="subprocessors"')));
+    assert.ok(subs.length > 200 && table.length > 200, `the sub-processor sections must still be findable on both pages (${lang})`);
+    for (const v of vendors) {
+      const re = new RegExp(`\\b${v}\\b`, 'i');
+      if (!re.test(subs)) problems.push(`${pre}privacy: the code calls ${v}, and the sub-processor list does not name it`);
+      if (!re.test(table)) problems.push(`${pre}dpa: the code calls ${v}, and the sub-processor table does not name it`);
+    }
   }
-  // A US sub-processor is on the signed table, under Standard Contractual
-  // Clauses. /press said "No US entity in the chain" in the same breath as the
-  // Hetzner location, which is the opposite of what the controller signs.
-  // Verified by sabotage in both directions: putting the sentence back turns
-  // this red, and so does removing the US row from /dpa.
-  const usRow = /<tr><td>([^<]+)<\/td><td>US[^<]*<\/td>/.exec(page('dpa'));
+  // DE AMERIKAANSE RIJ IS TERUG, en deze toets draait daarom weer echt.
+  //
+  // Deze toets bestond omdat /press "No US entity in the chain" zei terwijl de
+  // getekende tabel Resend Inc. in de Verenigde Staten noemde, onder Standard
+  // Contractual Clauses. Dat was het tegenovergestelde van wat de
+  // verwerkingsverantwoordelijke tekende.
+  //
+  // Op 22 september 2026 zette de site Mailjet in Parijs als mailprovider neer
+  // en haalde de rij weg. Mailjet is nooit aangezet: productie mailt via
+  // Resend Inc. in de VS. Sinds 23 september staat de rij er weer, en zolang
+  // hij er staat mag geen enkele pagina beweren dat er geen Amerikaanse partij
+  // in de keten zit. Welke drager actief is, staat in deploy/partners.json.
+  const usRow = /<tr><td>([^<]+)<\/td><td>US[^<]*<\/td>/.exec(page('en/dpa'))
+    || /<tr><td>([^<]+)<\/td><td>(?:VS|Verenigde Staten)[^<]*<\/td>/.exec(page('dpa'));
   if (usRow) {
     const denials = [];
     for (const slug of publicPages()) {
-      const m = /No US entity in the chain/.exec(visible(page(slug)));
+      const m = /No US entity in the chain|[Gg]een Amerikaanse (?:partij|entiteit) in de keten/.exec(visible(page(slug)));
       if (m) denials.push(`${slug}: says "${m[0]}", and the /dpa sub-processor table names ${usRow[1]} in the US`);
     }
     assert.deepEqual(denials, [], `\n  ${denials.join('\n  ')}\n`);
   }
-  assert.ok(usRow, 'the /dpa table no longer names a US sub-processor; check /press and /privacy before deleting this assertion');
+  // Geen assertie dat de rij er MOET zijn: hem weghalen was de verbetering.
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
 
@@ -1561,14 +1782,19 @@ test('the signing and receipt retentions on /privacy are the ones the relay appl
   const def = Number(/DEFAULT_TTL_DAYS\s*=\s*(\d+)/.exec(env)[1]);
   const max = Number(/MAX_TTL_DAYS\s*=\s*(\d+)/.exec(env)[1]);
   assert.ok(def > 0 && max >= def, 'envelope.js must declare a default and a maximum retention');
-  const priv = visible(page('privacy'));
+  const priv = visible(page('en/privacy'));
+  const privNl = visible(page('privacy'));
+  assert.ok(privNl.includes(`${def} dagen, tenzij het verzoek om een andere termijn vraagt, en nooit langer dan ${max} dagen`),
+    `privacy (nl): the envelope retention must say ${def} days by default and ${max} days at most`);
+  assert.ok(visible(page('dpa')).includes(`blijven bewaard tot de envelop verloopt: ${def} dagen, tenzij het verzoek een andere termijn vraagt, en nooit langer dan ${max} dagen`),
+    `dpa (nl): the sub-processor row must state the ${def} day default and the ${max} day maximum`);
   assert.ok(priv.includes(`${def} days unless the request asks for another term, and never longer than ${max} days`),
     `privacy: the envelope retention must say ${def} days by default and ${max} days at most`);
   // /dpa is the document a controller signs, and its Hetzner row said the
   // capsule "may persist until envelope expiry": a term with no number in it.
   // Same two constants, same sentence, so the signed table cannot drift from
   // the policy page. Verified by the same sabotage as above.
-  assert.ok(visible(page('dpa')).includes(`persist until the envelope expires: ${def} days unless the request asks for another term, and never longer than ${max} days`),
+  assert.ok(visible(page('en/dpa')).includes(`persist until the envelope expires: ${def} days unless the request asks for another term, and never longer than ${max} days`),
     `dpa: the sub-processor row must state the ${def} day default and the ${max} day maximum, not "until envelope expiry"`);
 
   const rly = stripJsComments(read('relay/relay.js'));
@@ -1577,6 +1803,25 @@ test('the signing and receipt retentions on /privacy are the ones the relay appl
   const minutes = (Number(m[1]) * Number(m[2]) * Number(m[3])) / 60000;
   assert.ok(priv.includes(`Redis · ${minutes} minutes, then deleted`),
     `privacy: the delivery-receipt row must say ${minutes} minutes`);
+  assert.ok(privNl.includes(`Redis · ${minutes} minuten, daarna verwijderd`),
+    `privacy (nl): the delivery-receipt row must say ${minutes} minutes`);
+});
+
+// 52 ── Acceptatie r4, Nieuw 1: the admin keeps the invited addresses so each
+// party hears "Iedereen heeft getekend". They are readable (a mail cannot go
+// to a hash), so /privacy has to say that, with the term sign-notify.js keeps
+// them for. Verified by sabotage: TTL_SECONDS 8 -> 9 days turns this red.
+test('the invited-address retention on /privacy is the one sign-notify.js applies', () => {
+  const src = stripJsComments(read('admin/lib/sign-notify.js'));
+  const m = /TTL_SECONDS\s*=\s*(\d+)\s*\*\s*86400/.exec(src);
+  assert.ok(m, 'sign-notify.js must declare TTL_SECONDS as <days> * 86400');
+  const days = Number(m[1]);
+  assert.match(src, /async function rememberParties\(/, 'sign-notify.js keeps the invited addresses');
+  assert.match(src, /async function forget\([\s\S]*?partiesKeyFor\(envelopeId\)/, 'forget() drops the invited addresses with the record');
+  assert.ok(visible(page('privacy')).includes(`De adressen die een afzender uitnodigt om te tekenen, bewaren wij leesbaar en niet als hash, omdat wij die mensen mailen dat iedereen getekend heeft; naar een hash kan geen mail. Ze worden gewist zodra het document compleet is of iemand weigert, hooguit na ${days} dagen.`),
+    `privacy (nl): the invited addresses must be named, readable, with ${days} days at most`);
+  assert.ok(visible(page('en/privacy')).includes(`The addresses a sender invites to sign are kept readable, not as a hash, because we email those people that everyone has signed; an email cannot go to a hash. They are deleted as soon as the document is complete or someone declines, after ${days} days at most.`),
+    `privacy: the invited addresses must be named, readable, with ${days} days at most`);
 });
 
 // 27 ── The CT log hash. ct-hash.js is SHA3-256 throughout and /dpa says so;
@@ -1588,10 +1833,14 @@ test('the CT-log hash named on /privacy and /dpa is the one ct-hash.js computes'
   const algos = [...new Set([...src.matchAll(/createHash\('([^']+)'\)/g)].map((m) => m[1]))];
   assert.deepEqual(algos, ['sha3-256'], `ct-hash.js now hashes with ${algos.join(', ')}; rewrite the CT-log rows`);
   const shown = 'SHA3-256';
-  assert.ok(visible(page('privacy')).includes(`/data/ct-log.json · ${shown} one-way hash only`),
+  assert.ok(visible(page('en/privacy')).includes(`/data/ct-log.json · ${shown} one-way hash only`),
     `privacy: the CT-log row must name ${shown}`);
-  assert.ok(visible(page('dpa')).includes(`device IDs hashed ${shown} in CT log`),
+  assert.ok(visible(page('en/dpa')).includes(`device IDs hashed ${shown} in CT log`),
     `dpa: the data-minimisation row must name ${shown}`);
+  assert.ok(visible(page('privacy')).includes(`/data/ct-log.json · alleen een eenrichtingshash (${shown})`),
+    `privacy (nl): the CT-log row must name ${shown}`);
+  assert.ok(visible(page('dpa')).includes(`apparaat-ID's gehasht met ${shown} in de CT-log`),
+    `dpa (nl): the data-minimisation row must name ${shown}`);
 });
 
 // 28 ── The browser-storage list. It named ps_free_uses "to enforce the 10/day
@@ -1635,11 +1884,18 @@ test('the browser storage /privacy lists is the storage the frontend writes', ()
       if (fn) into.add(fn[1]);
     }
   };
+  // The sealed store (js/account-seal.js, review #573 M4) writes localStorage
+  // through sealPut/sealGet: the same three shapes, under those names.
+  const harvestSealed = (src, into) => {
+    const s2 = src.replace(/\b(?:m\.)?seal(Put|Get)\(/g, (x, v) => 'localStorage.' + (v === 'Put' ? 'set' : 'get') + 'Item(');
+    harvest(s2, 'get|set', into);
+  };
   const keys = new Set();
   const cleared = new Set();
   for (const f of files) {
     const src = stripJsComments(read(`frontend/${f}`));
     harvest(src, 'get|set', keys);
+    harvestSealed(src, keys);
     harvest(src, 'remove', cleared);
   }
   assert.ok(keys.size >= 4, `only ${keys.size} storage keys resolved; the check would be vacuous`);
@@ -1658,18 +1914,22 @@ test('the browser storage /privacy lists is the storage the frontend writes', ()
       `a frontend file stores "${k}". The ParaSend session token is held in memory only, and /privacy says so.`);
   }
 
-  const priv = visible(page('privacy'));
-  const list = priv.slice(priv.indexOf('<h2>Local storage in your browser</h2>'), priv.indexOf('</ul>', priv.indexOf('<h2>Local storage in your browser</h2>')));
-  const named = [...list.matchAll(/<code>([^<]+)<\/code>/g)].map((m) => m[1].replace(/&hellip;$/, ''));
   const problems = [];
-  for (const k of [...keys].sort()) {
-    if (!named.some((n) => k === n || k.startsWith(n))) problems.push(`privacy: the frontend writes "${k}" and the storage list does not name it`);
-  }
-  for (const n of named) {
-    if (![...keys].some((k) => k === n || k.startsWith(n))) problems.push(`privacy: the storage list names "${n}" and no frontend file writes it`);
-  }
-  for (const k of [...cleared].filter((c) => !keys.has(c)).sort()) {
-    if (named.some((n) => k === n || k.startsWith(n))) problems.push(`privacy: the storage list names "${k}" and the frontend only ever deletes it, which is not storage the browser keeps`);
+  // Both languages: the English copy under en/, the Dutch page at the plain path.
+  for (const [slug, heading] of [['en/privacy', '<h2>Local storage in your browser</h2>'], ['privacy', '<h2>Lokale opslag in uw browser</h2>']]) {
+    const priv = visible(page(slug));
+    assert.ok(priv.includes(heading), `${slug}: the storage section "${heading}" must still be on the page`);
+    const list = priv.slice(priv.indexOf(heading), priv.indexOf('</ul>', priv.indexOf(heading)));
+    const named = [...list.matchAll(/<code>([^<]+)<\/code>/g)].map((m) => m[1].replace(/&hellip;$/, ''));
+    for (const k of [...keys].sort()) {
+      if (!named.some((n) => k === n || k.startsWith(n))) problems.push(`${slug}: the frontend writes "${k}" and the storage list does not name it`);
+    }
+    for (const n of named) {
+      if (![...keys].some((k) => k === n || k.startsWith(n))) problems.push(`${slug}: the storage list names "${n}" and no frontend file writes it`);
+    }
+    for (const k of [...cleared].filter((c) => !keys.has(c)).sort()) {
+      if (named.some((n) => k === n || k.startsWith(n))) problems.push(`${slug}: the storage list names "${k}" and the frontend only ever deletes it, which is not storage the browser keeps`);
+    }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
@@ -1685,9 +1945,11 @@ test('the self-host access log /security describes is the one the self-host conf
   assert.ok(fmt, 'deploy/nginx-selfhost.conf must define its access log format');
   assert.match(fmt[2], /^\$remote_addr/, 'the self-host log format no longer starts with the client address; rewrite the IP-logging row on /security');
   assert.match(conf, new RegExp(`access_log\\s+\\S+\\s+${fmt[1]};`), 'the self-host config must still use that format');
-  const sec = visible(page('security'));
+  const sec = visible(page('en/security'));
   assert.ok(sec.includes('<code>deploy/nginx-selfhost.conf</code> writes an access log whose first field is the client address'),
     'security: the IP-logging row must state what a self-hosted relay logs');
+  assert.ok(visible(page('security')).includes('<code>deploy/nginx-selfhost.conf</code> schrijft een toegangslog met als eerste veld het adres van de client'),
+    'security (nl): the IP-logging row must state what a self-hosted relay logs');
 });
 
 // 30 ── One city. /dpa and /privacy are the documents a customer relies on and
@@ -1695,15 +1957,20 @@ test('the self-host access log /security describes is the one the self-host conf
 // jurisdiction. Nothing in this repository can prove which datacentre runs the
 // service, but nothing in it may name two.
 test('the repository names one Hetzner location, the one the DPA names', () => {
-  const CITY = /Hetzner[^.<|\n]*?\b(Nuremberg|Frankfurt|Falkenstein|Helsinki|Ashburn|Hillsboro|Singapore)\b/g;
-  const dpaCities = [...new Set([...visible(page('dpa')).matchAll(CITY)].map((m) => m[1]))];
+  // Dutch pages write Neurenberg; it is the same city.
+  const CITY = /Hetzner[^.<|\n]*?\b(Nuremberg|Neurenberg|Frankfurt|Falkenstein|Helsinki|Ashburn|Hillsboro|Singapore|Singapur)\b/g;
+  const NAME = { Neurenberg: 'Nuremberg', Singapur: 'Singapore' };
+  const city = (c) => NAME[c] || c;
+  const dpaCities = [...new Set([...visible(page('en/dpa')).matchAll(CITY)].map((m) => city(m[1])))];
   assert.deepEqual(dpaCities, ['Nuremberg'], `the DPA now names ${dpaCities.join(', ')}; this test follows the DPA, so update it deliberately`);
+  const dpaNl = [...new Set([...visible(page('dpa')).matchAll(CITY)].map((m) => m[1]))];
+  assert.deepEqual(dpaNl, ['Neurenberg'], `the Dutch DPA now names ${dpaNl.join(', ')}; it must name the city the English DPA names`);
   const files = ['README.md', 'ROADMAP.md', 'SECURITY.md',
     ...publicPages().map((s) => `frontend/${s}.html`)];
   const problems = [];
   for (const f of files) {
     for (const m of read(f).matchAll(CITY)) {
-      if (m[1] !== dpaCities[0]) problems.push(`${f}: names Hetzner ${m[1]}, the DPA says ${dpaCities[0]}`);
+      if (city(m[1]) !== dpaCities[0]) problems.push(`${f}: names Hetzner ${m[1]}, the DPA says ${dpaCities[0]}`);
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
@@ -1734,9 +2001,14 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
     `the checkout payload now sends ${fields.join(', ')}; the /dpa data column has to say so`);
   const meta = /metadata:\s*\{([^}]*)\}/.exec(payload);
   assert.ok(meta, 'the checkout payload must still carry a metadata object');
-  const metaKeys = meta[1].split(',').map((k) => k.split(':')[0].trim()).filter(Boolean);
+  const metaEntries = meta[1].split(',').map((k) => k.split(':')[0].trim()).filter(Boolean);
+  const metaKeys = metaEntries.filter((k) => !k.startsWith('...'));
   assert.deepEqual(metaKeys, ['accountId', 'product', 'plan', 'interval'],
     `the payment metadata is now ${metaKeys.join(', ')}; the /dpa and /privacy columns name the old set`);
+  // The one spread: a reverse-charged sale adds its VAT terms (relay/lib/vat.js).
+  // Anything else spread into the payload would reach Mollie unnamed.
+  assert.deepEqual(metaEntries.filter((k) => k.startsWith('...')), ['...vatMod.metadataOf(vatTerms)'],
+    'the checkout metadata spreads in something other than the VAT terms; the /dpa and /privacy columns do not name it');
   assert.ok(!/email/i.test(payload),
     'the checkout payload now carries an email field; /dpa and /privacy say no email address is sent');
 
@@ -1748,9 +2020,15 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.match(rec, /email:\s*\(rec && rec\.email\)/,
     'the customer record no longer sends the account email; rewrite the Mollie rows rather than delete this line');
 
+  // What that spread adds, asked of the module rather than copied: the pages
+  // have to name these keys, and only for a reverse-charged sale.
+  const { createRequire } = await import('node:module');
+  const vatLib = createRequire(import.meta.url)(path.join(ROOT, 'relay/lib/vat.js'));
+  assert.deepEqual(vatLib.metadataOf({ treatment: 'standard' }), {}, 'a 21% sale must add nothing to the Mollie metadata');
+  const vatKeys = Object.keys(vatLib.metadataOf({ treatment: 'reverse_charge', vatId: 'BE0999000001', country: 'BE' }));
+
   // The stance itself, called rather than pattern-matched: an unset
   // BILLING_MODE with a live key is production today, and it is one-off only.
-  const { createRequire } = await import('node:module');
   const mollieLib = createRequire(import.meta.url)(path.join(ROOT, 'relay/lib/mollie.js'));
   const savedEnv = { BILLING_MODE: process.env.BILLING_MODE, MOLLIE_API_KEY: process.env.MOLLIE_API_KEY, MOLLIE_TEST_API_KEY: process.env.MOLLIE_TEST_API_KEY };
   try {
@@ -1765,7 +2043,35 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
     for (const [k, v] of Object.entries(savedEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }
 
-  const dpaPage = visible(page('dpa'));
+  // Dutch pages first, then the English copies under en/.
+  const dpaNl = visible(page('dpa'));
+  assert.ok(dpaNl.includes(`de betalingsmetadata die de relay meegeeft: ${metaKeys.join(', ')}`),
+    `dpa (nl): the Mollie data column must name the metadata keys relay.js sends (${metaKeys.join(', ')})`);
+  assert.ok(dpaNl.includes('Het bedrag, een omschrijving van het abonnement'),
+    'dpa (nl): the Mollie data column must name the amount and the description');
+  assert.ok(dpaNl.includes('Er wordt geen e-mailadres verstuurd zolang terugkerende betaling uit staat'),
+    'dpa (nl): the Mollie data column must say no email address is sent');
+  assert.ok(dpaNl.includes(`Alleen bij verlegde btw komen daar het btw-nummer van het bedrijf en het bewijs van de controle bij: ${vatKeys.join(', ')}`),
+    `dpa (nl): the Mollie data column must name the keys a reverse-charged sale adds (${vatKeys.join(', ')})`);
+  const privNl = visible(page('privacy'));
+  assert.ok(privNl.includes(`betaalmetadata (${metaKeys.join(', ')})`),
+    'privacy (nl): the Mollie entry must name the same metadata keys');
+  assert.ok(privNl.includes(`Alleen bij verlegde btw komen daar het btw-nummer van het bedrijf en het bewijs van de controle bij (${vatKeys.join(', ')})`),
+    'privacy (nl): the Mollie entry must name the keys a reverse-charged sale adds');
+  assert.ok(privNl.includes('Elke betaling is eenmalig, voor de termijn die u koopt; er zijn geen abonnementen'),
+    'privacy (nl): the Mollie entry must describe one-off payments only');
+  const termsNl = visible(page('terms'));
+  assert.ok(termsNl.includes('Elke betaling is een eenmalige betaling voor de periode die u koopt.'),
+    'terms (nl): the payment paragraph must describe one-off payments');
+  assert.ok(termsNl.includes('Automatische verlenging staat niet aan'),
+    'terms (nl): the payment paragraph must say renewal is not automatic');
+  const pricingNl = visible(page('pricing'));
+  assert.ok(pricingNl.includes('Elke betaling is eenmalig voor de periode die u koopt'),
+    'pricing (nl): the payment block must describe one-off payments');
+  assert.ok(pricingNl.includes('Automatisch verlengen staat niet aan'),
+    'pricing (nl): the payment block must say renewal is not automatic');
+
+  const dpaPage = visible(page('en/dpa'));
   assert.ok(dpaPage.includes(`the payment metadata the relay sets: ${metaKeys.join(', ')}`),
     `dpa: the Mollie data column must name the metadata keys relay.js sends (${metaKeys.join(', ')})`);
   assert.ok(dpaPage.includes('The amount, a plan description'),
@@ -1773,12 +2079,16 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.ok(dpaPage.includes('No email address is sent while recurring billing is off'),
     'dpa: the Mollie data column must say no email address is sent, because the payload carries none');
 
-  const privPage = visible(page('privacy'));
+  assert.ok(dpaPage.includes(`Only when the VAT is reverse charged are the business's VAT number and the proof of the check added: ${vatKeys.join(', ')}`),
+    `dpa: the Mollie data column must name the keys a reverse-charged sale adds (${vatKeys.join(', ')})`);
+  const privPage = visible(page('en/privacy'));
   assert.ok(privPage.includes(`payment metadata (${metaKeys.join(', ')})`),
     'privacy: the Mollie entry must name the same metadata keys');
+  assert.ok(privPage.includes(`Only when the VAT is reverse charged are the business's VAT number and the proof of the check added (${vatKeys.join(', ')})`),
+    'privacy: the Mollie entry must name the keys a reverse-charged sale adds');
   assert.ok(privPage.includes('Every payment is a one-off for the term you buy; there are no subscriptions'),
     'privacy: the Mollie entry must describe the stance the code takes, which is one-off payments only');
-  const termsPage = visible(page('terms'));
+  const termsPage = visible(page('en/terms'));
   assert.ok(termsPage.includes('Every checkout is a one-off payment for the term you buy.'),
     'terms: the payment paragraph must describe one-off payments');
   assert.ok(termsPage.includes('Automatic renewal is not switched on'),
@@ -1786,7 +2096,7 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
 
   // /pricing is where the money is asked for, so the same stance has to stand
   // next to the prices, not only in the legal pages a buyer never opens.
-  const pricingPage = visible(page('pricing'));
+  const pricingPage = visible(page('en/pricing'));
   assert.ok(pricingPage.includes('Every payment is a one-off for the term you buy'),
     'pricing: the payment block next to the prices must describe one-off payments, the stance mollie.js takes');
   assert.ok(pricingPage.includes('Automatic renewal is not switched on'),
@@ -1795,7 +2105,8 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   const stale = [];
   for (const slug of publicPages()) {
     const text = visible(page(slug));
-    for (const re of [/[Bb]illing is not yet live/, /automated billing is not yet live/, /arranged by hand, by e-mail/, /arranged manually/, /once billing is enabled/]) {
+    for (const re of [/[Bb]illing is not yet live/, /automated billing is not yet live/, /arranged by hand, by e-mail/, /arranged manually/, /once billing is enabled/,
+      /[Bb]etal(?:en|ing) is nog niet live/, /met de hand geregeld/, /handmatig geregeld/, /zodra betalen is ingeschakeld/]) {
       const m = re.exec(text);
       if (m) stale.push(`${slug}: says "${m[0]}", and the relay has taken Mollie payments since billing exists`);
     }
@@ -1813,7 +2124,7 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
 // Sabotage runs both ways: making the redeem route issue an invoice or create a
 // Mollie payment turns this red, and so does dropping the sentence.
 test('a gift code charges nothing, on the page and in the code that answers it', () => {
-  const pricing = visible(page('pricing'));
+  const pricing = visible(page('en/pricing'));
 
   // 1. The page says it, next to the prices and in the field itself.
   assert.ok(pricing.includes('A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.'),
@@ -1877,16 +2188,20 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   assert.match(handler, /Too many requests/, 'the handler must still rate limit; a public endpoint without one is a different claim');
 
   const SCOPE = 'applies to all plans';
-  for (const slug of ['pricing', 'privacy', 'audit-log-export']) {
+  for (const slug of ['en/pricing', 'en/privacy', 'en/audit-log-export']) {
     assert.ok(visible(page(slug)).toLowerCase().includes(SCOPE), `${slug}: must say the DPA ${SCOPE}, because the endpoint has no gate`);
   }
+  // Dutch: privacy says "alle plannen", audit-log-export "alle abonnementen".
+  assert.ok(visible(page('privacy')).includes('geldt voor alle plannen'), 'privacy (nl): must say the DPA applies to all plans, because the endpoint has no gate');
+  assert.ok(visible(page('audit-log-export')).includes('geldig voor alle abonnementen'), 'audit-log-export (nl): must say the DPA applies to all plans, because the endpoint has no gate');
+  assert.ok(visible(page('pricing')).includes('Ja, op elk plan, ook op Community.'), 'pricing (nl): must say the DPA applies to every plan, because the endpoint has no gate');
   // The homepage is the page a buyer reads first, and it listed a signed DPA as
   // an Enterprise feature while the endpoint asks nobody for a plan. #382 fixed
   // the sentence; this is what stops it coming back, on any page, in any tier
   // list. Scoped to list items that name a tier, because /index says "that is
   // in the signed Data Processing Agreement" in a breach-notification sentence
   // where the phrase is right.
-  assert.ok(visible(page('index')).includes('The Data Processing Agreement applies to every plan.'),
+  assert.ok(visible(page('en/index')).includes('The Data Processing Agreement applies to every plan.'),
     'index: the homepage must say the DPA applies to every plan, because the endpoint gates on nothing');
   // Two shapes carry a tier's feature list, and the sweep has to know both: the
   // one-line form on /index (<li> ... <b>Enterprise</b> ... </li>) and the card
@@ -1910,7 +2225,7 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   for (const slug of publicPages()) {
     for (const region of ENTERPRISE_REGIONS(page(slug))) {
       regionsSeen += 1;
-      const m = /signed DPA|signed Data Processing Agreement/i.exec(region);
+      const m = /signed DPA|signed Data Processing Agreement|ondertekende (?:DPA|verwerkersovereenkomst)/i.exec(region);
       if (m) tierGated.push(`${slug}: lists "${m[0]}" as an Enterprise feature, and /v2/sign-dpa asks nobody for a plan`);
     }
   }
@@ -1922,6 +2237,9 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
     /available on request for all paid tiers/i,
     /For Pro and Enterprise customers we provide a/i,
     /relay does not process personal data/i,
+    /op aanvraag beschikbaar voor alle betaalde/i,
+    /Voor Pro- en Enterprise-klanten (?:bieden|leveren) we/i,
+    /relay verwerkt geen persoonsgegevens/i,
   ];
   for (const slug of allPages()) {
     const text = visible(page(slug));
@@ -1933,29 +2251,66 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   assert.deepEqual(gated, [], `\n  ${gated.join('\n  ')}\n`);
 });
 
-// 33 ── The host-hardening numbers. /dpa row "Integrity and availability" and
-// the CIS section of SECURITY.md quote the same audit, and nothing kept them
-// equal: either could be edited alone and stay green. Neither file proves the
-// host is in that state, and this block does not claim it does; it only forbids
-// the repository from quoting two different figures for one benchmark.
-// Verified by sabotage in both directions: 49 to 48 in SECURITY.md, or 114 to
-// 113 on /dpa, each turn this red.
-test('the hardening figures on /dpa are the ones SECURITY.md records', () => {
+// 33 ── The host hardening on /dpa. The row used to quote the figures of one
+// dated CIS check (49 auditd rules, 119 of 121 AppArmor profiles, 114 checks)
+// as a standing fact, and nothing re-measured the host (telling SITE-48-A).
+// deploy/deploy-3.1.sh step 6l now reads the host on every deploy and every
+// --verify-only: auditd active, AIDE installed with a check at most
+// HOST_AIDE_MAX_AGE_DAYS old, AppArmor enabled with profiles in enforce mode.
+// The row may promise exactly those three things and nothing the step does not
+// measure: no rule count, no profile count, no CIS figure, and CIS only as a
+// guideline. SECURITY.md keeps the dated check as history, figures included.
+// Sabotage: put "(119 of 121 profiles)" back on /dpa, drop the aide test from
+// step 6l, or change the 2 days on either side, and this turns red.
+test('the host hardening on /dpa is what deploy step 6l measures, and no more', () => {
   const sec = read('SECURITY.md');
-  const bench = /### [\d-]+ [^\n]*CIS Ubuntu ([\d.]+) benchmark/.exec(sec);
-  assert.ok(bench, 'SECURITY.md must still record the CIS Ubuntu benchmark section');
-  const checks = /^(\d+) checks applied across/m.exec(sec);
-  assert.ok(checks, 'SECURITY.md must still state how many CIS checks were applied');
-  const rules = /\|\s*auditd\s*\|\s*(\d+) CIS L2 rules loaded\s*\|/.exec(sec);
-  assert.ok(rules, 'SECURITY.md must still state the auditd rule count');
-  assert.match(sec, /\|\s*AIDE\s*\|\s*Installed, daily integrity check\s*\|/, 'SECURITY.md must still record the daily AIDE check');
-  assert.match(sec, /\|\s*AppArmor\s*\|\s*\d+\/\d+ profiles enforcing\s*\|/, 'SECURITY.md must still record AppArmor enforcing');
+  const deploy = read('deploy/deploy-3.1.sh');
+  assert.match(sec, /### 2026-04-13 [^\n]*CIS Ubuntu 24\.04 benchmark/, 'SECURITY.md keeps the dated CIS record');
 
-  const row = visible(page('dpa'));
-  assert.ok(row.includes(`auditd (${rules[1]} CIS L2 rules)`), `dpa: the Article 32 row must say ${rules[1]} auditd rules, the figure SECURITY.md records`);
-  assert.ok(row.includes(`CIS Ubuntu ${bench[1]} L2 benchmark \u2014 ${checks[1]} checks`), `dpa: the Article 32 row must say CIS Ubuntu ${bench[1]} and ${checks[1]} checks`);
-  assert.ok(row.includes('AIDE daily file integrity check'), 'dpa: the Article 32 row must name the daily AIDE check SECURITY.md records');
-  assert.ok(row.includes('AppArmor enforcing'), 'dpa: the Article 32 row must name AppArmor enforcing');
+  // What step 6l measures, read off the script.
+  const step = deploy.slice(deploy.indexOf('step "6l. host hardening'), deploy.indexOf('judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS"'));
+  assert.ok(step.length > 200, 'deploy-3.1.sh must still have step 6l in phase 6');
+  assert.match(step, /systemctl is-active auditd/, '6l checks auditd');
+  assert.match(step, /command -v aide/, '6l checks the aide binary');
+  assert.match(step, /host aide last run age days/, '6l checks when AIDE last ran');
+  assert.match(step, /aa-status --enabled/, '6l checks AppArmor is enabled');
+  assert.match(step, /profiles are in enforce mode/, '6l counts profiles in enforce mode');
+  const judge = deploy.slice(deploy.indexOf('judge_host_hardening() {'));
+  assert.match(judge, /\$\(\(fails \+ 1\)\)/, '6l counts every miss');
+  assert.match(deploy, /host promises on \/dpa do not hold/, 'a miss is reported');
+  // review-574 N1: a miss is a WARN (STOP only under --host-strict), so /dpa
+  // may promise the check, never its outcome as a standing fact.
+  assert.match(deploy, /warn "6l host NOT PROVEN: \$host_msg"/, 'a miss is a warning in the log and the summary');
+  assert.match(deploy, /\[ "\$HOST_STRICT" -eq 1 \] && die "\$host_msg \(--host-strict\)"/, '--host-strict makes a miss a stop');
+  const days = /^HOST_AIDE_MAX_AGE_DAYS="\$\{PARAMANT_AIDE_MAX_AGE_DAYS:-(\d+)\}"$/m.exec(deploy);
+  assert.ok(days, 'deploy-3.1.sh names the AIDE age limit');
+
+  const rowOf = (html, head) => {
+    const m = new RegExp('<tr><td>' + head + '</td>[\\s\\S]*?</tr>').exec(html);
+    assert.ok(m, `the ${head} row exists`);
+    return m[0].replace(/<[^>]+>/g, '');
+  };
+  const en = rowOf(page('en/dpa'), 'Integrity and availability');
+  const nl = rowOf(page('dpa'), 'Integriteit en beschikbaarheid');
+  assert.ok(en.includes('We check at every deploy') && en.includes('whether auditd is active'), 'dpa: names the auditd check');
+  assert.ok(en.includes(`whether AIDE is installed and the daily file integrity check ran at most ${days[1]} days ago`), 'dpa: names the AIDE age 6l checks');
+  assert.ok(en.includes('AppArmor is enabled with profiles in enforce mode'), 'dpa: names AppArmor enforcing');
+  assert.ok(en.includes('--verify-only') && en.includes('this page states the check, not its outcome'), 'dpa: promises the check, not the outcome');
+  assert.ok(nl.includes('We controleren bij elke uitrol') && nl.includes('of auditd actief is'), 'dpa (nl): names the auditd check');
+  assert.ok(nl.includes(`of AIDE geïnstalleerd is en de dagelijkse integriteitscontrole van bestanden hooguit ${days[1]} dagen geleden draaide`), 'dpa (nl): names the AIDE age 6l checks');
+  assert.ok(nl.includes('of AppArmor aan staat met profielen in enforcing-modus'), 'dpa (nl): names AppArmor enforcing');
+  assert.ok(nl.includes('--verify-only') && nl.includes('deze pagina noemt de controle, niet de uitkomst'), 'dpa (nl): promises the check, not the outcome');
+  // More than 6l measures: figures, or CIS as a result rather than a guideline.
+  for (const [name, row, guide] of [['en', en, 'CIS Ubuntu 24.04 benchmark as a guideline; that is not a checked claim'],
+                                    ['nl', nl, 'CIS Ubuntu 24.04-benchmark als richtlijn; dat is geen getoetste claim']]) {
+    assert.ok(row.includes(guide), `dpa (${name}): CIS only as a guideline`);
+    assert.doesNotMatch(row, /\d+\s*(CIS )?L2|\d+ (of|van de) \d+|\d+ (checks|controles)|\d+ (rules|regels)|CIS[- ](check|controle) (of|van)/, `dpa (${name}): no figure 6l does not measure`);
+  }
+  // No other page states host hardening at all.
+  const pages = fs.readdirSync(path.join(ROOT, 'frontend'), { recursive: true })
+    .filter((f) => /\.html$/.test(f) && !/(^|\/)dpa\.html$/.test(f));
+  const loud = pages.filter((f) => /\bauditd\b|\bAIDE\b|AppArmor/.test(read('frontend/' + f)));
+  assert.deepEqual(loud, [], 'only /dpa may describe the host hardening, and it is held to step 6l');
 });
 
 // 34 ── The signature level. /about and /parasign name it: a Simple Electronic
@@ -2010,7 +2365,7 @@ test('the logs that hold an address are the ones /privacy names, with the bounds
   assert.match(reader, /access\.log/, 'scripts/access-log-visitors.mjs must still be the tool that reads the edge access log');
   assert.match(reader, /remote_addr|\bip\b/i, 'the reader must still work on client addresses; if it stopped, say so on /privacy');
 
-  const priv = visible(page('privacy'));
+  const priv = visible(page('en/privacy'));
   assert.ok(priv.includes('<h2>Logs that hold an address</h2>'),
     'privacy: the section naming the logs must still be on the page');
   assert.ok(priv.includes('Our own edge writes a server access log with the client address'),
@@ -2061,6 +2416,25 @@ test('the logs that hold an address are the ones /privacy names, with the bounds
     'privacy: the audit entry must say the trail is bounded by age as well as by count');
   assert.doesNotMatch(priv, /audit log[^<]*capped by volume, not by time/,
     'privacy: the audit log is bounded by age too; that sentence is false');
+
+  // The Dutch /privacy, same claims.
+  const nl = visible(page('privacy'));
+  assert.ok(nl.includes('<h2>Logs die een adres bevatten</h2>'), 'privacy (nl): the section naming the logs must still be on the page');
+  assert.ok(nl.includes('Onze eigen edge schrijft een servertoegangslog met het clientadres'),
+    'privacy (nl): the edge access log must be described, because a script in this repository reads it');
+  assert.ok(nl.includes('De nginx-configuratie in deze repository logt niets; de edge die ervoor staat wel'),
+    'privacy (nl): the difference between the config in this repository and the edge must be stated');
+  assert.doesNotMatch(nl, /een IP(?:-adres)? wordt alleen kortstondig verwerkt/i, 'privacy (nl): "only transiently" is not true of the edge access log');
+  assert.ok(nl.includes('een adres wordt ingekort tot het netwerk voordat het wordt geschreven'),
+    'privacy (nl): the admin log entry must describe the masking admin/lib/log-redact.js applies');
+  assert.doesNotMatch(nl, /Drie operationele regels schrijven het IP-adres van de client/,
+    'privacy (nl): the admin lines no longer write a client IP');
+  assert.ok(nl.includes(`hooguit ${days[1]} dagen, en hooguit ${maxEntries[1]} regels per account`),
+    `privacy (nl): the audit row must state the ${days[1]} day and ${maxEntries[1]} entry bounds`);
+  assert.ok(nl.includes('1.2.x.x'), 'privacy (nl): the audit rows must show the masked form');
+  assert.ok(nl.includes(`niets ouder dan ${days[1]} dagen blijft bestaan, en een account bewaart hooguit zijn laatste ${maxEntries[1]} regels`),
+    'privacy (nl): the audit entry must say the trail is bounded by age as well as by count');
+  assert.doesNotMatch(nl, /auditlog[^<]*begrensd naar omvang, niet naar tijd/i, 'privacy (nl): the audit log is bounded by age too');
 });
 
 // 36 -- The norm mappings. /pricing said "NEN 7510, eIDAS, and IEC 62443
@@ -2105,7 +2479,7 @@ test('the norm mappings the site claims are the ones written in the tree, and no
   assert.deepEqual(eidasMappings, [],
     `an eIDAS mapping now exists in ${eidasMappings.join(', ')}; /pricing says there is none`);
 
-  const pricing = visible(page('pricing'));
+  const pricing = visible(page('en/pricing'));
   assert.ok(pricing.includes('an IEC 62443 requirement table in the OT guide, and a NEN 7510 table in the DICOM guide'),
     'pricing: the compliance paragraph must name the two mappings that exist');
   assert.ok(pricing.includes('There is no eIDAS mapping document.'),
@@ -2208,8 +2582,17 @@ test('every page that promises burn-on-read says which client and which plan it 
   // at the counter. Only GET /v2/outbound/:hash, the API's own route, spends a
   // read. So the exemption those three pages get below is not a slug allowlist,
   // it stands or falls with these two lines.
-  assert.match(relaySrc, /td\.used = true;\s*blobDrop\(blobHash\);/,
+  // Since 2026-10-04 the burn goes through dlBurn() and comes in two shapes:
+  // on 'finish' for an old client, and on POST .../ack for /get, which confirms
+  // only once it has decrypted the file. Either way the blob is deleted
+  // outright and the read counter is never consulted.
+  // Since 2026-10-05 an old client's download burns after delivery: the
+  // token is spent and the blob unlisted on 'finish', and destroyed once the
+  // connection stayed clean (afterDelivery). Still outright, still no counter.
+  assert.match(relaySrc, /td\.used = true; td\.gone = 'downloaded'; td\.claim = null;\s*blobDrop\(blobHash, false\);/,
     'the /v2/dl download-token route no longer deletes the blob outright; /get, /ontvang and /parashare call a Paramant link single-use because it does');
+  assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(td\.hash\);/,
+    'the /v2/dl ack no longer deletes the blob outright; /get calls a link single-use because a confirmed download does');
   assert.equal((relaySrc.match(/entry\.views_remaining = \(entry\.views_remaining \?\? 1\) - 1;/g) || []).length, 1,
     'the read counter is spent in more than one place now; the download-link pages promise single-use because only GET /v2/outbound/:hash spends a read');
 
@@ -2285,12 +2668,12 @@ test('every page that promises burn-on-read says which client and which plan it 
   // The screens a customer reaches after signing in are not in publicPages, and
   // both of them carried the flat claim. /get, /ontvang and /parashare are the
   // share flow, which anyone with a link opens without an account.
-  const SIGNED_IN = ['dashboard', 'auth/setup', 'get', 'ontvang', 'parashare'];
+  const SIGNED_IN = ['dashboard', 'auth/setup', 'get', 'en/get', 'ontvang', 'en/ontvang', 'parashare', 'en/parashare'];
   const everyPage = [...publicPages(), ...SIGNED_IN];
   // Pages about a client that never sends max_views. Naming a plan is not a
   // qualification here; naming the client is.
   const CLIENT_ONLY = new Set([
-    'parasend', 'get', 'ontvang', 'parashare', 'dashboard', 'auth/setup',
+    'parasend', 'en/parasend', 'get', 'en/get', 'ontvang', 'en/ontvang', 'parashare', 'en/parashare', 'dashboard', 'auth/setup',
     'help/gmail-extension', 'help/outlook-extension',
   ]);
   const CLIENT = /\bweb app\b|\bextensions?\b|\badd-in\b/i;
@@ -2343,7 +2726,7 @@ test('every page that promises burn-on-read says which client and which plan it 
     const j = i >= 0 ? i : html.indexOf('</head>');
     return html.slice(0, j >= 0 ? j : html.length);
   };
-  const DL_LINK_PAGES = new Set(['get', 'ontvang', 'parashare']);
+  const DL_LINK_PAGES = new Set(['get', 'en/get', 'ontvang', 'en/ontvang', 'parashare', 'en/parashare']);
   const headClaims = [];
   for (const slug of everyPage) {
     if (DL_LINK_PAGES.has(slug)) continue; // pinned to the /v2/dl assertion above
@@ -2395,33 +2778,52 @@ test('every page that promises burn-on-read says which client and which plan it 
   // named Pro and stopped there. The tiers.js row is still 'pro'; the plan it is
   // sold under has been Firm since 6 September 2026.
   const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Firm and ${reads.enterprise} on Enterprise.`;
-  for (const slug of ['parasend', 'pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
+  for (const slug of ['en/parasend', 'en/pricing', 'en/security', 'en/help/gmail-extension', 'en/help/outlook-extension']) {
     assert.ok(flatten(bodyOf(page(slug))).includes(unified),
       `${slug}: must carry the client-and-plan sentence in full: "${unified}"`);
   }
+  // /parasend is Nederlands sinds 23 september 2026: dezelfde zin, dezelfde
+  // getallen uit tiers.js, in de taal van de pagina.
+  const unifiedNl = `De web app en de extensies wissen het bestand bij elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot ${reads.pro} keer bij Firm en ${reads.enterprise} keer bij Enterprise.`;
+  assert.ok(flatten(bodyOf(page('parasend'))).includes(unifiedNl),
+    `parasend: must carry the client-and-plan sentence in full: "${unifiedNl}"`);
+  // The two extension help pages are Dutch since 2026-09-23 and carry the same
+  // sentence in Dutch, with the same numbers off tiers.js.
+  const unifiedNlHelp = `De webapp en de extensies wissen het bestand na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot ${reads.pro} keer op Firm en ${reads.enterprise} keer op Enterprise.`;
+  for (const slug of ['help/gmail-extension', 'help/outlook-extension']) {
+    assert.ok(flatten(bodyOf(page(slug))).includes(unifiedNlHelp),
+      `${slug}: must carry the client-and-plan sentence in full: "${unifiedNlHelp}"`);
+  }
   // And the buyer has to be told why more reads is worth paying for, or the
   // honest version reads as a downgrade next to "burns on the first read".
-  for (const slug of ['parasend', 'pricing']) {
+  for (const slug of ['en/parasend', 'en/pricing']) {
     assert.ok(flatten(bodyOf(page(slug))).includes('one link a whole team can open'),
       `${slug}: more reads has to be sold as a feature, not confessed as a weaker promise`);
   }
+  assert.ok(flatten(bodyOf(page('parasend'))).includes('één link die een heel team kan openen'),
+    'parasend: more reads has to be sold as a feature, not confessed as a weaker promise');
 
   // The ParaSend tier cards, which are where a buyer reads the number before he
   // pays for it. Community's card is the one page element allowed to say "Burn
   // on first read" flat, because the card it sits in is the plan.
-  const pricingSrc = page('pricing');
+  const pricingSrc = page('en/pricing');
   assert.ok(pricingSrc.includes('<li>Burn on first read</li>'),
     'pricing: the ParaSend Community card must still say the link burns on the first read');
   assert.ok(pricingSrc.includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
     `pricing: the ParaSend Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(pricingSrc.includes(`<li>Up to ${reads.enterprise} reads per link through the API</li>`),
     `pricing: the ParaSend Enterprise card must offer the ${reads.enterprise} reads per link tiers.js grants, and say they come through the API`);
-  assert.ok(page('parasend').includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
+  assert.ok(page('en/parasend').includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
+    `en/parasend: the Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+  assert.ok(page('en/parasend').includes('<li>Burn on first read</li>'),
+    'en/parasend: the Community card must still say the link burns on the first read');
+  assert.ok(page('parasend').includes(`<li>Tot ${reads.pro} keer lezen per link via de API</li>`),
     `parasend: the Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
-  assert.ok(page('parasend').includes('<li>Burn on first read</li>'),
+  assert.ok(page('parasend').includes('<li>Gewist na de eerste keer lezen</li>'),
     'parasend: the Community card must still say the link burns on the first read');
-  assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link through the API`),
-    `index: the ParaSend Firm price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+  // The English homepage carried a ParaSend price line with this figure until
+  // acceptance 3.1.1 gave it the Dutch homepage's four cards; /en/pricing and
+  // /en/parasend, pinned above, are where the figure is sold.
 
   // The two pages that spell the ParaSend plans out on their own terms. The
   // durations on /docs come off view_ttl_ms since 2026-09-04, so a tier change
@@ -2433,16 +2835,87 @@ test('every page that promises burn-on-read says which client and which plan it 
     return `${n} ${unit}${n === 1 ? '' : 's'}`;
   };
   const spelled = [
-    ['architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Firm and ${reads.enterprise} on Enterprise`],
-    ['docs', `Community gets ${span('community')} and 1 read, Firm ${span('pro')} and up to ${reads.pro} reads, Enterprise ${span('enterprise')} and ${reads.enterprise} reads`],
+    ['en/architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Firm and ${reads.enterprise} on Enterprise`],
+    ['en/docs', `Community gets ${span('community')} and 1 read, Firm ${span('pro')} and up to ${reads.pro} reads, Enterprise ${span('enterprise')} and ${reads.enterprise} reads`],
   ];
   for (const [slug, sentence] of spelled) {
     assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
       `${slug}: must spell the per-plan read counts as "${sentence}", the numbers tiers.js sets`);
   }
+
+  // ── The Dutch pages. Same rules, Dutch vocabulary.
+  const spanNl = (tier) => {
+    const h = ttlOf(tier) / 3_600_000;
+    return h <= 24 ? `${h} uur` : `${h / 24} ${h / 24 === 1 ? 'dag' : 'dagen'}`;
+  };
+  const spelledNl = [
+    ['architecture', `na de laatste keer lezen die de link toestaat: één keer bij Community, tot ${reads.pro} keer bij Firm en ${reads.enterprise} keer bij Enterprise`],
+    ['docs', `Community krijgt ${spanNl('community')} en 1 lezing, Firm ${spanNl('pro')} en tot ${reads.pro} lezingen, Enterprise ${spanNl('enterprise')} en ${reads.enterprise} lezingen`],
+  ];
+  for (const [slug, sentence] of spelledNl) {
+    assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
+      `${slug} (nl): must spell the per-plan read counts as "${sentence}", the numbers tiers.js sets`);
+  }
+  const unifiedNlSecurity = `De webapp en de extensies verwijderen het bestand op elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot ${reads.pro} keer op Firm en ${reads.enterprise} keer op Enterprise.`;
+  assert.ok(flatten(bodyOf(page('security'))).includes(unifiedNlSecurity),
+    `security (nl): must carry the client-and-plan sentence in full: "${unifiedNlSecurity}"`);
+  // Dutch /pricing sells one office plan, so it names that plan's read count.
+  assert.ok(flatten(bodyOf(page('pricing'))).includes(`De webapp en de extensies wissen het na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot ${reads.pro} keer op Firm.`),
+    'pricing (nl): must say the web app and extensions burn on the first read on every plan, and that more reads come through the API');
+
+  const ERASE_NL = 'verbrand(?:t|en)?|vernietig(?:d|t|en)|gewist|wis(?:t|sen)|verwijder(?:d|t|en)|weg|verdwijn(?:t|en)|verdwenen';
+  // Mirrors MOMENT above. "na lezen" is how the Dutch pages write the feature
+  // name "burn-on-read", which the English sweep does not count either.
+  const MOMENT_NL = [
+    'bij (?:het )?(?:lezen|downloaden|openen)',
+    'bij de eerste (?:keer lezen|keer openen|download|lezing)',
+    'na (?:de )?(?:eerste|één|een enkele)(?: geslaagde)? (?:keer lezen|keer openen|download|lezing)',
+    'nadat (?:hij|het|het bestand) (?:is )?gelezen',
+    'tot (?:de|het) (?:eerste )?(?:lezen|download|downloaden)\\b',
+    'zodra (?:hij|het|het bestand|de link) (?:is )?(?:gelezen|gedownload|geopend|bezorgd)',
+    'opent (?:hem|het|de link|het bestand) één keer',
+    'downloadt het één keer',
+  ].join('|');
+  const CLAIM_NL = [
+    new RegExp(`(?:^|[^\\p{L}])(?:${ERASE_NL})(?![\\p{L}])[^.<]{0,40}(?:${MOMENT_NL})`, 'iu'),
+    new RegExp(`(?:${MOMENT_NL})(?![\\p{L}])[^.<]{0,60}(?:^|[^\\p{L}])(?:${ERASE_NL})(?![\\p{L}])`, 'iu'),
+    /\bmaar één keer (?:te )?(?:openen|lezen|downloaden)\b/i,
+  ];
+  const CLIENT_NL = /\bwebapp\b|\bweb app\b|\bextensies?\b|\bbrowserextensies?\b|\badd-in\b|\bSDK\b/i;
+  const PLAN_NL = [/\bCommunity\b/, new RegExp(`tot ${reads.pro} (?:keer|lezingen|leesbeurten)`, 'i')];
+  const unqualifiedNl = [];
+  const mentioningNl = new Set();
+  for (const slug of everyPage) {
+    const clientOnly = CLIENT_ONLY.has(slug);
+    for (const para of paragraphs(bodyOf(page(slug)))) {
+      if (/laatste keer lezen|eerste keer lezen|\bna lezen\b|gewist na|vernietigd na/i.test(para)) mentioningNl.add(slug);
+      const hit = CLAIM_NL.find((re) => re.test(para));
+      if (!hit) continue;
+      const ok = clientOnly ? CLIENT_NL.test(para) : (CLIENT_NL.test(para) || PLAN_NL.some((re) => re.test(para)));
+      if (!ok) unqualifiedNl.push(`${slug}: "${hit.exec(para)[0]}" states burn-on-read for every plan (nl). Paragraph: ${para.slice(0, 160)}`);
+    }
+  }
+  assert.deepEqual(unqualifiedNl, [], `\n  ${unqualifiedNl.join('\n  ')}\n`);
+  assert.ok(mentioningNl.size >= 10, `only ${mentioningNl.size} Dutch pages still describe how long a transfer lives; the Dutch patterns have stopped matching the site`);
+  const soldNl = [];
+  const driftedNl = [];
+  const BY_NAME_NL = { community: 'community', firm: 'pro', pro: 'pro', business: 'business', enterprise: 'enterprise' };
+  for (const slug of everyPage) {
+    for (const para of paragraphs(bodyOf(page(slug)))) {
+      if (/via de API/i.test(para)) continue;
+      const benefit = /(?:tot \d+|meer) (?:leesbeurten|lezingen|keer lezen) per link/i.exec(para);
+      if (benefit) soldNl.push(`${slug}: offers "${benefit[0]}" without naming the API (nl)`);
+    }
+    for (const m of flatten(bodyOf(page(slug))).matchAll(/tot (\d+) (?:keer|lezingen|leesbeurten) (?:op|bij) (Community|Firm|Pro|Business|Enterprise)\b/gi)) {
+      const want = reads[BY_NAME_NL[m[2].toLowerCase()]];
+      if (Number(m[1]) !== want) driftedNl.push(`${slug}: says "${m[0]}", tiers.js grants ${want}`);
+    }
+  }
+  assert.deepEqual([...new Set(soldNl)], [], `\n  ${[...new Set(soldNl)].join('\n  ')}\n`);
+  assert.deepEqual(driftedNl, [], `\n  ${driftedNl.join('\n  ')}\n`);
 });
 
-// 36 ── The account key and the browser. /privacy now has a section that names
+// 45 ── The account key and the browser. /privacy now has a section that names
 // which pages hold the API key in memory and which do not, and the list is a
 // claim about code: /parashare runs on a fifteen-minute session token, /account
 // reveals on purpose, /pricing and /dashboard still authenticate with the key
@@ -2460,7 +2933,8 @@ test('every page that promises burn-on-read says which client and which plan it 
 // fetch out of pricing-billing.js without rewriting the page, and this fails by
 // name.
 test('the ParaSend credential /privacy describes is the credential the code implements', () => {
-  const priv = visible(page('privacy'));
+  const priv = visible(page('en/privacy'));
+  const privNl = visible(page('privacy'));
 
   // 1. Fifteen minutes, from the relay, not from the copywriter.
   const ttl = /^const TTL_S = (\d+);/m.exec(stripJsComments(read('relay/lib/session-token.js')));
@@ -2480,10 +2954,14 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   const countRules = (from, to) => (scope.slice(scope.indexOf(from), scope.indexOf(to))
     .match(/\{ method:/g) || []).length;
   const rules = countRules('const SCOPE = [', 'const APP_SCOPE = [');
-  assert.equal(rules, 5,
-    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says five, so change the page with the code`);
-  assert.ok(priv.includes('the relay accepts it on the five requests a transfer makes and refuses it on everything else'),
+  // Nine since 2026-10-04: announcing the blocks of a live hand-over and saying
+  // no after the fingerprint check (SENDNAME-28/29) joined the seven.
+  assert.equal(rules, 9,
+    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says nine, so change the page with the code`);
+  assert.ok(priv.includes('the relay accepts it on the nine requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
+  assert.ok(privNl.includes('de relay accepteert het bij de negen verzoeken die een overdracht doet'),
+    'privacy (NL): the storage section must state the same count');
   const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
   assert.equal(appRules, 5,
     `the relay's app allowlist now has ${appRules} entries; /privacy says five, so change the page with the code`);
@@ -2539,11 +3017,27 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   // 5. The manual self-host escape on /parashare is named rather than hidden.
   assert.ok(priv.includes('you can still type a key by hand on that page'),
     'privacy: the self-host exception must be stated, because on that path a key really is typed into the browser');
-  assert.match(page('parashare'), /data-click="expandApiKeyCard">Use a key by hand/,
+  assert.match(page('en/parashare'), /data-click="expandApiKeyCard">(?:Enter a key|Your own server\?)</,
+    'and /en/parashare must still offer it, or /privacy describes a door that is not there');
+  assert.match(page('parashare'), /data-click="expandApiKeyCard">(?:Voer een sleutel in|Eigen server\?)</,
     'and /parashare must still offer it, or /privacy describes a door that is not there');
+
+  // The Dutch /privacy, same claims with the same numbers.
+  assert.ok(privNl.includes('Dat token leeft vijftien minuten'), 'privacy (nl): the storage section must state the token lifetime');
+  assert.ok(privNl.includes(`de relay accepteert het bij de ${WOORDEN[rules]} verzoeken die een overdracht doet en weigert het bij al het andere`),
+    'privacy (nl): the storage section must state what the token can and cannot do');
+  assert.ok(privNl.includes(`dat de relay accepteert bij ${WOORDEN[appRules]} verzoeken`),
+    'privacy (nl): the pricing/dashboard token must be described by what it can do');
+  assert.ok(privNl.includes('Een bestand versturen (<code>/parashare</code>) doet dat niet.'), 'privacy (nl): the claim itself must be on the page');
+  for (const where of Object.keys(HOLDERS)) {
+    assert.ok(privNl.includes(`<code>${where}</code>`), `privacy (nl): ${where} fetches the account key and the page must name it`);
+  }
+  assert.ok(privNl.includes('doen dat niet meer.'), 'privacy (nl): the page must say the pricing and dashboard pages stopped holding the key');
+  assert.ok(privNl.includes('kunt u op die pagina nog steeds met de hand een sleutel invoeren'),
+    'privacy (nl): the self-host exception must be stated');
 });
 
-// 37 ── The two legal facts, and the sentence that keeps them honest.
+// 46 ── The two legal facts, and the sentence that keeps them honest.
 //
 // Verified against the primary sources on 2026-09-03 (vault: "Verificatie -
 // twee juridische argumenten voor Paramant"). Both are true and both are one
@@ -2567,7 +3061,15 @@ test('the two legal facts are stated with their limits, and never as a promise',
   const DISCLAIMER = 'This is not legal advice; ask your own counsel what your matter needs.';
 
   // 1. Art. 3:15a, on the two pages where a buyer weighs SES against QES.
-  for (const slug of ['parasign', 'pricing']) {
+  // /parasign is Dutch since 23 September 2026: the same four checks in the
+  // words the Dutch /pricing is held to further down this file.
+  {
+    const html = body('parasign');
+    for (const phrase of ['art. 3:15a', 'wetten.overheid.nl/BWBR0005291', 'voldoende betrouwbaar', 'Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.']) {
+      assert.ok(html.includes(phrase), `parasign: the legal paragraph lost "${phrase}"`);
+    }
+  }
+  for (const slug of ['en/pricing']) {
     const html = body(slug);
     assert.ok(html.includes('art. 3:15a'),
       `${slug}: must cite the article by number, as "art. 3:15a"`);
@@ -2580,8 +3082,10 @@ test('the two legal facts are stated with their limits, and never as a promise',
       `${slug}: the legal paragraph must carry the disclaimer: "${DISCLAIMER}"`);
   }
 
-  // 2. The Rotterdam decision, on /security, with all four limits.
-  const sec = body('security');
+  // 2. The Rotterdam decision, on /security, with all four limits. The English
+  // wording is held on /en/security; the Dutch page is held to the same four
+  // limits in Dutch by block 42.
+  const sec = body('en/security');
   assert.ok(sec.includes('ECLI:NL:RBROT:2026:9319'),
     'security: the decision must be cited by its ECLI, not paraphrased as "a court ruled"');
   assert.ok(sec.includes('uitspraken.rechtspraak.nl/details?id=ECLI:NL:RBROT:2026:9319'),
@@ -2661,7 +3165,16 @@ test('the two legal facts are stated with their limits, and never as a promise',
 //   the receiver needs no account -> /get reads that fragment and spends the
 //                                   one-time download token
 test('the pages before the button say the ParaSend web app is a live handshake, and say what is not', () => {
-  const SENTENCE = 'In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app.';
+  // Rewritten on 24 September 2026, when /parashare made the link the default
+  // and the live hand-over the Extra safe tick box. The two plain phrases this
+  // block exists for ("both online", "compare a short code") stay, now about
+  // the stand that really does both.
+  const SENTENCE = 'In the web app you send a link that the other person opens when it suits them, to one person or, with Firm, to several people at once. With Extra safe you and the receiver are both online and compare a short code, and the file is handed over live. You can also send with the API or the SDK.';
+  // /parasend is Nederlands sinds 23 september 2026 en draagt dezelfde zin in
+  // het Nederlands, met de standnamen die /parashare toont.
+  const SENTENCE_NL = 'In de webapp stuurt u een link die de ontvanger opent wanneer het uitkomt, naar één persoon of, met Firm, naar meerdere mensen tegelijk. Met ‘Extra veilig’ zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. U kunt ook versturen met de API of SDK.';
+  const sentenceOf = (slug) => (slug === 'parasend' ? SENTENCE_NL : SENTENCE);
+  const THREE = ['en/index', 'en/parasend', 'parasend', 'en/pricing'];
 
   // Half one. The web app really does need the other side present, and really
   // does compare a code before anything moves.
@@ -2670,11 +3183,14 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
     'the ParaSend web app no longer holds a socket open to the other side; "both online" may no longer be stated as a fact');
   assert.match(share, /wss:\/\/|RELAY_WS|relay\.paramant\.app/,
     'the ParaSend web app no longer dials the relay socket; check the live-handshake sentence before trusting it');
-  assert.ok(/short code|sas|safety number|compare/i.test(share),
+  assert.ok(/short code|sas|safety number|compare/i.test(share) && /controlecode|vergelijk/i.test(share),
     'the ParaSend web app no longer derives a code for the two sides to compare; the sentence promises one');
+  assert.match(read('frontend/en/parashare.html'),
+    /<strong>Extra safe<\/strong>: choose this when the other person is at a screen right now too\. You compare a short code together/,
+    '/en/parashare step 1 no longer carries the Extra safe promise the pages before it now summarise');
   assert.match(read('frontend/parashare.html'),
-    /The person you send to has to be online while you send; you confirm a short code together\./,
-    '/parashare step 1 no longer carries the sentence the three pages before it now summarise');
+    /<strong>Extra veilig<\/strong>: kies dit als de ontvanger nu ook achter een scherm zit\. U vergelijkt samen een korte code/,
+    '/parashare step 1 no longer carries the Extra veilig promise the pages before it now summarise');
 
   // Half two. There IS an asynchronous route, it is the API, and it holds the
   // sealed file against a deadline rather than a live peer.
@@ -2700,8 +3216,12 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // because the copy is what this block exists to distrust.
   assert.match(read('frontend/parashare.html'), /data-click="chooseModeLink"/,
     '/parashare no longer offers the "Send a link" stand that the three pages send a buyer to');
-  assert.ok(visible(read('frontend/parashare.html')).includes('Send a link'),
-    '/parashare must name the stand in the same words the three pages use, or the buyer arrives and cannot find it');
+  assert.match(read('frontend/en/parashare.html'), /data-click="chooseModeLink"/,
+    '/en/parashare no longer offers the "Send a link" stand that the three pages send a buyer to');
+  assert.ok(visible(read('frontend/en/parashare.html')).includes('Extra safe'),
+    '/en/parashare must name Extra safe in the same words the pages before it use, or the buyer arrives and cannot find it');
+  assert.ok(visible(read('frontend/parashare.html')).includes('Extra veilig'),
+    '/parashare must name Extra veilig in the same words the pages before it use, or the buyer arrives and cannot find it');
   assert.match(share, /function createLink\(/,
     'the "Send a link" stand has no flow behind it; the tail of the sentence promises one');
   assert.match(share, /\/v2\/inbound/,
@@ -2719,20 +3239,27 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
 
   // The three pages. Same sentence on all three: the site says this one way, as
   // it does with the read counts above.
-  for (const slug of ['index', 'parasend', 'pricing']) {
+  for (const slug of THREE) {
     const text = visible(page(slug)).replace(/\s+/g, ' ');
-    assert.ok(text.includes(SENTENCE),
-      `${slug}: must carry the live-handshake sentence in full, before the button: "${SENTENCE}"`);
+    assert.ok(text.includes(sentenceOf(slug)),
+      `${slug}: must carry the live-handshake sentence in full, before the button: "${sentenceOf(slug)}"`);
   }
 
   // Both halves, phrase by phrase, so a rewrite that keeps the shape but drops
   // the plain words fails here rather than in a review a year from now.
-  for (const slug of ['index', 'parasend', 'pricing']) {
+  for (const slug of ['en/index', 'en/parasend', 'en/pricing']) {
     const text = visible(page(slug)).replace(/\s+/g, ' ');
     assert.ok(text.includes('both online'),
       `${slug}: the words "both online" are the whole point; a paraphrase is what hid this for months`);
     assert.ok(text.includes('compare a short code'),
       `${slug}: must say the two sides compare a short code, in those words`);
+  }
+  {
+    const text = visible(page('parasend')).replace(/\s+/g, ' ');
+    assert.ok(text.includes('allebei online'),
+      'parasend: the words "allebei online" are the whole point; a paraphrase is what hid this for months');
+    assert.ok(text.includes('vergelijkt u een korte controlecode'),
+      'parasend: must say the two sides compare a short code, in those words');
   }
 
   // It has to come BEFORE the call to action on each page, or it is the same
@@ -2740,13 +3267,14 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // all three: the homepage card's list sits above its .prod-cta, the /parasend
   // hero line above .ps-actions, the /pricing paragraph above the tier grid.
   const before = {
-    index: /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/parasend"/,
+    'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/en\/parasend"/,
     parasend: /<div class="ps-actions">/,
-    pricing: /<div class="tier-grid">/,
+    'en/parasend': /<div class="ps-actions">/,
+    'en/pricing': /<div class="tier-grid">/,
   };
   for (const [slug, cta] of Object.entries(before)) {
     const html = visible(page(slug));
-    const said = html.replace(/\s+/g, ' ').indexOf(SENTENCE);
+    const said = html.replace(/\s+/g, ' ').indexOf(sentenceOf(slug));
     // The sentence index is measured on collapsed text and the CTA on raw html,
     // so compare on one string: collapse both.
     const flat = html.replace(/\s+/g, ' ');
@@ -2756,7 +3284,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   }
 });
 
-// 39 ── The plans ParaSend actually has, and the reads they actually buy.
+// 47 ── The plans ParaSend actually has, and the reads they actually buy.
 //
 // Found by a writer reading the live site on 4 September 2026: /pricing and
 // /parasend offered "up to 10 reads on Pro, 25 on Business and 100 on
@@ -2789,7 +3317,7 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   // The ParaSend grid is the one under the PARASEND marker. It used to be found
   // by its parasend checkout button; Firm is sold as one line over both
   // products, so that button now says firm and the marker is the stable anchor.
-  const pricingSrc = page('pricing');
+  const pricingSrc = page('en/pricing');
   const parasendHalf = pricingSrc.slice(pricingSrc.indexOf('<!-- TIER CARDS: PARASEND -->'));
   assert.ok(parasendHalf.length > 500, '/pricing no longer carries the PARASEND tier-card marker');
   const parasendGrid = /<div class="tier-grid">([\s\S]*?)<\/section>/.exec(parasendHalf)?.[1];
@@ -2807,10 +3335,16 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   // Firm reads the 'pro' row of tiers.js: it grants the ParaSend Pro tier, and
   // the entitlement tier names never moved, only the name the plan is sold under.
   const sentence = `Through the API a paid link can allow more reads: up to ${viewsOf('pro')} reads on Firm and ${viewsOf('enterprise')} on Enterprise.`;
-  for (const slug of ['pricing', 'parasend', 'security']) {
+  for (const slug of ['en/pricing', 'en/parasend', 'en/security']) {
     assert.ok(visible(page(slug)).replace(/\s+/g, ' ').includes(sentence),
       `${slug}: must name the API read counts as "${sentence}", the max_views tiers.js grants to the plans ParaSend sells`);
   }
+  const sentenceNl = `Via de API kan een betaalde link vaker gelezen worden: tot ${viewsOf('pro')} keer bij Firm en ${viewsOf('enterprise')} keer bij Enterprise.`;
+  assert.ok(visible(page('parasend')).replace(/\s+/g, ' ').includes(sentenceNl),
+    `parasend: must name the API read counts as "${sentenceNl}", the max_views tiers.js grants to the plans ParaSend sells`);
+  const zin = `Via de API kan een betaalde link vaker gelezen worden: tot ${viewsOf('pro')} keer op Firm en ${viewsOf('enterprise')} keer op Enterprise.`;
+  assert.ok(visible(page('security')).replace(/\s+/g, ' ').includes(zin),
+    `security (nl): must name the API read counts as "${zin}", the max_views tiers.js grants`);
 
   // And Business may not come back beside a ParaSend read count anywhere on the
   // site. Still scoped to reads on purpose: the link lifetimes are the other
@@ -2823,13 +3357,16 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
     /up to \d+[^.]{0,40}\bon Business\b/i,
     /\bBusiness\b[^.]{0,24}\b\d+ reads?\b/i,
     /\b\d+ reads? on Business\b/i,
+    /\btot \d+[^.]{0,40}\b(?:op|bij) Business\b/i,
+    /\bBusiness\b[^.]{0,24}\b\d+ (?:keer lezen|lezingen?|leesbeurten?)\b/i,
+    /\b\d+ (?:keer|lezingen?|leesbeurten?) (?:op|bij) Business\b/i,
   ];
   const offenders = [];
   for (const slug of allPages()) {
     const text = visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     for (const sentence of text.split(/(?<=\.)\s+/)) {
       if (!/\bBusiness\b/.test(sentence)) continue;
-      if (/ParaSign|signature/i.test(sentence)) continue; // ParaSign does sell Business
+      if (/ParaSign|signature|Ondertekenen|handtekening/i.test(sentence)) continue; // ParaSign does sell Business
       const hit = READ_CLAIM.find((re) => re.test(sentence));
       if (hit) offenders.push(`${slug}: "${sentence.trim().slice(0, 180)}" names Business in a read claim, and ParaSend has no Business plan`);
     }
@@ -2837,7 +3374,7 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });
 
-// 40 ── The plans a ParaSend link lifetime may name, and the durations tiers.js
+// 48 ── The plans a ParaSend link lifetime may name, and the durations tiers.js
 // sets for them.
 //
 // The sequel to block 39, the same family of untruth one claim over. /terms and
@@ -2870,7 +3407,7 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
 
   // Which plans a duration may be hung on, read off the price table itself --
   // the same grid block 39 reads, so the two cannot drift apart.
-  const pricingSrc = page('pricing');
+  const pricingSrc = page('en/pricing');
   const parasendHalf = pricingSrc.slice(pricingSrc.indexOf('<!-- TIER CARDS: PARASEND -->'));
   assert.ok(parasendHalf.length > 500, '/pricing no longer carries the PARASEND tier-card marker');
   const parasendGrid = /<div class="tier-grid">([\s\S]*?)<\/section>/.exec(parasendHalf)?.[1];
@@ -2890,11 +3427,28 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
   const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, 'twenty-four': 24 };
   const numberOf = (s) => (/^\d+$/.test(s) ? Number(s) : NUM[s.toLowerCase()]);
   const NAMED = /\b(\d+|one|two|three|four|five|six|seven|twenty-four)[\s-](hour|day)s?\b[^.]{0,30}?\b(?:on|for)\s+(Community|Firm|Pro|Business|Enterprise)\b/g;
+  // The Dutch register: "zeven dagen op Enterprise", "24 uur voor Firm".
+  const GETAL = { één: 1, een: 1, twee: 2, drie: 3, vier: 4, vijf: 5, zes: 6, zeven: 7, vierentwintig: 24 };
+  const NAMED_NL = /(?<![\p{L}\d])(\d+|één|een|twee|drie|vier|vijf|zes|zeven|vierentwintig)\s+(uur|dag|dagen)(?![\p{L}])[^.]{0,30}?(?<![\p{L}])(?:op|voor|bij)\s+(Community|Firm|Pro|Business|Enterprise)(?![\p{L}])/gu;
   const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
   const wrong = [];
   const seen = {};
   for (const slug of allPages()) {
+    for (const m of flat(slug).matchAll(NAMED_NL)) {
+      const tier = m[3].toLowerCase();
+      seen[slug] = (seen[slug] || 0) + 1;
+      if (!sold.includes(tier)) {
+        wrong.push(`${slug}: "${m[0]}" hangs a link lifetime on ${m[3]}, and the ParaSend price table does not sell that plan`);
+        continue;
+      }
+      const row = ROW_OF[tier];
+      const n = /^\d+$/.test(m[1]) ? Number(m[1]) : GETAL[m[1].toLowerCase()];
+      const stated = m[2].toLowerCase() === 'uur' ? n : n * 24;
+      if (stated !== hoursOf(row)) {
+        wrong.push(`${slug}: "${m[0]}" states ${stated} hours, and tiers.js gives ${row} ${hoursOf(row)}`);
+      }
+    }
     for (const m of flat(slug).matchAll(NAMED)) {
       const tier = m[3].toLowerCase();
       seen[slug] = (seen[slug] || 0) + 1;
@@ -2914,7 +3468,7 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
   // And the sentences have to still be there. A sweep alone passes on a page
   // that quietly dropped the claim, which is how a buyer ends up with no
   // expiry stated anywhere.
-  for (const slug of ['terms', 'press', 'privacy']) {
+  for (const slug of ['terms', 'press', 'privacy', 'en/terms', 'en/press', 'en/privacy']) {
     assert.ok((seen[slug] || 0) >= 3,
       `${slug}: must still state the link lifetime for all three ParaSend plans; found ${seen[slug] || 0} of them`);
   }
@@ -2924,18 +3478,19 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
   // one /privacy used. ParaSign sentences are exempt because ParaSign does sell
   // a Business plan.
   const DURATION = /\b(?:\d+|one|two|three|four|five|six|seven|twenty-four)[\s-](?:hour|day)s?\b/;
+  const DUUR = /(?<![\p{L}\d])(?:\d+|één|een|twee|drie|vier|vijf|zes|zeven|vierentwintig)\s+(?:uur|dag|dagen)(?![\p{L}])/u;
   const named = [];
   for (const slug of allPages()) {
     for (const sentence of flat(slug).split(/(?<=\.)\s+/)) {
-      if (!/\bBusiness\b/.test(sentence) || !DURATION.test(sentence)) continue;
-      if (/ParaSign|signature/i.test(sentence)) continue;
+      if (!/\bBusiness\b/.test(sentence) || !(DURATION.test(sentence) || DUUR.test(sentence))) continue;
+      if (/ParaSign|signature|Ondertekenen|handtekening/i.test(sentence)) continue;
       named.push(`${slug}: "${sentence.trim().slice(0, 180)}" gives Business a link lifetime, and ParaSend has no Business plan`);
     }
   }
   assert.deepEqual(named, [], `\n  ${named.join('\n  ')}\n`);
 });
 
-// ── /gereedschap: the page that says what works without an account ──────────
+// 49 ── /gereedschap: the page that says what works without an account ──────────
 //
 // This page is written in Dutch and every sweep above matches English, so none
 // of them can read it. That is exactly why it needs its own block: its whole
@@ -2997,10 +3552,506 @@ test('the tools page only calls a tool account-free while the code keeps it that
   assert.ok(tools.includes('vijftig verzendingen per maand'), 'gereedschap: must state the Community sending limit');
 
   // The ladder quotes Firm at the price the pricing page charges.
-  assert.ok(/&euro;29</.test(page('pricing')), 'pricing: Firm is no longer 29');
+  assert.ok(/&euro;29</.test(page('en/pricing')), 'pricing: Firm is no longer 29');
   assert.ok(tools.includes('29 euro per maand'), 'gereedschap: the ladder must quote the Firm price the pricing page charges');
 
   // The page promises no gratis limit it cannot show. It may name Community,
   // never "Free", and it may not invent a free allowance of its own.
   assert.doesNotMatch(tools, /\bgratis\b[^.]{0,40}\bonbeperkt\b/i, 'gereedschap: no unlimited free allowance');
+});
+
+// 42 ── The Dutch pages, 23 September 2026.
+//
+// Mick decided six things that day: Dutch as the main language on /, /pricing,
+// /about and /security, with the English text kept under /en/; one offer, "Voor
+// uw kantoor: 29 euro per maand", with Community beside it and Business and
+// Enterprise only through "Meer nodig?"; the headline on /; two product names
+// outward, Versturen and Ondertekenen; the certification sentence at the top of
+// /security; and Mick visible on /about. Every sentence below is read against
+// the source that makes it true, the same way the English pages are held above.
+// The English copies under /en/ carry the old pins; this block is what holds
+// the Dutch text.
+//
+// Verified by sabotage: pro.max_recipients 30 -> 10, the Firm monthly price in
+// billing-catalog.js 35.09 -> 36.30, the audit report renamed, and "nog niet"
+// taken out of the certification sentence each turn this block red.
+test('the Dutch pages say what the code, the catalog and the files on disk say', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const catalog = require('../relay/lib/billing-catalog.js');
+  const tiers = require('../relay/lib/tiers.js');
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ')
+    .replace(/&euml;/g, 'ë').replace(/&eacute;/g, 'é').replace(/&Eacute;/g, 'É').replace(/&euro;/g, '€')
+    .replace(/&rarr;/g, '→').replace(/&amp;/g, '&').replace(/\s+/g, ' ').replace(/ ([.,;:])/g, '$1');
+  const body = (slug) => { const h = visible(page(slug)); return h.slice(h.indexOf('<body')); };
+  const problems = [];
+  const says = (slug, phrase) => { if (!flat(slug).includes(phrase)) problems.push(`${slug}: must say "${phrase}"`); };
+
+  // 1. The language, both ways, and the way back.
+  const ORIGIN = 'https://paramant.app';
+  for (const slug of ['index', 'pricing', 'about', 'security']) {
+    const nl = slug === 'index' ? '/' : `/${slug}`;
+    const en = slug === 'index' ? '/en' : `/en/${slug}`;
+    const nlHtml = page(slug); const enHtml = page(`en/${slug}`);
+    if (!/^<!DOCTYPE html>\s*<html lang="nl">/i.test(nlHtml)) problems.push(`${slug}: <html lang="nl"> is the decision`);
+    if (!/^<!DOCTYPE html>\s*<html lang="en">/i.test(enHtml)) problems.push(`en/${slug}: the English copy must say lang="en"`);
+    for (const [name, html, canonical] of [[slug, nlHtml, nl], [`en/${slug}`, enHtml, en]]) {
+      if (!html.includes(`<link rel="canonical" href="${ORIGIN}${canonical}">`)) problems.push(`${name}: canonical must be ${canonical}`);
+      for (const [lang, href] of [['nl', nl], ['en', en], ['x-default', nl]]) {
+        if (!html.includes(`<link rel="alternate" hreflang="${lang}" href="${ORIGIN}${href}">`)) problems.push(`${name}: hreflang ${lang} must point at ${href}`);
+      }
+    }
+    if (!body(slug).includes(`href="${en}" hreflang="en"`)) problems.push(`${slug}: no visible way to the English page`);
+    if (!body(`en/${slug}`).includes(`href="${nl}" hreflang="nl"`)) problems.push(`en/${slug}: no visible way back to the Dutch page`);
+  }
+  // /en is served the way /help is, or the English homepage is a 404.
+  assert.match(read('deploy/nginx-paramant-live.conf'), /location = \/en \{ try_files \/en\/index\.html =404; \}/,
+    'nginx must serve /en from frontend/en/index.html');
+
+  // 2. The one offer. The amounts are the catalog's, the limits are tiers.js's.
+  const monthlyIncl = Number(catalog.priceOf('firm', 'firm', 'monthly'));
+  const excl = Math.round(monthlyIncl / 1.21 * 100) / 100;
+  const inclNl = monthlyIncl.toFixed(2).replace('.', ',');
+  says('index', `Voor uw kantoor: ${excl} euro per maand.`);
+  says('index', `Excl. btw, dus ${inclNl} euro per maand met 21% btw.`);
+  says('index', `Voor uw kantoor: ${excl} euro per maand, excl. btw.`);
+  says('pricing', `Voor uw kantoor: ${excl} euro per maand.`);
+  says('about', `Voor uw kantoor: ${excl} euro per maand`);
+  for (const slug of ['index', 'about']) says(slug, 'Meer nodig? Mail Mick: privacy@paramant.app');
+  // /pricing since 05-10-2026: who the line is for, and the same address.
+  says('pricing', 'Grotere organisatie? Dan is er Business, op aanvraag: 1.000 handtekeningen per maand, een vaste contactpersoon en een audittrail die u kunt exporteren, voor €299 per maand excl. btw. Neem contact op: privacy@paramant.app');
+  const lim = (tier, dim) => tiers.tierLimit(tier, dim);
+  for (const slug of ['index', 'pricing', 'about']) {
+    says(slug, `${lim('community', 'signs_month')} handtekeningen per maand`);
+    says(slug, `${lim('community', 'transfers_month')} verzendingen per maand`);
+    says(slug, `${lim('pro', 'signs_month')} handtekeningen per maand`);
+    says(slug, `${lim('pro', 'transfers_month')} verzendingen per maand`);
+    says(slug, `tot ${lim('pro', 'max_recipients')} ontvangers per verzending`);
+  }
+  assert.equal(lim('community', 'max_recipients'), 1, 'community.max_recipients moved; three Dutch pages say one recipient');
+  for (const slug of ['index', 'pricing', 'about']) says(slug, 'één ontvanger per verzending');
+  // "Het hele kantoor, niet per gebruiker" was part of the brief and is NOT on
+  // the page: an account is one login today, and the roadmap still lists
+  // "multiple users per account" as coming. What the page may say is that the
+  // price is per account, and that more users are still to come.
+  says('pricing', 'Firm kost per account, niet per gebruiker. Een account met meerdere gebruikers komt nog');
+  assert.match(visible(page('en/pricing')), /Coming to paid plans: multiple users per account/,
+    'the Dutch page says more users per account is still coming; the roadmap line it rests on is on /en/pricing');
+  for (const slug of ['index', 'pricing']) {
+    if (/het hele kantoor/i.test(flat(slug))) problems.push(`${slug}: "het hele kantoor" promises seats an account does not have yet`);
+  }
+  // One primary button on the signed-out homepage and on /pricing. Since 5
+  // October 2026 the signed-out homepage is the demo dashboard (Mick: "Moet
+  // meteen die dashboard zijn voor users maar dan niet ingelogd"), and its one
+  // primary button is Account maken, beside Probeer het zelf.
+  const homeOut = (page('index').match(/<div class="home-state" data-home="out">[\s\S]*?<\/section>/) || [''])[0];
+  const homeMain = visible(page('index')).slice(visible(page('index')).indexOf('<main'), visible(page('index')).indexOf('</main>'));
+  const signedIn = (homeMain.match(/<div class="home-state" data-home="in"[\s\S]*?<div class="hp-art"/) || [''])[0];
+  const fills = (homeMain.replace(signedIn, '').match(/class="hp-btn hp-btn-fill"/g) || []).length;
+  if (fills !== 1) problems.push(`index: ${fills} primary buttons signed out, the decision is one`);
+  if (!/<a class="hp-btn hp-btn-fill" href="\/signup">Account maken<\/a>/.test(homeOut)) problems.push('index: the one primary button is Account maken (/signup), in the demo dashboard');
+  if (!/<a class="hp-btn hp-btn-line" href="\/sign\?mode=invite">Probeer het zelf<\/a>/.test(homeOut)) problems.push('index: the second action is Probeer het zelf, in the demo dashboard');
+  const pricingMain = visible(page('pricing')).slice(visible(page('pricing')).indexOf('<main'));
+  if ((pricingMain.match(/class="btn btn-primary/g) || []).length !== 1) problems.push('pricing: exactly one primary button');
+
+  // 3. The title line, word for word, inside the demo dashboard (Mick, 5
+  // October 2026: no hero above the dashboard; the title says what it is for).
+  assert.match(homeOut, /<div class="wp-demo wp-demo-top"[\s\S]*?<h1 id="home-h1">Veilig versturen en laten tekenen, voor praktijken en kantoren\.<\/h1>/,
+    'index: the title line sits inside the demo dashboard');
+  assert.match(homeOut, /^<div class="home-state" data-home="out">\s*(?:<!--[\s\S]*?-->\s*)?<div class="wp-demo wp-demo-top"/,
+    'index: the demo dashboard is the first thing signed out, with no hero above it');
+  says('index', 'Gratis met het Community-plan. Voor uw kantoor: 29 euro per maand, excl. btw.');
+
+  // 4. Two product names outward. The Dutch bar names Versturen and
+  // Ondertekenen, apply-nav.py and nav-auth.js carry the same list, and no nav
+  // or heading on a public page presents a retired name as a product.
+  const nav = (html) => (html.match(/<nav class="nav">[\s\S]*?<\/nav>/) || [''])[0];
+  for (const slug of ['index', 'pricing', 'about', 'security']) {
+    const labels = [...nav(page(slug)).matchAll(/class="nav-link">([^<]+)</g)].map((m) => m[1]);
+    if (labels.join(',') !== 'Versturen,Ondertekenen,Gereedschap,Beveiliging,Prijzen') problems.push(`${slug}: the Dutch bar reads ${labels.join(',')}`);
+  }
+  const navAuth = read('frontend/js/nav-auth.js');
+  for (const label of ['Versturen', 'Ondertekenen', 'Gereedschap', 'Beveiliging', 'Prijzen']) {
+    if (!navAuth.includes(`['${label}', `)) problems.push(`nav-auth.js: the Dutch list lost ${label}, the bar would change under the reader`);
+  }
+  const RETIRED = /ghost ?pipe|parashare|parapear|\bvault\b/i;
+  for (const slug of publicPages()) {
+    const html = visible(page(slug));
+    const spots = [nav(html), ...[...html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)].map((m) => m[1])];
+    for (const spot of spots) {
+      const text = spot.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (RETIRED.test(text)) problems.push(`${slug}: a nav or heading presents a retired name: "${text.slice(0, 80)}"`);
+    }
+  }
+
+  // 5. /security, at the top: what Paramant is not, then what you get, and
+  // each of the three things exists.
+  const CERT = 'Paramant is nog niet NEN 7510- of ISO 27001-gecertificeerd. Wel krijgt u: een verwerkersovereenkomst, servers in Duitsland (Hetzner, Neurenberg) en een extern auditrapport (april 2026). Voor uw eigen NEN 7510-dossier leveren wij de beheersmaatregelen aan.';
+  const firstLede = (body('security').match(/<p class="lede[^"]*"[^>]*>([\s\S]*?)<\/p>/) || [, ''])[1]
+    .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  if (firstLede !== CERT) problems.push(`security: the first paragraph must be the certification sentence, it reads "${firstLede}"`);
+  assert.ok(fs.existsSync(path.join(ROOT, 'frontend/dpa.html')), 'the verwerkersovereenkomst the sentence offers is /dpa');
+  assert.match(page('security'), /href="\/docs\/security-audit-2026-04\.md">extern auditrapport \(april 2026\)</,
+    'security: the audit report link sits on the words that promise it');
+  assert.match(read('frontend/docs/security-audit-2026-04.md'), /April 2026/,
+    'the audit report the sentence names must be the April 2026 one');
+  assert.match(read('frontend/docs/dicom-guide.md'), /NEN 7510/,
+    'the NEN 7510 table /security points a dossier at must still be in the DICOM guide');
+  // No Dutch sentence may turn "nog niet" into a certificate.
+  for (const slug of publicPages()) {
+    const t = flat(slug);
+    for (const m of t.matchAll(/[^.]*\b(?:NEN ?7510|ISO ?27001)[^.]*gecertificeerd[^.]*\./gi)) {
+      if (!/\bnog niet\b|\bgeen\b|\bniet\b/i.test(m[0])) problems.push(`${slug}: "${m[0].trim()}" reads as a certificate Paramant does not hold`);
+    }
+  }
+  // The Rotterdam decision in Dutch, with its four limits.
+  const sec = flat('security');
+  for (const phrase of ['ECLI:NL:RBROT:2026:9319', 'rechter-commissaris', 'Het was de cliënt, niet de advocaat.',
+    'als openbaarmaking kan gelden', 'Het is geen vaste rechtspraak.', 'Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.']) {
+    if (!sec.includes(phrase)) problems.push(`security: the decision must be stated with its limits: "${phrase}"`);
+  }
+  // Art. 3:15a with its condition, on the Dutch /pricing.
+  const pr = flat('pricing');
+  for (const phrase of ['art. 3:15a', 'voldoende betrouwbaar', 'Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.']) {
+    if (!pr.includes(phrase)) problems.push(`pricing: the legal paragraph must carry "${phrase}"`);
+  }
+  if (!page('pricing').includes('wetten.overheid.nl/BWBR0005291')) problems.push('pricing: art. 3:15a must link to the statute');
+
+  // 6. /about: Mick visible. His own portrait (the one on mickbeer.com), sized
+  // and named, and only research lines with a source.
+  const about = page('about');
+  const hero = about.slice(about.indexOf('<main'), about.indexOf('class="about-band"', about.indexOf('<main')));
+  assert.match(hero, /<picture class="portrait">[\s\S]*?<img src="\/assets\/mick\/mick-beer-240\.jpg" width="112" height="112" alt="Mick Beer"/,
+    'about: Mick\'s own portrait, with its size set so the page does not jump, and his name as alt text');
+  for (const f of ['frontend/assets/mick/mick-beer-240.jpg', 'frontend/assets/mick/mick-beer-240.webp']) {
+    assert.ok(fs.existsSync(path.join(ROOT, f)), `about: ${f} must exist`);
+  }
+  says('about', 'Mick Beer Privacy- en securityonderzoeker, oprichter van Paramantis Solutions B.V.');
+  const research = [...(hero.match(/<ul class="about-research">([\s\S]*?)<\/ul>/) || [, ''])[1].matchAll(/<li>([\s\S]*?)<\/li>/g)]
+    .map((m) => m[1].replace(/<[^>]+>/g, '').trim());
+  assert.deepEqual(research, [
+    'Mick onderzoekt hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen.',
+    'Zijn artikelen en tools staan op mickbeer.com.',
+  ], 'about: the research lines are the two with a source, and no more');
+  assert.ok(flat('index').includes('Ik onderzoek hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen.'),
+    'about: the first research line is sourced from the letter on the homepage; the letter must still say it');
+  assert.match(hero, /<a href="https:\/\/mickbeer\.com"/, 'about: the second line links the site it names');
+  // Jargon folded away on /about: the algorithm names only inside <details>.
+  const aboutOpen = visible(about).replace(/<details[\s\S]*?<\/details>/g, '');
+  for (const rx of [/ML-DSA/, /ML-KEM/, /\bFIPS\b/]) {
+    if (rx.test(aboutOpen.slice(aboutOpen.indexOf('<body')))) problems.push(`about: ${rx.source} outside the folded technical block`);
+  }
+
+  // 7. The Dutch argument, high on the page and sourced, and the parent company
+  // named so "no parent abroad" is the whole truth.
+  const home = page('index');
+  const why = home.indexOf('id="why-nl-h"'); const cost = home.indexOf('id="split-h"'); const check = home.indexOf('id="check-h"');
+  if (!(why > 0 && why < cost && why < check)) problems.push('index: "Waarom Nederlands telt" must stand directly under the hero, above the price and the checks');
+  says('index', 'Zivver is sinds juni 2025 onderdeel van Kiteworks in Californië.');
+  says('index', 'de aankondiging van Kiteworks over de overname van Zivver (17 juni 2025)');
+  for (const slug of ['index', 'en/index', 'about']) says(slug, 'Paramantis Digital B.V.');
+  says('index', 'Het moederbedrijf is Paramantis Digital B.V., ook Nederlands, KvK 42114664. Er is geen moederbedrijf in het buitenland.');
+  says('index', 'Het moederbedrijf van Paramant staat op paramantis.nl, gecontroleerd op 23 september 2026.');
+  for (const slug of publicPages()) {
+    if (/no parent company anywhere/i.test(flat(slug))) problems.push(`${slug}: "no parent company" is half the truth; the parent is Paramantis Digital B.V.`);
+  }
+
+  // 8. The same facts the English pages are held to, in Dutch.
+  // Acceptatie 3.1.1: the homepage carried "both online" as the rule for the
+  // whole web app. It now carries the /parasend sentence: a link by default,
+  // both online only with Extra veilig.
+  says('index', 'In de webapp stuurt u een link die de ontvanger opent wanneer het uitkomt');
+  says('index', 'zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode');
+  const prodCta = home.indexOf('<div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">');
+  if (!(home.indexOf('vergelijkt u een korte controlecode') > 0 && home.indexOf('vergelijkt u een korte controlecode') < prodCta)) problems.push('index: the handshake sentence stands above the versturen card button');
+  const buy = page('pricing').indexOf('data-billing-interval="monthly"');
+  const hs = page('pricing').indexOf('allebei online en vergelijkt u een korte code');
+  if (!(hs > 0 && hs < buy)) problems.push('pricing: the handshake stands above the button that buys it');
+  says('pricing', 'Elke betaling is eenmalig voor de periode die u koopt');
+  says('pricing', 'Automatisch verlengen staat niet aan');
+  says('pricing', 'er wordt niets afgeschreven, nu niet en later niet');
+  says('pricing', 'Ja, op elk plan, ook op Community.');
+  says('index', 'Dezelfde versleuteling als elk plan, de verwerkersovereenkomst en servers in Duitsland.');
+  for (const slug of ['index', 'pricing', 'about', 'security']) {
+    if (/\b(legally binding|juridisch bindend|onkraakbaar|100% veilig)\b/i.test(flat(slug))) problems.push(`${slug}: a promise no page may make`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 41 ── How many people one send reaches, per plan.
+//
+// relay.js refuses a send to more named recipients than max_recipients allows
+// (tiers.checkRecipients, 403 over_limit). Community is one; Firm reads the pro
+// row, Enterprise its own, and both are thirty. /pricing named the thirty on
+// Firm, but /parasend, the homepage and /docs said nothing about recipients and
+// the press kit sold a different product altogether. Every page that names the
+// number now names the one tiers.js sets, and no page may name another.
+//
+// Verified by sabotage: pro.max_recipients 30 -> 10 (red on every page below);
+// "up to 20 recipients" anywhere on the site (red in the sweep).
+test('the recipients per send on the site are the max_recipients tiers.js sets', () => {
+  const tiersSrc = read('relay/lib/tiers.js');
+  const recipientsOf = (tier) => {
+    const m = /max_recipients:\s*(\d+)/.exec(tiersSrc.slice(tiersSrc.indexOf(`  ${tier}: Object.freeze`)));
+    assert.ok(m, `tiers.js ${tier} must declare a literal max_recipients`);
+    return Number(m[1]);
+  };
+  const community = recipientsOf('community');
+  const firm = recipientsOf('pro');
+  const enterprise = recipientsOf('enterprise');
+  assert.equal(community, 1, 'community.max_recipients moved; "One recipient per send" on /pricing, /parasend and the homepage is now false');
+  assert.equal(firm, enterprise, 'Firm and Enterprise no longer share a recipient ceiling; /docs and /press name one number for both');
+
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const must = {
+    'en/pricing': ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
+    parasend: ['Eén ontvanger per verzending', `Tot ${firm} ontvangers per verzending, elk met een eigen eenmalige link`],
+    'en/parasend': ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
+    'en/index': ['one recipient per send', `up to ${firm} recipients per send`],
+    'en/docs': [`One recipient per send on Community, up to ${firm} on Firm and Enterprise`],
+    'en/press': [`up to ${firm} named recipients`, `One per send on Community · up to ${firm} per send on Firm and Enterprise`],
+    // The Dutch pages.
+    pricing: ['één ontvanger per verzending', `tot ${firm} ontvangers per verzending`],
+    index: ['één ontvanger per verzending', `tot ${firm} ontvangers per verzending`],
+    docs: [`Eén ontvanger per verzending op Community, tot ${firm} op Firm en Enterprise`],
+    press: [`maximaal ${firm} genoemde ontvangers`, `Eén per verzending op Community · tot ${firm} per verzending op Firm en Enterprise`],
+  };
+  const missing = [];
+  for (const [slug, phrases] of Object.entries(must)) {
+    const text = flat(slug).replace(/&middot;/g, '·').replace(/&eacute;/g, 'é').replace(/&Eacute;/g, 'É');
+    for (const p of phrases) if (!text.includes(p)) missing.push(`${slug}: must say "${p}"`);
+  }
+  assert.deepEqual(missing, [], `\n  ${missing.join('\n  ')}\n`);
+
+  // Any other count of recipients per send, anywhere on the site, is a number
+  // tiers.js does not grant.
+  const offenders = [];
+  for (const slug of publicPages()) {
+    const text = flat(slug);
+    for (const m of text.matchAll(/\bup to (\d+) (?:named )?recipients\b|\b(\d+) recipients per send\b|\btot (\d+) ontvangers\b|\b(\d+) ontvangers per verzending\b/gi)) {
+      const n = Number(m[1] || m[2] || m[3] || m[4]);
+      if (n !== firm) offenders.push(`${slug}: "${m[0]}", and tiers.js grants ${firm} on the paid plans`);
+    }
+    for (const m of text.matchAll(/\b(?:tot|maximaal) (\d+) (?:genoemde )?ontvangers\b|\b(\d+) ontvangers per verzending\b/gi)) {
+      const n = Number(m[1] || m[2]);
+      if (n !== firm) offenders.push(`${slug}: "${m[0]}", and tiers.js grants ${firm} on the paid plans`);
+    }
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
+});
+
+// 50 ── The sign-in and account pages are Dutch on their own path and English under
+// /en/ since 23 September 2026, the way /, /pricing, /about and /security went
+// first. Each pair has to say its language, point search engines at both, and
+// give the reader a visible way across and back. The token pages carry the
+// token across in their script, so their switch names the page and the script
+// adds the rest.
+test('the sign-in and account pages exist in both languages and link each other', () => {
+  const ORIGIN = 'https://paramant.app';
+  const PAIRS = ['auth/login', 'auth/backup', 'auth/request-reset', 'auth/reset-confirm', 'auth/setup',
+    'signup', 'signup/verified', 'account', 'dashboard', 'claim'];
+  const problems = [];
+  for (const slug of PAIRS) {
+    const nlHtml = read(`frontend/${slug}.html`);
+    const enHtml = read(`frontend/en/${slug}.html`);
+    const nl = `/${slug}`; const en = `/en/${slug}`;
+    if (!/^<!DOCTYPE html>\s*<html lang="nl">/i.test(nlHtml)) problems.push(`${slug}: <html lang="nl">`);
+    if (!/^<!DOCTYPE html>\s*<html lang="en">/i.test(enHtml)) problems.push(`en/${slug}: <html lang="en">`);
+    for (const [name, html, canonical] of [[slug, nlHtml, nl], [`en/${slug}`, enHtml, en]]) {
+      if (!html.includes(`<link rel="canonical" href="${ORIGIN}${canonical}">`)) problems.push(`${name}: canonical must be ${canonical}`);
+      for (const [lang, href] of [['nl', nl], ['en', en], ['x-default', nl]]) {
+        if (!html.includes(`<link rel="alternate" hreflang="${lang}" href="${ORIGIN}${href}">`)) problems.push(`${name}: hreflang ${lang} must point at ${href}`);
+      }
+    }
+    if (!nlHtml.includes(`<a href="${en}" hreflang="en" lang="en">This page in English</a>`)) problems.push(`${slug}: no visible way to the English page`);
+    if (!enHtml.includes(`<a href="${nl}" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a>`)) problems.push(`en/${slug}: no visible way back to the Dutch page`);
+  }
+  // The pages that load one script for both copies must tell it the language:
+  // every script that holds both texts reads <html lang>, and nothing else.
+  for (const file of ['frontend/js/auth-login.js', 'frontend/js/auth-setup.js', 'frontend/js/passkey.js',
+    'frontend/js/account.inline1.js', 'frontend/js/dashboard.js', 'frontend/js/signup.inline1.js']) {
+    const js = read(file);
+    if (!/function nlEn\(nl, en\) \{ return \/\^en\\b\/i\.test\(document\.documentElement\.lang \|\| ''\) \? en : nl; \}/.test(js)) problems.push(`${file}: no nlEn switch on <html lang>`);
+  }
+  // Two paths carry a token after the page name, so nginx needs them spelled out.
+  const conf = read('deploy/nginx-paramant-live.conf');
+  for (const p of ['/en/auth/setup/', '/en/auth/reset-confirm/']) {
+    if (!conf.includes(`location ${p} { try_files ${p.replace(/\/$/, '')}.html =404; }`)) problems.push(`nginx: ${p} is not served`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 43 ── Co-signing: no fixed order, initials on every page for every signer ──────
+// /parasign promised "Medeondertekenaars in een vaste volgorde" and the English
+// page "Co-signing with routing order", while the relay never checked it:
+// sign() in relay/envelope.js fills any party slot at any time, and the
+// create body carries no order field. A law firm that relies on that sentence
+// gets a second signature before the first. Found 27 September 2026 while
+// answering the first paying customer, who wanted two people to initial every
+// page. What is true since #528 is the opposite half: every signer, the
+// invited ones included, can repeat their mark on every page (all_pages).
+// So the pages say that, and no page may promise an order until the relay
+// enforces one. Build the order first, then lift this check.
+test('no page promises a signing order the relay does not enforce, and /parasign names initials on every page', () => {
+  const envelope = read('relay/envelope.js');
+  const enforcesOrder = /\b(signing_order|sign_order|routing_order|sequential)\b/.test(envelope);
+  assert.equal(enforcesOrder, false, 'relay/envelope.js now knows a signing order; update the /parasign card and this test together');
+  assert.match(envelope, /field\.all_pages/, 'the relay no longer accepts all_pages; /parasign promises initials on every page');
+  for (const slug of ['co-sign', 'en/co-sign']) {
+    assert.match(page(slug), /id="appearance-allpages"/, `${slug} lost the every-page checkbox the /parasign card promises`);
+  }
+
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const must = {
+    parasign: ['Samen tekenen, met een paraaf op elke pagina', 'Er is geen vaste volgorde'],
+    'en/parasign': ['Co-signing, with initials on every page', 'There is no fixed order'],
+  };
+  const missing = [];
+  for (const [slug, phrases] of Object.entries(must)) {
+    for (const p of phrases) if (!flat(slug).includes(p)) missing.push(`${slug}: must say "${p}"`);
+  }
+  assert.deepEqual(missing, [], `\n  ${missing.join('\n  ')}\n`);
+
+  const offenders = [];
+  const promise = /\bvaste volgorde\b(?! dwingt)|\bin de volgorde waarin ze (?:onder)?tekenen\b|\brouting order\b|\bsigning order\b|\bin the order they should sign\b/i;
+  for (const slug of publicPages()) {
+    const text = flat(slug).replace(/Er is geen vaste volgorde/g, '').replace(/There is no fixed order/g, '');
+    const m = promise.exec(text);
+    if (m) offenders.push(`${slug}: "${m[0]}"`);
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
+});
+
+// 53 ── What you can do after paying, 5 October 2026.
+//
+// The betaaltest of that day found that paying worked and the rights were
+// right, and that the words around them were not: Business kept ParaSend
+// Community while the page sold it as the step up from Firm, the dashboard
+// promised Firm "no rate limit" against 500 an hour, and reverse-charged VAT
+// was on the invoice and nowhere on the site. The question was whether you
+// can pay, get the right rights, and read exactly that on the site.
+//
+// So /pricing (NL and EN) now carries one table of what each plan can do,
+// every cell is read here from the module the relay gates on, and /dashboard
+// has to say the same numbers in the lines it shows after paying. The VAT
+// sentence is held to lib/vat.js and the invoice mention in lib/invoice.js.
+test('what /pricing says each plan can do is what the relay enforces and what /dashboard shows', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const tiers = require('../relay/lib/tiers.js');
+  const ent = require('../relay/lib/entitlements.js');
+  const catalog = require('../relay/lib/billing-catalog.js');
+  const vatSrc = read('relay/lib/vat.js');
+  const invoiceSrc = read('relay/lib/invoice.js');
+  const problems = [];
+  const rows = (slug) => {
+    const h = visible(page(slug));
+    const out = new Map();
+    for (const tr of h.matchAll(/<tr><th scope="row">([^<]+)<\/th>((?:<td>[^<]*<\/td>)+)<\/tr>/g)) {
+      out.set(tr[1], [...tr[2].matchAll(/<td>([^<]*)<\/td>/g)].map((m) => m[1]));
+    }
+    return out;
+  };
+  const cell = (slug, row, want) => {
+    const got = rows(slug).get(row);
+    if (JSON.stringify(got) !== JSON.stringify(want)) problems.push(`${slug} "${row}": ${JSON.stringify(got)} must be ${JSON.stringify(want)}`);
+  };
+
+  // What each sold plan grants, asked of the catalog and the entitlement
+  // layer exactly as the webhook writes it, not restated from tiers.js names.
+  const after = (product, plan) => {
+    const acct = { plan: 'community', plan_parasign: 'free', plan_parasend: 'community' };
+    for (const g of catalog.grantsOf(product, plan) || []) ent.applyProductTier(acct, g.product, g.tier);
+    return ent.getEntitlements(acct);
+  };
+  const free = ent.getEntitlements({ plan: 'community', plan_parasign: 'free', plan_parasend: 'community' });
+  const firm = after('firm', 'firm');
+  const biz = after('parasign', 'business');
+  // Business is more than Firm: the whole ParaSend half of Firm is in it.
+  for (const k of ['transfers_month', 'outbound_per_hour', 'view_ttl_ms', 'max_views', 'devices', 'tier']) {
+    const pick = (e) => (k === 'transfers_month' ? e.parasend.quotas[k] : k === 'tier' ? e.parasend.tier : e.parasend.limits[k]);
+    if (pick(biz) !== pick(firm)) problems.push(`Business must carry Firm's ParaSend ${k}: ${pick(biz)} vs ${pick(firm)}`);
+  }
+  const sendQ = (e) => e.parasend.quotas.transfers_month;
+  // max_recipients is a tiers.js row read on the ParaSend tier (tier-gate),
+  // max_parties one on the ParaSign tier; neither is on the entitlement view.
+  const L = (e, k) => (k === 'max_recipients' ? tiers.tierLimit(e.parasend.tier, k) : e.parasend.limits[k]);
+  const parties = (e) => tiers.tierLimit(e.parasign.tier === 'free' ? 'community' : e.parasign.tier, 'max_parties');
+  const audit = (e) => !!e.parasign.features.audit_export;
+  const signs = (e) => e.parasign.quotas.signs_month;
+  const hours = (ms) => ms / 3600000;
+  const nlNum = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const enNum = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const oneTimeMb = 5; // tests/site-claims block 1 holds the one-time-link ceiling; the table repeats it
+  const hr = (n, lang) => (lang === 'nl' ? `${n} uur` : `${n} hour${n === 1 ? '' : 's'}`);
+
+  // Since acceptatie 3.1.1 (taal 5 and 32) the Dutch table carries the same
+  // three plans as the English one, Business marked "op aanvraag", and the API
+  // rows sit under their own heading.
+  cell('pricing', 'Handtekeningen per maand', [nlNum(signs(free)), nlNum(signs(firm)), nlNum(signs(biz))]);
+  cell('pricing', 'Ondertekenaars per document', [free, firm, biz].map((e) => String(parties(e))));
+  cell('pricing', 'Verzendingen per maand', [String(sendQ(free)), `${sendQ(firm)}, hooguit ${L(firm, 'outbound_per_hour')} per uur`, `${sendQ(biz)}, hooguit ${L(biz, 'outbound_per_hour')} per uur`]);
+  cell('pricing', 'Ontvangers per verzending', [free, firm, biz].map((e) => String(L(e, 'max_recipients'))));
+  cell('pricing', 'Een link blijft geldig', [free, firm, biz].map((e) => hr(hours(L(e, 'view_ttl_ms')), 'nl')));
+  cell('pricing', 'Keer openen per link', [free, firm, biz].map((e) => String(L(e, 'max_views'))));
+  cell('pricing', 'Geregistreerde apparaten', [free, firm, biz].map((e) => String(L(e, 'devices'))));
+  cell('pricing', 'Bestand via een eenmalige link', [`${oneTimeMb} MB`, `${oneTimeMb} MB`, `${oneTimeMb} MB`]);
+  cell('pricing', 'API-sleutel voor ondertekenen', ['nee', 'ja', 'ja']);
+  cell('pricing', 'Audittrail exporteren', [free, firm, biz].map((e) => (audit(e) ? 'ja' : 'nee')));
+
+  cell('en/pricing', 'Signatures a month', [enNum(signs(free)), enNum(signs(firm)), enNum(signs(biz))]);
+  cell('en/pricing', 'Signers per document', [free, firm, biz].map((e) => String(parties(e))));
+  cell('en/pricing', 'Transfers a month', [String(sendQ(free)), `${sendQ(firm)}, at most ${L(firm, 'outbound_per_hour')} an hour`, `${sendQ(biz)}, at most ${L(biz, 'outbound_per_hour')} an hour`]);
+  cell('en/pricing', 'Recipients per send', [free, firm, biz].map((e) => String(L(e, 'max_recipients'))));
+  cell('en/pricing', 'A link stays valid', [free, firm, biz].map((e) => hr(hours(L(e, 'view_ttl_ms')), 'en')));
+  cell('en/pricing', 'Reads per link', [free, firm, biz].map((e) => String(L(e, 'max_views'))));
+  cell('en/pricing', 'Registered devices', [free, firm, biz].map((e) => String(L(e, 'devices'))));
+  cell('en/pricing', 'File over a one-time link', [`${oneTimeMb} MB`, `${oneTimeMb} MB`, `${oneTimeMb} MB`]);
+  cell('en/pricing', 'ParaSign API key', ['no', 'yes', 'yes']);
+  cell('en/pricing', 'Audit log export', [free, firm, biz].map((e) => (audit(e) ? 'yes' : 'no')));
+  // The one-time-link ceiling the table repeats, from the relay itself.
+  if (!/5\s*\*\s*1024\s*\*\s*1024|5_242_880|5242880/.test(read('relay/relay.js'))) problems.push('the 5 MB one-time-link ceiling is no longer in relay.js; the pricing tables repeat it');
+
+  // /dashboard after paying says the same numbers, and no longer "no rate limit".
+  const dash = read('frontend/js/dashboard.js');
+  const firmSend = (dash.match(/pro: nlEn\('(Versturen: [^']+)', '([^']+)'\)/) || []);
+  if (!firmSend[1]) problems.push('dashboard.js: the Firm ParaSend line is gone');
+  else {
+    for (const [lang, text] of [['nl', firmSend[1]], ['en', firmSend[2]]]) {
+      const want = lang === 'nl'
+        ? [`${sendQ(firm)} verzendingen per maand`, `hooguit ${L(firm, 'outbound_per_hour')} per uur`, `tot ${L(firm, 'max_recipients')} ontvangers`, `${hours(L(firm, 'view_ttl_ms'))} uur`, `tot ${L(firm, 'max_views')} keer`, `tot ${L(firm, 'devices')} geregistreerde apparaten`]
+        : [`${sendQ(firm)} transfers a month`, `at most ${L(firm, 'outbound_per_hour')} an hour`, `up to ${L(firm, 'max_recipients')} recipients`, `${hours(L(firm, 'view_ttl_ms'))} hours`, `up to ${L(firm, 'max_views')} reads`, `up to ${L(firm, 'devices')} registered devices`];
+      for (const w of want) if (!text.includes(w)) problems.push(`dashboard.js ${lang} Firm ParaSend line must say "${w}": ${text}`);
+    }
+  }
+  if (/geen snelheidslimiet|no rate limit/i.test(dash.replace(/^\s*\/\/.*$/gm, ''))) problems.push('dashboard.js promises no rate limit; tiers.js holds Firm to outbound_per_hour');
+  // The plan name is said once, in the band's heading; the lines under it name
+  // the product (acceptatie 3.1.1, taal 25). The Business heading carries it.
+  if (!/pro_business: nlEn\('Versturen: /.test(dash)) problems.push('dashboard.js: a Business customer reads his ParaSend half');
+  const firmSign = dash.match(/pro: nlEn\('(Ondertekenen: [^']+)'/);
+  if (!firmSign || !firmSign[1].includes(`${signs(firm)} handtekeningen per maand`)) problems.push('dashboard.js: the Firm ParaSign line must say the signs ceiling');
+
+  // Business on the English page: more than Firm, in words.
+  const en = visible(page('en/pricing'));
+  if (!en.includes(`ParaSend as on Firm: ${sendQ(biz)} transfers a month, up to ${L(biz, 'max_recipients')} recipients per send, ${hours(L(biz, 'view_ttl_ms'))} hour links`)) problems.push('en/pricing: the Business card must say it carries ParaSend as on Firm');
+  if (!en.includes('Business is one payment for its own term, and includes ParaSend on the same terms as Firm.')) problems.push('en/pricing: how payment works must say what Business includes');
+
+  // Reverse-charged VAT, as lib/vat.js decides it and lib/invoice.js prints it.
+  const mentionNl = (invoiceSrc.match(/REVERSE_CHARGE_NL = '([^']+)'/) || [])[1];
+  const mentionEn = (invoiceSrc.match(/REVERSE_CHARGE_EN = '([^']+)'/) || [])[1];
+  if (mentionNl !== 'Btw verlegd' || mentionEn !== 'VAT reverse charged') problems.push(`invoice.js mention moved: ${mentionNl} / ${mentionEn}`);
+  if (!/const HOME = 'NL'/.test(vatSrc)) problems.push('vat.js: the home member state moved; the sentence says "another EU member state"');
+  if (!/VIES/.test(vatSrc) || !/company name and an address/.test(vatSrc)) problems.push('vat.js: the conditions the sentence names (VIES, name and address) are no longer there');
+  // Written the way every other excl. amount on these pages is: 29, not 29.00.
+  const monthlyExcl = String(Math.round(Number(catalog.priceOf('firm', 'firm', 'monthly')) / 1.21 * 100) / 100);
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/&euro;/g, '€').replace(/&ldquo;|&rdquo;/g, '"').replace(/\s+/g, ' ');
+  const vatSays = {
+    pricing: ['Bent u een bedrijf in een ander EU-land, dan wordt de btw verlegd.', `€${monthlyExcl.replace('.', ',')} per maand zonder btw`, `0% btw, "${mentionNl}"`, 'btw-nummer, bedrijfsnaam en adres', '(VIES)', 'betaalt u 21% btw'],
+    'en/pricing': ['A business established in another EU member state pays no Dutch VAT: it is reverse charged.', `Firm €${monthlyExcl} a month`, `0% VAT, "${mentionNl} / ${mentionEn}"`, 'VAT number, company name and address', '(VIES)', 'you pay 21% VAT'],
+    terms: ['dan wordt de btw verlegd', `0% btw, "${mentionNl} / ${mentionEn}"`, 'bedrijfsnaam en adres', '(VIES)', 'rekenen wij 21% btw'],
+    'en/terms': ['the VAT is reverse charged', `0% VAT, "${mentionNl} / ${mentionEn}"`, 'company name and address', '(VIES)', 'we charge 21% VAT'],
+  };
+  for (const [slug, phrases] of Object.entries(vatSays)) for (const ph of phrases) if (!flat(slug).includes(ph)) problems.push(`${slug}: the VAT sentence must say "${ph}"`);
+
+  assert.deepEqual(problems, [], problems.join('\n'));
 });

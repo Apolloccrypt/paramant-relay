@@ -27,7 +27,12 @@ function test(name, fn) {
 
 const PLAN = { product: 'parasign', plan: 'pro', interval: 'monthly' };
 const ORDER = catalog.resolveOrder(PLAN);
-const PAID_UNTIL = new Date('2026-10-01T12:00:00.000Z');
+// Far in the future on purpose. This stood on 2026-10-01T12:00Z, and the
+// suites that call ensureSubscription without a fixed `now` compare it with
+// Date.now(): from that afternoon on the paid period lay in the past, the
+// payload was refused with no_start_date, and three tests went red on main
+// without a single line changing.
+const PAID_UNTIL = new Date('2099-10-01T12:00:00.000Z');
 
 // Every ensureSubscription call below passes recurring: true. That flag is the
 // brake from mollie.billingStance(): it is only true when BILLING_MODE was set
@@ -59,7 +64,7 @@ test('the subscription starts on the day the paid period ends, not today', () =>
     mollieInterval: mollieFake().mollieInterval,
   });
   assert.ok(!built.error, `payload refused: ${built.error}`);
-  assert.strictEqual(built.payload.startDate, '2026-10-01');
+  assert.strictEqual(built.payload.startDate, '2099-10-01');
   assert.strictEqual(built.payload.interval, '1 month');
 });
 

@@ -72,6 +72,7 @@ const aliases = {
   '/': '/index.html',
   '/parasign': '/parasign.html',
   '/parasend': '/parasend.html',
+  '/en/parasend': '/en/parasend.html',
   '/about': '/about.html',
   '/security': '/security.html',
   '/trust': '/trust.html',
@@ -79,6 +80,15 @@ const aliases = {
   '/help': '/help/index.html',
   '/download': '/download.html',
   '/gereedschap': '/gereedschap.html',
+  // The English copies of the four Dutch pages (23 September 2026).
+  // deploy/nginx-paramant-live.conf maps /en onto frontend/en/index.html.
+  '/en': '/en/index.html',
+  '/en/about': '/en/about.html',
+  '/en/parasign': '/en/parasign.html',
+  '/en/security': '/en/security.html',
+  '/en/trust': '/en/trust.html',
+  '/en/docs': '/en/docs.html',
+  '/en/download': '/en/download.html',
 };
 
 const server = http.createServer((req, res) => {
@@ -152,24 +162,35 @@ const measure = (page, claims) => page.evaluate((specs) => {
 // proof the right element was measured; the geometry is the assertion.
 const PAGES = [
   {
+    // The Dutch homepage (5 October 2026). Mick: "Moet meteen die dashboard
+    // zijn voor users maar dan niet ingelogd, waardoor je meteen ziet wat het
+    // kan, waarvoor en de feel hebt." So the first screen IS the demo
+    // dashboard: its "Voorbeeld" bar, the title line inside it that says what
+    // it is for, the price in one line, its two actions, and the start of the
+    // register. There is no hero above it any more (the 23 September headline
+    // retired with it; the price and the free plan stay on the first screen).
     slug: '/',
     claims: [
-      { name: 'the H1', css: '[data-home="out"] h1', text: 'Get documents signed and send files safely' },
-      { name: 'the line that says who it is for', css: '[data-home="out"] p.lede', text: 'small professional firms' },
+      { name: 'the demo bar, marked as an example', css: '[data-home="out"] .wp-demo-top #wp-demo-h', text: 'Zo ziet uw overzicht eruit' },
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Veilig versturen en laten tekenen, voor praktijken en kantoren' },
+      { name: 'the Community plan and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'Community-plan', also: ['Voor uw kantoor: 29 euro per maand'] },
+      { name: 'the primary action, Account maken', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/signup', text: 'Account maken' },
+      { name: 'the second action, Probeer het zelf', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/sign?mode=invite', text: 'Probeer het zelf' },
+      { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Uw documenten' },
+    ],
+  },
+  {
+    slug: '/en',
+    claims: [
+      { name: 'the demo bar, marked as an example', css: '[data-home="out"] .wp-demo-top #wp-demo-h', text: 'This is what your overview looks like' },
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Send files safely and get documents signed, for small professional firms' },
       // The split the whole homepage argues from. It has to be readable as a
       // split, so both halves are checked in one line: free tier named, paid
       // tier named, on the first screen.
-      { name: 'the Community and business plans split', css: '[data-home="out"] p.hero-note', text: 'Community plan', also: ['business plans from'] },
-      { name: 'the first action', css: '[data-home="out"] .home-actions a', href: '/sign' },
-      // Mick, 4 September: one note is enough. The founder line left both hero
-      // states; the letter signature further down the page is the one place the
-      // homepage still names him, and tests/ui-truthfulness pins that block.
-      // Mick, 5 September: the English ownership line became a Dutch tile with
-      // one quiet fact under it. Two lines where there was one, so this claim
-      // now also measures the bottom of the second: the block is absolutely
-      // positioned inside .hp-band, which is why it cannot push the hero down.
-      { name: 'the band tile and the fact under it', css: '.hp-band-tag', text: 'Beter een goede buur dan een verre vriend.', also: ['Onze servers staan in Neurenberg.'] },
-      { name: 'the heading of the five facts, which now come before the gift (panel of 4 September: facts convince, the letter can wait)', css: '#check-h', text: 'Five things you can check' },
+      { name: 'the Community and business plans split', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'Community plan', also: ['business plans from'] },
+      { name: 'the primary action, Create account', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/en/signup', text: 'Create account' },
+      { name: 'the second action, Try it yourself', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/en/sign?mode=invite', text: 'Try it yourself' },
+      { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Your documents' },
     ],
   },
   {
@@ -189,7 +210,17 @@ const PAGES = [
     ],
   },
   {
+    // Dutch since 23 September 2026; the English original is /en/parasign below.
     slug: '/parasign',
+    claims: [
+      { name: 'the line that says who it is for', css: 'p.ps-who', text: 'Voor juridische, financiële en zorgpraktijken' },
+      { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/sign' },
+      { name: 'the SES scope statement', css: '.scope-note p', phrase: 'Simple Electronic Signature (SES)', at: 815 },
+      { name: 'the free limit', css: 'p.ps-fine', text: '2 handtekeningen per maand' },
+    ],
+  },
+  {
+    slug: '/en/parasign',
     claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For legal, finance and healthcare practices' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/sign' },
@@ -206,13 +237,34 @@ const PAGES = [
   {
     slug: '/parasend',
     claims: [
+      { name: 'the line that says who it is for', css: 'p.ps-who', text: 'Voor kantoren die nu klantdossiers' },
+      { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/parashare' },
+      { name: 'the free limit', css: 'p.ps-sub', text: '50 verzendingen per maand' },
+    ],
+  },
+  {
+    // De Engelse kopie van /parasend houdt de Engelse pins.
+    slug: '/en/parasend',
+    claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For offices that email client documents' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/parashare' },
       { name: 'the free limit', css: 'p.ps-sub', text: '50 transfers a month' },
     ],
   },
   {
+    // Mick visible (23 September 2026): the place for his photo, his name and
+    // title, and the first line about his research, before the buttons.
     slug: '/about',
+    claims: [
+      { name: 'the place for his photo', css: '.about-person .portrait' },
+      { name: 'the name of the person behind it', css: '.about-byline .n', text: 'Mick Beer' },
+      { name: 'his title', css: '.about-byline .t', text: 'Privacy- en securityonderzoeker' },
+      { name: 'the first line about his research', css: '.about-research li', text: 'persoonsgegevens weglekken' },
+      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/about',
     // The case this whole file exists for: two lines, no id of their own until
     // now, and the only place on the site that names the person behind it.
     claims: [
@@ -223,7 +275,18 @@ const PAGES = [
     ],
   },
   {
+    // The certification sentence is the first thing on the page, and what you
+    // do get follows in the same paragraph.
     slug: '/security',
+    claims: [
+      { name: 'the certification sentence', css: '.page-hero .cert-lede', text: 'Paramant is nog niet NEN 7510- of ISO 27001-gecertificeerd' },
+      { name: 'the bounded promise', css: '.page-hero .lede', nth: 1, text: 'Breekt iemand in op onze eigen server' },
+      { name: 'who is behind it', css: '.hero-by', text: 'Paramantis Solutions B.V.' },
+      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/security',
     claims: [
       // Bounded on purpose: what breaking in still does not get you. A promise
       // with its limit attached is worth nothing if the limit scrolls away.
@@ -236,6 +299,14 @@ const PAGES = [
   {
     slug: '/trust',
     claims: [
+      { name: 'the lede', css: '.page-hero .lede', text: 'Voor organisaties die Paramant op hun eigen server draaien' },
+      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/security' },
+      { name: 'the second action', css: '.hero-cta a.btn-secondary', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/trust',
+    claims: [
       { name: 'the lede', css: '.page-hero .lede', text: 'For organisations that run Paramant on their own server' },
       { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/security' },
       { name: 'the second action', css: '.hero-cta a.btn-secondary', href: '/pricing' },
@@ -243,6 +314,16 @@ const PAGES = [
   },
   {
     slug: '/docs',
+    claims: [
+      // The one line on a reference page written for the person who decides
+      // rather than the person who integrates.
+      { name: 'the line for the buyer', css: 'p.docs-buyer', text: 'Overweegt u Paramant?' },
+      { name: 'the first button', css: '.docs-hero-actions a.docs-hero-btn', nth: 0, href: '#quickstart' },
+      { name: 'the second button', css: '.docs-hero-actions a.docs-hero-btn', nth: 1, href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/docs',
     claims: [
       // The one line on a reference page written for the person who decides
       // rather than the person who integrates.
@@ -256,22 +337,32 @@ const PAGES = [
     // Three questions, three answers, no scrolling. An answer whose last line
     // is cut off is a page that has not answered.
     claims: [
-      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Signing a document needs an account' },
-      { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is free' },
+      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Om te ondertekenen heeft u een account nodig' },
+      { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is gratis' },
       // The third answer is where the page says the documents live in Germany,
       // which is the answer the buyer this page was rewritten for came to read.
       // It ended at 860 in DejaVu; the Q&A block, its heading and the space
       // between a question and its answer are tighter on a phone, which lifts it
       // to 822 with all three answers intact.
-      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner Nuremberg', at: 822 },
+      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner in Neurenberg', at: 822 },
     ],
   },
   {
     slug: '/download',
     claims: [
+      { name: 'the status sentence', css: 'header.dl-lead h1', text: 'niet meer onderhouden' },
+      { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'De laatste build is van maart 2026' },
+      // "Open de webapp" opens the web app, not the home page (fase 1, SENDNAME-49-A).
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/parashare' },
+      { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/download',
+    claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'no longer maintained' },
       { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'The last build is from March 2026' },
-      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/' },
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/en/parashare' },
       { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
     ],
   },
@@ -303,8 +394,14 @@ for (const spec of PAGES) {
         }
       }
       if (claim.href) {
-        assert.equal(hit.href, claim.href,
-          `${spec.slug}: ${hit.name} points at ${hit.href}, not ${claim.href}`);
+        // An English page leads to the English page where one exists (fase 2,
+        // SITE-03-F); the spec keeps the route, the /en in front follows.
+        const enRoute = (h) => (/^\/en(\/|$)/.test(spec.slug) && /^\/(?!en(\/|$))/.test(h)
+          && (fs.existsSync(path.join(ROOT, 'en', h.replace(/^\/|[#?].*$/g, '') + '.html')) || fs.existsSync(path.join(ROOT, 'en', h.replace(/^\/|[#?].*$/g, ''), 'index.html')))
+          ? (h === '/' ? '/en' : '/en' + h) : h);
+        const want = enRoute(claim.href);
+        assert.equal(hit.href, want,
+          `${spec.slug}: ${hit.name} points at ${hit.href}, not ${want}`);
       }
       assert.ok(hit.bottom <= FOLD.height,
         `${spec.slug}: ${hit.name} ends at y=${hit.bottom}, ${hit.bottom - FOLD.height}px past the ${FOLD.height}px first screen (top y=${hit.top}, font ${hit.font})${claim.at ? `. It was measured at y=${claim.at} when the CSS that pulled it onto the screen was written, so it moved ${hit.bottom - claim.at}px down since` : ''}. A phone reader has to scroll for it.`);

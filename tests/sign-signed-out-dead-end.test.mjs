@@ -30,6 +30,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadPdfLibs } from './helpers/sign-pdf-libs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
@@ -91,6 +92,7 @@ async function openSign(authenticated) {
 
 // A real PDF, built in the page with the pdf-lib the page already loads.
 async function pickPdf(page) {
+  await loadPdfLibs(page);
   await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 400 && !(window.PDFLib && window.pdfjsLib); i++) await sleep(20);
@@ -129,7 +131,7 @@ async function walkToTheEnd(page, mode) {
 }
 
 // ── the three workflows, signed out ──────────────────────────────────────────
-for (const [mode, label] of [['alone', 'Sign in to sign'], ['cosign', 'Sign in to sign'], ['invite', 'Sign in to send']]) {
+for (const [mode, label] of [['alone', 'Inloggen om te ondertekenen'], ['cosign', 'Inloggen om te ondertekenen'], ['invite', 'Inloggen om te versturen']]) {
   const { page, calls } = await openSign(false);
   await page.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
   const button = await walkToTheEnd(page, mode);
@@ -142,17 +144,24 @@ for (const [mode, label] of [['alone', 'Sign in to sign'], ['cosign', 'Sign in t
     await page.locator('#ds-signedout').isVisible(), '#ds-signedout');
   const hint = await textOf(page, mode === 'invite' ? '#ds-recipients-hint' : '#ds-sign-signin-hint');
   ok(`${mode}: and the last step says the prepared file does not travel`,
-    /has not been uploaded/i.test(hint), hint);
+    /is niet geüpload/i.test(hint), hint);
 
   // The gate proper: nothing on the whole route asked for anything that needs
   // an account. No 401 was raised, because no request was made that could.
   ok(`${mode}: nothing on the route needs a session`,
     calls.length === 0, calls.join(', ') || 'none');
 
+  // An invitation needs someone to go to; the button checks that before the
+  // sign-in (test with a stranger, 13-10-2026).
+  if (mode === 'invite') {
+    await page.locator('#ds-add-recipient').click();
+    await page.locator('[data-field="label"]').nth(0).fill('Signer Demo');
+    await page.locator('[data-field="email"]').nth(0).fill('demo@example.com');
+  }
   await page.locator(button).click();
-  await page.waitForURL(/\/auth\/login\?next=(%2F|\/)sign$/, { timeout: 15000 }).catch(() => {});
+  await page.waitForURL(/\/auth\/login\?next=(%2F|\/)sign(%3Fherstel%3D1)?$/, { timeout: 15000 }).catch(() => {});
   ok(`${mode}: pressing it goes to the sign-in and back to /sign`,
-    /\/auth\/login\?next=(%2F|\/)sign$/.test(page.url()), page.url());
+    /\/auth\/login\?next=(%2F|\/)sign(%3Fherstel%3D1)?$/.test(page.url()), page.url());
   await page.close();
 }
 
@@ -180,7 +189,7 @@ for (const mode of ['alone', 'cosign', 'invite']) {
   const button = await walkToTheEnd(page, mode);
   const buttonText = await textOf(page, button);
   ok(`${mode}: signed in, the last button is the real one`,
-    buttonText.trim() === (mode === 'invite' ? 'Send for signature' : 'Sign this document'), buttonText);
+    buttonText.trim() === (mode === 'invite' ? 'Versturen om te laten tekenen' : 'Dit document ondertekenen'), buttonText);
   if (mode !== 'invite') {
     ok(`${mode}: signed in, no sign-in hint on the last step`,
       await page.locator('#ds-sign-signin-hint').count() === 1

@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
-const aliases = { '/': '/index.html', '/dashboard': '/dashboard.html', '/account': '/account.html', '/pricing': '/pricing.html' };
+const aliases = { '/': '/index.html', '/dashboard': '/dashboard.html', '/account': '/account.html', '/pricing': '/pricing.html', '/en/dashboard': '/en/dashboard.html' };
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -62,7 +62,14 @@ const json = (route, body, status = 200) =>
 
 // The one shape: "8 September 2026". Anchored on both ends of the match so a
 // two-digit year or a trailing slash cannot slip through.
-const MONTH = '(?:January|February|March|April|May|June|July|August|September|October|November|December)';
+// The site's main language is Dutch since 23 September 2026 and
+// js/format-date.js writes the month in the page's language: "8 september
+// 2026" on a lang="nl" page, "8 September 2026" on a lang="en" page. Which one
+// a page must show follows from its own <html lang>, read below, so a page can
+// never pass with the other language's month.
+const MONTH = '(?:January|February|March|April|May|June|July|August|September|October|November|December|januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)';
+const NL_MONTHS = { September: 'september', August: 'augustus' };
+const inLang = (lang, english) => (lang === 'en' ? english : english.replace(/[A-Z][a-z]+/g, (m) => NL_MONTHS[m] || m));
 const ONE_SHAPE = new RegExp(`^\\d{1,2} ${MONTH} \\d{4}$`);
 const ANY_DATE_LIKE = new RegExp(`\\b\\d{1,2} ${MONTH} \\d{4}\\b`);
 
@@ -135,6 +142,7 @@ const shown = await account.evaluate(() => {
   const invoiceRow = document.querySelector('#billing-invoices .info-row .info-label');
   const historyRow = document.querySelector('#billing-history .info-row .info-label');
   return {
+    lang: document.documentElement.lang,
     body: document.body.innerText,
     term: text(document.getElementById('billing-term-line')),
     accessUntil: text(document.getElementById('billing-next')),
@@ -153,14 +161,18 @@ ok('/account shows no slashed date anywhere on the page', accountSlash.length ==
 
 // 2. The three dates that sat side by side now read the same way.
 const pick = (s) => (s.match(ANY_DATE_LIKE) || [''])[0];
-const trio = { 'the term line': pick(shown.term), 'access until': pick(shown.accessUntil), 'the invoice row': pick(shown.invoice) };
+// Since 05-10-2026 the term line carries the date twice ("paid until X, the
+// new term starts on X") and the separate "access until" row is gone: it
+// showed a second date after an upgrade. Its slot reads the line's last date.
+const lastDate = (s) => { const all = s.match(new RegExp(ANY_DATE_LIKE.source, 'g')) || ['']; return all[all.length - 1]; };
+const trio = { 'the term line': pick(shown.term), 'access until': lastDate(shown.term), 'the invoice row': pick(shown.invoice) };
 for (const [where, value] of Object.entries(trio)) {
   ok(`${where} carries a date in the one shape, day month year`, ONE_SHAPE.test(value), `${where}: "${value}" from "${shown[Object.keys(trio).indexOf(where) === 0 ? 'term' : 'accessUntil']}"`);
 }
 ok('the three dates on one screen are the same date, written one way',
-  trio['the term line'] === '8 September 2026'
-  && trio['access until'] === '8 September 2026'
-  && trio['the invoice row'] === '8 September 2026',
+  trio['the term line'] === inLang(shown.lang, '8 September 2026')
+  && trio['access until'] === inLang(shown.lang, '8 September 2026')
+  && trio['the invoice row'] === inLang(shown.lang, '8 September 2026'),
   JSON.stringify(trio));
 
 // 3. Every other date the page renders is in the same shape.
@@ -174,8 +186,11 @@ for (const [where, value] of Object.entries({
 }
 
 // A moment, not a day, still says which day and which zone.
-ok('a session says the day and names the clock it is on',
-  /8:48/.test(shown.session) === false && /20:48 UTC/.test(shown.session), shown.session);
+// Dutch time since acceptatie 3.1.1 (taal 52), like the mails: 20:48 UTC on
+// 17 March is 21:48 in Amsterdam (winter time), and UTC is not named to a
+// customer.
+ok('a session says the day and the time on Dutch time, without UTC',
+  /(om|at) 21:48/.test(shown.session) && !/UTC/.test(shown.session), shown.session);
 
 // ── /dashboard ───────────────────────────────────────────────────────────────
 // "Created Aug 31, 2026" sat one card away from "Ends on 8 September". Same
@@ -185,9 +200,10 @@ ok('a session says the day and names the clock it is on',
 // 3268d4a9). Wait for both before reading the page.
 const dashboard = await open('/dashboard', () => {
   const line = document.getElementById('dh-term-line');
-  return line && !line.hidden && /Created /.test(document.body.innerText);
+  return line && !line.hidden && /Gemaakt /.test(document.body.innerText);
 });
 const dash = await dashboard.evaluate(() => ({
+  lang: document.documentElement.lang,
   body: document.body.innerText,
   term: ((document.getElementById('dh-term-line') || {}).textContent || '').trim(),
 }));
@@ -196,11 +212,22 @@ await dashboard.close();
 const dashSlash = dash.body.split('\n').filter((line) => SLASHED.test(line));
 ok('/dashboard shows no slashed date anywhere on the page', dashSlash.length === 0, dashSlash.join(' | '));
 ok('/dashboard writes the term date exactly as /account does',
-  pick(dash.term) === '8 September 2026', dash.term);
+  pick(dash.term) === inLang(dash.lang, '8 September 2026'), dash.term);
 // The document row is where "Created Aug 31, 2026" stood, a third notation on a
 // screen that already had two.
+// /dashboard is Dutch since 23 September 2026; the month name comes from the
+// shared js/format-date.js, so either spelling of the month is the one shape.
 ok('a document row writes its date the same way the term line does',
-  /Created 31 August 2026/.test(dash.body), (dash.body.match(/Created [^\n]*/) || ['no document row'])[0]);
+  new RegExp(`Gemaakt ${inLang(dash.lang, '31 August 2026')}`).test(dash.body), (dash.body.match(/Gemaakt [^\n]*/) || ['no document row'])[0]);
+// The English copy loads the same script and must say it in English.
+const dashboardEn = await open('/en/dashboard', () => {
+  const line = document.getElementById('dh-term-line');
+  return line && !line.hidden && /Created /.test(document.body.innerText);
+});
+const dashEn = await dashboardEn.evaluate(() => document.body.innerText);
+await dashboardEn.close();
+ok('/en/dashboard writes the document row date the same way',
+  /Created 31 August 2026/.test(dashEn), (dashEn.match(/Created [^\n]*/) || ['no document row'])[0]);
 
 // ── report ───────────────────────────────────────────────────────────────────
 await browser.close();

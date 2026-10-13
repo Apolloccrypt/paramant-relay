@@ -1,3 +1,6 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 // Passkey (WebAuthn) client wiring for the account-setup and login pages
 // (ADR R018, PR-A). ESM module, self-hosted deps only (CSP script-src 'self').
 // Runs ALONGSIDE the existing email+TOTP flows; it never touches them. Each
@@ -57,30 +60,30 @@ function setStatus(el, text, isError, techCode) {
 // plus the one route that is known to still work, and the code kept small
 // underneath for support.
 const PASSKEY_START_FALLBACK =
-  'We could not start the passkey prompt on this device. '
-  + 'Try “My passkey is on another device”, or use a 6-digit code.';
+  nlEn('Inloggen met een passkey kon op dit apparaat niet starten. ', 'We could not start the passkey prompt on this device. ')
+  + nlEn('Kies “Mijn passkey staat op een ander apparaat”, of gebruik een code van 6 cijfers.', 'Try “My passkey is on another device”, or use a 6-digit code.');
 // Creating a passkey is a different screen with different exits: the
 // cross-device link and the 6-digit code are not on it, so the sign-in sentence
 // would send somebody looking for a button that is not there.
 const PASSKEY_CREATE_FALLBACK =
-  'We could not start the passkey setup on this device. '
-  + 'Reload this page and try again, or set up the authenticator app instead.';
+  nlEn('Het instellen van een passkey kon op dit apparaat niet starten. ', 'We could not start the passkey setup on this device. ')
+  + nlEn('Laad deze pagina opnieuw en probeer het nog eens, of stel de authenticator-app in.', 'Reload this page and try again, or set up the authenticator app instead.');
 
 // `kind` picks which exits the sentence may point at: 'login' (default) or
 // 'create'. The technical code is the same in both.
 function passkeyStartFailure(status, serverError, kind) {
   let text = kind === 'create' ? PASSKEY_CREATE_FALLBACK : PASSKEY_START_FALLBACK;
   if (serverError === 'invalid_email') {
-    text = 'That email address does not look complete, so we could not look up your passkey. '
-      + 'Check it and try again, or use “My passkey is on another device”.';
+    text = nlEn('Dat e-mailadres lijkt niet compleet, dus we konden uw passkey niet opzoeken. ', 'That email address does not look complete, so we could not look up your passkey. ')
+      + nlEn('Controleer het en probeer het opnieuw, of kies “Mijn passkey staat op een ander apparaat”.', 'Check it and try again, or use “My passkey is on another device”.');
   } else if (serverError === 'setup_token_required' || serverError === 'invalid_setup_token') {
-    text = 'This setup link is no longer valid. Ask for a new one on the sign-in page '
-      + 'under “Email me a new setup link”.';
+    text = nlEn('Deze instellink is niet meer geldig. Vraag een nieuwe aan op de inlogpagina ', 'This setup link is no longer valid. Ask for a new one on the sign-in page ')
+      + nlEn('onder “Stuur mij een nieuwe instellink”.', 'under “Email me a new setup link”.');
   } else if (status === 429) {
     text = kind === 'create'
-      ? 'Too many attempts from this internet connection. Wait a few minutes and try again.'
-      : 'Too many sign-in attempts from this internet connection. Wait a few minutes, '
-        + 'then try again or use a 6-digit code.';
+      ? nlEn('Te veel pogingen vanaf deze internetverbinding. Wacht een paar minuten en probeer het opnieuw.', 'Too many attempts from this internet connection. Wait a few minutes and try again.')
+      : nlEn('Te veel inlogpogingen vanaf deze internetverbinding. Wacht een paar minuten ', 'Too many sign-in attempts from this internet connection. Wait a few minutes, ')
+        + nlEn('en probeer het opnieuw, of gebruik een code van 6 cijfers.', 'then try again or use a 6-digit code.');
   }
   const e = new Error(text);
   e.techCode = 'could_not_start (' + status + (serverError ? ' ' + serverError : '') + ')';
@@ -102,15 +105,15 @@ function esc(s) {
 function passkeyAuthErrorMessage(e) {
   const name = e && e.name;
   if (name === 'AbortError') {
-    return 'Passkey sign-in was cancelled.';
+    return nlEn('Inloggen met een passkey is afgebroken.', 'Passkey sign-in was cancelled.');
   }
   if (name === 'SecurityError') {
-    return 'Passkey sign-in could not start on this site. If this keeps happening, contact support.';
+    return nlEn('Inloggen met een passkey kon op deze site niet starten. Blijft dit gebeuren, neem dan contact met ons op.', 'Passkey sign-in could not start on this site. If this keeps happening, contact support.');
   }
   // NotAllowedError and anything else: ambiguous. Give the actionable options.
-  return 'No passkey was used on this device. Sign in with your email and code above, '
-    + 'or tap “My passkey is on another device” to sign in with the passkey on your phone. '
-    + 'If you cancelled, just try again.';
+  return nlEn('Er is op dit apparaat geen passkey gebruikt. Log hierboven in met uw e-mailadres en code, ', 'No passkey was used on this device. Sign in with your email and code above, ')
+    + nlEn('of tik op “Mijn passkey staat op een ander apparaat” om in te loggen met de passkey op uw telefoon. ', 'or tap “My passkey is on another device” to sign in with the passkey on your phone. ')
+    + nlEn('Heeft u zelf afgebroken? Probeer het dan gewoon opnieuw.', 'If you cancelled, just try again.');
 }
 
 // ── Registration: account-setup page (/auth/setup/<setup_token>) ─────────────
@@ -121,7 +124,7 @@ function wireSetupPasskey() {
 
   if (!browserSupportsWebAuthn()) {
     btn.disabled = true;
-    setStatus(status, 'This browser does not support passkeys. Use the authenticator-app setup above.', true);
+    setStatus(status, nlEn('Deze browser ondersteunt geen passkeys. Stel hierboven de authenticator-app in.', 'This browser does not support passkeys. Set up the authenticator app above.'), true);
     return;
   }
 
@@ -130,7 +133,7 @@ function wireSetupPasskey() {
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    setStatus(status, 'Follow your device prompt to create the passkey…', false);
+    setStatus(status, nlEn('Volg de stappen op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/register/options', { setup_token: setupToken });
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
@@ -140,19 +143,19 @@ function wireSetupPasskey() {
         attResp = await startRegistration({ optionsJSON: opt.data.options });
       } catch (e) {
         throw new Error(e && e.name === 'InvalidStateError'
-          ? 'A passkey for this account already exists on this device.'
-          : 'Passkey creation was cancelled.');
+          ? nlEn('Op dit apparaat staat al een passkey voor dit account.', 'A passkey for this account already exists on this device.')
+          : nlEn('Het maken van de passkey is afgebroken.', 'Passkey creation was cancelled.'));
       }
 
       const ver = await postJSON('/api/user/auth/webauthn/register/verify', {
         flowId: opt.data.flowId,
         response: attResp,
       });
-      if (!ver.ok) throw new Error(ver.data && ver.data.error ? ver.data.error : 'verification_failed (' + ver.status + ')');
+      if (!ver.ok) throw Object.assign(new Error(nlEn('De passkey kon niet worden vastgelegd. Probeer het opnieuw.', 'The passkey could not be saved. Try again.')), { techCode: (ver.data && ver.data.error ? ver.data.error : 'verification_failed') + ' (' + ver.status + ')' });
 
       showRecoveryCodes(Array.isArray(ver.data.recovery_codes) ? ver.data.recovery_codes : []);
     } catch (e) {
-      setStatus(status, e.message || 'Passkey registration failed.', true, e.techCode);
+      setStatus(status, e.message || nlEn('Het maken van de passkey is mislukt.', 'Passkey registration failed.'), true, e.techCode);
       btn.disabled = false;
     }
   });
@@ -160,9 +163,10 @@ function wireSetupPasskey() {
   // Passkey-specific success UI (own ids; the TOTP success section is untouched).
   function showRecoveryCodes(codes) {
     document.querySelectorAll('section[id^="state-"]').forEach((s) => s.classList.add('hidden'));
+    { const intro = document.getElementById('setup-intro'); if (intro) intro.classList.add('hidden'); }   // no "step 3 of 5" above the codes
     const section = document.getElementById('state-passkey-success');
     const grid = document.getElementById('passkey-backup-codes');
-    if (!section || !grid) { window.location = '/dashboard'; return; }
+    if (!section || !grid) { window.location = nlEn('/dashboard', '/en/dashboard'); return; }
     grid.innerHTML = '';
     codes.forEach((c) => {
       const d = document.createElement('div');
@@ -177,7 +181,7 @@ function wireSetupPasskey() {
     const dlBtn = document.getElementById('passkey-download-codes');
     if (dlBtn) dlBtn.addEventListener('click', () => {
       const blob = new Blob([
-        'Paramant backup codes\nSave these; each can be used once to sign in if you lose your passkey.\n\n' + codes.join('\n') + '\n',
+        nlEn('Paramant back-upcodes\nBewaar ze goed. Elke code werkt één keer om in te loggen als u uw passkey kwijt bent.\n\n', 'Paramant backup codes\nSave these; each can be used once to sign in if you lose your passkey.\n\n') + codes.join('\n') + '\n',
       ], { type: 'text/plain' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -208,8 +212,10 @@ function wireSetupPasskey() {
 // ends up wrong.
 function safeNext() {
   const q = new URLSearchParams(window.location.search);
-  const want = q.get('next') || q.get('return') || '/dashboard';
-  return /^\/(?![\/\\])/.test(want) ? want : '/dashboard';
+  const want = q.get('next') || q.get('return') || nlEn('/dashboard', '/en/dashboard');
+  // No whitespace, control character or backslash anywhere: the URL parser
+  // drops a tab or newline, so /%09/evil.example became //evil.example.
+  return /^\/(?![\/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(want) ? want : nlEn('/dashboard', '/en/dashboard');
 }
 
 // ── Login: /auth/login (email-first passkey sign-in) ─────────────────────────
@@ -221,7 +227,7 @@ function wireLoginPasskey() {
 
   if (!browserSupportsWebAuthn()) {
     btn.disabled = true;
-    setStatus(status, 'This browser does not support passkeys.', true);
+    setStatus(status, nlEn('Deze browser ondersteunt geen passkeys.', 'This browser does not support passkeys.'), true);
     return;
   }
 
@@ -229,9 +235,9 @@ function wireLoginPasskey() {
 
   btn.addEventListener('click', async () => {
     const email = (emailEl && emailEl.value || '').trim();
-    if (!email) { setStatus(status, 'Enter your email address first.', true); if (emailEl) emailEl.focus(); return; }
+    if (!email) { setStatus(status, nlEn('Vul eerst uw e-mailadres in.', 'Enter your email address first.'), true); if (emailEl) emailEl.focus(); return; }
     btn.disabled = true;
-    setStatus(status, 'Follow your device prompt to sign in…', false);
+    setStatus(status, nlEn('Volg de stappen op uw apparaat om in te loggen…', 'Follow your device prompt to sign in…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/login/options', { email });
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error);
@@ -253,11 +259,11 @@ function wireLoginPasskey() {
         flowId: opt.data.flowId,
         response: asseResp,
       });
-      if (!ver.ok) throw new Error('We could not verify a passkey for that account.');
+      if (!ver.ok) throw new Error(nlEn('We konden geen passkey voor dat account bevestigen.', 'We could not verify a passkey for that account.'));
 
       window.location = returnUrl;
     } catch (e) {
-      setStatus(status, e.message || 'Passkey sign-in failed.', true, e.techCode);
+      setStatus(status, e.message || nlEn('Inloggen met een passkey is mislukt.', 'Passkey sign-in failed.'), true, e.techCode);
       btn.disabled = false;
     }
   });
@@ -265,6 +271,15 @@ function wireLoginPasskey() {
 
 // ── Account dashboard: add a passkey to an existing logged-in account ────────
 // authUser + TOTP step-up (the server gates the ceremony on a valid TOTP).
+// A failed load in words, never "(HTTP 429)" (retest T5-1): what happened
+// and what the reader can do, by status.
+function loadFailText(status, nlWhat, enWhat) {
+  if (status === 429) return nlEn(nlWhat + ' konden even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
+  if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
+  if (status >= 500) return nlEn(nlWhat + ' konden nu niet worden geladen door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  return nlEn(nlWhat + ' konden nu niet worden geladen. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
+}
+
 function wireAccountPasskey() {
   const btn = document.getElementById('account-passkey-btn');
   if (!btn) return;                                  // not the account page
@@ -276,11 +291,11 @@ function wireAccountPasskey() {
   async function refresh() {
     try {
       const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
-      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = 'Could not load passkeys (HTTP ' + r.status + ').'; } return; }
+      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = loadFailText(r.status, 'Uw passkeys', 'your passkeys'); } return; }
       const d = await r.json();
       const pk = d.passkeys || [];
       if (!pk.length) {
-        if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = 'No passkey on your account yet.'; }
+        if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = nlEn('Nog geen passkey op uw account.', 'No passkey on your account yet.'); }
         if (listEl) listEl.innerHTML = '';
         return;
       }
@@ -288,48 +303,86 @@ function wireAccountPasskey() {
       if (listEl) listEl.innerHTML = pk.map((c) => {
         const lbl = c.label ? esc(c.label) : 'passkey';
         const when = c.created_at ? esc(paramantDate.moment(c.created_at, '')) : '';
+        // A lost or stolen device must not stay a valid sign-in (ACCT-32).
+        const del = c.credId
+          ? ' <button type="button" class="btn btn-small btn-secondary" data-remove-passkey="' + esc(c.credId) + '" style="margin-left:8px">' + nlEn('Verwijderen', 'Remove') + '</button>'
+          : '';
         return '<li style="padding:8px 0;border-bottom:1px solid var(--ink-hair,#e5e7eb)">'
-          + '<strong>' + lbl + '</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; active'
-          + (when ? ' &middot; added ' + when : '') + '</span></li>';
+          + '<strong>' + lbl + nlEn('</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; actief', '</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; active')
+          + (when ? nlEn(' &middot; toegevoegd ', ' &middot; added ') + when : '') + '</span>' + del + '</li>';
       }).join('');
+      if (listEl) listEl.querySelectorAll('[data-remove-passkey]').forEach((b) => b.addEventListener('click', () => removePasskey(b)));
     } catch { /* leave existing UI */ }
+  }
+
+  // DELETE /api/user/account/webauthn/credentials/:credId with { totp } or
+  // { backup_code } in the body (admin freshSecondFactor). The account keeps
+  // its authenticator app, so removing the last passkey locks nobody out.
+  async function removePasskey(b) {
+    const credId = b.getAttribute('data-remove-passkey');
+    const ask = window.paAskSecondFactor;
+    if (typeof ask !== 'function') return;
+    const factor = await ask(b.closest('li') || b,
+      nlEn('Deze passkey verwijderen: daarna kunt u er niet meer mee inloggen. Bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Remove this passkey: you can no longer sign in with it afterwards. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Passkey verwijderen', 'Remove passkey'));
+    if (!factor) return;
+    b.disabled = true;
+    try {
+      const r = await fetch('/api/user/account/webauthn/credentials/' + encodeURIComponent(credId), {
+        method: 'DELETE', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(factor),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setStatus(status, nlEn('Passkey verwijderd. U logt er niet meer mee in.', 'Passkey removed. It no longer signs you in.'), false);
+      } else if (r.status === 404) {
+        setStatus(status, nlEn('Deze passkey bestaat niet meer, of verwijderen kan op deze server nog niet. Er is niets veranderd.', 'This passkey no longer exists, or removing is not available on this server yet. Nothing changed.'), true);
+      } else {
+        const t = typeof window.paSecondFactorError === 'function' ? window.paSecondFactorError(r.status, body) : nlEn('Verwijderen is niet gelukt. Er is niets veranderd.', 'Removing did not work. Nothing changed.');
+        setStatus(status, t, true);
+      }
+    } catch {
+      setStatus(status, nlEn('Paramant is niet bereikbaar. Er is niets veranderd.', 'We could not reach Paramant. Nothing changed.'), true);
+    }
+    b.disabled = false;
+    refresh();
   }
 
   if (!browserSupportsWebAuthn()) {
     btn.disabled = true;
-    setStatus(status, 'This browser does not support passkeys.', true);
+    setStatus(status, nlEn('Deze browser ondersteunt geen passkeys.', 'This browser does not support passkeys.'), true);
     refresh();
     return;
   }
 
   btn.addEventListener('click', async () => {
     const totp = (totpEl && totpEl.value || '').trim();
-    if (!/^\d{6}$/.test(totp)) { setStatus(status, 'Enter your current 6-digit TOTP code first.', true); if (totpEl) totpEl.focus(); return; }
+    if (!/^\d{6}$/.test(totp)) { setStatus(status, nlEn('Vul eerst uw huidige code van 6 cijfers in.', 'Enter your current 6-digit code first.'), true); if (totpEl) totpEl.focus(); return; }
     btn.disabled = true;
-    setStatus(status, 'Verifying your code…', false);
+    setStatus(status, nlEn('Uw code wordt gecontroleerd…', 'Verifying your code…'), false);
     try {
       const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
-      if (opt.status === 403) throw new Error('That TOTP code was not accepted. Try the current code from your authenticator.');
+      if (opt.status === 403) throw new Error(nlEn('Die code is niet geaccepteerd. Probeer de huidige code uit uw authenticator-app.', 'That code was not accepted. Try the current code from your authenticator app.'));
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
 
-      setStatus(status, 'Follow your device prompt to create the passkey…', false);
+      setStatus(status, nlEn('Volg de stappen op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
       let attResp;
       try {
         attResp = await startRegistration({ optionsJSON: opt.data.options });
       } catch (e) {
         throw new Error(e && e.name === 'InvalidStateError'
-          ? 'A passkey for this account already exists on this device.'
-          : 'Passkey creation was cancelled.');
+          ? nlEn('Op dit apparaat staat al een passkey voor dit account.', 'A passkey for this account already exists on this device.')
+          : nlEn('Het maken van de passkey is afgebroken.', 'Passkey creation was cancelled.'));
       }
 
       const ver = await postJSON('/api/user/account/webauthn/register/verify', { flowId: opt.data.flowId, response: attResp });
-      if (!ver.ok) throw new Error(ver.data && ver.data.error ? ver.data.error : 'verification_failed (' + ver.status + ')');
+      if (!ver.ok) throw Object.assign(new Error(nlEn('De passkey kon niet worden vastgelegd. Probeer het opnieuw.', 'The passkey could not be saved. Try again.')), { techCode: (ver.data && ver.data.error ? ver.data.error : 'verification_failed') + ' (' + ver.status + ')' });
 
-      setStatus(status, 'Passkey activated. You can now sign in with it.', false);
+      setStatus(status, nlEn('Passkey geactiveerd. U kunt er nu mee inloggen.', 'Passkey activated. You can now sign in with it.'), false);
       if (totpEl) totpEl.value = '';
       refresh();
     } catch (e) {
-      setStatus(status, e.message || 'Could not activate passkey.', true, e.techCode);
+      setStatus(status, e.message || nlEn('De passkey kon niet worden geactiveerd.', 'Could not activate passkey.'), true, e.techCode);
       btn.disabled = false;
     }
   });
@@ -352,13 +405,13 @@ function wireDiscoverablePasskey() {
 
   if (!browserSupportsWebAuthn()) { btn.disabled = true; return; }
 
-  const _rp = new URLSearchParams(window.location.search), _rv = _rp.get('next') || _rp.get('return') || '/dashboard';
+  const _rp = new URLSearchParams(window.location.search), _rv = _rp.get('next') || _rp.get('return') || nlEn('/dashboard', '/en/dashboard');
   // Local paths only (leading single slash) — never an off-site open redirect.
-  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
+  const returnUrl = /^\/(?![\/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    setStatus(status, 'Your browser will show a QR code — scan it with your phone to sign in…', false);
+    setStatus(status, nlEn('Uw browser toont een QR-code. Scan die met uw telefoon om in te loggen…', 'Your browser will show a QR code. Scan it with your phone to sign in…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/login/discoverable/options', {});
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error);
@@ -374,11 +427,11 @@ function wireDiscoverablePasskey() {
         flowId: opt.data.flowId,
         response: asseResp,
       });
-      if (!ver.ok) throw new Error('We could not verify that passkey.');
+      if (!ver.ok) throw new Error(nlEn('We konden die passkey niet bevestigen.', 'We could not verify that passkey.'));
 
       window.location = returnUrl;
     } catch (e) {
-      setStatus(status, e.message || 'Cross-device passkey sign-in failed.', true, e.techCode);
+      setStatus(status, e.message || nlEn('Inloggen met een passkey op een ander apparaat is mislukt.', 'Cross-device passkey sign-in failed.'), true, e.techCode);
       btn.disabled = false;
     }
   });

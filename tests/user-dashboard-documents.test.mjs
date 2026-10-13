@@ -14,6 +14,8 @@ const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   if (pathname === '/dashboard') pathname = '/dashboard.html';
   if (pathname === '/account') pathname = '/account.html';
+  if (pathname === '/en/dashboard') pathname = '/en/dashboard.html';
+  if (pathname === '/en/account') pathname = '/en/account.html';
   const file = path.join(ROOT, pathname);
   if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (error, body) => {
@@ -74,7 +76,10 @@ await page.route('**/api/user/parasign/inbox/*/resend', (route) => {
 const checks = [];
 function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, detail:String(detail) }); }
 
-await page.goto(ORIGIN + '/dashboard', { waitUntil:'networkidle' });
+// /dashboard and /account are Dutch since 23 September 2026. The English copies
+// under /en/ load the same scripts, so this suite walks the whole flow there,
+// word for word as before, and the Dutch page is checked at the end.
+await page.goto(ORIGIN + '/en/dashboard', { waitUntil:'networkidle' });
 await page.locator('#dh-root:not([hidden])').waitFor();
 await page.waitForFunction(() => document.querySelectorAll('.dh-document').length === 2);
 const mainText = await page.locator('main').innerText();
@@ -92,10 +97,13 @@ ok('dashboard leads with three plain-language actions', await page.locator('.dh-
 // and signing alone is third. On a 390px screen the old order put both
 // ParaSign modes above the fold and pushed ParaSend out of sight, which made
 // the dashboard disagree with a homepage that sells two things.
-ok('signing actions enter the intended workflow', await page.locator('.dh-start-card').nth(0).getAttribute('href') === '/sign?mode=invite' && await page.locator('.dh-start-card').nth(1).getAttribute('href') === '/parashare' && await page.locator('.dh-start-card').nth(2).getAttribute('href') === '/sign?mode=alone', await page.locator('.dh-start').innerText());
+ok('signing actions enter the intended workflow', await page.locator('.dh-start-card').nth(0).getAttribute('href') === '/en/sign?mode=invite' && await page.locator('.dh-start-card').nth(1).getAttribute('href') === '/en/parashare' && await page.locator('.dh-start-card').nth(2).getAttribute('href') === '/en/sign?mode=alone', await page.locator('.dh-start').innerText());
 ok('open filter shows waiting and in-progress documents', await page.locator('.dh-document').count() === 2 && /Waiting for signatures/.test(await page.locator('#dh-documents').innerText()) && /In progress/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
 ok('relay document counts fill every filter', await page.locator('[data-doc-count="open"]').innerText() === '2' && await page.locator('[data-doc-count="completed"]').innerText() === '1' && await page.locator('[data-doc-count="cancelled"]').innerText() === '1' && await page.locator('[data-doc-count="all"]').innerText() === '4', await page.locator('.dh-filters').innerText());
-ok('normal dashboard no longer loads developer operations', overviewRequests === 0 && !/API keys|More tools|Operations/.test(mainText), overviewRequests);
+// One read of the overview per page load is the 80% usage band every account
+// gets (eindmatrix DASH-27-N); what must not come back is the five-second
+// polling operations panel (DASH-27-A), so more than one request fails.
+ok('normal dashboard no longer loads developer operations', overviewRequests <= 1 && !/API keys|More tools|Operations/.test(mainText), overviewRequests);
 await page.locator('.dh-document').first().click();
 ok('open document has actionable owner controls', await page.locator('#dh-document-dialog').isVisible() && await page.locator('[data-pa-action="document-cancel"]').isVisible() && /not recoverable from the relay dashboard/i.test(await page.locator('#dh-document-dialog-body').innerText()), await page.locator('#dh-document-dialog-body').innerText());
 page.once('dialog', (dialog) => dialog.accept());
@@ -107,7 +115,7 @@ if (process.env.PARAMANT_DASHBOARD_SCREENSHOT_PATH) await stableScreenshot(page,
 
 await page.locator('[data-doc-filter="completed"]').click();
 ok('completed filter shows only completed work', await page.locator('.dh-document').count() === 1 && /Completed contract/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
-await page.locator('.dh-document').click();
+await page.locator('.dh-document .dh-document-open').click();
 const completedDialogMetrics = await page.locator('#dh-document-dialog').evaluate((node) => {
   const box = node.getBoundingClientRect();
   const style = getComputedStyle(node);
@@ -116,7 +124,8 @@ const completedDialogMetrics = await page.locator('#dh-document-dialog').evaluat
   return { hidden:node.hidden, display:style.display, position:style.position, zIndex:style.zIndex, background:style.backgroundColor, panelDisplay:panelStyle && panelStyle.display, panelBackground:panelStyle && panelStyle.backgroundColor, top:box.top, left:box.left, bottom:box.bottom, right:box.right, width:box.width, height:box.height, innerWidth, innerHeight };
 });
 const completedDialogInViewport = !completedDialogMetrics.hidden && completedDialogMetrics.top >= -5 && completedDialogMetrics.left >= -5 && completedDialogMetrics.bottom <= completedDialogMetrics.innerHeight + 5 && completedDialogMetrics.right <= completedDialogMetrics.innerWidth + 5;
-ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
+console.error('[n]', await page.locator('.dh-document').count(), '[body]', (await page.locator('#dh-document-dialog-body').innerText().catch(()=>'-')).slice(0,80));
+ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('#dh-document-dialog a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
 if (process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH) {
   await page.waitForTimeout(100);
   await stableScreenshot(page.locator('#dh-document-dialog'), { path:process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH });
@@ -206,9 +215,12 @@ ok('the inbox offers the one thing it can do and pretends no way in',
   inbox.openers === 0 && inbox.acts.every((t) => t === 'Send me the link again'), JSON.stringify(inbox.acts));
 
 await page.locator('.dh-inbox-act').first().click();
-await page.waitForFunction(() => /Sent/.test(document.querySelector('.dh-inbox-act').textContent));
-ok('send me the link again asks once and says which address it went to',
-  resendRequests === 1 && (await page.locator('.dh-inbox-act').first().textContent()).trim() === 'Sent to demo@example.com',
+await page.waitForFunction(() => /Asked the sender/.test(document.querySelector('.dh-inbox-act').textContent));
+// COSIGN-46-A (2026-10-05): only the sender's browser holds the link that
+// opens the document, so the sender is asked to send the invitation again.
+ok('send me the link again asks once and says the sender was asked',
+  resendRequests === 1 && (await page.locator('.dh-inbox-act').first().textContent()).trim() === 'Asked the sender'
+  && /We have asked the sender to send you the invitation again/.test(await page.locator('.dh-inbox-note').first().textContent()),
   `${resendRequests} requests :: ${await page.locator('.dh-inbox-act').first().textContent()}`);
 
 await page.setViewportSize({ width:1280, height:900 });
@@ -247,7 +259,7 @@ await planPage.route('**/api/user/me', (route) => route.fulfill({ status:200, co
 
 async function planCase(state) {
   planState = state;
-  await planPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+  await planPage.goto(ORIGIN + '/en/dashboard', { waitUntil:'domcontentloaded' });
   await planPage.locator('#dh-root:not([hidden])').waitFor();
   return {
     // textContent, not innerText: the chip is uppercased in CSS, and what is
@@ -265,9 +277,12 @@ ok('a Community account sees the give-back band', freePlan.badge === 'Community'
 // one action that fills the list now sits in it as a real button.
 const emptyCta = await planPage.locator('.dh-empty a').first();
 const emptyCtaBox = await emptyCta.boundingBox();
+// Mick 05-10: taalronde
 ok('the empty document list offers the action that fills it',
-  await planPage.locator('.dh-empty strong').innerText() === 'No open requests' &&
-  (await emptyCta.getAttribute('href')).startsWith('/sign') &&
+  await planPage.locator('.dh-empty strong').innerText() === 'Nothing open right now' &&
+  // This is /en/dashboard: the button opens the English signing page
+  // (acceptatie 3.1.1, betalen punt 5).
+  (await emptyCta.getAttribute('href')).startsWith('/en/sign') &&
   emptyCtaBox.height >= 44, JSON.stringify({ href: await emptyCta.getAttribute('href'), height: emptyCtaBox && Math.round(emptyCtaBox.height) }));
 
 // The stored tier is 'pro' and the badge says Firm. Those are two different
@@ -321,7 +336,7 @@ await acctPage.route('**/api/user/account', (route) => route.fulfill({ status:20
 
 async function acctCase(state) {
   acctState = state;
-  await acctPage.goto(ORIGIN + '/account', { waitUntil:'domcontentloaded' });
+  await acctPage.goto(ORIGIN + '/en/account', { waitUntil:'domcontentloaded' });
   await acctPage.locator('#billing-content:not(.hidden)').waitFor();
   return {
     chip: (await acctPage.locator('#plan-chip').textContent()).trim(),
@@ -363,16 +378,49 @@ const acctPaid = await acctCase({ plan:'community', plan_parasign:'pro', paid_un
 // paidProductTier(), which walks the tier keys and fails closed on anything it
 // does not recognise. A give-back band decided by the plan NAME is exactly the
 // bug this line was written for, and it would show up here as giveBack true.
-ok('a self-serve customer gets the badge and the cancel button he pays for',
+// A one-off payment is not a subscription (besluit 05-10-2026): the badge,
+// and no cancel button, because nothing would be collected again.
+ok('a self-serve customer on a one-off payment gets the badge and no cancel button',
   acctPaid.chip === 'Firm' && acctPaid.current === 'Firm' &&
-  acctPaid.active === true && acctPaid.cancel === true &&
+  acctPaid.active === true && acctPaid.cancel === false &&
   acctPaid.giveBack === false && acctPaid.bought === true, JSON.stringify(acctPaid));
+const acctRenews = await acctCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:future, auto_renews:true });
+ok('a plan with a collection behind it keeps the cancel button',
+  acctRenews.active === true && acctRenews.cancel === true, JSON.stringify(acctRenews));
 
 const acctLapsed = await acctCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:past });
 ok('an expired paid period falls back to Community on /account too',
   acctLapsed.chip === 'Community' && acctLapsed.current === 'Community' &&
   acctLapsed.active === false && acctLapsed.cancel === false &&
   acctLapsed.giveBack === true, JSON.stringify(acctLapsed));
+
+// ── The Dutch page, on the same script ───────────────────────────────────────
+{
+  const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await nl.route('**/api/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+  await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+  await nl.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({
+    email:'demo@example.com', label:'Demo', plan:'pro', created_at:'2026-06-01T10:00:00.000Z',
+    backup_codes_remaining:8, session_expires_at:'2026-07-21T16:00:00.000Z', usage_purpose:'organisation' }) }));
+  await nl.route('**/api/user/documents', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ documents:[
+    { id:'env_waiting_abcdefghijklmnop', original_filename:'Lease agreement.pdf', status:'sent', created_at:'2026-07-21T10:00:00.000Z', party_count:2, signed_count:0 },
+    { id:'env_progress_abcdefghijklmnop', original_filename:'Service order.pdf', status:'sent', created_at:'2026-07-20T10:00:00.000Z', party_count:3, signed_count:1 },
+    { id:'env_void_abcdefghijklmnop', original_filename:'<img src=x onerror=window.dashboardInjected=1>', status:'void', created_at:'2026-07-18T10:00:00.000Z', party_count:1, signed_count:0 },
+  ] }) }));
+  await nl.goto(ORIGIN + '/dashboard', { waitUntil:'networkidle' });
+  await nl.locator('#dh-root:not([hidden])').waitFor();
+  await nl.waitForFunction(() => document.querySelectorAll('.dh-document').length === 2);
+  const nlMain = await nl.locator('main').innerText();
+  const nlDocs = await nl.locator('#dh-documents').innerText();
+  ok('nl: the mission line is Dutch', /Uw documenten, overzichtelijk bij elkaar/.test(nlMain), nlMain.slice(0, 200));
+  ok('nl: the same three actions lead', await nl.locator('.dh-start-card').count() === 3
+    && await nl.locator('.dh-start-card').nth(0).getAttribute('href') === '/sign?mode=invite', await nl.locator('.dh-start').innerText());
+  ok('nl: the open filter says in Dutch where each document stands',
+    /Wacht op handtekeningen/.test(nlDocs) && /Bezig/.test(nlDocs) && !/Waiting for signatures|In progress/.test(nlDocs), nlDocs);
+  ok('nl: filenames are rendered as text here too', await nl.locator('.dh-document img').count() === 0
+    && await nl.evaluate(() => !window.dashboardInjected), nlDocs);
+  await nl.close();
+}
 
 for (const check of checks) console.log(`${check.pass ? 'PASS' : 'FAIL'} ${check.name}${check.detail ? ' :: ' + check.detail : ''}`);
 await browser.close();

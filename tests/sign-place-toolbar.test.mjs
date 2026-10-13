@@ -20,6 +20,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadPdfLibs } from './helpers/sign-pdf-libs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
@@ -65,6 +66,7 @@ for (const [width, height] of [[320, 844], [360, 844], [390, 844], [1440, 900]])
   await page.route('**/api/user/session/verify', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"authenticated":true,"email":"demo@example.com"}' }));
   await page.goto(`${ORIGIN}/sign.html`, { waitUntil: 'domcontentloaded' });
 
+  await loadPdfLibs(page);
   const reached = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 400 && !(window.PDFLib && window.pdfjsLib); i++) await sleep(20);

@@ -75,3 +75,56 @@ test('apply-nav.py reproduces frontend/ byte for byte', () => {
     fs.rmSync(work, { recursive: true, force: true });
   }
 });
+
+// The language switch (23 September 2026). Every page with the shared bar says
+// NL | EN, marks the language it is in, and each half goes to the same page in
+// that language: the path with or without /en in front. A page without a
+// counterpart sends the other half to that language's home page, never to a
+// 404. A page that declares lang="en" carries the English bar, every other
+// page the Dutch one.
+test('every shared bar carries NL | EN, pointing at the same page in the other language', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
+  const urlOf = (rel) => {
+    let slug = rel.replace(/\.html$/, '');
+    if (slug === 'index') return '/';
+    if (slug.endsWith('/index')) slug = slug.slice(0, -'/index'.length);
+    return '/' + slug;
+  };
+  const pages = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) { if (!['node_modules', 'vendor'].includes(entry.name)) walk(full); }
+      else if (entry.name.endsWith('.html')) pages.push(path.relative(root, full).split(path.sep).join('/'));
+    }
+  };
+  walk(root);
+  const problems = [];
+  let stamped = 0;
+  for (const rel of pages) {
+    const html = fs.readFileSync(path.join(root, rel), 'utf8');
+    const nav = (html.match(/<nav class="nav">[\s\S]*?<\/nav>/) || [''])[0];
+    if (!nav || !/nav-hamburger/.test(nav)) continue;
+    // co-sign and developer keep their own, narrower app nav (KEEP_OWN_NAV in
+    // apply-nav.py); the generator does not stamp them, so neither does this.
+    if (['co-sign.html', 'developer.html'].includes(rel)) continue;
+    stamped++;
+    // Where the page sits decides the two links; what it says it is (<html
+    // lang>) decides which half is current and which bar it carries.
+    const underEn = rel.startsWith('en/');
+    const english = /<html\b[^>]*\blang="en/i.test(html);
+    const nlRel = underEn ? rel.slice(3) : rel;
+    const enRel = underEn ? rel : `en/${rel}`;
+    const nl = fs.existsSync(path.join(root, nlRel)) ? urlOf(nlRel) : '/';
+    const en = fs.existsSync(path.join(root, enRel)) ? urlOf(enRel) : '/en';
+    const sw = (nav.match(/<div class="nav-lang"[^>]*>[\s\S]*?<\/div>/) || [''])[0];
+    if (!sw) { problems.push(`${rel}: no language switch in the bar`); continue; }
+    if (!/aria-label="Taal \/ Language"/.test(sw)) problems.push(`${rel}: the switch has no "Taal / Language" label`);
+    if (!sw.includes(`<a href="${nl}" hreflang="nl" lang="nl"${english ? '' : ' aria-current="true"'}>NL</a>`)) problems.push(`${rel}: NL should go to ${nl}${english ? '' : ' and be marked current'}`);
+    if (!sw.includes(`<a href="${en}" hreflang="en" lang="en"${english ? ' aria-current="true"' : ''}>EN</a>`)) problems.push(`${rel}: EN should go to ${en}${english ? ' and be marked current' : ''}`);
+    const dutchBar = /class="nav-link">Versturen</.test(nav);
+    if (english === dutchBar) problems.push(`${rel}: carries the ${dutchBar ? 'Dutch' : 'English'} bar`);
+  }
+  assert.ok(stamped > 40, `expected the shared bar on most pages, found ${stamped}`);
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});

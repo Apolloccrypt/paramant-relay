@@ -17,7 +17,12 @@ const catalog = require('../lib/billing-catalog');
 const entitlements = require('../lib/entitlements');
 const tiers = require('../lib/tiers');
 
-const html = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'pricing.html'), 'utf8');
+// Since 23 September 2026 /pricing is Dutch and sells one offer; the full
+// English tier table moved to /en/pricing unchanged. Every check below that
+// reads `html` holds that full table. The Dutch page has its own block at the
+// end of this file, bound to the same catalog.
+const html = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'en', 'pricing.html'), 'utf8');
+const htmlNl = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'pricing.html'), 'utf8');
 
 let passed = 0;
 function ok(name) { passed++; console.log('  ok -', name); }
@@ -62,18 +67,28 @@ ok('6 checkout buttons with data-billing-*');
 for (const b of buttons) {
   assert(!/payment-links\.mollie\.com/.test(b.href),
     'checkout button falls back to a static Mollie link (no metadata, unattributable): ' + b.href);
-  assert(b.href.startsWith('/auth/login'),
-    'no-JS fallback must be sign-in, got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
+  // Since 13-10-2026 (test with a stranger) the fallback is the free account,
+  // /signup?next=..., because a visitor without a session nearly always has
+  // no account yet; the signup page links on to the sign-in. Either way the
+  // payment is made by an account, which is the point of this check.
+  assert(/^\/(en\/)?(auth\/login|signup)\?next=\/(en\/)?pricing$/.test(b.href),
+    'no-JS fallback must be the account (signup or sign-in, back to pricing), got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
+  // Every button, not only the variants below: a button the checkout refuses
+  // is a price the site shows and nobody can pay.
+  assert(!catalog.resolveSale(b).error,
+    'the checkout refuses a button on the page: ' + b.product + '/' + b.plan + '/' + b.interval);
 }
-ok('no-JS fallback on every button is sign-in, never a metadata-less payment link');
+ok('no-JS fallback on every button is the account (signup or sign-in), never a metadata-less payment link');
 
 for (const v of VARIANTS) {
   const btn = buttons.find(b => b.product === v.product && b.plan === v.plan && b.interval === v.interval);
   assert(btn, 'missing button for ' + v.product + '/' + v.plan + '/' + v.interval);
 
-  // The triple must resolve in the server-side catalog...
-  const order = catalog.resolveOrder(btn);
-  assert(!order.error, 'catalog rejects ' + v.product + '/' + v.plan + '/' + v.interval + ': ' + order.error);
+  // The triple must be something the CHECKOUT sells: in the catalog and on
+  // sale (resolveSale, the check POST /v2/billing/checkout makes). resolveOrder
+  // alone also resolves the legacy Pro rows the checkout refuses.
+  const order = catalog.resolveSale(btn);
+  assert(!order.error, 'the checkout refuses ' + v.product + '/' + v.plan + '/' + v.interval + ': ' + order.error);
 
   // ...and the catalog (= link) amount must be exactly the shown price + 21% btw.
   const incl = (v.excl * 1.21).toFixed(2);
@@ -88,7 +103,7 @@ const PARASIGN_COPY = [
   '>&euro;0<',
   '2 signatures a month',
   'No limit on receiving',
-  'Full post-quantum crypto - Public verification log',
+  'Full post-quantum cryptography, public verification log',
   'No card required',
   // FIRM - EUR 29/month, both products in one payment
   '&euro;29<',
@@ -107,8 +122,8 @@ const PARASIGN_COPY = [
   'Annual: &euro;2,990 excl. &middot; 16.7% off',
   // ENTERPRISE - Let's talk
   "Let's talk",
-  'Dedicated relay instance - Sector relay (health, legal, finance)',
-  'SLA with service credits - Self-hosting licence - Audit support',
+  'Dedicated relay instance, sector relay (health, legal, finance)',
+  'SLA with service credits, self-hosting licence, audit support',
 ];
 for (const s of PARASIGN_COPY) {
   assert(html.includes(s), 'missing ParaSign card copy: ' + s);
@@ -136,9 +151,10 @@ for (const s of ['&euro;29<', 'Annual &euro;290 excl.']) {
 ok('Firm excl-btw amounts visible in the ParaSend grid');
 
 // Excl-btw framing plus the incl-21% checkout notice.
-assert(/excl\. btw/.test(html), 'missing "excl. btw" mention');
-assert(/incl\. 21% btw/.test(html), 'missing "incl. 21% btw" checkout notice');
-ok('page states excl. btw and that checkout charges incl. 21% btw');
+assert(/excl\. VAT/.test(html), 'missing "excl. VAT" mention (English page, acceptatie 3.1.1 taal 53)');
+assert(/incl\. 21% VAT/.test(html), 'missing "incl. 21% VAT" checkout notice');
+assert(!/\bbtw\b/.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'the English pricing page says btw; it says VAT');
+ok('page states excl. VAT and that checkout charges incl. 21% VAT');
 
 // The Community limits on the page are the ones the relay actually enforces.
 //
@@ -248,7 +264,7 @@ function showsAmount(pageHtml, amount) {
 function showsAmountOnCard(pageHtml, amount, interval) {
   const re = interval === 'monthly'
     ? new RegExp('<div class="tier-price">' + esc(amount) + '(?![\\d.,])')
-    : new RegExp('Annual:?\\s*' + esc(amount) + '(?![\\d.,])');
+    : new RegExp('(?:Annual|Per jaar):?\\s*' + esc(amount) + '(?![\\d.,])');
   return re.test(pageHtml);
 }
 
@@ -258,7 +274,8 @@ function showsAmountOnCard(pageHtml, amount, interval) {
 // to one page without the other turns this suite red instead of leaving two
 // prices on the site.
 const parasignHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasign.html'), 'utf8');
-for (const s of ['2 signatures a month', '100 signatures a month; after that signing waits for the new month', '1,000 signatures a month']) {
+// /parasign is Dutch since 23 September 2026, so the same three lines in Dutch.
+for (const s of ['2 handtekeningen per maand', '100 handtekeningen per maand; daarna wacht ondertekenen tot de nieuwe maand', '1.000 handtekeningen per maand']) {
   assert(parasignHtml.includes(s), 'parasign.html lost the quota line: ' + s);
 }
 assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
@@ -507,8 +524,14 @@ ok('every amount and discount sits on the card of the plan it belongs to (' + bo
 // Firm covers both products, so both product pages have to quote it; ParaSign
 // Business is quoted on /parasign only, which is the only page that sells it.
 const PRODUCT_PAGES = [
-  { product: 'parasign', file: 'parasign.html', sells: ['firm/firm', 'parasign/business'] },
-  { product: 'parasend', file: 'parasend.html', sells: ['firm/firm'] },
+  // /parasign is Dutch since 23 September 2026 and writes its amounts the Dutch
+  // way: a dot for thousands, a comma for cents.
+  { product: 'parasign', file: 'parasign.html', sells: ['firm/firm', 'parasign/business'], locale: 'nl-NL' },
+  // Since the NL | EN switch (23-09-2026) /parasend is Dutch and the English
+  // text it had lives at /en/parasend unchanged. The checks below that read
+  // English hold the English copy; the Dutch page is held to the same numbers
+  // in Dutch further down.
+  { product: 'parasend', file: 'en/parasend.html', sells: ['firm/firm'], locale: 'en-US' },
 ];
 const productHtml = {};
 for (const page of PRODUCT_PAGES) {
@@ -517,10 +540,10 @@ for (const page of PRODUCT_PAGES) {
   for (const v of VARIANTS.filter(x => page.sells.includes(x.product + '/' + x.plan))) {
     const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
     assert(!order.error, 'catalog rejects ' + v.plan + '/' + v.interval + ': ' + order.error);
-    const excl = '&euro;' + v.excl.toLocaleString('en-US');
+    const excl = '&euro;' + v.excl.toLocaleString(page.locale);
     assert(showsAmountOnCard(pageHtml, excl, v.interval),
       page.file + ' no longer shows ' + excl + ' on the ' + v.plan + ' card for ' + v.interval);
-    const incl = '&euro;' + Number(order.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const incl = '&euro;' + Number(order.amount).toLocaleString(page.locale, { minimumFractionDigits: 2 });
     assert(showsAmount(pageHtml, incl), page.file + ' no longer shows the catalog amount ' + incl + ' incl. btw for ' + v.plan + '/' + v.interval);
     ok(page.file + ' ' + v.plan + ' ' + v.interval + ': shows ' + excl + ' excl and ' + incl + ' incl');
   }
@@ -528,6 +551,44 @@ for (const page of PRODUCT_PAGES) {
     page.file + ' must state excl. btw and the incl. 21% btw checkout amount');
 }
 ok('both product pages carry the btw convention and the catalog amounts');
+
+// The Dutch /parasend, held to the same catalog and tiers.js numbers in Dutch
+// notation: a comma for decimals, "Per jaar" for the annual price.
+{
+  const nlHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasend.html'), 'utf8');
+  for (const v of VARIANTS.filter(x => x.product + '/' + x.plan === 'firm/firm')) {
+    const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
+    const excl = '&euro;' + v.excl.toLocaleString('nl-NL');
+    const opCard = v.interval === 'monthly'
+      ? new RegExp('<div class="tier-price">' + esc(excl) + '(?![\\d.,])')
+      : new RegExp('Per jaar:?\\s*' + esc(excl) + '(?![\\d.,])');
+    assert(opCard.test(nlHtml), 'parasend.html (nl) no longer shows ' + excl + ' on the firm card for ' + v.interval);
+    const incl = '&euro;' + Number(order.amount).toLocaleString('nl-NL', { minimumFractionDigits: 2 });
+    assert(showsAmount(nlHtml, incl), 'parasend.html (nl) no longer shows the catalog amount ' + incl + ' incl. btw for ' + v.interval);
+  }
+  assert(/excl\. btw/.test(nlHtml) && /incl\. 21% btw/.test(nlHtml),
+    'parasend.html (nl) must state excl. btw and the incl. 21% btw checkout amount');
+  const NL_LINES = [
+    [tiers.tierLimit('community', 'transfers_month') + ' verzendingen per maand', 'community transfers_month'],
+    [tiers.tierLimit('community', 'file_mb') + ' MB per bestand', 'community file_mb'],
+    ['Link verloopt na ' + hoursNl(tiers.tierLimit('community', 'view_ttl_ms')) + ' uur', 'community view_ttl_ms'],
+    ['Tot ' + tiers.tierLimit('community', 'outbound_per_hour') + ' keer ophalen per uur', 'community outbound_per_hour'],
+    ['Tot ' + tiers.tierLimit('community', 'devices') + ' geregistreerde apparaten', 'community devices'],
+    ['Gewist na de eerste keer lezen', 'community max_views'],
+    [tiers.tierLimit('pro', 'transfers_month') + ' verzendingen per maand', 'firm transfers_month'],
+    ['Link verloopt na ' + hoursNl(tiers.tierLimit('pro', 'view_ttl_ms')) + ' uur', 'firm view_ttl_ms'],
+    ['Tot ' + tiers.tierLimit('pro', 'max_views') + ' keer lezen per link', 'firm max_views'],
+    ['Tot ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' keer ophalen per uur', 'firm outbound_per_hour'],
+    ['Tot ' + tiers.tierLimit('pro', 'devices') + ' geregistreerde apparaten', 'firm devices'],
+  ];
+  assert(tiers.tierLimit('community', 'max_views') === 1, 'Community has one view in tiers.js');
+  for (const [line, dim] of NL_LINES) {
+    assert(nlHtml.includes(line), 'parasend.html (nl) no longer states the ' + dim + ' that tiers.js enforces: "' + line + '"');
+  }
+  assert(!/uploads per uur|Onbeperkt verzenden|onbeperkt aantal verzendingen/i.test(nlHtml),
+    'parasend.html (nl) states an anon upload figure or unlimited transfers');
+  ok('the Dutch /parasend carries the same catalog amounts and tiers.js limits');
+}
 
 // ── The free number, pinned to the code that enforces it ─────────────────────
 //
@@ -544,6 +605,7 @@ ok('both product pages carry the btw convention and the catalog amounts');
 // being wrong together, which is exactly what happened here: /pricing and
 // index.html carry the same upload figure and are corrected in their own PRs.
 const hours = (ms) => ms / 3_600_000;
+function hoursNl(ms) { return ms / 3_600_000; }
 
 // The transfer lines are matched on the number and accept either spelling of
 // the period, so tiers.js drift fails here and wording drift fails in the
@@ -606,10 +668,10 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
   assert(/No hourly cap on API retrievals/.test(productHtml.parasend),
     'parasend.html must state the Enterprise hourly position tiers.js gives it (unlimited)');
   for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['parasend.html', productHtml.parasend]]) {
-    assert(!/(sends|uploads) an hour/i.test(pageHtml),
+    assert(!/(sends|uploads) an hour|(verzendingen|uploads) per uur/i.test(pageHtml),
       name + ' calls the hourly figure a send rate; outbound_per_hour counts retrievals through GET /v2/outbound, not sends');
   }
-  assert(new RegExp('Up to ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' ParaSend retrievals an hour').test(productHtml.parasign),
+  assert(new RegExp('Tot ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' keer per uur een ParaSend-bestand ophalen').test(productHtml.parasign),
     'parasign.html must quote the hourly retrieval ceiling a ParaSign Pro account derives (' +
     tiers.tierLimit('pro', 'outbound_per_hour') + ')');
   ok('the hourly retrieval ceiling on /parasend and /parasign comes from tiers.js (' +
@@ -636,11 +698,14 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
     const dim = receivingDim(block.quotas);
     assert(!dim, 'entitlements.js meters receiving for ' + product + ' (' + dim + '), so "No limit on receiving" is no longer true');
   }
-  for (const [name, pageHtml] of [['pricing.html', html], ['parasign.html', productHtml.parasign]]) {
+  // /parasign is Dutch since 23 September 2026 and says the same in Dutch.
+  assert(productHtml.parasign.includes('Geen grens op ontvangen'),
+    'parasign.html dropped the receiving line; it is the one claim on these pages backed by a field that does not exist');
+  for (const [name, pageHtml] of [['pricing.html', html]]) {
     assert(pageHtml.includes('No limit on receiving'),
       name + ' dropped the receiving line; it is the one claim on these pages backed by a field that does not exist');
   }
-  assert(/Receiving is not metered\./.test(productHtml.parasign),
+  assert(/Ontvangen wordt niet geteld\./.test(productHtml.parasign),
     '/parasign must say what "no limit on receiving" rests on, and that signing what you receive is still counted');
   ok('"No limit on receiving" holds: no receiving dimension in tiers.js or in the entitlement quotas');
 })();
@@ -663,7 +728,7 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
 // account and ask the entitlement layer what ParaSend then delivers. A card may
 // name a transfer ceiling exactly when its own plan hands one over.
 (function signingCardsClaimOnlyDeliveredTransfers() {
-  const TRANSFER_FIGURE = /[\d][\d,]*\s*(?:ParaSend\s+)?transfers/i;
+  const TRANSFER_FIGURE = /[\d][\d,.]*\s*(?:ParaSend\s+)?(?:transfers|verzendingen)/i;
   const parasignGrid = html.slice(html.indexOf('<!-- TIER CARDS: PARASIGN -->'), html.indexOf('<!-- TIER CARDS: PARASEND -->'));
   assert(parasignGrid.length > 500, 'the ParaSign tier grid markers moved; this gate would read nothing');
 
@@ -709,18 +774,36 @@ ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
    tiers.tierLimit('community', 'transfers_month') + '/' + tiers.tierLimit('pro', 'transfers_month') + ' transfers, ' +
    tiers.tierLimit('community', 'file_mb') + ' MB)');
 
-// A feature bullet quoted from /pricing has to stay a quote. This one names a
-// subprocessor, so dropping "via Resend" would quietly remove a disclosure the
-// EU claim depends on being made in the same breath.
-for (const line of ['Email notifications via Resend']) {
+// A feature bullet quoted from /pricing has to stay a quote, and the two pages
+// have to carry the same one. It says what the mail carries, not where the
+// carrier sits: which company sends the mail is pinned in one place,
+// deploy/partners.json, and tests/partners.test.mjs holds every page to it. On 2026-09-23 this bullet still said "carried inside the EU"
+// while production mailed through Resend in the US; that may not recur.
+for (const line of ['Email notifications (only the address and the link, never the file)']) {
   assert(html.includes(line), '/pricing lost the feature line: ' + line);
   assert(productHtml.parasend.includes(line), 'parasend.html lost the feature line /pricing carries: ' + line);
 }
 ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
 
+// No page may promise EU-only mail while the active carrier is outside the EU.
+const partnersJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'deploy', 'partners.json'), 'utf8'));
+const mailActief = partnersJson.partijen.filter((p) => p.rol === 'mail' && p.status === 'actief');
+const actief = mailActief.map((p) => p.id).join(', ') || '(geen)';
+// EU/EER-landcodes; een drager zonder bekend land telt als buiten de EU.
+const EU_LANDEN = new Set(['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT',
+  'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK']);
+assert(mailActief.length > 0, 'deploy/partners.json has no active mail carrier');
+if (!mailActief.every((p) => EU_LANDEN.has(p.land && p.land.code))) {
+  for (const [naam, pagina] of [['pricing', html], ['pricing-nl', htmlNl], ['parasend', productHtml.parasend]]) {
+    assert(!/carried inside the EU|verstuurd binnen de EU|mail (stays|blijft) (in|binnen) de EU/i.test(pagina),
+      naam + ' promises EU-only mail while the active carrier (' + actief + ') is outside the EU');
+  }
+}
+ok('no page promises EU-only mail while the carrier (' + actief + ') is outside the EU');
+
 // The signature quota lines stay pinned to the words /pricing uses: they are
 // billing copy, not a tiers.js row.
-for (const line of ['2 signatures a month', '100 signatures a month; after that signing waits for the new month', '1,000 signatures a month']) {
+for (const line of ['2 handtekeningen per maand', '100 handtekeningen per maand; daarna wacht ondertekenen tot de nieuwe maand', '1.000 handtekeningen per maand']) {
   assert(productHtml.parasign.includes(line), 'parasign.html lost the quota line: ' + line);
 }
 assert(tiers.tierLimit('community', 'signs_month') === 2,
@@ -769,13 +852,25 @@ ok('the compliance bullet on /parasend carries its own limit');
 // the wording is pinned, so a page that reverts fails here and says so plainly.
 (function oneMonthlyForm() {
   const MONTHLY_FORM = /([\d,]+) (signatures|transfers|ParaSend transfers) per month/;
-  const PAGES = ['pricing.html', 'parasend.html', 'parasign.html', 'index.html', 'signup.html', 'help/index.html'];
+  // /help, /parasend, /parasign and /signup are Dutch since 23 September 2026;
+  // their English copies live under /en and are held to the English form here.
+  // The Dutch pages are held to theirs below.
+  const PAGES = ['en/pricing.html', 'en/parasend.html', 'en/parasign.html', 'en/index.html', 'en/signup.html', 'en/help/index.html'];
   for (const rel of PAGES) {
     const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
     const stray = MONTHLY_FORM.exec(pageHtml);
     assert(!stray, rel + ' says "' + (stray ? stray[0] : '') + '"; the site says "' +
       (stray ? stray[1] + ' ' + stray[2] : 'N noun') + ' a month" and one limit gets one spelling');
     assert(/(signatures|transfers) a month/.test(pageHtml),
+      rel + ' no longer states a monthly allowance at all, so this gate is guarding nothing');
+  }
+  // /parasign, /help, /parasend and /signup are Dutch since 23 September 2026.
+  // Their one form is "per maand".
+  for (const rel of ['parasign.html', 'help/index.html', 'parasend.html', 'signup.html']) {
+    const pageNl = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
+    const strayNl = /([\d.]+) (handtekeningen|verzendingen) (in de|elke|een|iedere) maand|([\d,]+) (signatures|transfers) (per|a) month/.exec(pageNl);
+    assert(!strayNl, rel + ' says "' + (strayNl ? strayNl[0] : '') + '"; the Dutch form is "N handtekeningen per maand"');
+    assert(/(handtekeningen|verzendingen) per maand/.test(pageNl),
       rel + ' no longer states a monthly allowance at all, so this gate is guarding nothing');
   }
   ok('every page that repeats a monthly limit uses one spelling ("a month")');
@@ -799,10 +894,13 @@ ok('the compliance bullet on /parasend carries its own limit');
 // is pinned here too, for the plan name the same sentence uses. Neither can move
 // without this going red.
 (function dashboardPriceAnswer() {
-  const dashHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'dashboard.html'), 'utf8');
+  // /dashboard is Dutch since 23 September 2026; the English answer lives on at
+  // /en/dashboard and is held here. The Dutch one is held to the same amount
+  // right after this block.
+  const dashHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'en', 'dashboard.html'), 'utf8');
   const visible = dashHtml.replace(/<!--[\s\S]*?-->/g, ' ');
   const answerMatch = /<dt>What does it cost\?<\/dt>\s*<dd>([\s\S]*?)<\/dd>/.exec(visible);
-  assert(answerMatch, 'dashboard.html must still answer "What does it cost?"');
+  assert(answerMatch, 'en/dashboard.html must still answer "What does it cost?"');
   const answer = answerMatch[1];
 
   // The plan by the name /pricing sells it under, and both products it covers,
@@ -818,7 +916,7 @@ ok('the compliance bullet on /parasend carries its own limit');
   const order = catalog.resolveOrder({ product: 'firm', plan: 'firm', interval: 'monthly' });
   assert(!order.error, 'billing-catalog has no monthly Firm price: ' + order.error);
   const firmExcl = Math.round((parseFloat(order.amount) / 1.21) * 100) / 100;
-  assert(new RegExp('&euro;' + firmExcl + ' a month excl\\. btw').test(answer),
+  assert(new RegExp('&euro;' + firmExcl + ' a month excl\\. VAT').test(answer),
     'the dashboard must price Firm at the catalog amount (&euro;' + firmExcl + '), got: ' + answer.trim());
 
   // ui-truthfulness in one line: no amount here that a reader cannot find on
@@ -844,7 +942,85 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert(new RegExp('&euro;' + firmExcl + '(?![\\d.,])').test(helpHtml),
     '/help must still name the Firm price (&euro;' + firmExcl + ') the dashboard agrees with');
   assert(/\bFirm\b/.test(helpHtml), '/help must name the plan by the name /pricing sells it under');
+  // The Dutch /dashboard: the same question, the same plan, the same amount,
+  // both products by the names the Dutch bar uses, and an amount the Dutch
+  // /pricing carries.
+  const dashNl = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'dashboard.html'), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, ' ');
+  const answerNlMatch = /<dt>Wat kost het\?<\/dt>\s*<dd>([\s\S]*?)<\/dd>/.exec(dashNl);
+  assert(answerNlMatch, 'dashboard.html must still answer "Wat kost het?"');
+  const answerNl = answerNlMatch[1];
+  assert(/\bFirm\b/.test(answerNl), 'the Dutch dashboard price answer must name the Firm plan');
+  for (const productName of ['Ondertekenen', 'Versturen']) {
+    assert(answerNl.includes(productName),
+      'the Dutch dashboard price answer must name ' + productName + '; naming one product prices half the account');
+  }
+  const firmExclNl = String(firmExcl).replace('.', ',');
+  assert(new RegExp('&euro;' + firmExclNl + ' per maand excl\\. btw').test(answerNl),
+    'the Dutch dashboard must price Firm at the catalog amount (&euro;' + firmExclNl + '), got: ' + answerNl.trim());
+  for (const amount of new Set([...answerNl.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))) {
+    // The Dutch /pricing writes its amounts as "29 euro"; either notation counts.
+    const a = amount.replace(/[.]/g, '\\.');
+    assert(new RegExp('(?:&euro;|€)\\s?' + a + '(?![\\d.,])|(?<![\\d.,])' + a + ' euro\\b').test(htmlNl),
+      'the Dutch dashboard names &euro;' + amount + ', which is not on the Dutch /pricing');
+  }
+  assert(/\bCommunity is altijd gratis\b/.test(answerNl),
+    'the Dutch dashboard answer must still name the free plan Community');
   ok('the dashboard price answer names Firm, both products and the catalog amount');
+})();
+
+// ── The Dutch /pricing: one offer, one button ───────────────────────────────
+//
+// Mick, 23 September 2026: "Voor uw kantoor: 29 euro per maand", one primary
+// button, Community visible beside it, and Business and Enterprise only through
+// "Meer nodig?". The page may sell nothing but Firm, every amount on it is the
+// catalog amount written the Dutch way (35,09), and the one primary action is
+// the monthly Firm checkout.
+(function dutchPricing() {
+  const btnRe = /<a\s+href="([^"]+)"\s+data-billing-product="([a-z]+)"\s+data-billing-plan="([a-z]+)"\s+data-billing-interval="([a-z]+)"([^>]*)>/g;
+  const buys = [];
+  for (let m; (m = btnRe.exec(htmlNl)); ) buys.push({ href: m[1], product: m[2], plan: m[3], interval: m[4], rest: m[5] });
+  assert.deepStrictEqual(buys.map((b) => `${b.product}/${b.plan}/${b.interval}`), ['firm/firm/monthly', 'firm/firm/yearly'],
+    'the Dutch /pricing sells Firm, monthly and yearly, and nothing else');
+  for (const b of buys) {
+    assert(b.href === '/signup?next=/pricing', 'no-JS fallback on the Dutch page must be the free account, back to pricing, got ' + b.href);
+    assert(!catalog.resolveSale(b).error, 'the checkout refuses ' + b.product + '/' + b.plan + '/' + b.interval);
+  }
+  assert(/class="btn btn-primary/.test(buys[0].rest), 'the monthly Firm button is the primary action');
+  const visibleNl = htmlNl.replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/gi, '');
+  const body = visibleNl.slice(visibleNl.indexOf('<main'));
+  assert.strictEqual((body.match(/class="btn btn-primary/g) || []).length, 1, 'the Dutch /pricing carries exactly one primary button');
+
+  const nl = (amount) => Number(amount).toFixed(2).replace('.', ',');
+  const monthlyIncl = catalog.priceOf('firm', 'firm', 'monthly');
+  const yearlyIncl = catalog.priceOf('firm', 'firm', 'yearly');
+  const monthlyExcl = Math.round(Number(monthlyIncl) / 1.21 * 100) / 100;
+  const yearlyExcl = Math.round(Number(yearlyIncl) / 1.21 * 100) / 100;
+  assert(body.includes(`Voor uw kantoor: ${monthlyExcl} euro per maand.`), 'the offer must name the catalog amount excl. btw: ' + monthlyExcl);
+  assert(body.includes(`&euro;${nl(monthlyIncl)} per maand, inclusief 21% btw`), 'the offer must name the incl. amount the checkout charges: ' + nl(monthlyIncl));
+  assert(body.includes(`&euro;${nl(yearlyIncl)} incl. btw (&euro;${yearlyExcl} excl.)`), 'the yearly line must be the catalog yearly amount');
+  // Since 05-10-2026 the line says who it is for: a larger organisation, and
+  // the one address to write to. Still no Business button on this page.
+  // Since acceptatie 3.1.1 (taal 5) the line names Business, on request, with
+  // what it adds and its price, and the table has a Business column: the same
+  // plans as the English page, but still no Business button or card.
+  assert(/Grotere organisatie\? Dan is er Business, op aanvraag: [^<]*Neem contact op: <a href="mailto:privacy@paramant\.app/.test(body), 'Business is reached through "Grotere organisatie? Dan is er Business, op aanvraag", with the contact address');
+  assert(body.includes('<th scope="col">Business (op aanvraag)</th>'), 'the Dutch table names Business as on request');
+  assert(!/class="tier-card|data-billing-plan="business"|>Business<|>Enterprise</.test(body), 'no Business or Enterprise card on the Dutch /pricing');
+
+  const lim = (tier, dim) => tiers.tierLimit(tier, dim);
+  for (const phrase of [
+    `${lim('community', 'signs_month')} handtekeningen per maand`,
+    `${lim('community', 'transfers_month')} verzendingen per maand`,
+    `${lim('community', 'file_mb')} MB`,
+    `${lim('pro', 'signs_month')} handtekeningen per maand`,
+    `${lim('pro', 'transfers_month')} verzendingen per maand`,
+    `tot ${lim('pro', 'max_recipients')} ontvangers per verzending`,
+    `${lim('pro', 'view_ttl_ms') / 3600000} uur geldig`,
+  ]) assert(body.includes(phrase), 'the Dutch /pricing must state, as tiers.js has it: ' + phrase);
+  assert.strictEqual(lim('community', 'max_recipients'), 1, 'community.max_recipients moved; the Dutch page says one recipient');
+  assert(body.includes('&eacute;&eacute;n ontvanger per verzending'), 'the Dutch /pricing must say Community sends to one recipient');
+  ok('the Dutch /pricing sells one offer at the catalog amount, with the tiers.js limits');
 })();
 
 console.log('pricing-page: ' + passed + ' checks passed');

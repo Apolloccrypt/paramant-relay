@@ -116,7 +116,7 @@ async function testTestSandbox(eng) {
   assert.ok(gp.n >= 1, 'TEST key DID drive the sandbox signing engine');
   assert.strictEqual(out.status, 'completed', 'test envelope auto-completes');
   assert.ok(/sandbox/i.test(out._sandbox_note || ''), 'test create reports the sandbox note');
-  assert.strictEqual(out.signers[0].status, 'completed', 'test signer marked completed');
+  assert.strictEqual(out.signers[0].status, 'signed', 'test signer marked signed (the word GET uses too)');
   ok('psk_test_ create is auto-signed by the sandbox signer');
 }
 

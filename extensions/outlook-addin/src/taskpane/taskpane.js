@@ -4,6 +4,12 @@ import {
 import { getAttachments, removeAttachments, insertIntoBody } from '../shared/office-helpers.js';
 import { buildLinkHtml } from '../../../shared/link-block.js';
 
+// Guard against a second copy of this script on the page. Until 1.0.2 the
+// template carried its own <script type=module> next to the one webpack
+// injects, so every handler ran twice (fase 1, EXT-19-A).
+if (window.__paramantTaskpane) throw new Error('taskpane.js loaded twice');
+window.__paramantTaskpane = true;
+
 Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Outlook) return;
 
@@ -13,12 +19,10 @@ Office.onReady(async (info) => {
     await refreshAttachments();
     return;
   }
-
-  const caps = await getCapabilities();
-  const totpOn = !!caps.user_totp;
-  document.getElementById('show-totp').classList.toggle('hidden', !totpOn);
-  document.getElementById('banner-rolling-out').classList.toggle('hidden', totpOn);
   showLogin();
+  // The e-mail + code form only where the relay says user sign-in is on.
+  const caps = await getCapabilities();
+  document.getElementById('show-totp').classList.toggle('hidden', !caps.user_totp);
 });
 
 // ── Login state ───────────────────────────────────────────────────────────────────
@@ -43,6 +47,20 @@ function wireLoginForms() {
     document.getElementById('form-apikey').classList.remove('hidden');
   });
 
+  document.getElementById('form-totp').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email    = document.getElementById('email').value.trim();
+    const code     = document.getElementById('totp').value.trim();
+    const errorDiv = document.getElementById('error-totp');
+    const btn      = e.target.querySelector('button[type="submit"]');
+    errorDiv.classList.remove('visible'); errorDiv.textContent = '';
+    btn.disabled = true;
+
+    const result = await loginWithTotp(email, code);
+    if (result.success) { showStatus(result); await refreshAttachments(); }
+    else { showFormError(errorDiv, result.message || 'Invalid e-mail or code.'); btn.disabled = false; }
+  });
+
   document.getElementById('form-apikey').addEventListener('submit', async e => {
     e.preventDefault();
     const apikey   = document.getElementById('apikey').value.trim();
@@ -55,23 +73,27 @@ function wireLoginForms() {
     if (result.success) { showStatus(result); await refreshAttachments(); }
     else { showFormError(errorDiv, result.message || 'Invalid API key.'); btn.disabled = false; }
   });
-
-  document.getElementById('form-totp').addEventListener('submit', async e => {
-    e.preventDefault();
-    const email    = document.getElementById('email').value.trim();
-    const totp     = document.getElementById('totp').value.trim();
-    const errorDiv = document.getElementById('error-totp');
-    const btn      = e.target.querySelector('button[type="submit"]');
-    errorDiv.classList.remove('visible'); errorDiv.textContent = '';
-    btn.disabled = true;
-
-    const result = await loginWithTotp(email, totp);
-    if (result.success) { showStatus(result); await refreshAttachments(); }
-    else { showFormError(errorDiv, result.message || 'Invalid email or code.'); document.getElementById('totp').value = ''; btn.disabled = false; }
-  });
 }
 
 function showFormError(el, msg) { el.textContent = msg; el.classList.add('visible'); }
+
+// Reveal the 402 upgrade notice with the plan/limit from the relay body. Text is
+// set via textContent and the link target is a fixed paramant.app URL, so no inline
+// script is introduced (the taskpane runs under the add-in host CSP).
+function showQuotaNotice(info) {
+  const box  = document.getElementById('quota-notice');
+  const body = document.getElementById('quota-notice-text');
+  const link = document.getElementById('quota-notice-link');
+  const text = document.getElementById('progress-text');
+  if (text) { text.textContent = ''; text.classList.remove('failed'); }
+  if (!box || !body || !link) return;
+  const planPart = info.plan ? ` on the ${info.plan} plan` : '';
+  body.textContent = (info.limit || info.limit === 0)
+    ? `You have used all ${info.limit} monthly transfer${info.limit === 1 ? '' : 's'}${planPart}. Upgrade to send more.`
+    : `You have used this month's transfer allowance${planPart}. Upgrade to send more.`;
+  link.href = info.upgradeUrl || 'https://paramant.app/pricing';
+  box.classList.remove('hidden');
+}
 
 // ── Session status ──────────────────────────────────────────────────────────────────
 function showStatus(session) {
@@ -83,12 +105,25 @@ function showStatus(session) {
 }
 
 // ── Attachments ───────────────────────────────────────────────────────────────────
+async function fileAttachments() {
+  return (await getAttachments()).filter(a => a.attachmentType === 'file' || a.attachmentType === undefined);
+}
+
+function sameList(a, b) {
+  return a.length === b.length && a.every((x, i) => x.id === b[i].id);
+}
+
+let shown = [];
 async function refreshAttachments() {
-  const attachments = (await getAttachments()).filter(a => a.attachmentType === 'file' || a.attachmentType === undefined);
+  const attachments = await fileAttachments();
+  shown = attachments;
+  const note = document.getElementById('progress-text');
+  if (note) { note.textContent = ''; note.classList.remove('failed'); }
+  document.getElementById('encrypt-progress')?.classList.add('hidden');
+  document.getElementById('encrypt-btn').disabled = false;
 
   if (attachments.length === 0) {
     switchState('state-no-attachments');
-    document.getElementById('refresh-btn').onclick = refreshAttachments;
   } else {
     switchState('state-has-attachments');
     const list = document.getElementById('attachment-list');
@@ -100,13 +135,29 @@ async function refreshAttachments() {
       li.append(name, size);
       list.appendChild(li);
     }
-    document.getElementById('encrypt-btn').onclick = () => encryptAll(attachments);
   }
-
+  // onclick, not addEventListener: refreshAttachments runs again on every
+  // refresh, and an assignment replaces the handler instead of stacking one.
+  document.getElementById('encrypt-btn').onclick = encryptCurrent;
+  for (const id of ['refresh-btn', 'refresh-btn-2', 'back-btn']) {
+    const btn = document.getElementById(id);
+    if (btn) btn.onclick = refreshAttachments;
+  }
   for (const id of ['logout-btn', 'logout-btn-2']) {
     const btn = document.getElementById(id);
     if (btn) btn.onclick = doLogout;
   }
+}
+
+// The list is read again at the click. An attachment added while the pane was
+// open used to be skipped and sent unencrypted, under a success screen that
+// said every original was removed (fase 1, EXT-21-A).
+async function encryptCurrent() {
+  const now = await fileAttachments();
+  // Show what is really going to be encrypted before it starts.
+  if (!sameList(now, shown)) await refreshAttachments();
+  if (!now.length) return;
+  await encryptAll(now);
 }
 
 async function encryptAll(attachments) {
@@ -118,6 +169,7 @@ async function encryptAll(attachments) {
 
   btn.disabled = true;
   progress.classList.remove('hidden');
+  text.classList.remove('failed');
 
   const n = attachments.length;
   const results = [];
@@ -130,8 +182,12 @@ async function encryptAll(attachments) {
 
     const result = await uploadAttachment(att, { ttlMs, onProgress: p => setOverall(p.fraction || 0) });
     if (!result.success) {
-      text.textContent = friendly(result.message, att.name);
-      text.classList.add('failed');
+      if (result.code === 'quota_reached') {
+        showQuotaNotice(result);
+      } else {
+        text.textContent = friendly(result.message, att.name);
+        text.classList.add('failed');
+      }
       btn.disabled = false;
       return;
     }
@@ -142,6 +198,16 @@ async function encryptAll(attachments) {
   text.textContent = 'Updating email…';
   await insertParamantBlock(results);
   await removeAttachments(attachments.map(a => a.id));
+
+  // Whatever is still attached now (added during the upload) goes out as a
+  // plain attachment. Say so instead of claiming everything was removed.
+  const left = await fileAttachments();
+  const successText = document.getElementById('success-text');
+  if (successText) {
+    successText.textContent = left.length
+      ? `Paramant links have been added to your email body. ${left.length} attachment${left.length === 1 ? ' was' : 's were'} added during encryption and ${left.length === 1 ? 'is' : 'are'} still a normal, unencrypted attachment: ${left.map(a => a.name).join(', ')}. Click "Back to attachments" to encrypt ${left.length === 1 ? 'it' : 'them'} too.`
+      : 'Paramant links have been added to your email body. The original attachments have been removed.';
+  }
   switchState('state-success');
 }
 
@@ -166,7 +232,7 @@ function switchState(stateId) {
 
 function friendly(message, name) {
   const m = String(message || '');
-  if (m === 'not_authenticated') return 'Session expired. Sign in again.';
+  if (m === 'not_authenticated') return 'Your sign-in has expired. Sign in again.';
   if (!m) return `Failed to encrypt ${name}`;
   return m; // relay messages are already human ("Max 5MB on trial", etc.)
 }

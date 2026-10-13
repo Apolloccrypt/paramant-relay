@@ -107,10 +107,18 @@ export function needsBrowser(entry) {
 // @paramant/core binding it loads eagerly at boot, the admin dependencies and
 // a reachable redis. Naming the file it spawns is the honest signal, and it is
 // in the source of the helper rather than in a list here.
+//
+// THE SUITE ITSELF COUNTS. Until 2026-09-22 this skipped the entry file and
+// only asked the question of the helpers it imported, on the reading that a
+// suite reaches the stack through a helper. tests/ontvang-browser.test.mjs
+// spawns relay.js in its own body, so it answered no, landed in the stubbed
+// half, and failed there with "Cannot find module 'argon2'" -- the same shape
+// of failure the two notes above describe, arrived at from the other side. A
+// suite that starts a relay needs the stack whether it does it in a helper or
+// in its own first thirty lines.
 const RELAY_ENTRYPOINT = /['"]relay\.js['"]/;
 export function needsStack(entry) {
   return reaches(entry, ({ file }) => {
-    if (path.resolve(file) === path.resolve(entry)) return false;
     try { return RELAY_ENTRYPOINT.test(fs.readFileSync(file, 'utf8')); } catch { return false; }
   });
 }
@@ -120,9 +128,16 @@ const suites = fs.readdirSync(path.join(ROOT, 'tests'))
   .map((name) => path.join('tests', name))
   .sort();
 
+// DE DRIE BANEN MOETEN ELKAAR UITSLUITEN. Drie workflowstappen draaien
+// --no-browser, --browser-no-stack en --stack, en tot 22-09 overlapten de
+// eerste en de laatste: een suite zonder browser die wel een relay start viel
+// in allebei. Die draait dan twee keer, en de ene keer in een baan die geen
+// backend heeft. Daarom kijkt --no-browser ook naar de stack: wie er een
+// nodig heeft gaat naar de baan die er een bouwt, browser of niet.
+// tests/ci-verdeling.test.mjs bewaakt dat deze drie de set blijven verdelen.
 const MODES = {
   '--browser': (b) => b,
-  '--no-browser': (b) => !b,
+  '--no-browser': (b, s) => !b && !s,
   '--browser-no-stack': (b, s) => b && !s,
   '--stack': (b, s) => s,
 };

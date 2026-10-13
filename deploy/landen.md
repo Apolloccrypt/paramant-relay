@@ -96,6 +96,16 @@ De drie stapels betekenen iets verschillends voor wat je met de datum doet:
 - `waarde`: hier ligt werk dat nog telt. De datum is de dag waarop het geland
   moet zijn, en die dag komt uit de volgorde in `landen-inhaalslag.md`.
 
+## Gearchiveerde takken
+
+Op 23 september 2026 zijn de takken die te lang buiten main lagen en geen open
+PR hadden als tag `archief/<tak>` op hun tip bewaard en daarna van origin
+verwijderd. Er ging niets verloren. Terughalen doe je zo:
+
+```
+git push origin refs/tags/archief/<tak>:refs/heads/<tak>
+```
+
 ## De inhaalslag
 
 De volledige triage van 5 september 2026, met per tak de stapel, de

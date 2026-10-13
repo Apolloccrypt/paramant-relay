@@ -168,7 +168,7 @@ nav.nav .nav-dropdown-menu li a {
 nav.nav .nav-dropdown-menu li a:hover,
 nav.nav .nav-dropdown-menu li a:focus {
   color: var(--ink);
-  background: rgba(217, 164, 65, 0.15);
+  background: rgba(29, 78, 216, 0.15);
   border-left: 2px solid var(--ochre);
   padding-left: calc(var(--space-5) - 2px);
   outline: none;
@@ -236,8 +236,8 @@ nav.nav .nav-link.active::after { transform: scaleX(1); }
   text-decoration: none;
   white-space: nowrap;
 }
-.settings-tabs a:hover { color: var(--cobalt); background: rgba(217, 164, 65, .05); }
-.settings-tabs a[aria-current="page"] { color: var(--cobalt); background: rgba(217, 164, 65, .1); }
+.settings-tabs a:hover { color: var(--cobalt); background: rgba(29, 78, 216, .05); }
+.settings-tabs a[aria-current="page"] { color: var(--cobalt); background: rgba(29, 78, 216, .1); }
 .settings-tabs a:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 @media (max-width:520px) {
   .settings-tabs { gap:2px; padding:3px; }
@@ -266,10 +266,10 @@ nav.nav .nav-hamburger {
 }
 nav.nav .nav-hamburger:hover {
   border-color: var(--cobalt);
-  background: rgba(217, 164, 65, .05);
+  background: rgba(29, 78, 216, .05);
 }
 nav.nav .nav-hamburger:focus-visible {
-  outline: 3px solid rgba(217, 164, 65, .35);
+  outline: 3px solid rgba(29, 78, 216, .35);
   outline-offset: 2px;
 }
 nav.nav .nav-hamburger span {
@@ -356,7 +356,7 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
   transition: color var(--duration-base) var(--ease-sharp);
 }
 .nav-mobile-group-btn:hover {
-  background: rgba(217, 164, 65, 0.08);
+  background: rgba(29, 78, 216, 0.08);
   color: var(--ink);
 }
 .nav-mobile-group.open .nav-mobile-group-btn { color: var(--ink); }
@@ -395,13 +395,13 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
 .nav-mobile-group-items a:focus-visible {
   color: var(--ink);
   border-left-color: var(--ochre);
-  background: rgba(217, 164, 65, 0.1);
+  background: rgba(29, 78, 216, 0.1);
   outline: none;
 }
 .nav-mobile-group-items a[aria-current="page"] {
   color: var(--ink);
   border-left-color: var(--ochre);
-  background: rgba(217, 164, 65, 0.12);
+  background: rgba(29, 78, 216, 0.12);
   font-weight: 600;
 }
 
@@ -432,13 +432,13 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
 .nav-mobile-standalone:focus-visible {
   color: var(--cobalt);
   border-left-color: var(--cobalt);
-  background: rgba(217, 164, 65, .04);
+  background: rgba(29, 78, 216, .04);
   outline: none;
 }
 .nav-mobile-standalone[aria-current="page"] {
   color: var(--cobalt);
   border-left-color: var(--cobalt);
-  background: rgba(217, 164, 65, .06);
+  background: rgba(29, 78, 216, .06);
   font-weight: 600;
 }
 
@@ -473,7 +473,7 @@ body.nav-locked .nav {
 /* ════════════════════════════════════════
    RESPONSIVE
    ════════════════════════════════════════ */
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .meta-bar { display: none; }
   nav.nav {
     padding: 0 16px;
@@ -527,7 +527,7 @@ body.nav-locked .nav {
   color: var(--ink-dim);
   line-height: 1.35;
 }
-.nmpl-featured { border-left-color: rgba(217, 164, 65, .25); }
+.nmpl-featured { border-left-color: rgba(29, 78, 216, .25); }
 .nmpl-featured .nmpl-title { color: var(--cobalt); }
 
 /* Desktop Products dropdown — title + tagline */
@@ -577,8 +577,8 @@ nav.nav .nav-link-btn:hover {
   position: absolute;
   top: -200px;
   left: 0;
-  background: var(--navy);
-  color: var(--ink);
+  background: var(--invert);
+  color: var(--bone-on-navy, #FFFFFF);   /* --ink is the navy itself: text on its own ground */
   padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;
@@ -588,8 +588,8 @@ nav.nav .nav-link-btn:hover {
   border: 2px solid var(--ochre);
   transition: top 120ms ease;
 }
-.skip-link:focus,
-.skip-link:focus-visible { top: 0; outline: none; }
+.skip-link:focus { top: 0; outline: none; }
+.skip-link:focus-visible { top: 0; outline: 3px solid var(--cobalt); outline-offset: 2px; }
 .skip-link:focus:hover { background: var(--ochre); }
 
 /* ════════════════════════════════════════
@@ -682,7 +682,7 @@ nav.nav .nav-help:hover,
 nav.nav .nav-signin:hover { color: var(--cobalt); }
 nav.nav .nav-help:focus-visible,
 nav.nav .nav-signin:focus-visible {
-  outline: 3px solid rgba(217, 164, 65, .35);
+  outline: 3px solid rgba(29, 78, 216, .35);
   outline-offset: 2px;
 }
 
@@ -717,7 +717,7 @@ nav.nav .nav-cta:hover {
   color: var(--ink);
 }
 nav.nav .nav-cta:focus-visible {
-  outline: 3px solid rgba(217, 164, 65, .35);
+  outline: 3px solid rgba(29, 78, 216, .35);
   outline-offset: 2px;
 }
 
@@ -743,7 +743,7 @@ nav.nav .nav-user-trigger {
 }
 nav.nav .nav-user-trigger:hover { border-color: var(--cobalt); }
 nav.nav .nav-user-trigger:focus-visible {
-  outline: 3px solid rgba(217, 164, 65, .35);
+  outline: 3px solid rgba(29, 78, 216, .35);
   outline-offset: 2px;
 }
 nav.nav .nav-user-email {
@@ -782,7 +782,7 @@ nav.nav .nav-menu-item {
   cursor: pointer;
   text-align: left;
 }
-nav.nav .nav-menu-item:hover { background: rgba(217, 164, 65, .06); color: var(--cobalt); }
+nav.nav .nav-menu-item:hover { background: rgba(29, 78, 216, .06); color: var(--cobalt); }
 nav.nav .nav-menu-signout { color: var(--brick-ink); }
 nav.nav .nav-menu-signout:hover { background: rgba(196, 96, 79, .06); color: var(--brick-ink); }
 nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: var(--space-1) 0; }
@@ -841,7 +841,7 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
 }
 .nav-mobile-tail .nav-tail-link:hover { color: var(--cobalt); }
 .nav-mobile-tail a:focus-visible {
-  outline: 3px solid rgba(217, 164, 65, .35);
+  outline: 3px solid rgba(29, 78, 216, .35);
   outline-offset: 2px;
 }
 
@@ -850,13 +850,18 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
    Last block in the file on purpose: it overrides the rules above it, which
    have the same specificity, and CSS settles a tie by order.
 
-   The hamburger appears below 1024px, but the crowding it was hiding is a
+   The hamburger appears below 1280px (it was 1024px until 2026-09-24: the
+   signed-in Dutch bar needs about 1350px at full padding, so between 1024 and
+   1350 the theme switch and the account button were pushed past the right
+   edge, which is exactly where a zoomed desktop window lives). From 1280 to
+   1439 the bar tightens instead, see the block below. The crowding the
+   hamburger hides is still a
    phone problem, not a tablet one: at 820px five elements have room to
    breathe, at 390px they had 60px of slack between them and the button ended
    up against the hamburger. So the bar sheds its two text links at 700px, not
-   at 1024px. A tablet keeps Help and Sign in where they were.
+   at 1280px. A tablet keeps Help and Sign in where they were.
    ════════════════════════════════════════ */
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   nav.nav .nav-auth { gap: var(--space-3); }
   nav.nav .nav-cta,
   nav.nav .nav-user-trigger,
@@ -873,4 +878,124 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
    the bar handed something over. */
 @media (min-width: 701px) {
   .nav-mobile-tail { display: none !important; }
+}
+
+/* ════════════════════════════════════════
+   LANGUAGE SWITCH  (NL | EN, stamped by apply-nav.py)
+   The current language is marked with aria-current and drawn solid; the
+   other is a plain link to the same page in that language. In the bar from
+   701px up. Below that the phone bar keeps one action beside the menu button,
+   and the same switch sits in the strip under the drawer, where Sign in and
+   Help already went.
+   ════════════════════════════════════════ */
+.nav-lang {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+.nav-lang a,
+.nav-mobile-tail .nav-lang a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 44px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: none;
+}
+.nav-lang a:hover { color: var(--cobalt); }
+.nav-lang a[aria-current] {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.nav-lang a:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
+}
+.nav-lang-sep { color: var(--ink-2); padding: 0 2px; }
+@media (max-width: 700px) {
+  nav.nav .nav-lang { display: none; }
+}
+
+/* ════════════════════════════════════════
+   THEME SWITCH  (sun | moon, stamped by apply-nav.py beside NL | EN)
+   Same form and weight as the language switch: two halves and a bar, the
+   current edition drawn in the ink and underlined, the other in --ink-2.
+   One button; aria-pressed="true" means the dark edition is on. The marking
+   follows <html data-theme>, which /js/theme.js writes before the first
+   paint, so the switch never shows the wrong half, not even for a frame.
+   In the bar from 701px up; below that it sits with NL | EN in the strip
+   under the drawer.
+   ════════════════════════════════════════ */
+.nav-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.nav-theme-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 44px;
+  color: var(--ink-2);
+}
+.nav-theme-opt .nav-theme-icon {
+  padding-bottom: 3px;
+  border-bottom: 1.5px solid transparent;
+  box-sizing: content-box;
+}
+.nav-theme-sep { color: var(--ink-2); padding: 0 2px; }
+:root:not([data-theme="dark"]) .nav-theme-light,
+:root[data-theme="dark"] .nav-theme-dark { color: var(--ink); }
+:root:not([data-theme="dark"]) .nav-theme-light .nav-theme-icon,
+:root[data-theme="dark"] .nav-theme-dark .nav-theme-icon { border-bottom-color: currentColor; }
+.nav-theme:hover .nav-theme-opt { color: var(--cobalt); }
+.nav-theme:focus-visible {
+  outline: 3px solid var(--accent-ring, rgba(29, 78, 216, .35));
+  outline-offset: 2px;
+}
+/* In the strip the two switches share one row. */
+.nav-mobile-tail .nav-prefs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+@media (max-width: 700px) {
+  nav.nav .nav-theme { display: none; }
+}
+
+/* ════════════════════════════════════════
+   TIGHT BAR  (1280 to 1439px)
+   The widest bar, signed in and in Dutch, is six workspace links, the account
+   button, NL | EN and the theme switch: about 1350px at the roomy padding. The
+   step to the hamburger sits at 1280, so from there up to 1439 the bar gives
+   back its own air (side padding, the gap, the padding inside each link)
+   instead of pushing its last items past the edge.
+   tests/responsive-overflow.test.mjs measures it at every width.
+   ════════════════════════════════════════ */
+@media (min-width: 1280px) and (max-width: 1439px) {
+  nav.nav { padding: 0 24px; gap: var(--space-3); }
+  nav.nav .nav-link { padding: 0 var(--space-2); }
+  nav.nav .nav-link::after { left: var(--space-2); right: var(--space-2); }
 }

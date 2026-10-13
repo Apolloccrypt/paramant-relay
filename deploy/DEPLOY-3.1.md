@@ -1,4 +1,4 @@
-# Deploy runbook: main (3.1.0) to production
+# Deploy runbook: main (3.1.3) to production
 
 > `deploy/deploy-3.1.sh` executes this runbook. One command from the NUC
 > (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
@@ -37,6 +37,10 @@ ParaID-uitgifteroute staat open op productie*):
 | `MOLLIE_TEST_API_KEY` | not set | there is none, and none is coming for now |
 | `/v1/paraid/issue-*` | 404 from nginx, all six server blocks (server-side edit of 01-09) | route removed in the relay (#319) |
 | `/v2/health/deep` | `{"error":"Not available in this relay mode"}` | 200 behind `X-Internal-Auth` (#322) |
+
+Which outside party each key belongs to, and whether that party is active, is
+in `deploy/partners.json` (see RUNBOOK.md, section 7). A key for a party that
+is not `actief` there is a dead leftover, and `tests/partners.test.mjs` says so.
 
 What main brings that touches the deploy, with the PR that did it:
 
@@ -97,6 +101,14 @@ The three stances, pinned by `relay/test/billing-stance.test.js` and
 
 An explicit mode without its key boots at `error` and no checkout works, which
 is the existing `mollie_key_missing` contract.
+
+A key whose prefix belongs to the other mode (a `live_` value in
+`MOLLIE_TEST_API_KEY`, a `test_` value in `MOLLIE_API_KEY`) is refused as if it
+were absent, and a `BILLING_MODE` other than `live` or `test` (a typo such as
+`prod`) falls back to the empty stance. Both boot at `error`, with a `problems`
+list on the `billing_config` line and one `billing_config_refused` line each.
+The production stance above is unchanged by this. Pinned by
+`relay/test/incasso-latent.test.js`.
 
 So: **leave `BILLING_MODE` empty for this deploy.** Turning the recurring
 layer on is a separate decision, taken when there is a Mollie test key to
@@ -234,6 +246,24 @@ for v in BILLING_MODE MOLLIE_API_KEY MOLLIE_TEST_API_KEY INTERNAL_AUTH_TOKEN ADM
   docker compose exec -T relay-main sh -c "v=\$(printenv $v); if [ -z \"\$v\" ]; then echo empty; else echo set, prefix \$(echo \$v | cut -c1-5); fi"
 done
 grep -c '^INTERNAL_AUTH_TOKEN=' .env
+
+# The seller (#517): how many lines of .env hold a value. deploy-3.1.sh step 1b
+# goes further and reports each one, in .env and in relay-main, as empty, match
+# or differs against the public details. Never a value, not even a prefix.
+for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
+  printf '%-24s .env lines %s\n' "$v" "$(grep -cE "^(export[[:space:]]+)?$v=[[:space:]]*[\"']?[[:space:]]*[^\"'[:space:]]" .env)"
+done
+```
+
+NODE_ENV of the relay containers (`deploy-3.1.sh` step 1a2, again as 6k0 after
+the recreate and under `--verify-only`). From 3.1.2 a relay with NODE_ENV
+`test`, `development` or `dev`, or with `PARAMANT_FLEET_GOSSIP=0`, sends no tree
+heads to the fleet, so health would stop gossiping. The script stops on it:
+
+```bash
+for s in relay-main relay-health relay-finance relay-legal relay-iot; do
+  printf '%s NODE_ENV=%s\n' "$s" "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$(docker compose ps -q $s)" | sed -n 's/^NODE_ENV=//p')"
+done   # every line empty or production
 ```
 
 ### Which commit do we expect here
@@ -282,8 +312,8 @@ What has to be true before step 2:
 | `BILLING_MODE` | the recurring layer | **empty**. Do not set it in this deploy. |
 | `MOLLIE_API_KEY` | one-off checkout, as since 08-08 | set, `live_` prefix, unchanged |
 | `PARASIGN_CANARY_KEY` | the hourly ParaSign canary in `product-heartbeat.yml` | not a relay variable: a GitHub Actions secret holding a `psk_test_` key with the parasign scope. See step 7. |
-| `BILLING_SELLER_ADDRESS` | the supplier address on every invoice | set, with `\n` between lines. Empty prints an empty address block, which makes the document invalid under Wet OB art. 35a. |
-| `BILLING_SELLER_VAT` | whether a paid customer gets an invoice or a receipt | **not known yet.** Leave empty until the btw-id is on file. See below. |
+| `BILLING_SELLER_NAME`, `_ADDRESS`, `_KVK` | the seller on every document (#517) | set, in `.env`, matching the public details. Step 1e writes a missing one, after a backup. |
+| `BILLING_SELLER_VAT` | whether a paid customer gets a VAT invoice or a payment receipt, and whether reverse charge to an EU business can happen at all (#517) | **a decision.** Empty unless the deploy runs with `--seller-vat`; then step 1e writes it. See "Invoices: the four seller variables" below. |
 
 If `INTERNAL_AUTH_TOKEN` is empty: generate one (`openssl rand -hex 32`), add
 `INTERNAL_AUTH_TOKEN=...` to `/opt/paramant-relay/.env`, and know that the
@@ -298,12 +328,49 @@ payment. The number comes from a redis counter per calendar year
 retention is seven years, and the PDF is mailed to the account address through
 the existing Resend key. Nothing about the payment path itself changes.
 
-| variable | default | what it does |
-|---|---|---|
-| `BILLING_SELLER_NAME` | `Paramantis Solutions B.V.` | the name on the document |
-| `BILLING_SELLER_ADDRESS` | empty | the address block; `\n` separates lines |
-| `BILLING_SELLER_KVK` | `42115132` | printed in the footer (Handelsregisterwet art. 25) |
-| `BILLING_SELLER_VAT` | empty | the btw-id; **decides what the document is** |
+| variable | default in the code | what step 1e writes when it is missing | what it does |
+|---|---|---|---|
+| `BILLING_SELLER_NAME` | `Paramantis Solutions B.V.` | `"Paramantis Solutions B.V."` | the name on the document |
+| `BILLING_SELLER_ADDRESS` | empty | `"Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"` | the address block; `\n` separates lines |
+| `BILLING_SELLER_KVK` | `42115132` | `42115132` | printed in the footer (Handelsregisterwet art. 25) |
+| `BILLING_SELLER_VAT` | empty | `NL869798017B01` | the btw-id; **decides what the document is** |
+
+These are the public details of Paramantis Solutions B.V.: VIES holds the same
+name and address for that btw-id (checked 2026-09-25). They reach a relay only
+through the `x-relay-env` block of `docker-compose.yml`, and that block passes
+them from #517 on. Before that, a value in `.env` was never seen by any relay.
+
+`deploy/deploy-3.1.sh` step 1e writes them, the way 1c and 1d write theirs,
+with one difference: **the btw-id is a decision, not a default.**
+
+- Without `--seller-vat` 1e writes the name, the address and the KvK number
+  and leaves `BILLING_SELLER_VAT` alone. Every document stays a payment
+  receipt and nothing is reverse charged, and the run says so.
+- With `--seller-vat` (`bash deploy/deploy-3.1.sh --seller-vat`) 1e writes the
+  btw-id too, and the run says in so many words that from the recreate in
+  phase 4 on every new document is a VAT invoice and a business in another EU
+  country with a valid VAT number pays without VAT. Tell the bookkeeper
+  before the deploy, not after.
+- A btw-id that is already in `.env` without `--seller-vat` stops the run:
+  either confirm it with the flag or take the line out.
+- Every existing seller line is compared with the public details on its
+  letters and digits: `Paramantis Solutions BV`, an `export ` in front, blanks
+  or quotes around the value, and `Meerkoetmeen 47, 3844XM Harderwijk` on one
+  line all match. A line that differs stops the run before anything is
+  written; correct it or remove it by hand. A matching line is left alone,
+  byte for byte.
+- A missing line, or one set to nothing (`BILLING_SELLER_VAT=` or
+  `BILLING_SELLER_VAT=""`), gets the line in the table. Before the first write
+  1e copies `.env` to `/home/paramant/backups/.env-pre-seller-<TS>`, mode 600,
+  under the run's own TS. That copy is what `--rollback <TS>` puts back.
+- The address goes in double quotes, because docker compose turns `\n` inside
+  double quotes into a line break (checked with `docker compose config`).
+  `lib/invoice.js` reads an unquoted `\n` as a line break as well.
+- `.env` stays mode 600. Under `--preflight-only` the step only reports.
+- In a real run the output names the variable and its state (empty, match or
+  differs) and what happened to it, never the value. `--dry-run` prints the
+  script's remote blocks themselves, and the 1e block holds the four public
+  details.
 
 `BILLING_SELLER_VAT` is the one that matters. A document without the supplier's
 VAT identification number is not an invoice, and a customer who files it cannot
@@ -320,11 +387,20 @@ Set the variable and every document issued after the restart is a full VAT
 invoice. Documents already issued keep the form they were issued in on purpose:
 an invoice is a record of what was sent, not a template that reprints.
 
-Verify after the deploy, on any relay container:
+Step 6j verifies it after the deploy, without printing a value. It asks each
+of the five relays, through the relay's own `lib/invoice.js`, what it makes of
+its environment, compared with the same public details:
 
 ```
-docker compose exec relay-main printenv | grep BILLING_SELLER
+seller relay-main     name=match address=match kvk=match vat=match kind=invoice address_lines=3
 ```
+
+It counts: exactly five relays have to answer in exactly that shape, with
+`vat=match kind=invoice` after a `--seller-vat` run and `vat=empty
+kind=receipt` after any other. Anything else stops the run: a relay that does
+not answer, a value that differs, a sixth answer, or an address without any
+line breaks at all. A `docker compose config` that fails, or a compose that
+does not pass the four variables to the relays, is a stop too, not a skip.
 
 and, once a real payment has come in, that the log line says `result:"issued"`:
 
@@ -428,6 +504,16 @@ cp .env /home/paramant/backups/.env-pre-3.1-$TS && chmod 600 /home/paramant/back
 docker compose ps > /home/paramant/backups/state-pre-3.1-$TS.txt
 tar czf /home/paramant/backups/docroot-pre-3.1-$TS.tgz -C /home/paramant app
 cp /etc/nginx/sites-enabled/paramant-public.conf /etc/nginx/backups/paramant-public.conf.pre-3.1-$TS
+```
+
+The mirror of the other relays' tree heads (`deploy-3.1.sh` step 2c). 3.1.2
+moves heads that are not from a pinned key to `peer-sths/purged/` at its first
+start; it never deletes, but the copy is taken anyway, one tar per relay:
+
+```bash
+for s in relay-main relay-health relay-finance relay-legal relay-iot; do
+  docker cp "$(docker compose ps -q $s):/data/peer-sths" - > /home/paramant/backups/peer-sths-$s-pre-3.1-$TS.tar
+done
 ```
 
 ### The nginx conf names are not the same on every server
@@ -578,7 +664,7 @@ shape:
 `recurring:false` and `mode_source:inferred` are the brake. If it says
 `recurring:true`, `BILLING_MODE` is set somewhere: stop, find it, and do not
 continue until the line reads as above. `relay_started` must say
-`version:"3.1.0"`.
+`version:"3.1.3"`.
 
 Then the rest:
 
@@ -590,6 +676,36 @@ for c in health finance legal admin; do wait_healthy paramant-relay-$c || exit 1
 ```
 
 ## Step 5: frontend and nginx (server)
+
+### First: tag v3.1.3 on the merge commit
+
+`frontend/install.sh` is what `curl -fsSL https://paramant.app/install.sh | bash`
+runs, and since 3.1.1 it clones the release tag, now `v3.1.3` (`RELAY_VERSION` default; the same
+pin is in `install.sh` and `frontend/install-pi.sh`). The rsync below puts that
+installer live. Without the tag the one-line install stops at
+`git clone --branch v3.1.3` on every new machine. So the tag goes on the merge
+commit of the 3.1.3 PR on `main` **before** step 5, not afterwards in step 7:
+
+```bash
+# [admin], from a checkout of the repo
+git fetch origin main --tags
+C=<merge commit of the 3.1.3 PR on main>
+git merge-base --is-ancestor "$C" origin/main && echo "on main"
+git show "$C:package.json" | grep '"version": "3.1.3"'   # the tag is v plus this version
+git tag -a v3.1.3 -m "Release 3.1.3" "$C"
+git push origin v3.1.3
+git ls-remote --tags origin v3.1.3             # must print the tag before step 5
+```
+
+`deploy-3.1.sh` enforces this: before phase 2 (step `1z`, nothing written yet)
+and again right before phase 5 (step `5-pre`) it reads the tag the three
+installers pin, runs `git ls-remote --tags origin <tag>`, and stops when the tag
+is missing on origin or names another commit than the one it deploys. The stop
+line carries the exact `git tag -a ... && git push origin ...` to run.
+
+The tag push also starts `docker-publish.yml` (images `3.1.3`). If the server
+checkout is not on `$C` after step 3, stop: the tag would name a commit other
+than the one that is deployed.
 
 The docroot is a copy, not the checkout. Without `--delete`, on purpose:
 `dist/`, `paramant-mark.svg`, `developer.js` and the investor brief live only
@@ -789,6 +905,100 @@ Doing it by hand:
 nginx -T 2>/dev/null | grep -c 'limit_req_zone .* zone=relay_auth'   # must be 1, never 2
 ```
 
+### Step 5e: the whole site conf, not seven edits
+
+5c edits the server confs by anchor and never copied `deploy/nginx-paramant-live.conf`
+over them. Everything in that file that 5c did not name stayed in git. The
+prodtest of 2026-10-05 (after deploy TS 20261005-1557) measured the cost: the
+server `paramant.conf` differed from the repo by about 600 lines, and two of them
+were visible to every visitor:
+
+- every `/api/user/` route still sat on `relay_auth` (a login brake), so 12
+  parallel `/api/user/me` gave 6 x 429 and one `/account` load already got 429.
+  The `user_session` zone was bound but no location used it.
+- `/parashare?t=` and `/en/parashare?t=` (the add-in link) went to the login
+  page and lost the token, because the `$arg_t` redirect to `/get` was missing.
+
+Step 5e places the **whole** repo conf on the live slot (`paramant-live.conf`,
+else `paramant.conf`; `PARAMANT_NGINX_LIVE_SLOT` overrides), plus the
+security-headers snippet it includes (`/etc/nginx/snippets/paramant-security-headers.conf`).
+The public conf (slot 1) is not touched by 5e.
+
+1. **Render, locally.** `deploy/nginx-render.sh` fills in the two docroots
+   (`PARAMANT_DOCROOT`, `PARAMANT_LEGAL_DOCROOT`). With the production defaults
+   the output is the repo file byte for byte. The conf carries no certificate,
+   no `server_name` and no public listen: TLS ends in Caddy, so there is nothing
+   else per machine. The render comes from the commit phase 3 left the server
+   on (`PARAMANT_NGINX_REF` overrides), not from the NUC's working tree.
+2. **Gate, locally.** Before anything leaves the NUC: `/api/user/login` and
+   `/api/user/auth/webauthn/login/` on `relay_login`; `/api/user/auth/`, `setup/`,
+   `signup`, `account/totp/` and `account/backup-codes/` on `relay_auth`;
+   `/api/user/` on `user_session`; the `$arg_t` redirect on both `/parashare`s.
+3. **Server.** The conf and snippet travel base64 with their sha256 and are
+   checked on arrival. Every zone the conf uses must be bound in `nginx -T`
+   (otherwise FATAL, nothing written). Read-only, also before any write: if
+   another enabled conf (`paramant-public.conf`) proxies to `127.0.0.1:808[1-6]`,
+   5e prints those lines and stops, because the body limits of those blocks
+   would then meet real uploads. After comparing, `PARAMANT_NGINX_PUBLIC_808X_OK=1`
+   lets it go ahead. `:8086 /v2/` carries no `limit_req`, as on production: the
+   `api` zone (60/min) would cut a large upload off with 429. Then backups
+   (`/etc/nginx/backups/<name>.pre-nginx-sync-<TS>` and the snippet; a marker
+   `...absent-nginx-sync-<TS>` when there was no snippet), the diff printed in
+   full (`confdiff`, `snipdiff`), the write (through the symlink, `cat` not
+   `mv`), `nginx -t`, reload. A failing `nginx -t` or reload puts both files
+   back and reloads the old config. So does any command that fails after the
+   backups (a write on a full or read-only disk): an `ERR`/`EXIT` trap puts conf
+   and snippet back together, and only reloads when both are back on disk.
+4. **Loopback on the server**, straight at `127.0.0.1:8080` with
+   `Host: paramant.app`: the home page answers 200 and `/parashare?t=` answers
+   302 to `https://paramant.app/get?t=...`. A reload only signals nginx, so the
+   old workers answer for a moment (27 in 100 checks right after a reload); 5e
+   asks every 0.5 s for up to 10 s until the new conf answers, and judges
+   then. On a fault: back again.
+5. **From the NUC, through Caddy**: `/parashare?t=x` and `/en/parashare?t=x`
+   answer 302 to `/get?t=x` and `/en/get?t=x`, and 12 parallel
+   `/api/user/me` get no 429. On a fault: the backups go back and the run stops.
+
+What the server had that git did not, and is now in git (so nothing the
+server needs disappears with the copy): `absolute_redirect off` and
+`port_in_redirect off` on `:8080`, the `CT-BACKUP-DENY` location, the
+document-capsule location (`/api/user/envelopes/<id>/document`, 6m, which 5c
+used to insert), and HSTS out of the snippet (CT-DEDUP: Caddy sets it). What
+the server had dropped and git now drops too: the `:8090` block and the
+`/dicom/` gateway in front of it (H2: `paramant-ghost-pipe.fly.dev` no longer
+resolves, so it was a 502 that sent imaging data outside the EEA). The full
+table is in the prodtest evidence, `nginx/DRIFT.md`.
+
+#### Only the nginx conf: `--nginx-sync`
+
+```bash
+# what would change, nothing written, no ssh; diff against a copy of the server conf
+PARAMANT_NGINX_LIVE_COPY=/path/to/paramant.conf bash deploy/deploy-3.1.sh --dry-run --nginx-sync
+# the live diff, read-only
+bash scripts/check-prod-drift.sh
+# place it: steps 1 to 5 above and nothing else
+bash deploy/deploy-3.1.sh --nginx-sync
+```
+
+`--nginx-sync` runs 5e alone: no tags, no pull, no build, no recreate, no
+docroot. It renders from `DEPLOY_REF` (the conf should match the frontend that
+is live; set `PARAMANT_NGINX_REF` to the deployed commit when main has moved on).
+Its backups carry the run TS of that run, not a step-2 TS, so `--rollback`
+does not apply; the restore is
+
+```bash
+cp /etc/nginx/backups/paramant.conf.pre-nginx-sync-<TS> /etc/nginx/sites-enabled/paramant.conf
+cp /etc/nginx/backups/paramant-security-headers.conf.pre-nginx-sync-<TS> /etc/nginx/snippets/paramant-security-headers.conf
+nginx -t && systemctl reload nginx
+```
+
+`scripts/check-prod-drift.sh` now reads the site conf and the snippet as well
+and reports `nginx drift guard: OK` or the diff. Test lock:
+`tests/nginx-volledig-docker.test.mjs` boots the rendered conf in nginx:alpine
+behind a Caddy stand-in and holds the redirect, the 12 parallel calls and the
+strict doors; `tests/deploy-3.1-dryrun.test.sh` section 10 runs the real 5e
+block against stubs, every restore path included.
+
 ## Step 6: smoke tests
 
 In the order `deploy.sh` runs them, plus the two the 3.0.0 runbook used.
@@ -887,15 +1097,32 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://iot.paramant.app/v1/par
 curl -s -o /dev/null -w '%{http_code}\n' https://paramant.app/sign                                   # 200
 
 # 6f. the version the relay reports
-curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.0
+curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.3
 
 # 6g. billing stance on every relay, once more, from the logs
 for c in main health finance legal iot; do printf '%-8s' $c; docker logs paramant-relay-$c 2>&1 | grep '"billing_config"' | tail -1 | grep -o '"recurring":[a-z]*'; done
+
+# 6l. the host hardening /dpa promises, read-only (deploy-3.1.sh step 6l)
+systemctl is-active auditd                       # active
+command -v aide; ls -l /var/lib/aide/aide.db* /var/log/aide/   # binary, database, a log at most 2 days old
+aa-status --enabled && aa-status | grep 'profiles are in enforce mode'   # at least 1
 ```
+
+Step 6l also runs under `--verify-only`. It writes one line per point to the
+deploy log and flags a miss when auditd is not active, AIDE is missing, has no
+database or last checked more than 2 days ago (`PARAMANT_AIDE_MAX_AGE_DAYS`),
+or AppArmor is not enabled with at least one profile in enforce mode. A miss is
+a WARN, in the log and again in the summary under "HOST NOT PROVEN", and the
+deploy goes on to write the deployed-head marker: 6l runs after everything is
+live, and the host state was never measured before this step existed, so a stop
+here only left the next run stuck in 1a (review-574 N1). `--host-strict` makes
+a miss a STOP (never a rollback: the containers are fine). /dpa therefore
+promises the check ("we check at every deploy whether ..."), not its outcome.
+Once the host is right, confirm with `--verify-only --host-strict`.
 
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without
-`3.1.0`, or a `billing_config` line with `recurring:true`. A
+`3.1.3`, or a `billing_config` line with `recurring:true`. A
 `post-deploy-verify.sh` exit 1 stops the script too, but it is a non-critical
 failure: read the list, fix it, do not roll back on it.
 
@@ -964,8 +1191,19 @@ passing on an empty search.
    server against `127.0.0.1:3000`.
 3. **Drift guard** from the NUC: `scripts/check-prod-drift.sh origin/main` must
    print `OK`.
-4. Tag it: `git tag v3.1.0 <commit> && git push origin v3.1.0`, and put the live
-   date in `CHANGELOG.md`.
+4. Check the tag from step 5 names the commit that is live, and put the live
+   date in `CHANGELOG.md`. `v3.1.3` was set on the merge commit before the
+   frontend went out (step 5, "First: tag v3.1.3 on the merge commit"); here
+   it is compared with `/home/paramant/backups/deployed-head`:
+   ```bash
+   # [admin]
+   C=$(ssh <server> cat /home/paramant/backups/deployed-head)
+   [ "$(git rev-parse 'v3.1.3^{commit}')" = "$C" ] && echo "tag is live commit"
+   ```
+   Then check the installer and upgrade path once from a clean machine (matrix
+   SELF-01-A, SELF-12-A, SELF-13-A): `curl -fsSL https://paramant.app/install.sh | bash`
+   reaches "Stack healthy" on `v3.1.3`, and on a v3.1.2 install
+   `paramant upgrade` moves HEAD to the newest tag.
 5. Write the deploy down in the vault (`Sessies/2026-09/`), with the
    `billing_config` line as it was logged.
 
@@ -997,6 +1235,65 @@ line in `.env` and a recreate:
 Never set `BILLING_MODE=live` as the first step: that is exactly the deploy
 this brake exists to prevent.
 
+## Daily backup (systemd timer)
+
+`deploy/ops/backup-full-state.sh` used to run only inside a deploy (step 2).
+Between deploys nothing backed up the relay identities, the CT log or redis.
+`deploy/systemd/` has a oneshot service and a timer that run it every day at
+03:30 UTC. `Persistent=true` catches up a run the server missed while it was off.
+
+The bundle now also carries the host configuration, each only when present:
+`/opt/paramant-relay/.env`, `/etc/nginx`, `/etc/letsencrypt`, `/etc/caddy` and
+`/home/paramant/secrets`, under `host/` in the bundle. That makes the bundle
+the escrow of every production secret, so it is encrypted to more than one key.
+
+### Recipients: the server key and the offline escrow key
+
+The script encrypts to the public key in `/root/.config/paramant-backup/key.txt`
+(so a restore on this server works) plus every line of
+`/root/.config/paramant-backup/recipients.txt`, passed to `age -R`. The escrow
+key is made on an offline machine; only its public half goes to the server.
+
+```bash
+# offline machine, never networked while the key exists on it
+age-keygen -o escrow-key.txt          # prints "Public key: age1..."
+# print escrow-key.txt, store the paper with the owner, destroy the file
+
+# server, as root: add the PUBLIC key only
+install -d -m 700 /root/.config/paramant-backup
+echo 'age1...escrow-public-key...' >> /root/.config/paramant-backup/recipients.txt
+chmod 600 /root/.config/paramant-backup/recipients.txt
+
+# which keys will the next backup be encrypted to (writes nothing)
+bash /opt/paramant-relay/deploy/ops/backup-full-state.sh --recipients
+# expect: recipients: 2 (or more). "only one recipient" means no escrow key yet.
+```
+
+### Install the timer (server, as root)
+
+```bash
+cd /opt/paramant-relay
+install -m 644 deploy/systemd/paramant-backup.service /etc/systemd/system/
+install -m 644 deploy/systemd/paramant-backup.timer   /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now paramant-backup.timer
+systemctl list-timers paramant-backup.timer          # next run 03:30 UTC
+
+# first run by hand, then read what it wrote
+systemctl start paramant-backup.service
+journalctl -u paramant-backup.service -n 30 --no-pager
+# expect: "OK: N relay(s) + redis=1 + host=M, ... file(s), 2 recipient(s) -> ..."
+```
+
+If a cron line for the same script exists (`docs/ops/backup-restore-full.md`
+suggested one), remove it, or the backup runs twice a night. Whether the
+server has one is not known from the repo.
+
+The unit runs the script from the checkout, so a `git pull` in step 3 also
+updates what the timer runs. Restoring is `deploy/ops/restore-full-state.sh`;
+it restores relay data and redis, and lists the host configuration, which is
+put back by hand (see `RUNBOOK.md`, section Backup and restore).
+
 ## Step 8: rollback
 
 Trigger: any of the stop conditions in step 6, or clear breakage in the first
@@ -1009,8 +1306,46 @@ bash deploy/deploy-3.1.sh --rollback 20260902-1830
 ```
 
 That reads the manifest of step 2, retags the saved images, recreates the
-containers without rebuilding, restores `.env`, the nginx confs and the
-docroot, and re-runs the smoke tests. By hand, on the server, the equivalent
+containers without rebuilding, restores `.env`, the nginx confs (and the
+security-headers snippet when step 5e replaced it in that run) and the
+docroot, and re-runs the smoke tests. The `.env` it restores is the copy from
+before step 1e (`.env-pre-seller-$TS`) when 1e wrote anything in that run, and
+the step 2b copy (`.env-pre-3.1-$TS`) otherwise; the output says which.
+
+### Taking the seller back out
+
+The step 2b copy was made after step 1, so it already holds whatever 1e
+wrote. That is why the rollback prefers `.env-pre-seller-$TS`: it is the same
+file minus the seller lines of that run. The rollback does not touch git, the
+checkout stays on main, and main's `docker-compose.yml` passes whatever `.env`
+holds, so the file is what decides.
+
+By hand, on the server, everything 1e wrote in run `$TS`:
+
+```bash
+cd /opt/paramant-relay
+cp -a .env .env.bak-before-seller-rollback-$(date +%Y%m%d-%H%M)
+cp -a /home/paramant/backups/.env-pre-seller-$TS .env && chmod 600 .env
+docker compose up -d --no-deps --force-recreate relay-main relay-health relay-finance relay-legal relay-iot
+```
+
+Only the btw-id, so documents go back to payment receipts and reverse charge
+stops, while the name, the address and the KvK number stay:
+
+```bash
+cd /opt/paramant-relay
+cp -a .env .env.bak-before-seller-rollback-$(date +%Y%m%d-%H%M)
+sed -i -E '/^(export[[:space:]]+)?BILLING_SELLER_VAT=/d' .env && chmod 600 .env
+docker compose up -d --no-deps --force-recreate relay-main relay-health relay-finance relay-legal relay-iot
+```
+
+Then run `bash deploy/deploy-3.1.sh --verify-only` (without `--seller-vat`): 6j
+has to count five relays with `vat=empty kind=receipt`.
+
+What a rollback does not undo: every invoice issued in between stays an
+invoice with its number, and every payment that was reverse charged stays
+reverse charged, with its VIES proof. Documents are never rewritten. The
+bookkeeper has to know which numbers were issued in that window. By hand, on the server, the equivalent
 is the 3.0.0 script, which asks before it restores `.env`:
 
 ```bash

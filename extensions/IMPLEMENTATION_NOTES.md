@@ -44,11 +44,11 @@ So nothing actually encrypted, uploaded, or produced a working link.
    both installed never sees two buttons), remove the Outlook block from
    `chromium/manifest.json` `content_scripts` and the `content/outlook` webpack entry. I did
    not remove it because both paths now work and removing is your call.
-2. **Upload requires an API key.** TOTP login is kept but dormant (the relay capability is
-   off). A TOTP-only upload path would need a same-origin `paramant.app/api/relay` proxy I
-   could not verify exists. The popup/taskpane only show TOTP when the relay advertises it.
-3. **Product name** is now "Paramant: Encrypted Attachments" (colon, no em-dash).
-4. **Version** set to 1.0.0 in `chromium/manifest.json` and both `package.json`s.
+2. **Uploads.** The Chromium extension uploads with the API key, or, after an e-mail +
+   authenticator sign-in, with a 15-minute ParaSend session token from
+   POST /api/user/parasend/token on the health relay (2026-10-04, fase 1 EXT-03-A). The
+   Outlook taskpane offers the API key only: paramant.app does not answer a sign-in from
+   addin.paramant.app with CORS headers (EXT-20-A).
 
 ## Findings (acted on / for you)
 

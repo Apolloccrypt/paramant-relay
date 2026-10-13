@@ -132,6 +132,15 @@ async function stubRelay(state) {
         return reply();
       }
       if (url.pathname === '/health') return send(200, { ok: true });
+      // Any other route a suite wants answered: state.route(method, path,
+      // headers, body) returns { status, body } or nothing for the 404 below.
+      if (typeof state.route === 'function') {
+        const out = state.route(req.method, url.pathname, req.headers, body || {}, url);
+        if (out) {
+          if (out.headers) for (const [k, v] of Object.entries(out.headers)) res.setHeader(k, v);
+          return send(out.status || 200, out.body !== undefined ? out.body : {});
+        }
+      }
       return send(404, { error: 'stub_relay_has_no_such_route', path: url.pathname });
     });
   });

@@ -6,8 +6,8 @@
 // link into the compose body. The page never sees the API key, and the whole file is never
 // held in memory at once (chunks are sliced lazily from disk).
 
-import { CHUNK_PLAIN } from '../../../shared/paramant-core.js';
-import { startUpload, showError } from './shared/banner.js';
+import { CHUNK_PLAIN, encodeChunkMessage } from '../../../shared/paramant-core.js';
+import { startUpload, showError, showUpgrade } from './shared/banner.js';
 import { buildLinkHtml } from './shared/link-replace.js';
 import { getSettings } from '../shared/settings.js';
 
@@ -19,6 +19,8 @@ const FALLBACK = {
   err_network:  'Network error. Check your connection and try again.',
   err_upload:   'Upload failed. Please try again.',
   err_incomplete: 'Upload did not finish. Please try again.',
+  err_quota:    'Monthly transfer limit reached. Upgrade your plan to send more.',
+  cta_upgrade:  'Upgrade plan',
   success_inserted: 'Encrypted link inserted',
   link_title:   'Encrypted attachment via Paramant',
   link_meta:    'End-to-end encrypted. Single download. Expires {expiry}.',
@@ -145,9 +147,11 @@ async function uploadOne(composeWin, file, config) {
     for (let i = 0; i < total; i++) {
       if (cancelled) { await send({ type: 'TRANSFER_ABORT', transferId }).catch(() => {}); ui.remove(); return; }
       const slice = file.slice(i * CHUNK_PLAIN, Math.min((i + 1) * CHUNK_PLAIN, file.size));
-      const bytes = await slice.arrayBuffer();
-      const res = await send({ type: 'TRANSFER_CHUNK', transferId, index: i, bytes });
-      if (!res?.ok) throw new TransferError(res?.error);
+      // base64, not the ArrayBuffer: sendMessage serialises as JSON and an
+      // ArrayBuffer arrives as {} (zero bytes). See decodeChunkMessage.
+      const b64 = encodeChunkMessage(await slice.arrayBuffer());
+      const res = await send({ type: 'TRANSFER_CHUNK', transferId, index: i, b64 });
+      if (!res?.ok) throw new TransferError(res?.error, res);
       ui.setProgress((i + 1) / total);
     }
 
@@ -160,12 +164,29 @@ async function uploadOne(composeWin, file, config) {
     ui.succeed(t('success_inserted'));
   } catch (err) {
     if (transferId) send({ type: 'TRANSFER_ABORT', transferId }).catch(() => {});
+    const detail = err?.detail;
+    if (detail?.code === 'quota_reached') {
+      // Monthly transfer quota (402): show a real upgrade path, not a plain error.
+      ui.remove();
+      showUpgrade(quotaMessage(detail), detail.upgradeUrl || 'https://paramant.app/pricing', t('cta_upgrade'));
+      return;
+    }
     if (String(err?.message || err || '') === 'not_authenticated') send({ type: 'OPEN_POPUP' }).catch(() => {});
     ui.fail(friendlyError(err));
   }
 }
 
-class TransferError extends Error {}
+// TransferError carries the raw worker response (detail) so the quota 402 fields
+// (plan/limit/upgradeUrl) survive to the catch above.
+class TransferError extends Error {
+  constructor(message, detail) { super(message); this.detail = detail || null; }
+}
+
+// The shared core already builds a full human sentence (with plan + limit + the
+// pricing URL) in detail.error; prefer it, fall back to the localized generic.
+function quotaMessage(detail) {
+  return String(detail?.error || t('err_quota'));
+}
 
 function friendlyError(err) {
   const m = String(err?.message || err || '');

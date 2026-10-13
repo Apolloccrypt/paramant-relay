@@ -24,13 +24,18 @@ const pricing = readFileSync(new URL('../../frontend/js/pricing-billing.js', imp
 
 // Lift safeNext out of the file and run it against a fake location, so the test
 // exercises the real shipped source rather than a copy that can drift from it.
-function loadSafeNext() {
+// The fallback follows <html lang> since 23 September 2026 (the Dutch page and
+// its English copy under /en/ share this file), so nlEn is lifted with it.
+function loadSafeNext(lang = 'nl') {
   const m = passkey.match(/function safeNext\(\)\s*\{[\s\S]*?\n\}/);
   assert.ok(m, 'safeNext not found in passkey.js');
-  const fn = new Function('window', 'URLSearchParams', `${m[0]}; return safeNext;`);
-  return (search) => fn({ location: { search } }, URLSearchParams)();
+  const sw = passkey.match(/function nlEn\(nl, en\) \{[^\n]*\}/);
+  assert.ok(sw, 'nlEn not found in passkey.js');
+  const fn = new Function('window', 'URLSearchParams', 'document', `${sw[0]}\n${m[0]}; return safeNext;`);
+  return (search) => fn({ location: { search } }, URLSearchParams, { documentElement: { lang } })();
 }
 const safeNext = loadSafeNext();
+const safeNextEn = loadSafeNext('en');
 
 test('a local path is honoured', () => {
   assert.strictEqual(safeNext('?next=%2Fpricing'), '/pricing');
@@ -44,6 +49,12 @@ test('the older return parameter still works', () => {
 test('no parameter falls back to the dashboard', () => {
   assert.strictEqual(safeNext(''), '/dashboard');
   assert.strictEqual(safeNext('?next='), '/dashboard');
+});
+
+test('on the English copy the fallback is the English dashboard', () => {
+  assert.strictEqual(safeNextEn(''), '/en/dashboard');
+  assert.strictEqual(safeNextEn('?next=%2F%2Fevil.example'), '/en/dashboard');
+  assert.strictEqual(safeNextEn('?next=%2Fpricing'), '/pricing');
 });
 
 test('a protocol-relative target is refused, not followed', () => {

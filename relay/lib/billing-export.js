@@ -32,6 +32,7 @@
 // and gross, exactly as the record stores them, and names the invoice it
 // credits. Nothing is netted off and nothing is summarised away: the reader is
 // a bookkeeper who has to see both documents.
+const { neutralize } = require('./csv-safe');
 
 const invoice = require('./invoice');
 
@@ -90,10 +91,18 @@ function commaDecimal(value) {
 // customer_name is the company when the account filled one in and the email
 // address when it did not, so the column is never empty on a document that has
 // a buyer at all. The email keeps its own column either way.
+//
+// The last three are for the ICP return (opgaaf intracommunautaire
+// prestaties) and box 3b of the VAT return: whether the VAT was reverse charged
+// (lib/vat.js), the member state of the customer's VAT number, and the VIES
+// consultation number that proves the number was checked. Moneybird does not
+// book reverse-charged documents, so this file is where the bookkeeper finds
+// them. At the end, so a mapping made for the older columns still reads.
 const COLUMNS = [
   'number', 'date', 'type', 'customer_name', 'customer_email', 'customer_vat',
   'description', 'amount_net', 'vat_rate', 'amount_vat', 'amount_gross',
   'currency', 'payment_id', 'credit_for', 'moneybird_id',
+  'vat_treatment', 'customer_country', 'vat_consultation',
 ];
 
 const MONEY_COLUMNS = new Set(['amount_net', 'amount_vat', 'amount_gross']);
@@ -116,6 +125,9 @@ function rowOf(record) {
     payment_id: record.payment_id || '',
     credit_for: record.credit_for || '',
     moneybird_id: record.moneybird_id || '',
+    vat_treatment: record.vat_treatment || 'standard',
+    customer_country: buyer.country || '',
+    vat_consultation: (record.vat_check && record.vat_check.consultation) || '',
   };
 }
 
@@ -127,11 +139,11 @@ const SEP = ';';
 const EOL = '\r\n';
 
 // A field is quoted when it holds the separator, a quote or a line break, and a
-// quote inside a quoted field is doubled. Nothing else is escaped: a formula
-// injection guard belongs on a file that is executed, and every value here is a
-// number, a date or a name that came out of our own record.
+// quote inside a quoted field is doubled. A name or company comes from what the
+// buyer typed at checkout, so a cell that would start a formula gets the guard
+// from csv-safe.js; amounts stay numbers.
 function csvField(value) {
-  const s = String(value == null ? '' : value);
+  const s = neutralize(value);
   if (s.includes(SEP) || s.includes('"') || s.includes('\n') || s.includes('\r')) {
     return `"${s.replace(/"/g, '""')}"`;
   }

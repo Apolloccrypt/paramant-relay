@@ -54,7 +54,7 @@ const checks = [];
 function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, detail:String(detail) }); }
 await page.goto(ORIGIN + '/developer', { waitUntil:'networkidle' });
 const bodyText = await page.locator('main').innerText();
-ok('dashboard is ParaSign-only', /ParaSign API/.test(bodyText) && !/What happens to a transfer|Tools · status|S3|database backup/i.test(bodyText), bodyText.slice(0, 240));
+ok('dashboard is ParaSign-only', /API voor Ondertekenen/.test(bodyText) && !/What happens to a transfer|Tools · status|S3|database backup|Wat er met een overdracht gebeurt|Gereedschap · status|databaseback-?up|back-up van de database/i.test(bodyText), bodyText.slice(0, 240));
 ok('dashboard does not request the obsolete tool catalogue', toolsRequests === 0, toolsRequests);
 ok('signing usage ignores transfer usage', await page.locator('#sign-used').innerText() === '18' && !/400/.test(await page.locator('[aria-labelledby="usage-title"]').innerText()), await page.locator('[aria-labelledby="usage-title"]').innerText());
 ok('existing ParaSign key is visible', /psk_live_abc/.test(await page.locator('#psk-keys').innerText()), await page.locator('#psk-keys').innerText());

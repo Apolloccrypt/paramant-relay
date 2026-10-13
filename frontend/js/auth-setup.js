@@ -1,5 +1,14 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 (function() {
   const token = window.location.pathname.split('/').pop();
+  // The language switch names the page, not the link in the mail: carry the
+  // token across so the other language opens the same setup.
+  const langSwitch = document.querySelector('.lang-switch a');
+  if (langSwitch && token && token !== 'setup') {
+    langSwitch.setAttribute('href', langSwitch.getAttribute('href') + '/' + encodeURIComponent(token));
+  }
   let setupData = null;
   let backupCodes = [];
 
@@ -8,6 +17,10 @@
       s.classList.add('hidden');
     });
     document.getElementById(stateId).classList.remove('hidden');
+    // "Step 3 of 5, choose how you sign in" belongs to the choosing only: it
+    // stood above step 4, step 5 and even "All set" (retest T5-12a).
+    const intro = document.getElementById('setup-intro');
+    if (intro) intro.classList.toggle('hidden', !['state-loading', 'state-connecting'].includes(stateId));
   }
 
   async function init() {
@@ -28,8 +41,8 @@
         text: setupData.otpauth,
         width: 240,
         height: 240,
-        colorDark: '#1B1F22',
-        colorLight: '#F1EAD6',
+        colorDark: '#0B3A6A',
+        colorLight: '#FFFFFF',
         correctLevel: QRCode.CorrectLevel.M,
       });
 
@@ -47,8 +60,24 @@
     }
   }
 
-  document.getElementById('copy-secret').addEventListener('click', function() {
-    if (setupData) navigator.clipboard.writeText(setupData.secret);
+  // Copying can be refused (no permission, an older browser): then say so and
+  // leave the text to select by hand, instead of an unhandled error (hertest r2).
+  function copyText(text, btn) {
+    const said = function(ok) {
+      if (!btn) return;
+      const was = btn.dataset.label || btn.textContent;
+      btn.dataset.label = was;
+      btn.textContent = ok ? nlEn('Gekopieerd', 'Copied') : nlEn('Kopiëren lukte niet: selecteer de tekst', 'Copy failed: select the text');
+      setTimeout(function() { btn.textContent = was; }, 2500);
+    };
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) { said(false); return; }
+      navigator.clipboard.writeText(text).then(function() { said(true); }, function() { said(false); });
+    } catch (e) { said(false); }
+  }
+
+  document.getElementById('copy-secret').addEventListener('click', function(e) {
+    if (setupData) copyText(setupData.secret, e.currentTarget);
   });
 
   document.getElementById('verify-form').addEventListener('submit', async function(e) {
@@ -65,7 +94,7 @@
     });
 
     if (!res.ok) {
-      errorDiv.textContent = 'That code was not accepted. Codes change every 30 seconds, so use the one your app is showing right now.';
+      errorDiv.textContent = nlEn('Deze code werd niet geaccepteerd. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That code was not accepted. Codes change every 30 seconds, so use the one your app is showing right now.');
       errorDiv.classList.add('visible');
       return;
     }
@@ -83,7 +112,7 @@
     // so an empty set here means a genuine relay/activation failure, not the old
     // reload race. Surface a real error instead of a silent empty success screen.
     if (!Array.isArray(backupCodes) || backupCodes.length === 0) {
-      errorDiv.innerHTML = 'Your authenticator app is linked, so you can sign in. Your backup codes did not come through, which is usually temporary. Mail <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with the subject <code>Setup incomplete</code> and we issue a new set.';
+      errorDiv.innerHTML = nlEn('Uw authenticator-app is gekoppeld, dus u kunt inloggen. Uw back-upcodes kwamen niet door, meestal is dat tijdelijk. Mail <a href="mailto:hello@paramant.app?subject=Instellen%20onvolledig%20-%20back-upcodes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> met als onderwerp <code>Instellen onvolledig</code>, dan maken wij een nieuwe set.', 'Your authenticator app is linked, so you can sign in. Your backup codes did not come through, which is usually temporary. Mail <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with the subject <code>Setup incomplete</code> and we issue a new set.');
       errorDiv.classList.add('visible');
       return;
     }
@@ -98,22 +127,24 @@
     });
 
     show('state-success');
+    // The confirm signed the account in: the bar should say so (hertest r2 K4).
+    try { window.dispatchEvent(new Event('paramant:session-changed')); } catch (e) { /* old browser */ }
   });
 
   document.getElementById('saved-confirm').addEventListener('change', function(e) {
     document.getElementById('finish-btn').disabled = !e.target.checked;
   });
 
-  document.getElementById('copy-codes').addEventListener('click', function() {
-    navigator.clipboard.writeText(backupCodes.join('\n'));
+  document.getElementById('copy-codes').addEventListener('click', function(e) {
+    copyText(backupCodes.join('\n'), e.currentTarget);
   });
 
   document.getElementById('download-codes').addEventListener('click', function() {
     const blob = new Blob([
-      'Paramant backup codes\n' +
-      'Save these in a safe place. Each can be used once.\n\n' +
+      nlEn('Paramant back-upcodes\n', 'Paramant backup codes\n') +
+      nlEn('Bewaar deze op een veilige plek. Elke code werkt één keer.\n\n', 'Save these in a safe place. Each can be used once.\n\n') +
       backupCodes.join('\n') +
-      '\n\nGenerated: ' + new Date().toISOString()
+      nlEn('\n\nAangemaakt: ', '\n\nGenerated: ') + new Date().toISOString()
     ], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

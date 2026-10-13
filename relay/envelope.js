@@ -23,9 +23,15 @@
 'use strict';
 
 const crypto = require('crypto');
+const tiers = require('./lib/tiers');   // who may put how many names on a document
 
 const ID_BYTES = 24;             // 24 random bytes -> 32-char base64url
-const MAX_PARTIES = 20;          // sanity cap; CT-log/Redis can handle more
+// Absolute ceiling for one document, whatever a plan says. Thirty, matching the
+// ceiling on a send to a named group: above thirty people a document is no
+// longer signed by a room but circulated on a list, and a list wants an owner
+// and a different conversation. Was twenty, and nobody loses that: twenty is
+// the floor every plan keeps in lib/tiers.js, paid rows go to thirty.
+const MAX_PARTIES = 30;          // sanity cap; CT-log/Redis can handle more
 const MAX_LABEL_LEN = 80;
 const DEFAULT_TTL_DAYS = 30;
 const MAX_TTL_DAYS = 365;
@@ -128,11 +134,25 @@ function safeTextEqual(stored, provided) {
 //     page and normalized coordinates. Signer label, timestamp and key identity
 //     remain envelope data, so the placement adds no document text to the relay.
 //       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash || signer_pub || appearance_hash)
+// Manifest version 2 adds one optional flag per field: all_pages. It exists
+// because paper practice asks for an initial on EVERY sheet, and a manifest
+// capped at 8 fields cannot express that for a 20-page contract. One field with
+// all_pages:true means "this mark, at these normalised coordinates, on every
+// page of the document" -- the relay never learns the page count, so the flag
+// and not a list is what gets signed.
+//
+// Byte compatibility is the whole design. A manifest without an all_pages field
+// still normalises to exactly {"version":1,"fields":[...]} with the same key
+// order, so every signature and .psign proof made before this existed still
+// verifies byte-for-byte. The flag is only emitted when it is true, and the
+// version only rises to 2 when at least one field carries it.
 function normaliseAppearance(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  if (source.version !== undefined && source.version !== 1) throw new Error('unsupported appearance version');
+  const declared = source.version === undefined ? null : Number(source.version);
+  if (declared !== null && declared !== 1 && declared !== 2) throw new Error('unsupported appearance version');
   const input = source.fields === undefined ? [] : source.fields;
   if (!Array.isArray(input) || input.length > 8) throw new Error('invalid appearance fields');
+  let anyAllPages = false;
   const fields = input.map((field) => {
     if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error('invalid appearance field');
     const type = String(field.type || '');
@@ -148,9 +168,21 @@ function normaliseAppearance(value) {
     if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) {
       throw new Error('appearance field outside page');
     }
+    if (field.all_pages !== undefined) {
+      if (typeof field.all_pages !== 'boolean') throw new Error('invalid appearance all_pages');
+      if (field.all_pages) {
+        // A repeated mark declares one anchor page and repeats from there. A
+        // caller that repeats "from page 7" is describing something no screen
+        // offers, so it is a bug in that caller, not a silent reinterpretation.
+        if (pageIndex !== 0) throw new Error('invalid appearance all_pages page');
+        if (declared !== 2) throw new Error('all_pages requires appearance version 2');
+        clean.all_pages = true;
+        anyAllPages = true;
+      }
+    }
     return clean;
   });
-  return { version: 1, fields };
+  return { version: anyAllPages ? 2 : 1, fields };
 }
 
 // The REQUESTED position is a narrower thing than a signed appearance, and it
@@ -223,6 +255,7 @@ function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex,
 // ARGV[3] = ISO timestamp
 // ARGV[4] = canonical appearance manifest JSON
 // ARGV[5] = appearance manifest SHA3-256
+// ARGV[6] = encrypted ink (the visible handwriting, ciphertext only) or ''
 // Returns: { newOrIdem ('new'|'idem'|'conflict'), signedCount, partyCount, status }
 const SIGN_LUA = `
 local key = KEYS[1]
@@ -231,6 +264,7 @@ local sigComposite = ARGV[2]
 local at = ARGV[3]
 local appearance = ARGV[4]
 local appearanceHash = ARGV[5]
+local ink = ARGV[6] or ''
 local sigField = 'p' .. pi .. '_sig'
 local atField  = 'p' .. pi .. '_signed_at'
 local appearanceField = 'p' .. pi .. '_appearance'
@@ -261,6 +295,9 @@ redis.call('HSET', key, atField,  at)
 if appearance ~= '' then
   redis.call('HSET', key, appearanceField, appearance)
   redis.call('HSET', key, appearanceHashField, appearanceHash)
+end
+if ink ~= '' then
+  redis.call('HSET', key, 'p' .. pi .. '_ink', ink)
 end
 signedCount = redis.call('HINCRBY', key, 'signed_count', 1)
 if signedCount >= partyCount then
@@ -295,6 +332,48 @@ redis.call('HSET', key, 'void_reason', reason)
 return {'void', at}
 `;
 
+// Lua script: a party says no. Same key as SIGN_LUA and VOID_LUA, so a refusal
+// can never interleave with the signature that would have completed the
+// envelope. A refusal ends the request for everybody: the envelope goes to
+// 'void' (the terminal state every reader already knows), and the slot itself
+// records who refused and when, so the sender sees WHY it stopped.
+//   KEYS[1] = env:<id>   ARGV[1] = party index   ARGV[2] = ISO timestamp
+//   Returns: { code ('not_found'|'already_complete'|'voided'|'signed'|'idem'|'declined'), at }
+const DECLINE_LUA = `
+local key = KEYS[1]
+local pi = ARGV[1]
+local at = ARGV[2]
+local dh = redis.call('HGET', key, 'doc_hash')
+if not dh then return {'not_found', ''} end
+local status = redis.call('HGET', key, 'status') or ''
+local mine = redis.call('HGET', key, 'p' .. pi .. '_status') or ''
+if status == 'complete' then return {'already_complete', ''} end
+if mine == 'declined' then return {'idem', redis.call('HGET', key, 'p' .. pi .. '_declined_at') or ''} end
+if status == 'void' then return {'voided', ''} end
+if redis.call('HGET', key, 'p' .. pi .. '_sig') then return {'signed', ''} end
+redis.call('HSET', key, 'p' .. pi .. '_status', 'declined')
+redis.call('HSET', key, 'p' .. pi .. '_declined_at', at)
+redis.call('HSET', key, 'status', 'void')
+redis.call('HSET', key, 'voided_at', at)
+redis.call('HSET', key, 'void_reason', 'declined')
+redis.call('HSET', key, 'declined_by', pi)
+return {'declined', at}
+`;
+
+// The visible handwriting of one signature (a drawn line or a typed name),
+// encrypted in the signer's browser with a key derived from the document key.
+// The relay stores ciphertext it cannot read and hands it only to the holders
+// of an invite token for this envelope. It is presentation, never evidence:
+// the signed manifest still says only where a mark sits, so a missing or
+// unreadable ink costs the look of the PDF and nothing about what was signed.
+const MAX_INK_B64 = 43692;   // 32 KiB of ciphertext, base64url
+function cleanInk(value) {
+  if (value === undefined || value === null || value === '') return '';
+  const s = String(value);
+  if (s.length < 24 || s.length > MAX_INK_B64 || !/^[A-Za-z0-9_-]+$/.test(s)) throw new Error('invalid ink');
+  return s;
+}
+
 class EnvelopeStore {
   constructor(redisClient, { ctAppend, sigVerify } = {}) {
     this.redis = redisClient;
@@ -302,6 +381,7 @@ class EnvelopeStore {
     this.sigVerify = sigVerify || (() => false); // (sig, msg, pub) -> bool
     this._signScriptSha = null;
     this._voidScriptSha = null;
+    this._declineScriptSha = null;
   }
 
   available() {
@@ -320,6 +400,13 @@ class EnvelopeStore {
     if (!this.available()) throw new Error('redis unavailable');
     this._voidScriptSha = await this.redis.scriptLoad(VOID_LUA);
     return this._voidScriptSha;
+  }
+
+  async _loadDeclineScript() {
+    if (this._declineScriptSha) return this._declineScriptSha;
+    if (!this.available()) throw new Error('redis unavailable');
+    this._declineScriptSha = await this.redis.scriptLoad(DECLINE_LUA);
+    return this._declineScriptSha;
   }
 
   // Redis key for an account's envelope index (sorted set: member = envelope id,
@@ -356,11 +443,19 @@ class EnvelopeStore {
   // reader, the pruner and the backfill cannot drift apart.
   _partyMember(id, partyIndex) { return id + '#' + partyIndex; }
 
-  async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg, requestedAppearance }) {
+  async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg, requestedAppearance, plan }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
     if (!Array.isArray(parties) || parties.length === 0) throw new Error('parties required');
-    if (parties.length > MAX_PARTIES) throw new Error('too many parties (max ' + MAX_PARTIES + ')');
+    // Two ceilings, and the lower one wins. The plan says what this account
+    // bought; MAX_PARTIES says what one document can carry no matter what. An
+    // unknown or missing plan lands on community, which keeps the twenty every
+    // account already had.
+    const partyCap = Math.min(MAX_PARTIES, tiers.tierLimitNum(plan, 'max_parties') || MAX_PARTIES);
+    if (parties.length > partyCap) {
+      throw new Error('too many parties (max ' + partyCap + ' on the ' +
+                      tiers.normalisePlan(plan) + ' plan)');
+    }
     const ttlDays = Math.max(1, Math.min(MAX_TTL_DAYS,
       Number.isFinite(expiresInDays) ? expiresInDays : DEFAULT_TTL_DAYS));
     // ONE requested signing position for the whole envelope, the same for every
@@ -372,6 +467,17 @@ class EnvelopeStore {
     if (requestedAppearance !== undefined && requestedAppearance !== null) {
       requestedJson = JSON.stringify(normaliseRequestedAppearance(requestedAppearance));   // throws -> 400 at the route
     }
+    // A requested position PER PARTY. One box for everybody meant every party
+    // signed on exactly the same spot and the last mark covered the others
+    // (customer report 2026-10-04). Each party may now carry its own request;
+    // a party without one falls back to the envelope-wide box above. Same
+    // contract as that box: a request, never signed, validated before an id
+    // exists so a bad manifest leaves no record.
+    const partyRequestedJson = parties.map((p) => {
+      const value = p && typeof p === 'object' ? p.requested_appearance : undefined;
+      if (value === undefined || value === null) return '';
+      return JSON.stringify(normaliseRequestedAppearance(value));   // throws -> 400 at the route
+    });
     const now = new Date();
     const expires = new Date(now.getTime() + ttlDays * 86400_000);
 
@@ -408,6 +514,11 @@ class EnvelopeStore {
       // The creating account. Written for provenance + so a later re-backfill can
       // resolve the account directly from the record, without a key reverse-map.
       account_id: (accountId || '').toString().slice(0, 200),
+      // The sender's ParaSign tier when the request was made. The sender pays
+      // for every signature on it, and the create route checked he had room
+      // for all of them then; a plan that lapses while the request is open
+      // must not leave his signers with a refusal (sweep-acct finding 7).
+      sender_tier: (plan || '').toString().slice(0, 32),
       original_filename: (originalFilename || '').toString().slice(0, 200),
       party_count: String(parties.length),
       signed_count: '0',
@@ -429,6 +540,7 @@ class EnvelopeStore {
       // the creator (or admin) keeps the address and emails the invite link.
       hash['p' + i + '_email_hash'] = partyEmailHash(p.email);
       hash['p' + i + '_status'] = 'pending';
+      if (partyRequestedJson[i]) hash['p' + i + '_requested_appearance'] = partyRequestedJson[i];
       const token = crypto.randomBytes(32).toString('base64url');
       hash['p' + i + '_invite_token'] = token;
       inviteTokens.push(token);
@@ -577,6 +689,12 @@ class EnvelopeStore {
   // signature on this envelope", so no request field can steer the meter.
   // Returns null when no such envelope exists (the caller keeps that a 404) and
   // '' for a record written before account_id was stored.
+  // The sender's ParaSign tier at create(), or '' for older records.
+  async senderTier(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    return (await this.redis.hGet('env:' + id, 'sender_tier')) || '';
+  }
+
   async ownerAccountId(id) {
     if (!this.available()) throw new Error('redis unavailable');
     const h = await this.redis.hGetAll('env:' + id);
@@ -621,6 +739,34 @@ class EnvelopeStore {
   // handler has confirmed the caller owns (creator_api_hash) or participates in
   // (valid invite token) this envelope. getRedacted stays the public, redacted
   // view and is intentionally left untouched.
+  // The events of one envelope, for the account's audit export: when it was
+  // made, viewed, signed, declined, withdrawn, completed. Hashes and times
+  // only, never the document. Separate from getForReceipt on purpose, so the
+  // .psign recipe and its bytes are untouched.
+  async auditTimeline(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return null;
+    const n = parseInt(h.party_count, 10) || 0;
+    const parties = [];
+    for (let i = 0; i < n; i++) {
+      parties.push({
+        index: i,
+        label: h['p' + i + '_label'] || null,
+        viewed_at: h['p' + i + '_viewed_at'] || null,
+        signed_at: h['p' + i + '_signed_at'] || null,
+        declined_at: h['p' + i + '_declined_at'] || null,
+      });
+    }
+    return {
+      id, doc_hash: h.doc_hash, status: h.status || 'open',
+      created_at: h.created_at || null, completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
+      void_reason: h.status === 'void' ? (h.void_reason === 'declined' ? 'declined' : 'cancelled') : null,
+      parties,
+    };
+  }
+
   async getForReceipt(id) {
     if (!this.available()) throw new Error('redis unavailable');
     const key = 'env:' + id;
@@ -723,6 +869,11 @@ class EnvelopeStore {
         status: env.status,
         created_at: env.created_at,
         expires_at: env.expires_at,
+        // When signing stops (created_at + 7d, email mode), the date /co-sign
+        // shows as "Tekenen kan tot". expires_at is only how long the record is
+        // kept (30d); judging "still open" on that kept an expired request on
+        // the dashboard as waiting, with a Withdraw button (acceptatie r4, A2).
+        sign_expires_at: (env.binding_mode || 'open') === 'email' ? signInviteExpiresAt(env.created_at) : null,
         completed_at: env.completed_at,
         voided_at: env.voided_at,
         party_count: env.party_count,
@@ -736,6 +887,31 @@ class EnvelopeStore {
       };
     }));
     return rows.filter(Boolean);
+  }
+
+  // Welke envelopes van dit account gaan over DIT document.
+  //
+  // Waarom dit er is: een client die afbreekt tussen create() en het opschrijven
+  // van het envelope-id kan nu niet vaststellen of hij al een envelope voor dit
+  // document heeft. De dashboardlijst laat de documenthash bewust weg, en dat
+  // blijft zo; dit is een gerichte vraag waarop je alleen antwoord krijgt als je
+  // de hash al kent, en alleen over je eigen account. Het alternatief in de
+  // praktijk is bestandsnaam plus tijdstip als anker, en dat kan twee verzoeken
+  // voor hetzelfde bestand niet uit elkaar houden: dan is de veilige uitkomst
+  // een dubbele envelope of stilstand.
+  async findAccountEnvelopeIdsByDocHash(accountId, docHash, { limit = 100 } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const hash = String(docHash || '').trim().toLowerCase();
+    if (!accountId || !/^[0-9a-f]{64}$/.test(hash)) return [];
+    const ids = await this.listAccountEnvelopeIds(accountId, { limit, prune: true });
+    const rijen = await Promise.all(ids.map(async (id) => {
+      const [storedAccount, storedHash] = await this.redis.hmGet(
+        'env:' + id, ['account_id', 'doc_hash']);
+      if (!storedAccount || !safeTextEqual(storedAccount, accountId)) return null;
+      if (!storedHash || !safeHexEqual(storedHash, hash)) return null;
+      return id;
+    }));
+    return rijen.filter(Boolean);
   }
 
   // One-shot backfill of the per-account envelope index from existing env:* keys.
@@ -993,9 +1169,21 @@ class EnvelopeStore {
       // When this email-bound invite stops being signable (created_at + 7d);
       // null for open envelopes. Lets the admin gate fail early before the PRF.
       sign_expires_at: mode === 'email' ? signInviteExpiresAt(h.created_at) : null,
-      // Same requested position as the public view: one box for every party.
-      requested_appearance: h.requested_appearance ? storedAppearance(h.requested_appearance) : null,
-      requested_appearance_hash: h.requested_appearance_hash || null,
+      // This party's own requested position when the sender gave one, else
+      // the envelope-wide box. requested_for_party tells the page which of the
+      // two it got: a shared box is the same spot for every party, so /co-sign
+      // moves it to a free spot of this party's own instead of stacking them.
+      requested_appearance: h['p' + pi + '_requested_appearance']
+        ? storedAppearance(h['p' + pi + '_requested_appearance'])
+        : (h.requested_appearance ? storedAppearance(h.requested_appearance) : null),
+      requested_appearance_hash: h['p' + pi + '_requested_appearance'] ? null : (h.requested_appearance_hash || null),
+      requested_for_party: !!h['p' + pi + '_requested_appearance'],
+      created_at: h.created_at || null,
+      completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
+      // 'declined' when a party refused (the envelope is then void), else
+      // 'cancelled' for a sender's withdrawal. Lets the page say which.
+      void_reason: h.status === 'void' ? (h.void_reason === 'declined' ? 'declined' : 'cancelled') : null,
       // Everything the public projection used to hand to a passer-by, now for
       // the one caller entitled to it: the holder of this party's invite token,
       // whose token was checked against the record above. A co-signer has to
@@ -1014,6 +1202,9 @@ class EnvelopeStore {
           signer_pk_hash: s_ ? crypto.createHash('sha3-256').update(Buffer.from(s_.split(':')[1] || '', 'base64')).digest('hex') : null,
           appearance: s_ && h['p' + i + '_appearance'] ? storedAppearance(h['p' + i + '_appearance']) : null,
           appearance_hash: s_ ? (h['p' + i + '_appearance_hash'] || null) : null,
+          // Ciphertext of the visible handwriting; only the holders of the
+          // document key can read it. Absent for a slot that has not signed.
+          ink: s_ ? (h['p' + i + '_ink'] || null) : null,
         };
       }),
       party: {
@@ -1032,10 +1223,18 @@ class EnvelopeStore {
   // encrypts before upload; Redis receives only an opaque capsule. The
   // decryption key exists solely in the invite URL fragment and is never sent
   // to this store. Storage expires with the envelope record.
-  async putDocumentCapsule(id, accountId, capsule, capsuleSha256) {
+  //
+  // keyShare (optional): one half of a split document key. The sender's browser
+  // splits the AES key K into two random-looking halves, A xor B = K. Half A
+  // rides in the invitation link (the mail provider sees A and nothing else),
+  // half B is stored here next to the ciphertext and released only to a party
+  // whose invite token AND verified mailbox match. Neither store alone opens the
+  // document: the relay has ciphertext and B, the mailbox has A.
+  async putDocumentCapsule(id, accountId, capsule, capsuleSha256, keyShare) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!Buffer.isBuffer(capsule) || capsule.length === 0) throw new Error('document capsule required');
     if (!/^[0-9a-f]{64}$/.test(String(capsuleSha256 || ''))) throw new Error('invalid capsule hash');
+    if (keyShare !== undefined && keyShare !== null && keyShare !== '' && !/^[A-Za-z0-9_-]{43}$/.test(String(keyShare))) throw new Error('invalid key share');
     const envKey = 'env:' + id;
     const h = await this.redis.hGetAll(envKey);
     if (!h || !h.doc_hash) return { ok: false, code: 'not_found' };
@@ -1049,6 +1248,7 @@ class EnvelopeStore {
       document_capsule_sha256: actual,
       document_capsule_size: String(capsule.length),
       document_capsule_at: new Date().toISOString(),
+      ...(keyShare ? { document_key_share: String(keyShare) } : {}),
     });
     return { ok: true, sha256: actual, size: capsule.length, expires_in: ttl };
   }
@@ -1060,7 +1260,12 @@ class EnvelopeStore {
     if (!/^[0-9a-f]{64}$/.test(String(verifiedEmailHash || '')) || !safeHexEqual(party.party.email_hash, verifiedEmailHash)) {
       return { ok: false, code: 'not_authorized' };
     }
-    if (party.binding_mode === 'email' && party.sign_expires_at && Date.parse(party.sign_expires_at) < Date.now()) {
+    // The signing window closes the document for whoever still has to sign.
+    // It does not close it for the result: once every party has signed (or
+    // this party has), the same link keeps opening the document so each party
+    // can build the complete signed PDF, for as long as the record lives.
+    const finished = party.status === 'complete' || party.party.status === 'signed';
+    if (!finished && party.binding_mode === 'email' && party.sign_expires_at && Date.parse(party.sign_expires_at) < Date.now()) {
       return { ok: false, code: 'invite_expired' };
     }
     if (party.status === 'void') return { ok: false, code: 'voided' };
@@ -1068,7 +1273,92 @@ class EnvelopeStore {
     if (!encoded) return { ok: false, code: 'not_found' };
     const capsule = Buffer.from(encoded, 'base64');
     const sha256 = crypto.createHash('sha256').update(capsule).digest('hex');
-    return { ok: true, capsule, sha256 };
+    const keyShare = (await this.redis.hGet('env:' + id, 'document_key_share')) || '';
+    return { ok: true, capsule, sha256, keyShare };
+  }
+
+  // The owner's copy of the ciphertext, for the result page of the account
+  // that sent the request. No key share: the sender holds the whole key on the
+  // device it was made on, or the original file itself.
+  async getOwnerDocumentCapsule(id, accountId) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (!(await this.isOwner(id, accountId))) return { ok: false, code: 'not_found' };
+    const status = await this.redis.hGet('env:' + id, 'status');
+    if (status === 'void') return { ok: false, code: 'voided' };
+    const encoded = await this.redis.get(DOCUMENT_CAPSULE_PREFIX + id);
+    if (!encoded) return { ok: false, code: 'not_found' };
+    const capsule = Buffer.from(encoded, 'base64');
+    return { ok: true, capsule, sha256: crypto.createHash('sha256').update(capsule).digest('hex') };
+  }
+
+  // What the sender's result page needs: who signed where, with their inks.
+  // Owner-only; the caller has checked the account. Same party shape as
+  // getForParty, so /co-sign renders both with one function.
+  async getOwnerView(id, accountId) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (!(await this.isOwner(id, accountId))) return null;
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return null;
+    const partyCount = parseInt(h.party_count, 10) || 0;
+    return {
+      id: h.id,
+      doc_hash: h.doc_hash,
+      original_filename: h.original_filename || null,
+      status: h.status,
+      binding_mode: h.binding_mode || 'open',
+      recipe_version: parseInt(h.recipe_version, 10) || 1,
+      created_at: h.created_at || null,
+      expires_at: h.expires_at,
+      completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
+      void_reason: h.status === 'void' ? (h.void_reason === 'declined' ? 'declined' : 'cancelled') : null,
+      sign_expires_at: (h.binding_mode || 'open') === 'email' ? signInviteExpiresAt(h.created_at) : null,
+      party_count: partyCount,
+      signed_count: parseInt(h.signed_count, 10) || 0,
+      parties: Array.from({ length: partyCount }, (_, i) => {
+        const s_ = h['p' + i + '_sig'] || '';
+        return {
+          index: i,
+          label: h['p' + i + '_label'] || null,
+          status: s_ ? 'signed' : (h['p' + i + '_status'] || 'pending'),
+          signed_at: h['p' + i + '_signed_at'] || null,
+          declined_at: h['p' + i + '_declined_at'] || null,
+          signer_pk_hash: s_ ? crypto.createHash('sha3-256').update(Buffer.from(s_.split(':')[1] || '', 'base64')).digest('hex') : null,
+          appearance: s_ && h['p' + i + '_appearance'] ? storedAppearance(h['p' + i + '_appearance']) : null,
+          appearance_hash: s_ ? (h['p' + i + '_appearance_hash'] || null) : null,
+          ink: s_ ? (h['p' + i + '_ink'] || null) : null,
+        };
+      }),
+    };
+  }
+
+  // A party refuses to sign. Needs the same two credentials as reading the
+  // document: the invite token, and the verified mailbox asserted by the admin.
+  // The envelope ends for everyone (status 'void', void_reason 'declined'), and
+  // the slot keeps who refused and when.
+  async declineParty(id, partyIndex, token, verifiedEmailHash) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const party = await this.getForParty(id, partyIndex, token);
+    if (!party) return { ok: false, code: 'not_found' };
+    if (party.binding_mode === 'email'
+      && (!/^[0-9a-f]{64}$/.test(String(verifiedEmailHash || '')) || !safeHexEqual(party.party.email_hash, verifiedEmailHash))) {
+      return { ok: false, code: 'not_authorized' };
+    }
+    const pi = parseInt(partyIndex, 10);
+    const key = 'env:' + id;
+    await this._loadDeclineScript();
+    const [code, at] = await this.redis.evalSha(this._declineScriptSha, { keys: [key], arguments: [String(pi), new Date().toISOString()] });
+    if (code !== 'declined' && code !== 'idem') return { ok: false, code };
+    if (code === 'declined') {
+      try {
+        const h = await this.redis.hGetAll(key);
+        const partyCount = parseInt((h || {}).party_count, 10) || 0;
+        for (let i = 0; i < partyCount; i++) await this._dropFromPartyIndex(id, i, h['p' + i + '_email_hash'] || '');
+      } catch { /* the reader filters on status; a miss is cosmetic */ }
+      try { await this.deleteDocumentCapsule(id); } catch {}
+      try { this.ctAppend('envelope_decline', id, { party_index: pi }); } catch {}
+    }
+    return { ok: true, code, status: 'void', declined_at: at || null, party_index: pi };
   }
 
   async deleteDocumentCapsule(id) {
@@ -1204,6 +1494,9 @@ class EnvelopeStore {
     const storedRecipe = parseInt(h.recipe_version, 10) || 1;
     const effectiveRecipe = (mode === 'open') ? 4 : storedRecipe;
     if (effectiveRecipe >= 4 && !signerPubB64) return { ok: false, code: 'bad_signature' };
+    let ink = '';
+    try { ink = cleanInk(opts.ink); }
+    catch { return { ok: false, code: 'invalid_ink' }; }
     let appearance = null;
     let appearanceJson = '';
     let appearanceHashHex = '';
@@ -1228,7 +1521,7 @@ class EnvelopeStore {
     await this._loadScript();
     const result = await this.redis.evalSha(this._signScriptSha, {
       keys: [key],
-      arguments: [String(pi), composite, at, appearanceJson, appearanceHashHex],
+      arguments: [String(pi), composite, at, appearanceJson, appearanceHashHex, ink],
     });
     const [outcome, signedCountStr, partyCountStr, status] = result;
     if (outcome === 'conflict') return { ok: false, code: 'conflict' };

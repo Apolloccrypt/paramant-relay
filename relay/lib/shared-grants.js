@@ -71,15 +71,19 @@ const CHANNEL = 'paramant:entitlements:changed';
 
 const grantKey = (accountId) => `${GRANT_PREFIX}${accountId}`;
 
-// The six fields a grant is made of: for each product the tier, the period it
-// was paid for, and the bundle that sold it. Exactly the fields
-// entitlements.applyProductTier writes, so what travels is what was written.
+// The eight fields a grant is made of: for each product the tier, the period
+// it was paid for, the bundle that sold it, and every term per tier when the
+// product holds more than one (as JSON, since a hash field is a string).
+// Exactly the fields entitlements.applyProductTier writes, so what travels is
+// what was written. Without the terms a relay that took a Firm year and a
+// Business month would tell the others about the month alone.
 function grantFields() {
   const out = [];
   for (const product of entitlements.PRODUCTS) {
     out.push(entitlements.PRODUCT_PLAN_FIELD[product]);
     out.push(entitlements.PRODUCT_PAID_UNTIL_FIELD[product]);
     out.push(entitlements.PRODUCT_BUNDLE_FIELD[product]);
+    out.push(entitlements.PRODUCT_TERMS_FIELD[product]);
   }
   return out;
 }
@@ -107,9 +111,9 @@ function grantOf(rec) {
     if (String(tier) === entitlements.floorTierOf(product)) continue;
     out[planField] = String(tier);
     any = true;
-    for (const f of [entitlements.PRODUCT_PAID_UNTIL_FIELD[product], entitlements.PRODUCT_BUNDLE_FIELD[product]]) {
+    for (const f of [entitlements.PRODUCT_PAID_UNTIL_FIELD[product], entitlements.PRODUCT_BUNDLE_FIELD[product], entitlements.PRODUCT_TERMS_FIELD[product]]) {
       if (rec[f] === undefined || rec[f] === null || rec[f] === '') continue;
-      out[f] = String(rec[f]);
+      out[f] = typeof rec[f] === 'object' ? JSON.stringify(rec[f]) : String(rec[f]);
     }
   }
   return any ? out : null;
@@ -135,18 +139,25 @@ function grantOf(rec) {
 // Returns { ok } and never throws: a grant that was written locally must not be
 // undone by a redis that is having a bad minute. The caller logs the failure and
 // the periodic reseed on the writing container picks it up again.
-async function publish(redis, accountId, rec) {
+//
+// opts.replace marks the row as a REPLACEMENT (replaced_at): a reversal that
+// shortened a term. Every other container copies such a row as it is instead
+// of merging it, because a merge keeps the longer term. replaced_at is only
+// ever written, never cleared, so a later ordinary publish cannot hide it from
+// a container that has not applied it yet.
+async function publish(redis, accountId, rec, opts) {
   if (!redis || !accountId) return { ok: false, error: 'no_redis' };
   const grant = grantOf(rec);
   const key = grantKey(accountId);
   try {
     const now = new Date().toISOString();
     const row = { updated_at: now, revoked_at: grant ? '' : now };
+    if (opts && opts.replace) row.replaced_at = now;
     for (const f of FIELDS) row[f] = (grant && grant[f] !== undefined) ? grant[f] : '';
     await redis.hSet(key, row);
     await redis.sAdd(ACCOUNT_SET, String(accountId));
     await redis.publish(CHANNEL, String(accountId));
-    return { ok: true, grant };
+    return { ok: true, grant, replacedAt: row.replaced_at || null };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -170,7 +181,7 @@ async function readRow(redis, accountId) {
   try {
     const h = await redis.hGetAll(grantKey(accountId));
     if (!h || Object.keys(h).length === 0) return null;
-    return { exists: true, grant: grantOf(h), revokedAt: h.revoked_at || null, updatedAt: h.updated_at || null };
+    return { exists: true, grant: grantOf(h), revokedAt: h.revoked_at || null, updatedAt: h.updated_at || null, replacedAt: h.replaced_at || null };
   } catch {
     return null;
   }
@@ -188,7 +199,7 @@ async function readAll(redis) {
   const out = [];
   for (const accountId of ids) {
     const row = await readRow(redis, accountId);
-    if (row) out.push({ accountId, grant: row.grant, revokedAt: row.revokedAt });
+    if (row) out.push({ accountId, grant: row.grant, revokedAt: row.revokedAt, replacedAt: row.replacedAt });
   }
   return out;
 }
@@ -204,18 +215,23 @@ function applyTo(target, grant, now) {
   if (!target || !grant) return [];
   const moved = [];
   for (const product of entitlements.PRODUCTS) {
-    const planField = entitlements.PRODUCT_PLAN_FIELD[product];
-    const paidField = entitlements.PRODUCT_PAID_UNTIL_FIELD[product];
-    const before = `${target[planField]}|${target[paidField]}`;
+    // Every field of the grant, the terms included: a Pro year that arrives
+    // under a Business month changes no tier and no date a reader sees today,
+    // and it still has to reach this container's records.
+    const sig = () => JSON.stringify([
+      entitlements.PRODUCT_PLAN_FIELD, entitlements.PRODUCT_PAID_UNTIL_FIELD,
+      entitlements.PRODUCT_BUNDLE_FIELD, entitlements.PRODUCT_TERMS_FIELD,
+    ].map((field) => target[field[product]]));
+    const before = sig();
     entitlements.mergeProductGrantInto(target, grant, product, now);
-    if (`${target[planField]}|${target[paidField]}` !== before) moved.push(product);
+    if (sig() !== before) moved.push(product);
   }
   return moved;
 }
 
 // The other half of applyTo: bring a local record DOWN to the floor because the
 // fleet's row says this account has no paid term. Only ever called for a row
-// that actually carries revoked_at, and only the six grant fields are touched --
+// that actually carries revoked_at, and only the grant fields are touched --
 // email, label, keys and usage are the container's own business.
 // Returns the products that moved.
 function applyRevocation(target) {
@@ -226,12 +242,15 @@ function applyRevocation(target) {
     const floor = entitlements.floorTierOf(product);
     const paidField = entitlements.PRODUCT_PAID_UNTIL_FIELD[product];
     const bundleField = entitlements.PRODUCT_BUNDLE_FIELD[product];
+    const termsField = entitlements.PRODUCT_TERMS_FIELD[product];
     const had = target[planField] !== undefined && target[planField] !== floor;
     const hadPeriod = target[paidField] !== undefined && target[paidField] !== null;
-    if (!had && !hadPeriod) continue;
+    const hadTerms = target[termsField] !== undefined && target[termsField] !== null;
+    if (!had && !hadPeriod && !hadTerms) continue;
     entitlements.applyProductTier(target, product, floor);
     delete target[paidField];
     delete target[bundleField];
+    delete target[termsField];
     moved.push(product);
   }
   return moved;

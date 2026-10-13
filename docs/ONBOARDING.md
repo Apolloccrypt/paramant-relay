@@ -504,6 +504,9 @@ Off the host: the production SSH key is `~/.ssh/paramant_prod_claude` on the NUC
 and the deploy scripts hard-fail anywhere else with "run this from the NUC". The
 heartbeat credentials are GitHub Actions repository secrets.
 
+What to do with that access when something breaks, and where the escrow of
+every secret lives, is in [`RUNBOOK.md`](../RUNBOOK.md).
+
 **Who has the key: one person.** `deploy/DEPLOY-3.1.md:12-14` says it plainly:
 Mick runs the deploy by hand over SSH, from the NUC, where the production key
 lives. There is no second holder documented anywhere in this repo, and the backup
@@ -604,6 +607,10 @@ took production down 425 times before anyone looked.
 
 ## 10. Where to look next
 
+- [`RUNBOOK.md`](../RUNBOOK.md) in the repo root when production needs you:
+  access and escrow (names only), deploy and rollback in ten lines, the first
+  moves in an incident, monitoring without an assistant, backup and restore
+  including an empty machine, and the rules for working with another model.
 - `AGENTS.md` for the commit and PR rules and the environment caveats.
 - `docs/PROJECT-STATUS.md` is now a pointer table, not a snapshot. Follow it.
 - `docs/adrs/` for the 19 architecture decision records: the reasoning is written

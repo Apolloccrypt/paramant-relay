@@ -9,7 +9,9 @@
 // The file the block was written in is on no route an admin uses. Everything
 // passed anyway: the relay routes had
 // tests, the panel's three proxy hops had tests (coupons.test.js), and the
-// screen an admin opens had no Gift codes card on it at all.
+// screen an admin opens had no Gift codes card on it at all. Since 2026-10-05
+// the served panel speaks Dutch (Cadeaucodes); the assertions below match its
+// words, the behaviour they guard is unchanged.
 //
 // So this suite asserts the one thing none of those did: that the block is in
 // the SERVED file, that it is rendered by the Billing tab, and that the button
@@ -160,7 +162,7 @@ test('opening the Billing tab renders the gift-code card with its four fields', 
   });
   await run('loadBilling()');
   const html = nodes.get('tab-billing').innerHTML;
-  assert.match(html, /Gift codes/, 'the Billing tab renders no gift-code card');
+  assert.match(html, /Cadeaucodes/, 'the Billing tab renders no gift-code card');
   assert.match(html, /id="c-code"/, 'no code field');
   assert.match(html, /id="c-max"[^>]*value="100"/, 'no maximum redemptions field defaulting to 100');
   assert.match(html, /id="c-days"[^>]*value="90"/, 'no days field defaulting to 90');
@@ -170,8 +172,8 @@ test('opening the Billing tab renders the gift-code card with its four fields', 
   await new Promise((r) => setTimeout(r, 0));
   const rows = nodes.get('c-results').innerHTML;
   assert.match(rows, /COFFEE/);
-  assert.match(rows, /0 of 100/, 'the table must show used of maximum');
-  assert.match(rows, /no end date/);
+  assert.match(rows, /0 van 100/, 'the table must show used of maximum');
+  assert.match(rows, /geen einddatum/);
   assert.match(rows, /data-click="doRevokeCoupon"/, 'an open code needs a withdraw button');
   assert.ok(vm.runInContext('true', context));
 });
@@ -202,7 +204,7 @@ test('Create code posts to the panel route /admin/api/admin/coupons with X-Sessi
   assert.strictEqual(body.max_redemptions, 50);
   assert.deepStrictEqual(body.grants.map((g) => g.days), [30, 30], 'every grant on one code runs the same number of days');
   assert.strictEqual(body.valid_until, '2026-12-31T23:59:59Z', 'a date field means the end of that day');
-  assert.match(nodes.get('c-msg').textContent, /Created COFFEE/);
+  assert.match(nodes.get('c-msg').textContent, /Code COFFEE aangemaakt/);
 });
 
 test('Withdraw sends a DELETE with the code in the path and no body', async () => {
@@ -220,16 +222,16 @@ test('Withdraw sends a DELETE with the code in the path and no body', async () =
   assert.strictEqual(del.opts.headers['X-Session'], 'sess-abc');
   assert.strictEqual(del.opts.body, undefined,
     'the withdraw must send no body; a DELETE body the relay refuses before reading desynchronises a kept-alive connection');
-  assert.match(nodes.get('c-msg').textContent, /withdrawn/);
+  assert.match(nodes.get('c-msg').textContent, /ingetrokken/);
 });
 
 // ── 3. The failures say what happened, in words ──────────────────────────────
 
 test('a rejected code is explained in a sentence, not in a relay error word', async () => {
   const cases = [
-    [409, { error: 'code_exists' }, /already exists/i],
-    [400, { error: 'bad_valid_until' }, /not a date/i],
-    [503, { error: 'coupons_unavailable' }, /not reachable/i],
+    [409, { error: 'code_exists' }, /bestaat al/i],
+    [400, { error: 'bad_valid_until' }, /geen datum/i],
+    [503, { error: 'coupons_unavailable' }, /niet bereikbaar/i],
   ];
   for (const [status, body, expect] of cases) {
     const { nodes, run } = boot({ fetchImpl: () => jsonResponse(status, body) });
@@ -249,7 +251,7 @@ test('an unreachable relay is said out loud instead of dying in an unhandled rej
   nodes.set('c-max', Object.assign(makeNode('c-max'), { value: '100' }));
   nodes.set('c-days', Object.assign(makeNode('c-days'), { value: '90' }));
   await run('doCreateCoupon()');
-  assert.match(nodes.get('c-msg').textContent, /could not be reached/i);
+  assert.match(nodes.get('c-msg').textContent, /niet bereikbaar/i);
 });
 
 test('a code that cannot be a code never leaves the browser', async () => {
@@ -259,7 +261,7 @@ test('a code that cannot be a code never leaves the browser', async () => {
   nodes.set('c-days', Object.assign(makeNode('c-days'), { value: '90' }));
   await run('doCreateCoupon()');
   assert.strictEqual(calls.length, 0, 'a malformed code was sent to the relay anyway');
-  assert.match(nodes.get('c-msg').textContent, /letters, digits and dashes/i);
+  assert.match(nodes.get('c-msg').textContent, /letters, cijfers en streepjes/i);
 });
 
 // ── 4. The banner over it is no longer a lie ─────────────────────────────────
@@ -276,8 +278,8 @@ test('the Billing tab no longer calls itself a beta stub', async () => {
     'payments run through Mollie today: relay.js POST /v2/billing/checkout calls mollie.createPayment unconditionally');
   assert.doesNotMatch(html, /stub only|manually invoiced|in integration/i,
     'invoices and credit notes are drawn automatically from the payment webhook (relay/lib/invoice.js, relay/lib/credit-note.js)');
-  assert.match(html, /Mollie payments are live/,
+  assert.match(html, /Betalingen lopen echt via Mollie/,
     'the tab should say what is true rather than nothing');
-  assert.match(html, /no subscription and no direct debit/i,
+  assert.match(html, /geen abonnement en geen automatische incasso/i,
     'BILLING_MODE is empty in production, which leaves the recurring layer off (relay/lib/mollie.js billingStance)');
 });

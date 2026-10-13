@@ -55,6 +55,14 @@ async function main() {
   const one = await stamp.stampPdf(await makePdf(1), { envelopeId: 'env_1', docHash: 'b'.repeat(64), parties: [{ index: 0, label: 'Solo', status: 'signed', signed_at: '2026-07-19T10:00:00Z' }] });
   assert.strictEqual((await PDFLib.PDFDocument.load(one)).getPageCount(), 2, 'single page -> 2 (content + certificate)');
   ok('single-page document stamps correctly');
+
+  // The relay's reading copy carries the same plain marker /co-sign writes, so
+  // /verify can say "stamped copy of this envelope" (frontend/parasign-verify.js).
+  const at = one.indexOf('/ParamantStampedCopy (env=env_1;doc=' + 'b'.repeat(64) + ')');
+  assert.ok(at > 0, 'stamped copy carries /ParamantStampedCopy (env=..;doc=..) uncompressed');
+  const bad = await stamp.stampPdf(await makePdf(1), { envelopeId: 'env 1', docHash: 'nope', parties: [] });
+  assert.strictEqual(bad.indexOf('/ParamantStampedCopy'), -1, 'no marker without a valid id and hash');
+  ok('reading-copy marker written only for a valid envelope id and hash');
 }
 
 main()

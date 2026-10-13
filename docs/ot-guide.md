@@ -6,6 +6,8 @@ Ghost Pipe is a quantum-safe data conduit for OT environments. It transports sen
 
 This guide covers deploying Ghost Pipe as the IEC 62443 conduit between your OT zone (Levels 1–2) and your IT/SCADA zone (Level 3).
 
+> **Read this first: the transfer secret, and who can decrypt.** The `paramant-sender` and `paramant-receiver` scripts used in this guide encrypt with AES-256-GCM under a key derived (HKDF) from a random 32-byte transfer secret, not from your API key (`scripts/paramant-sender.py` `transfer_secret()` and `encrypt()`). Pass it with `--secret <base64url>` or the environment variable `PARAMANT_TRANSFER_SECRET`. Without one, the sender makes a secret and prints it once as `PARAMANT_TRANSFER_SECRET=...`; hand it to the receiving side out of band, it is stored nowhere else. The receiver refuses to start without it (unless `--no-decrypt` or `--pickup`), and a wrong secret is an error, never a silent write of the raw bytes. The relay never sees the secret, so it cannot decrypt what these scripts send; whoever holds the secret can. This is still symmetric encryption: `--hybrid` is two HKDF derivations of that same secret, not ML-KEM, and `paramant-receiver` does not open `--hybrid` blobs. For post-quantum end-to-end encryption against the receiver's registered public key, use the Python SDK (`paramant-sdk` on PyPI), which encapsulates an AES-256-GCM key with ML-KEM-768.
+
 ---
 
 ## Architecture — Purdue Model placement
@@ -32,7 +34,7 @@ This guide covers deploying Ghost Pipe as the IEC 62443 conduit between your OT 
 │         └──────────────────────────────────┘                   │
 │                                                                 │
 │  Data enters encrypted from Level 2.                           │
-│  Data exits as ciphertext only. Relay cannot decrypt.           │
+│  Data exits as ciphertext. Who can decrypt: see note above.    │
 └─────────────────────────────────────────────────────────────────┘
 ┌─────────────────────────────────────────────────────────────────┐
 │  Level 2 — Control network                                      │
@@ -164,7 +166,7 @@ paramant-sender --file reading.json \
 # Receiver (Level 3 side)
 paramant-receiver --hash <hash> \
   --relay https://dmz-relay.internal:3000 \
-  --key plk_xxx
+  --key plk_xxx --secret <transfer-secret-from-the-sender>
 ```
 
 The self-hosted relay has no dependency on `iot.paramant.app`. All traffic stays within your network perimeter.
@@ -222,7 +224,7 @@ See [API reference — Device Identity](api.md#device-identity) for the full enr
 
 | IEC 62443 Requirement | How Ghost Pipe addresses it |
 |---|---|
-| SR 4.1 — Information confidentiality | ML-KEM-768 + ECDH P-256 client-side encryption. Relay never holds plaintext. |
+| SR 4.1: Information confidentiality | With the Python SDK: ML-KEM-768 + AES-256-GCM client-side encryption, the relay never holds plaintext. With `paramant-sender`/`paramant-receiver`: AES-256-GCM under a key derived from a random transfer secret (`--secret` / `PARAMANT_TRANSFER_SECRET`) that the relay never sees (see the note at the top). |
 | SR 4.2 — Use control | API key per device. `plk_` operator keys for infrastructure, `pgp_` device keys for field units. |
 | SR 3.1 — Communication integrity | AES-256-GCM AEAD authentication tag on every payload. ML-DSA-65 signed STH in CT log. |
 | SR 1.1 — Device identification | `/v2/did/register` enrollment with ed25519 device key. DID document in public CT log. |

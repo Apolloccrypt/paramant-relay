@@ -121,6 +121,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Check 3 (STALE) compares asset content with origin/main, what prod runs.
+      # The checkout is shallow, so fetch that one commit; without it the check
+      # skips with a notice.
+      - name: Fetch origin/main for the STALE check
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
       - name: All local css/js links must carry a single ?v= cache-bust
         run: scripts/check-cache-bust.sh
 
@@ -182,9 +187,10 @@ jobs:
       # parasign-sandbox-live-guard, the only guard on "a psk_live_ key must
       # never reach the sandbox auto-signer". They run here instead, against the
       # engine this job builds, and test/_requires.js now fails them outright if
-      # it is missing. These four need the engine but not redis, and the redis
+      # it is missing. These three need the engine but not redis, and the redis
       # service now on this job is not exposed to them, so that one precondition
-      # stays declared by name rather than silently swallowed.
+      # stays declared by name rather than silently swallowed. The fourth,
+      # parasign-envelope-index, does need redis: it runs in the route step.
       - name: Relay ParaSign engine suites
         working-directory: relay
         env:
@@ -194,7 +200,6 @@ jobs:
           test/parasign-sandbox.test.js
           test/parasign-sandbox-live-guard.test.js
           test/parasign-open-api-e2e.test.js
-          test/parasign-envelope-index.test.js
 
       # inbound-hash-verify spawns a real relay.js, so it needs the installed
       # dependencies and belongs here, not in the no-install unit job. It sat in
@@ -202,15 +207,6 @@ jobs:
       # become healthy in time", which is what a missing `redis` module looks
       # like through a spawn with stdio ignored. Thirty red runs in a row on
       # main, and a suite nobody trusts is a suite nobody reads.
-      - name: Relay integration suite (needs deps)
-        working-directory: relay
-        # deep-health-gate boots relay.js three times (two modes and a
-        # missing-token case), so like inbound-hash-verify it needs the
-        # installed dependencies and lives here, not in the no-install job.
-        # billing-stance-boot boots it four more times and reads the
-        # billing_config line, the one that says whether the relay bills
-        # one-off (BILLING_MODE empty, production) or opens subscriptions.
-        run: node --test test/inbound-hash-verify.test.js test/deep-health-gate.test.js test/billing-stance-boot.test.js
 
       # The route layer of relay.js. Until 2026-09-02 the 6488 lines and 68
       # routes of relay.js were loaded by NO unit test at all, the coverage
@@ -264,8 +260,32 @@ jobs:
           # --test-reporter=tap: see the unit job below. This gate parses the
           # same TAP diagnostic lines, and its expected set is empty too, so
           # the spec reporter would leave it green over anything.
-          node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js test/parasign-party-index.test.js test/quota-gate.test.js test/entitlements.test.js test/did-principal.test.js \
-            test/counter-atomicity-gate.test.js test/public-projection-gate.test.js test/guess-budget-gate.test.js 2>&1 | tee /tmp/relay-routes.log
+          # WIE HIER DRAAIT WORDT NIET MEER MET DE HAND BIJGEHOUDEN. Elke suite
+          # die relay.js opstart hoort in deze baan, want relay.js laadt redis
+          # en @paramant/core bij het laden en dit is de enige baan die beide
+          # bouwt. Dat stond als namen in de baan hieronder, en op 22-09 voegde
+          # een tak negentien suites toe die een relay opstarten zonder dat er
+          # een naam bij kwam: de baan zonder afhankelijkheden probeerde ze te
+          # draaien, de relay kwam nooit omhoog, en de stap bleef hangen tot hij
+          # werd afgekapt. Diezelfde stap duurt op main 43 seconden.
+          #
+          # scripts/relay-suites.mjs stelt de vraag aan de imports. Daarachter
+          # staan de suites die hier om een ANDERE reden horen: de ML-DSA-65
+          # engine of een echte redis. sort -u omdat de twee lijsten elkaar
+          # overlappen en node --test een naam die er twee keer staat ook twee
+          # keer draait.
+          suites=$(
+            { node ../scripts/relay-suites.mjs --met-relay
+              printf '%s\n' test/parasign-signs-quota.test.js test/parasign-party-index.test.js \
+                test/quota-gate.test.js test/entitlements.test.js test/did-principal.test.js \
+                test/counter-atomicity-gate.test.js test/public-projection-gate.test.js \
+                test/guess-budget-gate.test.js test/parasign-cosign-parties.test.js \
+                test/parasign-envelope-index.test.js \
+                test/quota-sign-hold-race.test.js test/backup-code-race.test.js \
+                test/rate-limit-sliding.test.js
+            } | sort -u)
+          echo "$suites" | sed 's/^/  /'
+          node --test --test-reporter=tap $suites 2>&1 | tee /tmp/relay-routes.log
           # The same gate as the unit job below: a suite that runs and asserts
           # NOTHING still reports green, and that is how four ParaSign suites
           # came to mean nothing for weeks. This job has redis AND the engine,
@@ -374,7 +394,11 @@ jobs:
             exit 1
           fi
           echo "full-stack browser suites: $suites"
-          node --test $suites
+          # One at a time. These suites each start real relay processes and a
+          # real browser; run in parallel they compete for the same backend and
+          # for the machine. Two of them was enough to make the billing numbers
+          # of one suite move under the other.
+          node --test --test-concurrency=1 $suites
 
   relay-unit-tests:
     name: relay - unit suite (no native deps)
@@ -423,8 +447,19 @@ jobs:
           # reason. A dead gate that reports green is exactly the failure this
           # job exists to prevent, so the reporter is pinned rather than
           # inherited from whatever Node decides a default should be.
-          node --test --test-reporter=tap $(ls test/*.test.js | grep -vE \
-            'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|quota-gate|entitlements.test|did-principal|counter-atomicity-gate|public-projection-gate|guess-budget-gate|route-') \
+          # parasign-envelope-index heeft redis nodig en draaide tot 04-10 in
+          # de ParaSign engine-stap, die RELAY_TEST_SKIP=redis zet: hij sloeg
+          # daar elke run over (hertest r2). Hij draait nu in de route-stap
+          # hierboven, waar de redis is en de TAP-poort een stille suite rood
+          # maakt. Hier blijft hij uitgesloten.
+          #
+          # Wie een relay opstart hoort hier NIET, en dat wordt gevraagd aan de
+          # imports in plaats van aan een lijst met namen: zie de uitleg bij de
+          # route-stap in de crypto-baan. Wat daarachter staat is de tweede
+          # reden om hier niet te draaien, de ML-DSA-65 engine, en die is niet
+          # uit de imports af te leiden.
+          node --test --test-reporter=tap $(node ../scripts/relay-suites.mjs --zonder-relay | grep -vE \
+            'parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|quota-gate|entitlements.test|did-principal|counter-atomicity-gate|public-projection-gate|guess-budget-gate|parasign-cosign-parties|quota-sign-hold-race|backup-code-race') \
             2>&1 | tee /tmp/relay-units.log
           # Which suites ran and asserted nothing. The line comes from
           # summary() in test/_requires.js.
@@ -495,6 +530,11 @@ jobs:
         # happens (scripts/ui-contrast-sweep.mjs), so a job without a browser
         # goes red in seconds instead of silent for hours.
         run: node --test $(node scripts/browser-suites.mjs --no-browser)
+      # Een verouderde e-mailblocklist is een waarschuwing, geen rode check: een
+      # vergeten update mag nooit een spoedfix tegenhouden. Rood wordt alleen de
+      # wekelijkse workflow email-blocklist (RUNBOOK.md, sectie 8).
+      - name: E-mailblocklist, leeftijd van de bron
+        run: node scripts/update-email-blocklist.mjs --leeftijd
 
   landen:
     name: landen, geen tak te lang buiten main

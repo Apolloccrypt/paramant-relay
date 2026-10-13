@@ -39,7 +39,7 @@ async function _verifyAndInit() {
       'WASM integrity check failed.\n' +
       'Expected: ' + WASM_SHA256 + '\n' +
       'Got:      ' + hashHex + '\n' +
-      'Do not proceed — the crypto binary may have been tampered with.'
+      'Do not proceed: the crypto binary may have been tampered with.'
     );
   }
 

@@ -121,3 +121,6 @@ ffe1ee0ef045ed6be6a222d4797c92575bcc400a:tests/parasign-open-api.test.mjs:generi
 # rood; zonder deze twee regels kan geen enkele PR groen worden.
 773c001c88a1023aa027b97112974b2464094a77:tests/developer-parasign-dashboard.test.mjs:generic-api-key:28
 773c001c88a1023aa027b97112974b2464094a77:tests/developer-parasign-dashboard.test.mjs:generic-api-key:41
+dc14d533f0d6913a37e530bdf76d7c68c43ac047:frontend/en/help/iot-integration.html:curl-auth-header:289
+dc14d533f0d6913a37e530bdf76d7c68c43ac047:frontend/en/docs.html:curl-auth-header:599
+dc14d533f0d6913a37e530bdf76d7c68c43ac047:frontend/en/docs.html:curl-auth-header:609

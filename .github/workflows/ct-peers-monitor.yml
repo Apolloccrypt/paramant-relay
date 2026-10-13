@@ -1,0 +1,72 @@
+name: ct-peers-monitor
+
+# Once a day: do the five production relays agree with each other about the
+# signed tree heads they mirror? Read-only. The monitor sends GET requests and
+# nothing else, needs no secret, and writes nothing on production.
+#
+# Why it exists. Until 2026-10-06 scripts/paramant-verify-peers ran in no
+# workflow at all, so nobody watched the gossip mirror. Run by hand that day it
+# went red over 15 impostor keys calling themselves health.paramant.app, and it
+# would have passed a real fork signed by the real key
+# (paramant-bewijs/ct-onderzoek-2026-10-06). It now checks every mirrored head
+# of a pinned relay under the pinned key, looks for two roots at one size, and
+# asks each relay for an RFC 9162 consistency proof from the mirrored heads to
+# its current head, verified in the script itself.
+#
+# Exit 1 (a real inconsistency) fails the run. Exit 3 (a relay or peer did not
+# answer, so no verdict) is a warning: an outage is the heartbeat's alarm, not
+# this one's, and a monitor that goes red for someone else's reason gets
+# ignored. Unpinned peers in a mirror are reported as warnings too: they are
+# pollution, not evidence, and since 3.1.2 the relays refuse or hide them.
+#
+# This is still Paramant watching Paramant. An outside witness is the next step,
+# see docs/ontwerp-ct-witness.md.
+on:
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ct-peers-monitor
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: ct peers - production, read-only
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Install root deps (ML-DSA-65 verifier, no browsers)
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm ci
+      - name: Verify the production mirrors
+        run: |
+          set +e
+          node scripts/paramant-verify-peers --fleet --json > verify-peers.json
+          code=$?
+          set -e
+          node -e '
+            const r = require("./verify-peers.json");
+            console.log("verdict:", r.verdict);
+            for (const m of r.inconsistencies) console.log("::error::" + m);
+            for (const m of r.unreachable) console.log("::warning::unreachable: " + m);
+            console.log(r.warnings.length + " warning(s) about unpinned peers or relays");
+          '
+          if [ "$code" = "1" ]; then exit 1; fi
+          if [ "$code" = "3" ]; then echo "::warning::not every relay answered; no verdict for those"; exit 0; fi
+          exit "$code"
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: verify-peers-${{ github.run_id }}
+          path: verify-peers.json
+          if-no-files-found: error

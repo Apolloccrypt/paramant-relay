@@ -54,7 +54,8 @@ const aliases = {
   '/security':'/security.html', '/trust':'/trust.html', '/docs':'/docs.html',
   '/about':'/about.html', '/help':'/help/index.html', '/download':'/download.html',
   '/login':'/auth/login.html', '/verify':'/verify.html',
-  '/gereedschap':'/gereedschap.html',
+  '/gereedschap':'/gereedschap.html', '/partners':'/partners.html',
+  '/en':'/en/index.html', '/en/pricing':'/en/pricing.html', '/en/sign':'/en/sign.html',
 };
 const PAGES = Object.keys(aliases);
 const SIZES = [[390, 844], [1440, 900]];
@@ -73,6 +74,13 @@ const SIZES = [[390, 844], [1440, 900]];
 // De lijst mag korter worden en nooit langer: een nieuwe regel eronder is een
 // regressie, ook als niemand hem ziet.
 const KNOWN_LIGHT = [];
+
+// De donkere tegenhanger (design-system.css, :root[data-theme="dark"]) wordt
+// op dezelfde pagina's en breedtes gemeten. Hij begon leeg en blijft leeg:
+// elke pagina die de gedeelde stylesheet laadt, volgt de donkere set, en een
+// pagina die dat niet doet valt hier op.
+const KNOWN_DARK = [];
+const THEME_KEY = 'paramant.theme.v1';
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -136,11 +144,15 @@ const probe = () => {
   return { measured: out.length, fails: out.filter(Boolean) };
 };
 
-async function scan(slug) {
+async function scan(slug, theme = 'light') {
   const rows = [];
   let measured = 0;
   for (const [width, height] of SIZES) {
-    const page = await browser.newPage({ viewport: { width, height }, colorScheme: 'light' });
+    const context = await browser.newContext({ viewport: { width, height }, colorScheme: theme });
+    await context.addInitScript(([key, value]) => {
+      try { window.localStorage.setItem(key, value); } catch { /* storage off */ }
+    }, [THEME_KEY, theme]);
+    const page = await context.newPage();
     await page.route('**/api/user/session/verify', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: '{"authenticated":false}' }));
     await page.goto(ORIGIN + slug, { waitUntil: 'networkidle' });
     // Een kleurtransitie die nog loopt levert een kleur op die op geen enkel
@@ -153,7 +165,7 @@ async function scan(slug) {
     const result = await page.evaluate(probe);
     measured += result.measured;
     for (const row of result.fails) rows.push({ ...row, width });
-    await page.close();
+    await context.close();
   }
   // Eén regel per unieke combinatie van plek en kleurenpaar; 390 en 1440 tellen
   // hetzelfde geval anders twee keer.
@@ -180,6 +192,23 @@ test('every page clears WCAG AA in light, and the known page defects do not grow
   assert.deepEqual(unexpected, [],
     `New contrast failures in light mode. Every one of these is below WCAG AA and none of them is on the known list:\n  ${unexpected.join('\n  ')}\n`
     + 'Fix the colour, or, if it is a deliberate page-owned defect that predates this run, add it to KNOWN_LIGHT with the reason. Do not loosen the ratio.');
+});
+
+test('every page clears WCAG AA in dark as well, and the dark list stays empty', async (t) => {
+  let measured = 0;
+  const unexpected = [];
+  for (const slug of PAGES) {
+    const result = await scan(slug, 'dark');
+    measured += result.measured;
+    for (const hit of result.uniq) {
+      if (KNOWN_DARK.find((k) => k.slug === slug && k.sel === hit.sel)) continue;
+      unexpected.push(`${slug} ${hit.sel}: ${hit.c}:1 (needs ${hit.need}), ${hit.color} on ${hit.bg}, "${hit.text}"`);
+    }
+  }
+  t.diagnostic(`dark: ${measured} text pairs measured across ${PAGES.length} pages at 390 and 1440`);
+  assert.deepEqual(unexpected, [],
+    `New contrast failures in dark mode:\n  ${unexpected.join('\n  ')}\n`
+    + 'Fix the colour in the dark tokens or the page rule. Do not loosen the ratio.');
 });
 
 test.after(async () => { await browser.close(); server.close(); });

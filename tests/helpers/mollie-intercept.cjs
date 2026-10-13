@@ -19,6 +19,10 @@ if (process.env.FAKE_MOLLIE_URL) routes.set('api.mollie.com', new URL(process.en
 // cancellation confirmation. RESEND_API_KEY unset makes the relay skip sending
 // silently, which is exactly the state in which nobody notices a missing mail.
 if (process.env.FAKE_RESEND_URL) routes.set('api.resend.com', new URL(process.env.FAKE_RESEND_URL));
+// VIES, the European Commission's VAT number check (relay/lib/vat.js). Same
+// reason as Mollie: the host is hard-coded, and a test must never ask the real
+// service about a VAT number.
+if (process.env.FAKE_VIES_URL) routes.set('ec.europa.eu', new URL(process.env.FAKE_VIES_URL));
 
 if (routes.size) {
   const https = require('https');

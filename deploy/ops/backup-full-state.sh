@@ -12,6 +12,9 @@
 #   - trial-keys.jsonl       per relay
 #   - users.json             per relay: accounts (also covered by the old backup)
 #   - redis dump.rdb + AOF   the ParaSign sessions/blobs/mutable state
+#   - host configuration     /opt/paramant-relay/.env, /etc/nginx,
+#                            /etc/letsencrypt, /etc/caddy, /home/paramant/secrets
+#                            (each only when present; under host/ in the bundle)
 #
 # Method: snapshot the ENTIRE /data volume of each relay plus the whole redis
 # data volume, hash every file into a manifest, bundle, and age-encrypt. This
@@ -25,11 +28,21 @@
 # its AOF is crash-consistent to within ~1s; a best-effort BGSAVE is attempted
 # first for a cleaner point-in-time RDB.
 #
-# THE BUNDLE CONTAINS PRIVATE KEYS. It is age-encrypted to a public key; only
-# the offline private key can decrypt it. Treat every artifact as secret.
+# THE BUNDLE CONTAINS PRIVATE KEYS AND EVERY PRODUCTION SECRET. It is
+# age-encrypted to one or more public keys; only a matching private key can
+# decrypt it. Treat every artifact as secret.
 #
-# Usage (prod, as root, via cron or by hand):
-#   /home/paramant/scripts/backup-full-state.sh
+# Recipients: the public key in KEYFILE (the key on this server, so a restore
+# here works) PLUS every recipient line in RECIPIENTS_FILE, passed to age with
+# -R. Put the public key of the offline escrow key in RECIPIENTS_FILE: its
+# private half is not on this server, so a stolen server cannot open the
+# bundle with it, and a lost server does not take the only key with it.
+#
+# Usage (prod, as root; the systemd timer in deploy/systemd runs it daily):
+#   /opt/paramant-relay/deploy/ops/backup-full-state.sh
+#
+# Which public keys will a backup be encrypted to (no root, writes nothing):
+#   ./backup-full-state.sh --recipients
 #
 # Dry-run (no root, no age, no prune — proves the manifest):
 #   PARAMANT_BACKUP_SOURCES=$'main\t/some/dir\nhealth\t/other/dir' \
@@ -42,13 +55,18 @@ umask 077
 # ── Config (overridable via env) ──────────────────────────────────────────────
 BACKUP_ROOT="${BACKUP_ROOT:-/home/paramant/backups/full-state}"
 KEYFILE="${KEYFILE:-/root/.config/paramant-backup/key.txt}"
+RECIPIENTS_FILE="${RECIPIENTS_FILE:-/root/.config/paramant-backup/recipients.txt}"
+# Host paths copied into host/ when present. Space separated; override for tests.
+HOST_PATHS="${PARAMANT_BACKUP_HOST_PATHS:-/opt/paramant-relay/.env /etc/nginx /etc/letsencrypt /etc/caddy /home/paramant/secrets}"
 RELAY_FILTER="${RELAY_FILTER:-relay}"        # docker name grep for relay containers
 REDIS_CONTAINER="${REDIS_CONTAINER:-paramant-relay-redis}"
 LOG="${LOG:-/var/log/paramant-backup.log}"
 RETAIN_DAYS="${RETAIN_DAYS:-30}"
 
 DRY_RUN=0
+LIST_RECIPIENTS=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
+[[ "${1:-}" == "--recipients" ]] && LIST_RECIPIENTS=1
 
 # Fall back to /dev/null when the log path is not writable (e.g. non-root dry-run)
 # so logging never leaks a redirection error to stderr.
@@ -61,13 +79,47 @@ die()  { echo "ERROR: $*" >&2; log "ERROR: $*"; exit 1; }
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 DAY=$(date +%d)
 
+# ── Recipients ────────────────────────────────────────────────────────────────
+# AGE_ARGS ends up as: -r <server key> [-R <recipients file>]. At least one
+# recipient is required; a backup nobody can decrypt is not a backup.
+declare -a AGE_ARGS=()
+RECIPIENT_COUNT=0
+collect_recipients() {
+  local pub=""
+  if [[ -r "$KEYFILE" ]]; then
+    pub=$(grep -m1 "^# public key:" "$KEYFILE" | cut -d: -f2 | tr -d " ")
+    [[ -n "$pub" ]] || die "no public key line in $KEYFILE"
+    AGE_ARGS+=(-r "$pub")
+    RECIPIENT_COUNT=$((RECIPIENT_COUNT+1))
+    say "  recipient: $pub  (server key, $KEYFILE)"
+  fi
+  if [[ -f "$RECIPIENTS_FILE" ]]; then
+    local n
+    n=$(grep -cvE '^[[:space:]]*(#|$)' "$RECIPIENTS_FILE" || true)
+    if [[ "$n" -gt 0 ]]; then
+      AGE_ARGS+=(-R "$RECIPIENTS_FILE")
+      RECIPIENT_COUNT=$((RECIPIENT_COUNT+n))
+      grep -vE '^[[:space:]]*(#|$)' "$RECIPIENTS_FILE" | sed "s|^|  recipient: |; s|\$|  ($RECIPIENTS_FILE)|"
+    fi
+  fi
+  [[ $RECIPIENT_COUNT -gt 0 ]] || die "no recipients: neither $KEYFILE nor $RECIPIENTS_FILE gives a public key"
+  if [[ $RECIPIENT_COUNT -lt 2 ]]; then
+    say "  ! only one recipient. Add the offline escrow public key to $RECIPIENTS_FILE"
+    log "WARN: backup encrypted to a single recipient (no escrow key in $RECIPIENTS_FILE)"
+  fi
+}
+
+if [[ $LIST_RECIPIENTS -eq 1 ]]; then
+  collect_recipients
+  say "recipients: $RECIPIENT_COUNT"
+  exit 0
+fi
+
 # ── Preflight ─────────────────────────────────────────────────────────────────
 if [[ $DRY_RUN -eq 0 ]]; then
   [[ $EUID -eq 0 ]] || die "must run as root (reads root-owned volumes and 0600 keys)"
   command -v age >/dev/null 2>&1 || die "age not installed"
-  [[ -r "$KEYFILE" ]] || die "key file not readable: $KEYFILE"
-  PUBKEY=$(grep -m1 "^# public key:" "$KEYFILE" | cut -d: -f2 | tr -d " ")
-  [[ -n "$PUBKEY" ]] || die "no public key line in $KEYFILE"
+  collect_recipients
 fi
 
 WORK=$(mktemp -d)
@@ -156,6 +208,28 @@ else
   say "  ! redis: no source dir resolved (not captured)"
 fi
 
+# ── Collect host configuration ────────────────────────────────────────────────
+# The relay data alone does not bring a server back: without the .env, the
+# TLS certificates and the proxy config a restored relay has no secrets and
+# no front door. Each path is optional; what is absent is said, not hidden.
+HOST_COUNT=0
+HOST_CAPTURED=""
+for hp in $HOST_PATHS; do
+  if [[ ! -e "$hp" ]]; then
+    say "  - host $hp: absent, skipped"
+    continue
+  fi
+  mkdir -p "$STAGE/host"
+  if cp -a --parents "$hp" "$STAGE/host/" 2>/dev/null; then
+    say "  + host $hp"
+    HOST_COUNT=$((HOST_COUNT+1))
+    HOST_CAPTURED="$HOST_CAPTURED $hp"
+  else
+    say "  ! host $hp: copy failed"
+    log "WARN: host path $hp present but not copied"
+  fi
+done
+
 # ── Manifest (sha256 per file) ────────────────────────────────────────────────
 MANIFEST="$STAGE/MANIFEST.txt"
 {
@@ -164,6 +238,7 @@ MANIFEST="$STAGE/MANIFEST.txt"
   echo "host:        $(hostname)"
   echo "relays:      $RELAY_COUNT"
   echo "redis:       $([[ $REDIS_OK -eq 1 ]] && echo yes || echo no)"
+  echo "host_config: $([[ -n "$HOST_CAPTURED" ]] && echo "$HOST_CAPTURED" || echo none)"
   echo "dry_run:     $DRY_RUN"
   echo "# sha256  size  path (relative to bundle root)"
 } > "$MANIFEST"
@@ -206,7 +281,7 @@ mkdir -p "$BACKUP_ROOT/daily" "$BACKUP_ROOT/monthly"
 chmod 700 "$BACKUP_ROOT" "$BACKUP_ROOT/daily" "$BACKUP_ROOT/monthly" 2>/dev/null || true
 
 OUT="$BACKUP_ROOT/daily/paramant-full-$TIMESTAMP.tar.gz.age"
-age -r "$PUBKEY" -o "$OUT" "$BUNDLE" || die "age encryption failed"
+age "${AGE_ARGS[@]}" -o "$OUT" "$BUNDLE" || die "age encryption failed"
 chmod 600 "$OUT"
 # Keep a plaintext manifest next to the encrypted bundle for quick integrity
 # checks without decrypting. sha256 hashes of secret files leak nothing usable.
@@ -224,8 +299,8 @@ find "$BACKUP_ROOT/daily/" -type f -mtime +"$RETAIN_DAYS" -delete 2>/dev/null ||
 
 SIZE=$(du -h "$OUT" | cut -f1)
 say ""
-say "OK: $RELAY_COUNT relay(s) + redis=$REDIS_OK, $FILE_COUNT file(s) -> $OUT ($SIZE)"
-log "full-state backup OK: relays=$RELAY_COUNT redis=$REDIS_OK files=$FILE_COUNT -> $OUT ($SIZE)"
+say "OK: $RELAY_COUNT relay(s) + redis=$REDIS_OK + host=$HOST_COUNT, $FILE_COUNT file(s), $RECIPIENT_COUNT recipient(s) -> $OUT ($SIZE)"
+log "full-state backup OK: relays=$RELAY_COUNT redis=$REDIS_OK host=$HOST_COUNT files=$FILE_COUNT recipients=$RECIPIENT_COUNT -> $OUT ($SIZE)"
 
 # Optional offsite (same hook as the users-json backup).
 if [[ -x /home/paramant/scripts/backup-offsite.sh ]]; then

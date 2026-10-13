@@ -66,6 +66,7 @@ async function main() {
     const webhookCalls = [];
     const baseDeps = (over) => Object.assign({
       apiKeys, envStore, store, stamp: parasignStamp,
+      parasignEntitled: () => true,   // the account pays; see route-v1-entitlement
       publicOrigin: 'https://paramant.app',
       authHeader: 'Bearer ' + TOKEN,
       query: {},
@@ -96,7 +97,7 @@ async function main() {
     assert.strictEqual(res.statusCode, 201, 'create returns 201');
     const created = res.json();
     assert.strictEqual(created.status, 'completed', 'test envelope auto-completed by the sandbox signer');
-    assert.ok(created.signers.every(s => s.status === 'completed'), 'all signer slots completed');
+    assert.ok(created.signers.every(s => s.status === 'signed'), 'all signer slots signed (the word GET uses too)');
     assert.ok(created.documents && created.documents.signed_pdf, 'documents links exposed on completion');
     const id = created.id;
     ok('CREATE (psk_test_) auto-signs to completed via the sandbox signer');

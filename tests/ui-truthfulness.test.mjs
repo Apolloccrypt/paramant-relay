@@ -10,21 +10,37 @@ const adminHtml = read('admin/public/index.html') + read('frontend/admin.html');
 const adminJs = read('admin/public/app.js') + read('frontend/js/admin.page.js');
 const email = read('admin/lib/email-templates.js');
 
-assert.doesNotMatch(account + accountJs + adminHtml + adminJs, /Delete account permanently|Account deleted|permanent, cannot undo/i);
-assert.match(account, /makes its API key unusable/i);
-assert.match(account, /sessions and TOTP setup are removed/i);
-assert.match(account, /account record is retained/i);
+assert.doesNotMatch(account + accountJs + adminHtml + adminJs, /Delete account permanently|Account deleted|permanent, cannot undo|Account definitief verwijderen|Account verwijderd|definitief, kan niet ongedaan/i);
+assert.match(account, /werkt de API-sleutel niet meer/i);
+// What deactivation erases, said the same way on the screen and in the mail
+// (acceptatie 3.1.1, taal #8): the screen said "the account record is kept"
+// while the mail said "your personal data has been erased".
+assert.match(account, /Uw sessies, de koppeling met uw authenticator-app en open ondertekenverzoeken verdwijnen/i);
+assert.match(account, /persoonsgegevens wissen we/i);
+assert.doesNotMatch(account, /accountrecord blijft bewaard/i);
 assert.doesNotMatch(account, /Stub mode|No real payments are charged|Mollie integration pending/i);
-assert.match(adminHtml, /blocks the account key and removes active sessions and TOTP/i);
-assert.match(adminHtml, /Type DEACTIVATE to confirm/);
-assert.match(adminJs, /Account deactivated/);
+// Both admin screens speak Dutch since 2026-10-05 (admin/public was English).
+// Each one on its own must say what deactivation does, so they are read apart.
+const adminMainHtml = read('admin/public/index.html');
+const adminMainJs = read('admin/public/app.js');
+assert.match(adminMainHtml, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
+assert.match(adminMainHtml, /Typ DEACTIVATE om te bevestigen/);
+assert.match(adminMainJs, /Account gedeactiveerd/);
+const adminNl = read('frontend/admin.html');
+const adminNlJs = read('frontend/js/admin.page.js');
+assert.match(adminNl, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
+assert.match(adminNl, /Typ DEACTIVATE om te bevestigen/);
+assert.match(adminNlJs, /Account gedeactiveerd/);
 // Deletion now erases the personal data itself, so the mail has to say so.
 // It used to promise the opposite, because deletion only revoked the key and
 // left the address in users.json (audit finding 5 of 2026-07-21). A mail that
 // undersells an erasure is as untrue as one that oversells it, which is what
 // this file exists to catch.
-assert.match(email, /Personal data removed from our systems/);
-assert.match(email, /Billing records kept for as long as tax law requires/);
+assert.match(email, /personal data have been erased/);
+assert.match(email, /persoonsgegevens zijn gewist/);
+assert.match(email, /Invoices are kept for as long as tax law requires/);
+// After an erasure there is nothing to switch back on.
+assert.doesNotMatch(email, /wilt u weer toegang|want access again/i);
 assert.doesNotMatch(email, /Account record and audit entries retained/);
 assert.doesNotMatch(email, /sign up again|Files already relayed are not affected/i);
 
@@ -76,18 +92,28 @@ const signJs = read('frontend/sign-flow.js');
 // quote the very phrasing they exist to forbid ("no verified signer"), so a
 // no-overclaim check that scans the raw file fails on its own explanation.
 const signVisible = signHtml.replace(/<!--[\s\S]*?-->/g, '');
+// /sign is Dutch since 23 September 2026; the English copy is /en/sign and is
+// held to the same promises in its own words.
+const signEnHtml = read('frontend/en/sign.html');
+const signEnVisible = signEnHtml.replace(/<!--[\s\S]*?-->/g, '');
 
 // 1. An open-mode signature must never be presented as a verified signer.
 // Recipe version 4 binds the signer's PUBLIC KEY into the signed message, so
 // the proof commits to "key K signed slot i of document D" and to nothing about
 // who holds K. This is the same overclaim that renamed the ParaID assurance
 // rung from 'substantial' to 'mrz-unverified'.
-assert.match(signHtml, /Signer not verified/i,
+assert.match(signHtml, /Ondertekenaar niet geverifieerd/i,
   'sign.html must state that an open-mode signer is not verified');
-assert.match(signHtml, /does not\s+show who holds that key/i,
+assert.match(signHtml, /toont niet wie die sleutel heeft/i,
   'sign.html must say the proof does not identify the holder of the key');
-assert.doesNotMatch(signVisible, /identity verified|verified signer|signer verified|legally binding/i,
+assert.doesNotMatch(signVisible, /identiteit geverifieerd|geverifieerde ondertekenaar|juridisch bindend|identity verified|verified signer|legally binding/i,
   'sign.html must not claim a verified identity or legal effect it cannot deliver');
+assert.match(signEnHtml, /Signer not verified/i,
+  'en/sign.html must state that an open-mode signer is not verified');
+assert.match(signEnHtml, /does not\s+show who holds that key/i,
+  'en/sign.html must say the proof does not identify the holder of the key');
+assert.doesNotMatch(signEnVisible, /identity verified|verified signer|signer verified|legally binding/i,
+  'en/sign.html must not claim a verified identity or legal effect it cannot deliver');
 
 // The scope notice is driven by what the SERVER reported, never by the mode the
 // visitor picked in the UI. A label that guesses is worse than no label: it
@@ -100,10 +126,36 @@ assert.doesNotMatch(signJs, /showProofScope\([^)]*signingMode/,
 // 2. A visitor without a session is told what signing needs BEFORE picking a
 // file, not after. The page used to be behind an nginx auth_request; moving the
 // dead end to the last step would be worse than the redirect it replaced.
-assert.match(signHtml, /Signing a document needs an account/i,
+// Said once, in the bar above the steps; the block under it says what works
+// without an account instead of repeating the requirement (acceptatie 3.1.1
+// ronde 2, taal #18).
+assert.match(signHtml, /Om te tekenen of te versturen heeft u een gratis Community-account nodig\./,
   'sign.html must state the account requirement up front');
-assert.match(signHtml, /open a signing request someone sent you/i,
+assert.doesNotMatch(signHtml, /Voor ondertekenen is een account nodig/i,
+  'sign.html says the requirement twice, in the bar and in the block under it');
+assert.match(signHtml, /een verzoek openen dat iemand u stuurde/i,
   'sign.html must say what an invited signer can still do without an account');
+assert.match(signEnHtml, /To sign or send it, you need a free Community account\./,
+  'en/sign.html must state the account requirement up front');
+assert.doesNotMatch(signEnHtml, /Signing a document needs an account/i,
+  'en/sign.html says the requirement twice');
+assert.match(signEnHtml, /open a signing request someone sent you/i,
+  'en/sign.html must say what an invited signer can still do without an account');
+// And it may not promise signing WITHOUT an account: co-sign.js asks the
+// invitee to sign in with the invited mailbox before the sign step, and sends
+// someone without an account to /signup with the invitation's address first
+// ("Nog geen account? Maak er gratis een met het e-mailadres van deze
+// uitnodiging"). So the page says an account is made first, then signed.
+assert.doesNotMatch(signHtml, /tekenen met de link uit die e-mail/i,
+  'sign.html must not promise signing without an account');
+assert.doesNotMatch(signEnHtml, /sign it with the link from that email/i,
+  'en/sign.html must not promise signing without an account');
+assert.match(signHtml, /Maak dan gratis een account op dat adres/i,
+  'sign.html must say the invitee makes a free account on the invited address first');
+assert.match(signEnHtml, /Create a free one on that address/i,
+  'en/sign.html must say the invitee makes a free account on the invited address first');
+assert.match(read('frontend/co-sign.js'), /Maak er gratis een<\/a> met het e-mailadres van deze uitnodiging/,
+  'co-sign.js still sends an invitee without an account to signup with the invited address');
 assert.match(signJs, /function showSessionRequirement/,
   'sign-flow.js must have the session-requirement control');
 
@@ -114,13 +166,22 @@ assert.match(signJs, /function showSessionRequirement/,
 // saying what the screen does and what happens next, one action, and no promise.
 // These assertions pin the sentence each screen now opens with, so a rewrite
 // that quietly drops the explanation fails here instead of in production.
+// Since 23 September 2026 these screens are Dutch on their own path and English
+// under /en/. Both copies are held to the same sentence, each in its language.
 const authFirstSentence = {
-  'frontend/auth/login.html': /No password to type: sign in with your passkey/i,
-  'frontend/auth/setup.html': /Pick one now and add the other later/i,
-  'frontend/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
-  'frontend/auth/request-reset.html': /if it matches an account, we send a link/i,
-  'frontend/auth/reset-confirm.html': /You get two emails, one after the other/i,
-  'frontend/signup/verified.html': /Paramant has no passwords/i,
+  'frontend/en/auth/login.html': /No password to type: sign in with your passkey/i,
+  'frontend/en/auth/setup.html': /Pick one now and add the other later/i,
+  'frontend/en/auth/backup.html': /Each code works once\. You do not need your authenticator app for it/i,
+  // A back-up code is required since the mailbox alone stopped being enough.
+  'frontend/en/auth/request-reset.html': /one of your backup codes\. If they match, we first send an email to confirm the request/i,
+  'frontend/en/auth/reset-confirm.html': /You get two emails, one after the other/i,
+  'frontend/en/signup/verified.html': /Paramant has no passwords/i,
+  'frontend/auth/login.html': /Geen wachtwoord nodig: log in met uw passkey/i,
+  'frontend/auth/setup.html': /Kies er nu één en voeg de andere later toe/i,
+  'frontend/auth/backup.html': /Elke code werkt één keer\. Uw authenticator-app heeft u er niet voor nodig/i,
+  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan krijgt u eerst een mail om het verzoek te bevestigen/i,
+  'frontend/auth/reset-confirm.html': /U krijgt twee mails na elkaar/i,
+  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoord/i,
 };
 for (const [file, rx] of Object.entries(authFirstSentence)) {
   assert.match(read(file), rx, `${file} must open by saying what this screen does`);
@@ -131,7 +192,7 @@ for (const [file, rx] of Object.entries(authFirstSentence)) {
 const authVisible = Object.keys(authFirstSentence)
   .map((file) => read(file).replace(/<!--[\s\S]*?-->/g, ''))
   .join('\n');
-assert.doesNotMatch(authVisible, /EUR\s?\d|€|per month|Community tier|Mick Beer/i,
+assert.doesNotMatch(authVisible, /EUR\s?\d|€|per month|per maand|Community tier|Community-plan|Mick Beer/i,
   'auth screens must not carry pricing, tier names or the founder block');
 
 // A ParaSign signature is a Simple Electronic Signature (/about pins that
@@ -139,7 +200,7 @@ assert.doesNotMatch(authVisible, /EUR\s?\d|€|per month|Community tier|Mick Bee
 // to a PDF", which promises a legal effect the product does not deliver and
 // which tests/ui-truthfulness already forbids on /sign. Same rule, same surface.
 assert.doesNotMatch(authVisible,
-  /legally.binding|identity verified|verified signer|signer verified/i,
+  /legally.binding|identity verified|verified signer|signer verified|juridisch bindend|identiteit geverifieerd|geverifieerde ondertekenaar/i,
   'the auth screens must not claim a legal effect or a verified identity');
 
 console.log('ui-truthfulness: the auth screens say what they do and sell nothing');
@@ -155,7 +216,8 @@ console.log('ui-truthfulness: the auth screens say what they do and sell nothing
 //    container as /auth/login and /auth/backup.
 const styled = ['frontend/design-system.css', 'frontend/nav.css']
   .map(read).join('\n');
-for (const file of ['frontend/auth/request-reset.html', 'frontend/auth/reset-confirm.html']) {
+for (const file of ['frontend/auth/request-reset.html', 'frontend/auth/reset-confirm.html',
+                    'frontend/en/auth/request-reset.html', 'frontend/en/auth/reset-confirm.html']) {
   const main = read(file).match(/<main class="([^"]+)"/);
   assert.ok(main, `${file} must have a <main> with a class`);
   for (const cls of main[1].split(/\s+/)) {
@@ -167,16 +229,23 @@ for (const file of ['frontend/auth/request-reset.html', 'frontend/auth/reset-con
 // 2. The reset confirmation token is written with { EX: 3600 } (admin/server.js).
 //    The page claimed 15 minutes and justified it as a safety property, which
 //    made a wrong number sound deliberate.
-const resetConfirm = read('frontend/auth/reset-confirm.html');
+const resetConfirm = read('frontend/en/auth/reset-confirm.html');
+const resetConfirmNl = read('frontend/auth/reset-confirm.html');
 assert.match(resetConfirm, /Confirmation links last 60 minutes/i,
   'reset-confirm must state the TTL the code actually sets (EX: 3600)');
+assert.match(resetConfirmNl, /Een bevestigingslink werkt 60 minuten/i,
+  'the Dutch reset-confirm must state the same TTL (EX: 3600)');
 assert.doesNotMatch(resetConfirm, /arrives within a minute|within a minute/i,
   'no delivery-time promise: the reset mail is sent fire-and-forget');
+assert.doesNotMatch(resetConfirmNl, /binnen een minuut/i,
+  'no delivery-time promise in Dutch either');
 
 // 3. Clicking through from a mail to "confirm" and then being told a second mail
 //    follows reads as phishing unless the page says why it is split in two.
 assert.match(resetConfirm, /someone who briefly had your mailbox open/i,
   'reset-confirm must say why the reset takes two emails');
+assert.match(resetConfirmNl, /wie even in uw mailbox kon kijken/i,
+  'the Dutch reset-confirm must say why the reset takes two emails');
 
 // 4. The sign-in 429 is now per IP and ONLY per IP (5 per 900s,
 //    admin/lib/login-ratelimit.js). The per-email counter that used to share
@@ -194,6 +263,10 @@ assert.match(loginJs, /counts the connection, not your account/i,
   'the 429 text must name the counter that can actually cause it');
 assert.match(loginJs, /nobody can trigger it by guessing at your email address/i,
   'and must say the thing that changed, because it is what a locked-out reader is looking for');
+assert.match(loginJs, /De grens telt de verbinding, niet uw account/,
+  'the Dutch 429 text must name the same counter');
+assert.match(loginJs, /niemand kan hem veroorzaken door uw e-mailadres te raden/,
+  'and say the same thing that changed');
 
 // 4a. The 428 is the priced attempt, not a refusal, and the page handles it by
 //     solving the challenge and posting again. The message is only for the case
@@ -204,8 +277,12 @@ assert.match(loginJs, /ParamantCaptcha\.getCaptchaProof/,
   'and it must solve it with the proof-of-work helper the page loads');
 assert.match(loginJs, /extra verification this sign-in needs/i,
   'and when the challenge itself fails, the message must be about the verification, not about being blocked');
-assert.ok(read('frontend/auth/login.html').includes('/js/pow-captcha.js'),
-  'the login page must actually load the proof-of-work helper it calls');
+assert.match(loginJs, /De extra controle voor deze inlogpoging lukte niet/,
+  'the Dutch 428 text must be about the verification too');
+for (const file of ['frontend/auth/login.html', 'frontend/en/auth/login.html']) {
+  assert.ok(read(file).includes('/js/pow-captcha.js'),
+    `${file} must actually load the proof-of-work helper it calls`);
+}
 
 // 4b. A 503 means the TOTP single-use guard could not reach Redis and verification
 //     failed closed. Nothing is wrong with the code or the account, and the page
@@ -214,6 +291,8 @@ assert.match(loginJs, /res\.status === 503/,
   'the login page must handle the fail-closed 503 separately from a wrong code');
 assert.match(loginJs, /Nothing is wrong with your account or your code/i,
   'the 503 text must say the outage is ours, not theirs');
+assert.match(loginJs, /Er is niets mis met uw account of uw code/,
+  'the Dutch 503 text must say the outage is ours, not theirs');
 
 // 4b. POST /api/user/auth/request-totp-reset sends a CONFIRMATION mail whose
 //     token is { EX: 3600 } (admin/server.js:1890). The 14 day setup token is
@@ -226,21 +305,31 @@ assert.match(requestResetJs, /a confirmation email is on its way/i,
   'request-reset must say the first mail confirms the request, not that it carries the setup link');
 assert.match(requestResetJs, /valid for 60 minutes/i,
   'the confirmation token is EX 3600, so the success message must say 60 minutes');
-assert.match(requestResetJs, /that one works for 14 days/i,
-  'the 14 days belong to the second mail, the one with the setup link');
-assert.doesNotMatch(requestResetJs, /a setup link is on its way/i,
+// The setup link lives SETUP_TOKEN_TTL_S, two days since the 2026-09-05
+// review (admin/server.js); it was fourteen before that, and this page said so.
+assert.match(read('admin/server.js'), /SETUP_TOKEN_TTL_S[^\n]*2 \* 86400/,
+  'the setup link lasts two days; if that changes, change the sentence below with it');
+assert.match(requestResetJs, /that one works for two days/i,
+  'the two days belong to the second mail, the one with the setup link');
+assert.match(requestResetJs, /Die eerste mail bevestigt alleen het verzoek, en de link werkt 60 minuten/,
+  'the Dutch success message must attach the 60 minutes to the first mail');
+assert.match(requestResetJs, /Die werkt twee dagen/,
+  'and the two days to the second');
+assert.doesNotMatch(requestResetJs, /a setup link is on its way|een instellink is onderweg/i,
   'no setup link exists until the confirmation is opened');
 
 //     And the success message has to be visible when it fires: #success sat
 //     inside #reset-form, which auth-request-reset.js hides on success, so the
 //     confirmation was hidden with its parent and the screen went blank.
-const requestResetHtml = read('frontend/auth/request-reset.html');
-const resetFormBlock = requestResetHtml.slice(requestResetHtml.indexOf('<form id="reset-form"'),
-                                              requestResetHtml.indexOf('</form>'));
-assert.doesNotMatch(resetFormBlock, /id="success"/,
-  'the success message must sit outside #reset-form: the handler hides that form on success');
-assert.match(requestResetHtml, /id="success"/,
-  'request-reset still needs a success container, just not inside the form');
+for (const file of ['frontend/auth/request-reset.html', 'frontend/en/auth/request-reset.html']) {
+  const requestResetHtml = read(file);
+  const resetFormBlock = requestResetHtml.slice(requestResetHtml.indexOf('<form id="reset-form"'),
+                                                requestResetHtml.indexOf('</form>'));
+  assert.doesNotMatch(resetFormBlock, /id="success"/,
+    `${file}: the success message must sit outside #reset-form: the handler hides that form on success`);
+  assert.match(requestResetHtml, /id="success"/,
+    `${file}: request-reset still needs a success container, just not inside the form`);
+}
 
 //     The same endpoint answers 429 with retry_after 86400 (admin/server.js:1875)
 //     off a 5-per-address-per-24h and 10-per-connection-per-hour limit. A shared
@@ -249,6 +338,8 @@ assert.match(requestResetJs, /res\.status === 429/,
   'request-reset must handle 429 separately: retrying does not help for up to a day');
 assert.match(requestResetJs, /up to 24 hours to clear/i,
   'the 429 text must state the wait the server actually imposes (retry_after 86400)');
+assert.match(requestResetJs, /Het kan dus tot 24 uur duren/,
+  'the Dutch 429 text must state the same wait');
 
 // 5. Every one of these screens must name the party behind the product and the
 //    country it sits in. The stamped legal-strip carries the documents, not the
@@ -256,23 +347,25 @@ assert.match(requestResetJs, /up to 24 hours to clear/i,
 for (const file of Object.keys(authFirstSentence)) {
   assert.match(read(file), /Paramantis Solutions B\.V\./,
     `${file} must name the company behind the product`);
-  assert.match(read(file), /Harderwijk,\s+the Netherlands/,
+  assert.match(read(file), file.startsWith('frontend/en/') ? /Harderwijk,\s+the Netherlands/ : /Harderwijk,\s+Nederland/,
     `${file} must name the country the company sits in`);
 }
 
 // 6. /signup/verified made a lawyer choose between seven authenticator apps and
 //    told them a SHA-256 app is "stronger" without saying what that means.
-const verified = read('frontend/signup/verified.html');
-assert.doesNotMatch(verified, /SHA-256 app is stronger|Raivo|Aegis|2FAS|Ente Auth/i,
-  'verified must not ask the reader to rank authenticator apps; link the help page');
-assert.match(verified, /help\/authenticator-apps/,
-  'verified must link the help page that does compare the apps');
-assert.doesNotMatch(verified, /class="next-num"/,
-  'no step badge numbered 2 on a page that has no step 1');
-// Same rule as reset-confirm: the setup mail is dispatched fire-and-forget and
-// nothing in the code knows what the receiving provider will do with it.
-assert.doesNotMatch(verified, /can take up to 60 seconds|arrives within a minute/i,
-  'no delivery-time promise on verified either: the rule holds on every screen');
+for (const file of ['frontend/signup/verified.html', 'frontend/en/signup/verified.html']) {
+  const verified = read(file);
+  assert.doesNotMatch(verified, /SHA-256 app is stronger|SHA-256-app is sterker|Raivo|Aegis|2FAS|Ente Auth/i,
+    `${file}: verified must not ask the reader to rank authenticator apps; link the help page`);
+  assert.match(verified, /help\/authenticator-apps/,
+    `${file}: verified must link the help page that does compare the apps`);
+  assert.doesNotMatch(verified, /class="next-num"/,
+    `${file}: no step badge numbered 2 on a page that has no step 1`);
+  // Same rule as reset-confirm: the setup mail is dispatched fire-and-forget and
+  // nothing in the code knows what the receiving provider will do with it.
+  assert.doesNotMatch(verified, /can take up to 60 seconds|arrives within a minute|binnen een minuut|tot 60 seconden/i,
+    `${file}: no delivery-time promise on verified either: the rule holds on every screen`);
+}
 
 
 // 7. .lede carries no top margin and h1 carries no bottom margin, so on
@@ -281,7 +374,8 @@ assert.doesNotMatch(verified, /can take up to 60 seconds|arrives within a minute
 //    verified). The .mt-3 utility (16px) restores the gap without changing .lede
 //    for the eleven other pages that use it.
 for (const file of ['frontend/auth/setup.html', 'frontend/auth/backup.html',
-                    'frontend/auth/request-reset.html']) {
+                    'frontend/auth/request-reset.html', 'frontend/en/auth/setup.html',
+                    'frontend/en/auth/backup.html', 'frontend/en/auth/request-reset.html']) {
   const html = read(file);
   const afterH1 = html.slice(html.indexOf('</h1>'));
   assert.match(afterH1.slice(0, 200), /<p class="lede mt-3">/,
@@ -293,7 +387,7 @@ console.log('ui-truthfulness: the review findings on PR #337 stay fixed');
 // It states two things a page can be wrong about at real cost: what a signature
 // is worth, and what it costs. Both are pinned here, because the homepage is
 // the one page that repeats claims owned by another file.
-const home = read('frontend/index.html').replace(/<!--[\s\S]*?-->/g, '');
+const home = read('frontend/en/index.html').replace(/<!--[\s\S]*?-->/g, '');
 
 // 1. Same overclaim rule as sign.html. An open-mode signature commits to "key K
 // signed slot i of document D" and to nothing about who holds K, so the page
@@ -314,21 +408,43 @@ for (const m of home.matchAll(/[^.<>]*\bno account\b[^.<>]*/gi)) {
 // 3. Every price the homepage names must also stand on the pricing page. Two
 // pages quoting money is two places to be wrong; this makes the second one
 // follow the first instead of drifting away from it.
-const pricing = read('frontend/pricing.html');
+//
+// Since 23 September 2026 there are two pairs: the Dutch homepage and the Dutch
+// /pricing, which sell one offer (Community at 0, the kantoorplan at 29 euro),
+// and the English copies under /en/, which keep the full tier table. Each
+// homepage is held to its own pricing page. The Dutch pages write an amount as
+// "&euro;29" or as "29 euro", so both spellings count.
+const pricing = read('frontend/en/pricing.html');
+const pricingNl = read('frontend/pricing.html');
+const homeNl = read('frontend/index.html').replace(/<!--[\s\S]*?-->/g, '');
 // Matched on the WHOLE amount, not on a substring: an earlier version tested
 // pricing.includes('&euro;15'), which stayed green on a pricing page that only
 // ever said &euro;150. The digits must be followed by something that is not
 // another digit or a decimal separator.
-const homePrices = [...new Set([...home.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
-// Five: the three tier prices (0, 29, 299) and the two incl.-btw figures under
-// them. It was six while the Firm line also quoted a EUR 0.40 per-signature
-// rate; that rate was never charged and the line is gone, so the floor moved
-// down with it rather than the check being weakened for something else.
-assert.ok(homePrices.length >= 5, `expected the homepage to quote its tiers, found ${homePrices.length} prices`);
-const priceOnPricingPage = (amount) => new RegExp(`&euro;${amount.replace(/[.]/g, '\\.')}(?![\\d.,])`).test(pricing);
-const drifted = homePrices.filter((p) => !priceOnPricingPage(p));
+const pricesOf = (html) => [...new Set([
+  ...[...html.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]),
+  ...[...html.matchAll(/(?<![\d.,])([\d]+(?:,\d\d)?) euro\b/g)].map((m) => m[1]),
+])];
+const onPage = (page) => (amount) => new RegExp(`(?:&euro;${amount.replace(/[.]/g, '\\.')}(?![\\d.,])|(?<![\\d.,])${amount} euro\\b)`).test(page);
+// English: five, the three tier prices (0, 29, 299) and the two incl.-btw
+// figures under them. It was six while the Firm line also quoted a EUR 0.40
+// per-signature rate; that rate was never charged and the line is gone, so the
+// floor moved down with it rather than the check being weakened for something
+// else. Dutch: the two amounts of the one offer, 0 and 29.
+// Since acceptance 3.1.1 the English homepage has the Dutch homepage's cards
+// and sells the same one offer, so it is held to the same two amounts.
+const homePricesEn = pricesOf(home);
+assert.ok(homePricesEn.includes('0') && homePricesEn.includes('29'),
+  `expected the English homepage to name Community at 0 and Firm at 29, found ${homePricesEn.join(', ')}`);
+const homePrices = pricesOf(homeNl);
+assert.ok(homePrices.includes('0') && homePrices.includes('29'),
+  `expected the Dutch homepage to name Community at 0 and the kantoorplan at 29, found ${homePrices.join(', ')}`);
+const drifted = [
+  ...homePrices.filter((p) => !onPage(pricingNl)(p)).map((p) => `/ ${p} not on /pricing`),
+  ...homePricesEn.filter((p) => !onPage(pricing)(p)).map((p) => `/en ${p} not on /en/pricing`),
+];
 assert.deepEqual(drifted, [],
-  `these prices are on the homepage but not on /pricing: ${drifted.join(', ')}`);
+  `these prices are on a homepage but not on its pricing page: ${drifted.join(', ')}`);
 
 // ── The dashboard, which is the homepage for anyone who signed up ────────────
 // Mick's phone showed a badge reading "COMMUNITY PLAN" over a Start card, and
@@ -382,6 +498,10 @@ const wrongAlias = tierAliases.filter(([from, to]) => !new RegExp(`${from}:\\s*'
 assert.deepEqual(wrongAlias.map(([f, t]) => `${f}->${t}`), [],
   'dashboard.js must fold the same plan aliases normalisePlan does');
 
+// The dashboard is English and names every plan an account can hold, Business
+// and Enterprise included. The Dutch /pricing sells one offer and sends the rest
+// to Mick; the English /pricing still carries every card, so that is the page
+// the names are held to.
 const unsold = [...new Set(planNames)].filter((name) => !new RegExp(`>\\s*${name}\\s*<`).test(pricing));
 assert.deepEqual(unsold, [],
   `the dashboard shows these plan names, but /pricing does not sell them: ${unsold.join(', ')}`);
@@ -391,13 +511,18 @@ assert.deepEqual(unsold, [],
 // nine rules, zero links, one mailto in the footer.
 // The page was /pararules until the two-product-names round; the nine rules and
 // their verify links moved across word for word, only the name went.
-const rulesPage = read('frontend/rules.html');
-const guarantees = rulesPage.slice(rulesPage.indexOf('<h2>What we guarantee</h2>'), rulesPage.indexOf('<h2>How we build it</h2>'));
-const ruleCount = (guarantees.match(/<h3>\d+\s*&middot;/g) || []).length;
-const verifyCount = (guarantees.match(/class="rule-verify"/g) || []).length;
-assert.equal(verifyCount, ruleCount,
-  `rules.html has ${ruleCount} rules but ${verifyCount} verify links; the homepage promises one each`);
-assert.ok(ruleCount >= 9, `expected at least nine rules, found ${ruleCount}`);
+for (const [file, h2a, h2b] of [
+  ['frontend/en/rules.html', '<h2>What we guarantee</h2>', '<h2>How we build it</h2>'],
+  ['frontend/rules.html', '<h2>Wat we garanderen</h2>', '<h2>Hoe we het bouwen</h2>'],
+]) {
+  const rulesPage = read(file);
+  const guarantees = rulesPage.slice(rulesPage.indexOf(h2a), rulesPage.indexOf(h2b));
+  const ruleCount = (guarantees.match(/<h3>\d+\s*&middot;/g) || []).length;
+  const verifyCount = (guarantees.match(/class="rule-verify"/g) || []).length;
+  assert.equal(verifyCount, ruleCount,
+    `${file} has ${ruleCount} rules but ${verifyCount} verify links; the homepage promises one each`);
+  assert.ok(ruleCount >= 9, `expected at least nine rules in ${file}, found ${ruleCount}`);
+}
 
 // ── The same answer on the account page ──────────────────────────────────────
 // A customer who wants to know what he pays goes to /account, not /dashboard,
@@ -462,9 +587,11 @@ assert.doesNotMatch(hero, /data-dh="email"/,
 // because the pricing page disagreed, and the fix was to rename the tier rather
 // than to keep explaining it away.
 assert.ok(/<div class="tier-name">Community<\/div>/.test(pricing),
-  '/pricing must name its free tiers Community');
+  '/en/pricing must name its free tiers Community');
 assert.doesNotMatch(pricing, /<div class="tier-name">Free<\/div>/,
-  '/pricing must not have a tier named Free any more');
+  '/en/pricing must not have a tier named Free any more');
+assert.ok(/<p class="offer-kicker">Community<\/p>/.test(pricingNl),
+  '/pricing must name the free half Community, in its own block next to the offer');
 for (const [label, html] of [
   ['index.html', home],
   ['dashboard.html', read('frontend/dashboard.html')],
@@ -539,7 +666,7 @@ if (ruleNumbers.length) {
 // past: swapping "privacy and security researcher" for "award winning
 // cryptographer" deletes the very string the check looks for and it stays
 // green. Pinned in BOTH directions now.
-const about = read('frontend/about.html');
+const about = read('frontend/en/about.html');
 const flatten = (html) => html
   .replace(/<!--[\s\S]*?-->/g, ' ')
   .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
@@ -562,9 +689,9 @@ const ABOUT_WORDS = new Set(aboutText.toLowerCase().match(/[a-z]+/g) || []);
 // but /about; on the homepage exactly one place keeps them, the signature under
 // the letter, which is checked as a block further down. So index is the only
 // page still required to name him, and no other page may be forced to.
-const FOUNDER_REQUIRED = ['index'];
+const FOUNDER_REQUIRED = ['en/index'];
 // Pages that MAY name him. If they do, the same rules apply.
-const FOUNDER_OPTIONAL = ['pricing', 'parasign', 'dashboard', 'account'];
+const FOUNDER_OPTIONAL = ['en/pricing', 'parasign', 'dashboard', 'account'];
 for (const slug of [...FOUNDER_REQUIRED, ...FOUNDER_OPTIONAL]) {
   const text = flatten(read(`frontend/${slug}.html`));
   if (FOUNDER_REQUIRED.includes(slug)) {
@@ -701,8 +828,18 @@ assert.doesNotMatch(heroText, /for sending, from/,
 // One term for the free limit, on both pages a buyer reads in the same minute.
 // /pricing said "2 signatures a month" and /signup said "sign 2 documents a
 // month", which reads as two different products.
-const signupVisible = read('frontend/signup.html').replace(/<!--[\s\S]*?-->/g, '');
-for (const [label, html] of [['pricing.html', pricingVisible], ['signup.html', signupVisible]]) {
+const signupVisible = read('frontend/en/signup.html').replace(/<!--[\s\S]*?-->/g, '');
+const signupVisibleNl = read('frontend/signup.html').replace(/<!--[\s\S]*?-->/g, '');
+// The Dutch pair says it the Dutch way, one term on both pages.
+for (const [label, html] of [['pricing.html', read('frontend/pricing.html')], ['signup.html', signupVisibleNl]]) {
+  assert.match(html, /2 handtekeningen per maand/,
+    `${label} must name the free limit in the site's one Dutch term: "2 handtekeningen per maand"`);
+  assert.doesNotMatch(html, /\d+ documenten per maand/,
+    `${label} uses "documenten per maand" for the signature limit; the term is "2 handtekeningen per maand"`);
+}
+assert.doesNotMatch(signupVisibleNl, /class="tier-card"|privacy- en securityonderzoeker/,
+  'the Dutch signup.html must not carry tier tables or a founder block either');
+for (const [label, html] of [['en/pricing.html', pricingVisible], ['en/signup.html', signupVisible]]) {
   assert.match(html, /2 signatures a month/,
     `${label} must name the free limit in the site's one term: "2 signatures a month"`);
   assert.doesNotMatch(html, /\d+ documents a month/,
@@ -742,8 +879,8 @@ assert.doesNotMatch(pricingVisible, /Mick Beer/,
 // /dashboard, a page nobody without an account can open.
 const freeCardCtas = [...pricingVisible.matchAll(/<div class="tier-name">Community<\/div>[\s\S]*?<a href="([^"]+)"[^>]*class="btn btn-primary"/g)].map((m) => m[1]);
 assert.ok(freeCardCtas.length >= 2, 'pricing.html must still have Community cards with a primary action');
-assert.deepEqual([...new Set(freeCardCtas)], ['/signup'],
-  `the Community cards must send a visitor to /signup, not to a page they cannot open: ${freeCardCtas.join(', ')}`);
+assert.deepEqual([...new Set(freeCardCtas)], ['/en/signup'],
+  `the Community cards must send a visitor to /en/signup (this is the English page), not to a page they cannot open: ${freeCardCtas.join(', ')}`);
 
 console.log('ui-truthfulness: /pricing says what it sells, with the number, above the tables');
 
@@ -765,10 +902,15 @@ console.log('ui-truthfulness: the account page resolves plans from the same sour
 // deleting the visible paragraph left the test green: the same words also sit in
 // four meta tags. A pin that a meta description can satisfy pins nothing.
 const docsHtml = read('frontend/docs.html');
-const helpHtml = read('frontend/help/index.html');
-const securityHtml = read('frontend/security.html');
+const docsEn = read('frontend/en/docs.html');
+// /help is Dutch since 23 September 2026. The English answers below are quoted
+// from the English pages, so they are pinned on the English copy, /en/help; the
+// Dutch answers get their own pins after this block.
+const helpHtml = read('frontend/en/help/index.html');
+const helpNlHtml = read('frontend/help/index.html');
+const securityHtml = read('frontend/en/security.html');
 const developerHtml = read('frontend/developer.html');
-const homeGrid = read('frontend/index.html');
+const homeGrid = read('frontend/en/index.html');
 // Everything below </head>: the page a visitor reads, meta tags excluded. The
 // sales-voice and key-location gates below run against this, not against the
 // three answers alone, so a slogan cannot slip back in through the lede, an
@@ -783,20 +925,26 @@ assert.equal(helpAnswers.split('\n').length, 3,
 // it starts talking about pip install. It absorbed traffic that belonged on
 // /pricing, so it also has to name the price boundary of the API once, and it
 // gives the buyer a button of the same weight as the developer's Quick start.
-assert.match(docsHtml, /<p class="docs-buyer">Evaluating Paramant\? Your IT can check everything here\./,
+assert.match(docsEn, /<p class="docs-buyer">Evaluating Paramant\? Your IT can check everything here\./,
+  'en/docs.html must open with the visible line that tells a buyer what this page is for');
+assert.match(docsHtml, /<p class="docs-buyer">Overweegt u Paramant\? Uw IT kan hier alles controleren\./,
   'docs.html must open with the visible line that tells a buyer what this page is for');
-assert.match(docsHtml, /<p class="lede">[^<]*The ParaSign API is available from Firm/,
-  'docs.html must state in the visible lede which plan the ParaSign API needs');
-const docsActions = (docsHtml.match(/<div class="docs-hero-actions">[\s\S]*?<\/div>/) || [''])[0];
-assert.match(docsActions, /<a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">/,
-  'the developer keeps the primary button on /docs: Quick start');
-assert.match(docsActions, /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
-  'the buyer gets a real button to /pricing beside it, not only a text link');
-assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API access is included from Firm/,
+assert.match(docsEn, /<p class="lede">[^<]*The ParaSign API is available from Firm/,
+  'en/docs.html must state in the visible lede which plan the ParaSign API needs');
+assert.match(docsHtml, /<p class="lede">[^<]*De API voor Ondertekenen is beschikbaar vanaf Firm/,
+  'docs.html must state in the visible lede which plan the signing API needs');
+for (const page of [docsEn, docsHtml]) {
+  const docsActions = (page.match(/<div class="docs-hero-actions">[\s\S]*?<\/div>/) || [''])[0];
+  assert.match(docsActions, /<a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">/,
+    'the developer keeps the primary button on /docs: Quick start');
+  assert.match(docsActions, page === docsEn ? /<a href="\/en\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/ : /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
+    'the buyer gets a real button to /pricing beside it, not only a text link');
+}
+assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API-toegang zit in het abonnement vanaf Firm/,
   'developer.html must state in its visible lede which plan the ParaSign API needs');
 // /developer is noindex and only reachable once signed in, so it addresses the
 // developer reading it, never the buyer who sent them.
-assert.doesNotMatch(developerHtml, /your IT can check/i,
+assert.doesNotMatch(developerHtml, /your IT can check|uw IT kan/i,
   'developer.html talks to the developer on the screen, not to their buyer');
 // Both plan lines are only true while /pricing sells API access on Firm.
 assert.match(pricing, /<li>API access<\/li>/,
@@ -821,11 +969,11 @@ assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}
   'pricing.html is the source of the ParaSign Community allowance quoted on /help');
 assert.match(pricing, /&euro;29<span/,
   'pricing.html is the source of the Firm price quoted on /help');
-assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% btw/,
+assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% VAT/,
   'pricing.html is the source of the incl. btw figure quoted on /help');
 assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures a month\./,
   'help/index.html must name the free allowance, not just promise that free exists');
-assert.match(helpAnswers, /Firm at &euro;29 a month excl\. btw \(&euro;35\.09 incl\.\)/,
+assert.match(helpAnswers, /Firm at &euro;29 a month excl\. VAT \(&euro;35\.09 incl\. VAT\)/,
   'help/index.html must name the first paid price the way /pricing prints it');
 // Proof 3 of the messaging guide, quoted from /pricing. The slogan that follows
 // it there ("Pay for volume, never for security") stays on the page that sells;
@@ -846,13 +994,16 @@ assert.doesNotMatch(helpBody, /Pay for volume, never for security/,
 // not repeated here.
 assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
   'security.html must keep the server location row /help quotes');
-assert.match(homeGrid, /No US provider in the data path\. Email goes out via Resend, as <a href="\/privacy">\/privacy<\/a> sets out\./,
+// Fase 2 (SITE-34): the old line said the email carries "never ... a key".
+// For a send to named recipients the email carries the token that opens the
+// file, so the home page now says that, and /help says it shorter.
+assert.match(homeGrid, /Email still goes through Resend in the United States for now\. For a send to named recipients that email carries the link with the token/,
   'index.html is the source of the data-path wording and its Resend exception');
-assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext\./,
+assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext/,
   'help/index.html must answer where the documents live, and say they are ciphertext there');
-assert.match(helpAnswers, /no US provider is in the data path/,
-  'help/index.html must scope the claim to the data path');
-assert.match(helpAnswers, /Email goes out via Resend, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
+assert.match(helpAnswers, /under EU law/,
+  'help/index.html must say which law the stored files sit under');
+assert.match(helpAnswers, /Email still goes through Resend in the United States for now: never the document, but the links and codes that open a file, as <a class="buyer-qa-inline" href="\/en\/privacy">\/privacy<\/a> sets out\./,
   'help/index.html must name the Resend exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpAnswers, /no US company/i,
   'help/index.html must not repeat the unqualified no-US-company row from /security');
@@ -866,9 +1017,12 @@ assert.doesNotMatch(helpAnswers, /no US company/i,
 // would quote back. So /help may name a key only in the negative: any sentence
 // that mentions a key and a piece of infrastructure must be saying the key is
 // not there.
-assert.match(homeGrid, /Generated on your device, never sent/,
-  'index.html is the source of the promise that a key never reaches a server');
-assert.match(securityHtml, /relay holds only ciphertext, never keys/,
+// The English homepage lost its rules grid in acceptance 3.1.1 (it has the
+// Dutch homepage's four cards now); /en/parasend carries the rule.
+assert.match(read('frontend/en/parasend.html'), /Generated on your device, never sent/,
+  'en/parasend.html is the source of the promise that a key never reaches a server');
+// Fase 2 (SITE-30): the row now names its three exceptions.
+assert.match(securityHtml, /sends to named recipients and the extensions, the relay holds only ciphertext, no keys/,
   'security.html is the source of the promise that the relay holds no keys');
 // The sentence carries its exception since 5 September 2026. relay/lib/
 // parasign-store.js calls the /v1 hosted ceremony "the ONE deliberate break of
@@ -877,8 +1031,10 @@ assert.match(securityHtml, /relay holds only ciphertext, never keys/,
 // tests/crypto-claims.test.mjs block 9 is what stops the exception being
 // dropped again; this pins that both pages still say it in the same words.
 const KEYS_SENTENCE = /The relay never sees plaintext and never holds a private key,[^.]*hosted signing ceremony[^.]*\/v1/;
-assert.match(docsHtml, KEYS_SENTENCE,
-  'docs.html is the source of the sentence /help quotes about plaintext and keys');
+assert.match(docsEn, KEYS_SENTENCE,
+  'en/docs.html is the source of the sentence /help quotes about plaintext and keys');
+assert.match(docsHtml, /De relay ziet nooit leesbare inhoud en heeft nooit een privésleutel, met één uitzondering: de gehoste ondertekenronde op de <code>\/v1<\/code>-API/,
+  'docs.html must carry the same sentence in Dutch, exception included');
 assert.match(helpAnswers, KEYS_SENTENCE,
   'help/index.html must say where the keys are not, in the words docs.html uses, exception included');
 for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/)) {
@@ -892,19 +1048,45 @@ for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/))
     `help/index.html must not say a server holds a key: "${sentence.trim()}"`);
 }
 
+// The Dutch /help says the same three things. Same facts, same sources.
+const helpNlAnswers = [...helpNlHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
+assert.equal(helpNlAnswers.split('\n').length, 3,
+  'help/index.html must keep the three buyer answers in the Dutch block too');
+assert.match(helpNlAnswers, /Om te ondertekenen heeft u een account nodig\./,
+  'help/index.html must answer whether an account is required');
+assert.match(helpNlAnswers, /Kreeg u een verzoek om te ondertekenen\? Dat opent u ook zonder account\./,
+  'help/index.html must say what an invited signer can do without an account');
+assert.match(helpNlAnswers, /ParaSign Community is gratis, voor altijd, zonder betaalkaart: 2 handtekeningen per maand\./,
+  'help/index.html must name the free allowance, not just promise that free exists');
+assert.match(helpNlAnswers, /Firm: &euro;29 per maand excl\. btw \(&euro;35,09 incl\.\)/,
+  'help/index.html must name the first paid price the way /pricing prints it');
+assert.match(helpNlAnswers, /Elk plan heeft dezelfde versleuteling, dezelfde post-quantum handtekeningen en hetzelfde openbare bewijslog\./,
+  'help/index.html must carry the same-crypto fact');
+assert.match(helpNlAnswers, /Uw documenten staan versleuteld op servers van Hetzner in Neurenberg, Duitsland\./,
+  'help/index.html must answer where the documents live, and say they are ciphertext there');
+assert.match(helpNlAnswers, /bewaart nooit een privésleutel, behalve bij het gehoste ondertekenen op <code>\/v1<\/code>/,
+  'help/index.html must say where the keys are not, exception included');
+// Fase 2 (SITE-34): "nooit ... een sleutel" was onwaar voor versturen op naam.
+assert.match(helpNlAnswers, /E-mail gaat nog via Resend in de VS: nooit het document, wel de links en codes die een bestand openen, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
+  'help/index.html must name the mail exception in the same breath, with the /privacy link');
+assert.doesNotMatch(helpNlHtml.slice(helpNlHtml.indexOf('</head>')), /Betaal voor volume|Pay for volume, never for security/i,
+  'help/index.html must not carry the sales line anywhere in the body; it is a support page');
+
 // No sales voice on a support page. Someone here has already signed up.
 assert.doesNotMatch(helpBody, /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class/i,
   'help/index.html must stay in support voice');
 
 // The tone rule is site-wide, but these two articles kept em-dashes in the H1
 // and the tab title after an earlier pass cleaned only their ledes.
-for (const slug of ['index', 'api-key-vs-totp', 'lost-authenticator']) {
-  const html = read(`frontend/help/${slug}.html`);
+for (const slug of ['index', 'api-key-vs-totp', 'lost-authenticator', 'en/index', 'en/api-key-vs-totp', 'en/lost-authenticator']) {
+  const html = read(slug.startsWith('en/') ? `frontend/en/help/${slug.slice(3)}.html` : `frontend/help/${slug}.html`);
   assert.doesNotMatch(html, /\u2014|&mdash;|\u2013|&ndash;/,
     `help/${slug}.html must carry no em-dash or en-dash, in the H1, the title or anywhere else`);
 }
 assert.doesNotMatch(docsHtml, /\u2014|&mdash;|\u2013|&ndash;/,
   'docs.html must carry no em-dash or en-dash');
+assert.doesNotMatch(docsEn, /\u2014|&mdash;|\u2013|&ndash;/,
+  'en/docs.html must carry no em-dash or en-dash');
 
 console.log('ui-truthfulness: /docs and /help answer a buyer with sentences that ship elsewhere');
 
@@ -940,43 +1122,71 @@ const visible = (file) => visible0(read(file));
 // 413. Comparing two pages only proves they agree, and both were wrong together.
 const { default: tiers } = await import('../relay/lib/tiers.js');
 const parasign = visible('frontend/parasign.html');
+// The English original lives on at /en/parasign and keeps the English pins.
+const parasignEn = visible('frontend/en/parasign.html');
 const parasend = visible('frontend/parasend.html');
-const aboutVisible = visible('frontend/about.html');
+// De Engelse kopie van /parasend. De Engelse pins hieronder gelden voor die
+// kopie, de Nederlandse voor /parasend zelf.
+const parasendEn = visible('frontend/en/parasend.html');
+const aboutVisible = visible('frontend/en/about.html');
 // pricingVisible above is the same page as markup; this is its plain text.
-const pricingText = visible('frontend/pricing.html');
-const security = visible('frontend/security.html');
+const pricingText = visible('frontend/en/pricing.html');
+const security = visible('frontend/en/security.html');
 const signVisibleText = visible('frontend/sign.html');
 
 // Proof 1. The EU claim is about the data path, not the whole chain, and the
 // Resend exception travels with it. A page may shorten the long form on
 // /rules to this one; it may never drop the second half.
-const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
-const EU_EXCEPTION = 'Email goes out via Resend';
-const homeVisible = visible('frontend/index.html');
-for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['parasend', parasend]]) {
-  assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
+// Fase 2 (SITE-34, 2026-10-04): "No US provider in the data path" and "never
+// ... a key" were not true for a send to named recipients or an invitation to
+// sign, whose emails carry what opens the file. The claim is now about where
+// the encrypted files are, and the exception says what the email carries.
+const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). The encrypted';
+// De uitzondering, op elke pagina met dezelfde woorden: mail gaat nog via
+// Resend in de VS. Mailjet stond hier tot 23 september 2026, maar is nooit
+// aangezet; zie deploy/partners.json en tests/partners.test.mjs.
+const EU_EXCEPTION = 'Email still goes through Resend in the United States for now';
+const homeVisible = visible('frontend/en/index.html');
+// The homepage says it in its "Why Dutch matters" card, in that card's words.
+const EU_CLAIM_HOME = 'Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. The encrypted files sit only there.';
+for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
+  assert.ok(text.includes(name === 'index' ? EU_CLAIM_HOME : EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
   assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
 }
+// /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
+// begrenzing tot de weg van de data, in de taal van de pagina.
+assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). De versleutelde bestanden staan alleen op onze servers in de EU.'),
+  'parasend.html lost the data-path wording of the EU claim');
+assert.ok(parasend.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasend.includes('bevat die mail de link met het token'),
+  'parasend.html states the EU claim without naming the Resend exception');
+// /parasign is Dutch since 23 September 2026. The same two halves, in the
+// wording the Dutch homepage uses for proof 1.
+assert.ok(parasign.includes('De versleutelde documenten staan alleen op onze servers in de EU.'),
+  'parasign.html lost the data-path wording of the EU claim');
+assert.ok(parasign.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasign.includes('wel de helft van de documentsleutel'),
+  'parasign.html states the EU claim without naming the mail exception');
 // And it may not be offered against a source that does not carry it. The
 // Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
 // jurisdiction, the CLOUD Act row, retention, IP logging and analytics. Bunny is
 // not in it, and DNS is not a row. A page that names Bunny and then sends the
 // reader to that table has offered a checkpoint that fails when checked.
-const securityJurisdiction = (read('frontend/security.html')
+const securityJurisdiction = (read('frontend/en/security.html')
   .match(/<h2[^>]*>Jurisdiction[\s\S]*?<\/table>/) || [''])[0];
 assert.ok(securityJurisdiction, 'security.html must keep its Jurisdiction and privacy table');
 assert.ok(!/Bunny/i.test(securityJurisdiction),
   'the /security jurisdiction table now names Bunny; the product pages may point at it again');
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.doesNotMatch(text, /Bunny DNS[^.]*\.[^.]*\.[^.]*\.[^.]*jurisdiction table is on the/,
     `${name}.html sends the reader to the /security jurisdiction table for a claim that table does not carry`);
 }
 // The broader claim is the one section 9 of the guide holds open. It may stay
 // on /security, where the table qualifies it, and nowhere near a product hero.
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.doesNotMatch(text, /no US (company|provider) in the chain|no US company\b/i,
     `${name}.html claims more than the data path, which /privacy does not support`);
 }
+assert.doesNotMatch(parasign, /geen Amerikaanse (partij|aanbieder|bedrijf) in de keten|geen Amerikaans bedrijf\b/i,
+  'parasign.html claims more than the data path, which /privacy does not support');
 // The row used to read "Not applicable: no US infrastructure, no US company",
 // and this assertion pinned it, because /security was the one page where the
 // table qualified the broader claim. Section 9.2 of the guide names that row
@@ -986,8 +1196,8 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
 // window check that keeps the two together lives further down this file.
 assert.ok(!/no US company/i.test(security),
   'security.html must no longer claim "no US company", which is broader than /privacy supports');
-assert.ok(security.includes('No US provider in the data path'),
-  'security.html must carry proof 1 in the data-path wording the guide fixes');
+assert.ok(security.includes('The encrypted files sit only on our servers in the EU'),
+  'security.html must carry proof 1 in the wording of fase 2 (where the encrypted files are)');
 
 // ── "Why Dutch matters", 5 September ────────────────────────────────────────
 // Mick: "the pride in being Dutch is missing, it is too well behaved". The
@@ -998,18 +1208,12 @@ assert.ok(security.includes('No US provider in the data path'),
 // data-path line is proof 1 in its own words with the Resend exception beside
 // it. The row in docs/site-claims.md records the external half as UNCOVERED,
 // which is the same footing the competitor facts on /vs stand on.
-// 5 September, Mick: the band now carries a Dutch tile instead of the English
-// ownership line. The proverb is the eye-catcher and claims nothing; the line
-// under it is the checkable half and is the same server location /privacy,
-// /security and the DPA name. One Dutch sentence on an English page is his
-// choice, not a slip, and this is not a translation round: no other page moved.
-const bandSay = (read('frontend/index.html').match(/<span class="hp-band-say">([\s\S]*?)<\/span>/) || [, ''])[1];
-const bandSub = (read('frontend/index.html').match(/<span class="hp-band-sub">([\s\S]*?)<\/span>/) || [, ''])[1];
-assert.equal(bandSay, 'Beter een goede buur dan een verre vriend.',
-  'index.html: the band tile is the one line above the fold that carries the tone; change it deliberately, and update tests/first-screen with it');
-assert.equal(bandSub, 'Onze servers staan in Neurenberg.',
-  'index.html: the line under the tile is the checkable half and must keep naming the city /privacy and the DPA name');
-const whyNl = visible0((read('frontend/index.html').match(/<section class="hp-sec why-nl-sec"[\s\S]*?<\/section>/) || [''])[0]);
+// 23 September, Mick: the band at the top of the homepage is gone, the Dutch
+// tile and the Neurenberg line with it. The server location stays where it is
+// checkable: /privacy, /security and the DPA, pinned elsewhere in this file.
+assert.doesNotMatch(read('frontend/en/index.html'), /hp-band|goede buur/,
+  'index.html: the band was taken off the homepage on purpose; bring it back deliberately, not by accident');
+const whyNl = visible0((read('frontend/en/index.html').match(/<section class="hp-sec why-nl-sec"[\s\S]*?<\/section>/) || [''])[0]);
 assert.ok(whyNl, 'index.html must keep the "Why Dutch matters" section');
 for (const claim of [
   // The ownership facts. Sourced on the page, not in the code, so the wording is
@@ -1017,36 +1221,49 @@ for (const claim of [
   'The parent of WeTransfer has been Bending Spoons in Milan since July 2024.',
   'Zivver has been part of Kiteworks in California since June 2025.',
   'Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands.',
-  // Who owns Paramant. The number is the one every other page carries.
-  'Paramantis Solutions B.V., Harderwijk, KvK 42115132, with no parent company anywhere else.',
+  // Who owns Paramant. The number is the one every other page carries. It said
+  // "with no parent company anywhere else" until 23 September 2026, which was
+  // a half truth: there is a parent, Paramantis Digital B.V., and it is Dutch.
+  // paramantis.nl names it as the holding of the group, with its KvK number.
+  'Paramantis Solutions B.V., Harderwijk, KvK 42115132. Its parent is Paramantis Digital B.V., also Dutch, KvK 42114664. There is no parent company abroad.',
   'Dutch law governs the terms you agree to, and a Dutch court hears the dispute.',
   // Proof 1, in this section\u2019s own words, with the exception in the same breath.
-  'No US provider is in the data path.',
-  'The one exception is transactional email, which goes out through Resend, an American company: it receives the address and the invite link, never the document.',
+  // Fase 2 (SITE-34): the emails of a named send carry what opens the file.
+  'The encrypted files sit only there.',
+  'For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file.',
+  'Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider.',
   // The sentence that carries the pride. It claims nothing a reader cannot check.
   'We are Dutch, and we would rather say so than hide behind a Delaware address.',
 ]) {
   assert.ok(whyNl.includes(claim), `index.html: "Why Dutch matters" lost the line: ${claim}`);
 }
+assert.ok(/The parent of Paramant is named on paramantis\.nl, checked 23 September 2026\./.test(whyNl),
+  'index.html: the parent company is an external fact too, so its source and check date travel with it');
 assert.ok(/Ownership sources: .*Checked 3 September 2026\./.test(whyNl),
   'index.html: the ownership facts are external, so the sources line and its check date must stay with them');
 // terms.html \u00a713 is what "Dutch law governs the terms" points at.
-assert.match(read('frontend/terms.html'), /<h2 id="law">/,
-  'terms.html must keep the #law anchor the homepage sends the reader to');
-assert.match(read('frontend/terms.html'), /Dutch law applies\. Disputes go to the competent court in the district where Paramantis Solutions B\.V\. is established/,
+for (const file of ['frontend/en/terms.html', 'frontend/terms.html']) {
+  assert.match(read(file), /<h2 id="law">/,
+    `${file} must keep the #law anchor the homepage sends the reader to`);
+}
+assert.match(read('frontend/en/terms.html'), /Dutch law applies\. Disputes go to the competent court in the district where Paramantis Solutions B\.V\. is established/,
+  'en/terms.html must keep the governing-law sentence the homepage summarises');
+assert.match(read('frontend/terms.html'), /Nederlands recht is van toepassing\. Geschillen worden voorgelegd aan de bevoegde rechter in het arrondissement waar Paramantis Solutions B\.V\. is gevestigd/,
   'terms.html must keep the governing-law sentence the homepage summarises');
 // /security carries the same claim once, above the table where it is checked.
 // It deliberately avoids the exact "No US provider in the data path" wording, so
 // the window check above still measures the two occurrences it was written for.
-assert.match(read('frontend/security.html'), /A Dutch company owns this: Paramantis Solutions B\.V\. in Harderwijk, KvK 42115132\./,
+assert.match(read('frontend/en/security.html'), /A Dutch company owns this: Paramantis Solutions B\.V\. in Harderwijk, KvK 42115132\./,
   'security.html must name the owner above the jurisdiction table');
 // /pricing: who takes the money is part of the same answer. Mollie B.V. is the
 // Netherlands row in the /dpa sub-processor table, so this is not a new claim.
-const pricingPay = read('frontend/pricing.html');
+const pricingPay = read('frontend/en/pricing.html');
 assert.match(pricingPay, /You pay a Dutch company, in euros, through a Dutch payment provider \(Mollie\)\./,
   'pricing.html must say who is paid and where they sit, in the payment paragraph');
-assert.match(read('frontend/dpa.html'), /<td>Mollie B\.V\.<\/td><td>Netherlands \(EU\)<\/td>/,
+assert.match(read('frontend/en/dpa.html'), /<td>Mollie B\.V\.<\/td><td>Netherlands \(EU\)<\/td>/,
   'the /pricing line rests on the /dpa row that puts Mollie B.V. in the Netherlands');
+assert.match(read('frontend/dpa.html'), /<td>Mollie B\.V\.<\/td><td>Nederland \(EU\)<\/td>/,
+  'the Dutch /dpa keeps the row that puts Mollie B.V. in the Netherlands');
 console.log('ui-truthfulness: the homepage argues the Dutch case with facts it can source');
 
 // Proof 2. The three /about sentences the signing claim rests on.
@@ -1056,25 +1273,44 @@ for (const claim of [
   'A signed document verifies without contacting us.',
 ]) {
   assert.ok(aboutVisible.includes(claim), `about.html lost the signing claim: ${claim}`);
+  assert.ok(parasignEn.includes(claim), `en/parasign.html lost the signing claim: ${claim}`);
+}
+// /parasign carries the same three in Dutch, in the wording /about and
+// /security use on the Dutch side.
+for (const claim of [
+  'ML-DSA-65 (FIPS 204), in uw browser gemaakt. De private sleutel komt nooit bij de relay.',
+  'Elke handtekening komt in een openbaar logboek waar alleen iets bij kan, niets uit.',
+  'Een getekend document is te controleren zonder contact met ons.',
+]) {
   assert.ok(parasign.includes(claim), `parasign.html lost the signing claim: ${claim}`);
 }
 
 // Proof 3. The sentence the whole free-versus-paid split rests on. If the
 // pricing model ever gates cryptography behind a tier, this is what fails first.
 const SPLIT = 'Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.';
-for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['pricing', pricingText], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(SPLIT), `${name}.html lost the pay-for-volume sentence`);
 }
+assert.ok(parasend.includes('Elk plan krijgt dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare logboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.'),
+  'parasend.html lost the pay-for-volume sentence');
+assert.ok(parasign.includes('Elk plan krijgt dezelfde versleuteling, dezelfde post-quantum handtekeningen en hetzelfde openbare bewijslogboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.'),
+  'parasign.html lost the pay-for-volume sentence');
 // The other half of the split: the free plan is permanent, it is called
 // Community, and the reason it stays free is named in the same sentence.
 const FREE_FOREVER = 'not to unlock features, and that is what keeps the Community plan free';
-for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['pricing', pricingText], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(FREE_FOREVER), `${name}.html lost the Community-plan promise`);
 }
+assert.ok(parasend.includes('niet om functies vrij te spelen. Daardoor blijft het Community-plan gratis'),
+  'parasend.html lost the Community-plan promise');
+assert.ok(parasign.includes('niet om functies vrij te spelen, en dat houdt het Community-plan gratis'),
+  'parasign.html lost the Community-plan promise');
 // /sign carries the same split in one line, next to the account requirement,
 // and it names the plan the way /pricing names it.
-assert.match(signVisibleText, /Community accounts sign 2 documents a month/,
+assert.match(signVisibleText, /Met een Community-account zet u 2 handtekeningen per maand/,
   'sign.html must keep the free-tier line, under the plan name /pricing uses');
+assert.match(visible('frontend/en/sign.html'), /A Community account gives you 2 signatures a month/,
+  'en/sign.html must keep the free-tier line, under the plan name /pricing uses');
 assert.doesNotMatch(signVisibleText, /\bFree accounts\b|tier named Free|the tier is called Free/,
   'sign.html must not call the Community plan Free; one name across the site');
 
@@ -1084,7 +1320,7 @@ assert.doesNotMatch(signVisibleText, /\bFree accounts\b|tier named Free|the tier
 // carries the line. The product pages name the company instead.
 const FOUNDER = 'Mick Beer, privacy and security researcher';
 assert.ok(aboutVisible.includes(FOUNDER), 'about.html must name the founder with his exact title');
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.ok(!text.includes('Mick Beer'),
     `${name}.html must not name the founder in its body copy; /about carries that line`);
   assert.ok(text.includes('Paramantis Solutions B.V.'),
@@ -1098,7 +1334,9 @@ const GIVE_BACK = 'The Community plan is his way of giving something back to soc
 assert.ok(aboutVisible.includes(GIVE_BACK), 'about.html lost the give-back sentence the product pages quote');
 // Mick, 4 September: parasend states the same promise without the person, since
 // "his" has nothing to point at once the name is gone.
-assert.ok(parasend.includes('The Community plan is free and stays free; the business plans pay for the servers and keep it that way.'),
+assert.ok(parasendEn.includes('The Community plan is free and stays free; the business plans pay for the servers and keep it that way.'),
+  'en/parasend.html must keep the promise that the free plan stays free and say what pays for it');
+assert.ok(parasend.includes('Het Community-plan is gratis en blijft gratis. De zakelijke plannen betalen de servers en houden dat zo.'),
   'parasend.html must keep the promise that the free plan stays free and say what pays for it');
 
 // The limits, stated in the same voice as the promises. Both already shipped
@@ -1106,22 +1344,39 @@ assert.ok(parasend.includes('The Community plan is free and stays free; the busi
 // small print.
 const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).';
 assert.ok(aboutVisible.includes(SES), 'about.html lost the SES scope note');
-assert.ok(parasign.includes(SES), 'parasign.html must carry the SES scope note, not a softer version');
+// /parasign says it in Dutch, with the same two levels named in the same words.
+const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).';
+assert.ok(parasign.includes(SES_NL), 'parasign.html must carry the SES scope note, not a softer version');
+assert.ok(parasignEn.includes(SES), 'en/parasign.html must carry the SES scope note, not a softer version');
 // Where it sits is part of the claim. The note has to land in the hero section,
 // before the first band of the page, or it is a footnote with a test on it.
 const parasignHero = read('frontend/parasign.html').split('<section class="ps-band"')[0];
-assert.ok(visible0(parasignHero).includes(SES),
+assert.ok(visible0(parasignHero).includes(SES_NL),
   'the SES scope note must sit in the first screen of /parasign, not below the tiers');
-assert.ok(visible0(parasignHero).includes('legal, finance and healthcare practices in the EU'),
+assert.ok(visible0(parasignHero).includes('juridische, financiële en zorgpraktijken in de EU'),
   '/parasign must name who it is for in the first screen');
-assert.ok(visible0(parasignHero).includes(`${tiers.tierLimit('community', 'signs_month')} signatures a month`),
+assert.ok(visible0(parasignHero).includes(`${tiers.tierLimit('community', 'signs_month')} handtekeningen per maand`),
   'the free promise in the /parasign hero must carry the number tiers.js enforces');
 const parasendHero = read('frontend/parasend.html').split('<section class="ps-band"')[0];
-const communityHeroFacts = [
+const parasendEnHero = read('frontend/en/parasend.html').split('<section class="ps-band"')[0];
+for (const fact of [
   `${tiers.tierLimit('community', 'transfers_month')} transfers a month`,
   `${tiers.tierLimit('community', 'file_mb')} MB a file`,
   `links that last an hour`,
   `gone after one read`,
+]) {
+  assert.ok(visible0(parasendEnHero).includes(fact),
+    `the free promise in the /en/parasend hero must carry the limit tiers.js enforces: ${fact}`);
+}
+assert.doesNotMatch(visible0(parasendEnHero), /uploads (per|an) hour/i,
+  'the /en/parasend hero states the deprecated anon-endpoint rate as if it were a plan limit');
+assert.ok(visible0(parasendEnHero).includes('For offices that email client documents'),
+  '/en/parasend must name who it is for in the first screen');
+const communityHeroFacts = [
+  `${tiers.tierLimit('community', 'transfers_month')} verzendingen per maand`,
+  `${tiers.tierLimit('community', 'file_mb')} MB per bestand`,
+  `links die een uur geldig zijn`,
+  `na één keer lezen weg`,
 ];
 for (const fact of communityHeroFacts) {
   assert.ok(visible0(parasendHero).includes(fact),
@@ -1129,19 +1384,20 @@ for (const fact of communityHeroFacts) {
 }
 assert.ok(tiers.tierLimit('community', 'view_ttl_ms') === 3_600_000 && tiers.tierLimit('community', 'max_views') === 1,
   'the one-hour, one-read wording in the /parasend hero no longer matches tiers.js');
-assert.doesNotMatch(visible0(parasendHero), /uploads (per|an) hour/i,
+assert.doesNotMatch(visible0(parasendHero), /uploads (per|an) hour|uploads per uur/i,
   'the /parasend hero states the deprecated anon-endpoint rate as if it were a plan limit');
-assert.ok(visible0(parasendHero).includes('For offices that email client documents'),
+assert.ok(visible0(parasendHero).includes('Voor kantoren die nu klantdossiers'),
   '/parasend must name who it is for in the first screen');
 
 const NO_CERT = 'Paramant does not hold third-party certification for these frameworks.';
 assert.ok(pricing.includes(NO_CERT), 'pricing.html lost the certification limit');
-assert.ok(parasend.includes(NO_CERT), 'parasend.html quotes the compliance documentation, so it must carry its limit');
+assert.ok(parasendEn.includes(NO_CERT), 'en/parasend.html quotes the compliance documentation, so it must carry its limit');
+assert.ok(parasend.includes('Paramant heeft voor deze kaders geen certificering door een derde.'), 'parasend.html quotes the compliance documentation, so it must carry its limit');
 
 // A product page must not claim the identity or legal effect that /sign is
 // already forbidden from claiming. Same overclaim, wider surface.
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
-  assert.doesNotMatch(text, /identity verified|verified signer|signer verified|legally binding/i,
+for (const [name, text] of [['parasign', parasign], ['en/parasign', parasignEn], ['parasend', parasend], ['en/parasend', parasendEn]]) {
+  assert.doesNotMatch(text, /identity verified|verified signer|signer verified|legally binding|identiteit geverifieerd|geverifieerde ondertekenaar|juridisch bindend|rechtsgeldig bindend/i,
     `${name}.html must not claim a verified identity or legal effect it cannot deliver`);
 }
 
@@ -1152,8 +1408,9 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
 // (webapp) with SIG n/a on the pre-v1 hybrid wire, migrating to v1; ML-DSA-65 is
 // the SDK rows. The register is the source, so it is read here and the page is
 // held to what it says.
-const registerRow = (label) => {
-  const rows = read('frontend/crypto-agility.html').match(/<tr>[\s\S]*?<\/tr>/g) || [];
+// /parasend and /pricing are English, so they are held to the English register.
+const registerRow = (label, file = 'frontend/en/crypto-agility.html') => {
+  const rows = read(file).match(/<tr>[\s\S]*?<\/tr>/g) || [];
   const row = rows.find((r) => r.includes(label));
   return row ? [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').trim()) : null;
 };
@@ -1161,6 +1418,13 @@ const shareRow = registerRow('ParaShare (webapp)');
 assert.ok(shareRow && shareRow.length >= 4, 'crypto-agility.html no longer registers ParaShare (webapp)');
 const [, shareKem, shareSig, shareWire] = shareRow;
 assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the register changed; /parasend quotes it');
+// The Dutch register must say the same thing in the same row.
+const shareRowNl = registerRow('ParaShare (webapp)', 'frontend/crypto-agility.html');
+assert.ok(shareRowNl && shareRowNl.length >= 4, 'the Dutch crypto-agility.html no longer registers ParaShare (webapp)');
+assert.equal(shareRowNl[1], shareKem, 'the Dutch register gives ParaShare a different KEM than the English one');
+assert.equal(shareRowNl[2], shareSig, 'the Dutch register gives ParaShare a different SIG than the English one');
+assert.equal(shareRowNl[3], ({ 'pre-v1 hybrid': 'hybride, van v\u00f3\u00f3r v1' })[shareWire],
+  `the Dutch register must give ParaShare the same wire as the English one ("${shareWire}")`);
 
 // These used to sit inside `if (shareSig === 'n/a')`, which made the register
 // the only thing under test: move the webapp to ML-DSA-65 in the register and
@@ -1173,14 +1437,16 @@ assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the regi
 // name is what stopped this file parsing on main, so nothing here reaches it.
 (function registerSignatureWording() {
   const SIG_ON_PAGE = {
-    'n/a': { parasend: 'signature n/a', pricing: 'no default signature algorithm' },
-    'ML-DSA-65': { parasend: 'signature ML-DSA-65', pricing: 'ML-DSA-65 as its default signature algorithm' },
+    'n/a': { parasend: 'handtekening n.v.t.', parasendEn: 'signature n/a', pricing: 'no default signature algorithm' },
+    'ML-DSA-65': { parasend: 'handtekening ML-DSA-65', parasendEn: 'signature ML-DSA-65', pricing: 'ML-DSA-65 as its default signature algorithm' },
   };
   const wanted = SIG_ON_PAGE[shareSig];
   assert.ok(wanted,
     `crypto-agility.html now gives ParaShare (webapp) SIG "${shareSig}". /parasend and /pricing both ` +
     `describe that column in words, and this test has no wording for the new value, so update both ` +
     `pages and SIG_ON_PAGE together.`);
+  assert.ok(parasendEn.includes(wanted.parasendEn),
+    `the register gives ParaShare (webapp) SIG "${shareSig}", so /en/parasend must say "${wanted.parasendEn}"`);
   assert.ok(parasend.includes(wanted.parasend),
     `the register gives ParaShare (webapp) SIG "${shareSig}", so /parasend must say "${wanted.parasend}"`);
   assert.ok(pricing.includes(wanted.pricing),
@@ -1189,19 +1455,27 @@ assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the regi
   // does not give the webapp.
   for (const [sig, wording] of Object.entries(SIG_ON_PAGE)) {
     if (sig === shareSig) continue;
+    assert.ok(!parasendEn.includes(wording.parasendEn),
+      `/en/parasend describes ParaShare as "${wording.parasendEn}" while the register says "${shareSig}"`);
     assert.ok(!parasend.includes(wording.parasend),
       `/parasend describes ParaShare as "${wording.parasend}" while the register says "${shareSig}"`);
     assert.ok(!pricing.includes(wording.pricing),
       `/pricing describes ParaShare as "${wording.pricing}" while the register says "${shareSig}"`);
   }
 })();
-assert.ok(parasend.includes(`the webapp on the ${shareWire} wire`),
+assert.ok(parasendEn.includes(`the webapp on the ${shareWire} wire`),
+  '/en/parasend must state the wire format the register gives the webapp, not a better one');
+assert.ok(parasend.includes(`de webapp op het ${shareWire}-formaat`),
   '/parasend must state the wire format the register gives the webapp, not a better one');
 if (shareSig !== 'ML-DSA-65') {
-  assert.doesNotMatch(parasend, /ParaShare[^.]*ML-DSA-65 signed receipts/,
+  assert.doesNotMatch(parasendEn, /ParaShare[^.]*ML-DSA-65 signed receipts/,
+    'the register gives ParaShare no signature, so /en/parasend may not sell it ML-DSA-65 signed receipts');
+  assert.doesNotMatch(parasend, /ParaShare[^.]*ML-DSA-65 signed receipts|ParaShare[^.]*ondertekende ontvangstbewijzen/,
     'the register gives ParaShare no signature, so /parasend may not sell it ML-DSA-65 signed receipts');
 }
-assert.doesNotMatch(parasend, /proof that the file came from you/,
+assert.doesNotMatch(parasendEn, /proof that the file came from you/,
+  '/en/parasend may not promise sender proof on a path the register gives no signature');
+assert.doesNotMatch(parasend, /proof that the file came from you|bewijs dat het bestand van u (komt|kwam)/,
   '/parasend may not promise sender proof on a path the register gives no signature');
 
 // Tone, section 6 of the guide. We have no testimonials, no customer logos and
@@ -1211,7 +1485,7 @@ assert.doesNotMatch(parasend, /proof that the file came from you/,
 // sentence these pages quote ("not to unlock features"), so banning it would
 // fail on shipped copy the guide itself pins.
 const BANNED = /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class|effortless|next-generation|empower|journey/i;
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.doesNotMatch(text, BANNED, `${name}.html uses vocabulary the messaging guide bans`);
 }
 
@@ -1229,8 +1503,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // the sentences the buyer-facing copy on /about and /security now rests on.
   // Every one of them was already on a page before this file pinned it; nothing
   // here was written for marketing.
-  const securityRaw = read('frontend/security.html');
-  const trustRaw = read('frontend/trust.html');
+  const securityRaw = read('frontend/en/security.html');
+  const trustRaw = read('frontend/en/trust.html');
+  const trustNl = read('frontend/trust.html');
 
   // The founder. Name and title are the only ones the site can support, so they
   // are pinned as one string: no award, no year count, no prior employer.
@@ -1284,24 +1559,23 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // Resend, a US provider. The guide (section 9.2) says that row is the one that
   // has to move to the data-path wording, and it may never be written without
   // its one exception in the same breath.
-  assert.match(securityRaw, /No US provider in the data path/,
-    'security.html must state the jurisdiction claim about the data path, not about the whole chain');
+  // Fase 2 (SITE-30/34): the claim is where the encrypted files sit, and the
+  // mail exception travels with it, now saying what the mail carries.
+  assert.match(securityRaw, /The encrypted files sit only on our servers in the EU/,
+    'security.html must state where the encrypted files are');
   assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Resend)/,
-    'security.html must not claim "no US company" without naming the Resend exception beside it');
-  // "In the same breath" is the whole point of the wording, so it is measured
-  // as a window and not as "somewhere on the page": an earlier version of this
-  // check let a card drop Resend entirely, because the jurisdiction table lower
-  // down still carried the word.
+    'security.html must not claim "no US company" without naming the mail carrier beside it');
+  // "In the same breath" is measured as a window, not as "somewhere on the page".
   const WINDOW = 420;
   for (const [label, html] of [['security.html', securityRaw]]) {
     let at = -1, seen = 0;
-    while ((at = html.indexOf('No US provider in the data path', at + 1)) !== -1) {
+    while ((at = html.indexOf('The encrypted files sit only on our servers in the EU', at + 1)) !== -1) {
       seen += 1;
-      assert.match(html.slice(at, at + WINDOW), /Resend/,
-        `${label} states the data-path claim without naming the Resend exception within ${WINDOW} characters of it`);
+      assert.match(html.slice(at, at + WINDOW), /Resend in the United States/,
+        `${label} states where the files are without naming the mail carrier within ${WINDOW} characters of it`);
     }
     assert.ok(seen >= 2,
-      `${label} must carry the data-path wording in both the card and the jurisdiction row, found ${seen}`);
+      `${label} must carry the wording in both the card and the jurisdiction row, found ${seen}`);
   }
 
   // The certification limit, stated in the same voice as the proofs.
@@ -1312,7 +1586,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 
   // House style on the commercial pages, from the messaging guide: no marketing
   // words we cannot back, no invented social proof, no em-dashes.
-  const commercial = about + securityRaw + trustRaw;
+  const commercial = about + securityRaw + trustRaw + trustNl;
   assert.doesNotMatch(commercial, /revolutionary|seamless|cutting-edge|military-grade|enterprise-grade|world-class|next-generation|effortless|trusted by \d/i,
     'the commercial pages must not use the banned marketing vocabulary');
   assert.doesNotMatch(commercial, /\u2014/,
@@ -1334,7 +1608,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   assert.match(aboutHero, /Mick Beer/, 'about.html must name the founder in the hero');
   assert.match(aboutHero, /Privacy and security researcher, founder of Paramantis Solutions B\.V\./,
     'about.html must carry the founder title in the hero');
-  assert.match(aboutHero, /href="\/pricing" class="btn btn-primary"/,
+  assert.match(aboutHero, /href="\/en\/pricing" class="btn btn-primary"/,
     'about.html must offer a next step in the hero');
   // Nobody can promise ten years. The lede used to end on "the cryptography is
   // post-quantum, which is the proof that it still holds up in ten years", which
@@ -1364,9 +1638,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // fails here.
   const heroOf = (html) => html.slice(html.indexOf('<section class="page-hero'), html.indexOf('<main'));
   const securityHero = heroOf(securityRaw);
-  assert.match(securityHero, /href="\/pricing" class="btn btn-primary"/,
+  assert.match(securityHero, /href="\/en\/pricing" class="btn btn-primary"/,
     'security.html must offer a next step in the first screen, not only at the foot of the page');
-  assert.match(securityHero, /href="\/verify" class="btn btn-secondary"/,
+  assert.match(securityHero, /href="\/en\/verify" class="btn btn-secondary"/,
     'security.html must offer the verify step in the first screen');
   // Mick, 4 September: the founder line left this page. Who is accountable is
   // the company, where it sits and its registration, and that has to stay.
@@ -1412,7 +1686,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
     'security.html must quote the finding counts the /docs#audits table adds up to');
   assert.match(securityRaw, /the raw pentest output behind it is not published|What is not published is the raw pentest output/,
     'security.html must name what is actually unpublished: the raw pentest output, not the reports');
-  assert.doesNotMatch(securityRaw + trustRaw, /The audit reports themselves are not published/,
+  assert.doesNotMatch(securityRaw + trustRaw + trustNl, /The audit reports themselves are not published|De auditrapporten zelf worden niet gepubliceerd/,
     'the April 2026 report IS published at /docs/security-audit-2026-04.md; that sentence was untrue');
   assert.match(securityRaw, /href="\/docs\/security-audit-2026-04\.md"/,
     'security.html must link the published audit report it points at');
@@ -1420,7 +1694,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // /security with "an independent firm" left the suite green. Pinned on both.
   assert.match(securityRaw, /two by R\. Zwarts, one by Ryan Williams of Smart Cyber Solutions/,
     'security.html must name the auditors it credits');
-  assert.match(securityRaw, /href="\/docs#audits"/,
+  assert.match(securityRaw, /href="\/en\/docs#audits"/,
     'security.html must link the audit table that carries the counts');
   assert.doesNotMatch(securityRaw, /full audit history[^<]*<a href="\/architecture"/,
     'security.html must not send the reader to /architecture for audit material it sends back');
@@ -1430,71 +1704,94 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // The literal head strings belong to #334 and tests/seo-contract.test.mjs
   // pins them there. What this file guards is that the H1 and the head agree;
   // see the structural check further down.
-  assert.match(trustRaw, /<h1>Trust &amp; Verification<\/h1>/, 'trust.html H1 names the page');
-  assert.match(trustRaw, /two by R\. Zwarts, one by Ryan Williams of Smart Cyber Solutions/,
-    'trust.html must name the auditors it credits');
-  assert.match(trustRaw, /Together they produced 40 findings, 4 of them critical\./,
-    'trust.html must quote the same finding counts /docs#audits adds up to');
-  assert.match(trustRaw, /href="\/docs\/security-audit-2026-04\.md"/,
-    'trust.html must link the published audit report');
-  const trustHero = heroOf(trustRaw);
-  assert.match(trustHero, /For organisations that run Paramant on their own server/,
-    'trust.html must name its audience in the hero, not a screen below it');
-  assert.doesNotMatch(trustHero, /\brelay\b/i,
-    'trust.html must not use "relay" in the first screen; it is undefined there');
+  // The same checks run on the English copy and on the Dutch page.
+  for (const t of [
+    { file: 'en/trust.html', raw: trustRaw,
+      h1: /<h1>Trust &amp; Verification<\/h1>/,
+      auditors: /two by R\. Zwarts, one by Ryan Williams of Smart Cyber Solutions/,
+      findings: /Together they produced 40 findings, 4 of them critical\./,
+      audience: /For organisations that run Paramant on their own server/,
+      howToRead: '<h3>How to read this page</h3>',
+      jargon: /the operator who runs the relay/,
+      plans: ['ParaSign Community', 'ParaSend Community', 'Firm, ParaSign Business and Enterprise'],
+      twoOfThree: /Businesses pay for Pro or Enterprise/ },
+    { file: 'trust.html', raw: trustNl,
+      h1: /<h1>Vertrouwen en controle<\/h1>/,
+      auditors: /twee door R\. Zwarts, één door Ryan Williams van Smart Cyber Solutions/,
+      findings: /Samen leverden ze 40 bevindingen op, waarvan 4 kritiek\./,
+      audience: /Voor organisaties die Paramant op hun eigen server draaien/,
+      howToRead: '<h3>Zo leest u deze pagina</h3>',
+      jargon: /the operator who runs the relay|(?:beheerder|operator) die de relay draait/,
+      plans: ['Ondertekenen Community', 'Versturen Community', 'Firm, Ondertekenen Business en Enterprise'],
+      twoOfThree: /Businesses pay for Pro or Enterprise|Bedrijven betalen voor Pro of Enterprise/ },
+  ]) {
+    const trustRaw = t.raw;
+    assert.match(trustRaw, t.h1, `${t.file} H1 names the page`);
+    assert.match(trustRaw, t.auditors,
+      `${t.file} must name the auditors it credits`);
+    assert.match(trustRaw, t.findings,
+      `${t.file} must quote the same finding counts /docs#audits adds up to`);
+    assert.match(trustRaw, /href="\/docs\/security-audit-2026-04\.md"/,
+      'trust.html must link the published audit report');
+    const trustHero = heroOf(trustRaw);
+    assert.match(trustHero, t.audience,
+      'trust.html must name its audience in the hero, not a screen below it');
+    assert.doesNotMatch(trustHero, /\brelay\b/i,
+      'trust.html must not use "relay" in the first screen; it is undefined there');
 
-  // One name for one page. The H1 and the <title> said "Trust & Verification"
-  // while the social card and the structured data still said "Trust &
-  // Transparency", and no test in tests/ compares a title with its og:title.
-  // #334 owns the head wording and tests/seo-contract.test.mjs pins the literal
-  // strings, so this checks the RELATION instead: the four places that name the
-  // page must name it the same, and that name must be the one the H1 uses.
-  // Punctuation and case are not the point; "Transparency" versus
-  // "Verification" was.
-  const pageName = (re, label) => {
-    const m = re.exec(trustRaw);
-    assert.ok(m, `trust.html must carry ${label}`);
-    return m[1].replace(/&amp;|&/g, 'and').replace(/&middot;|\u00b7/g, '').replace(/[^a-z]+/gi, ' ').trim().toLowerCase();
-  };
-  const trustNames = {
-    title: pageName(/<title>([^<]*)<\/title>/, 'a title'),
-    og: pageName(/<meta property="og:title" content="([^"]*)"/, 'an og:title'),
-    twitter: pageName(/<meta name="twitter:title" content="([^"]*)"/, 'a twitter:title'),
-    jsonld: pageName(/"name": "([^"]*Paramant[^"]*)"/, 'a JSON-LD WebPage name'),
-  };
-  for (const [where, name] of Object.entries(trustNames)) {
-    assert.equal(name, trustNames.title,
-      `trust.html ${where} calls the page "${name}", the title calls it "${trustNames.title}"`);
+    // One name for one page. The H1 and the <title> said "Trust & Verification"
+    // while the social card and the structured data still said "Trust &
+    // Transparency", and no test in tests/ compares a title with its og:title.
+    // #334 owns the head wording and tests/seo-contract.test.mjs pins the literal
+    // strings, so this checks the RELATION instead: the four places that name the
+    // page must name it the same, and that name must be the one the H1 uses.
+    // Punctuation and case are not the point; "Transparency" versus
+    // "Verification" was.
+    const pageName = (re, label) => {
+      const m = re.exec(trustRaw);
+      assert.ok(m, `trust.html must carry ${label}`);
+      return m[1].replace(/&amp;|&/g, 'and').replace(/&middot;|\u00b7/g, '').replace(/[^a-z]+/gi, ' ').trim().toLowerCase();
+    };
+    const trustNames = {
+      title: pageName(/<title>([^<]*)<\/title>/, 'a title'),
+      og: pageName(/<meta property="og:title" content="([^"]*)"/, 'an og:title'),
+      twitter: pageName(/<meta name="twitter:title" content="([^"]*)"/, 'a twitter:title'),
+      jsonld: pageName(/"name": "([^"]*Paramant[^"]*)"/, 'a JSON-LD WebPage name'),
+    };
+    for (const [where, name] of Object.entries(trustNames)) {
+      assert.equal(name, trustNames.title,
+        `trust.html ${where} calls the page "${name}", the title calls it "${trustNames.title}"`);
+    }
+    const trustH1 = /<h1>([^<]*)<\/h1>/.exec(trustRaw)[1].replace(/&amp;|&/g, 'and').replace(/[^a-z]+/gi, ' ').trim().toLowerCase();
+    for (const word of trustH1.split(' ')) {
+      assert.ok(trustNames.title.includes(word),
+        `the /trust H1 says "${trustH1}" but the title says "${trustNames.title}"; the word "${word}" is missing`);
+    }
+    assert.doesNotMatch(trustRaw, /Trust &(amp;)? Transparency|Trust and transparency/i,
+      'trust.html must not keep the old page name anywhere');
+
+    // The hero addresses "anyone who has to check a supplier". That reader used to
+    // get one text link in the middle of a paragraph as the only way onward.
+    assert.match(trustHero, new RegExp('href="' + (t.file.startsWith('en/') ? '/en' : '') + '/security" class="btn btn-primary"'),
+      'trust.html must give the reviewer a real next step in the hero');
+    assert.match(trustHero, new RegExp('href="' + (t.file.startsWith('en/') ? '/en' : '') + '/pricing" class="btn btn-secondary"'),
+      'trust.html must offer pricing from the hero as well');
+
+    // "the operator who runs the relay" was the first sentence under the hero, and
+    // relay is not a word a supplier reviewer knows.
+    const trustFirstScreen = trustRaw.slice(0, trustRaw.indexOf(t.howToRead));
+    assert.doesNotMatch(trustFirstScreen, t.jargon,
+      'trust.html must not open on undefined jargon; say which server is meant');
+
+    // /pricing sells four ParaSign tiers. "Businesses pay for Pro or Enterprise"
+    // silently dropped Business, and the sentence sat on the page that exists to
+    // be checkable.
+    for (const name of t.plans) {
+      assert.ok(trustRaw.includes(name), `trust.html must name the plans as /pricing names them: "${name}"`);
+    }
+    assert.doesNotMatch(trustRaw, t.twoOfThree,
+      'trust.html must not name two of the three paid ParaSign tiers as if they were all of them');
   }
-  const trustH1 = /<h1>([^<]*)<\/h1>/.exec(trustRaw)[1].replace(/&amp;|&/g, 'and').replace(/[^a-z]+/gi, ' ').trim().toLowerCase();
-  for (const word of trustH1.split(' ')) {
-    assert.ok(trustNames.title.includes(word),
-      `the /trust H1 says "${trustH1}" but the title says "${trustNames.title}"; the word "${word}" is missing`);
-  }
-  assert.doesNotMatch(trustRaw, /Trust &(amp;)? Transparency|Trust and transparency/i,
-    'trust.html must not keep the old page name anywhere');
-
-  // The hero addresses "anyone who has to check a supplier". That reader used to
-  // get one text link in the middle of a paragraph as the only way onward.
-  assert.match(trustHero, /href="\/security" class="btn btn-primary"/,
-    'trust.html must give the reviewer a real next step in the hero');
-  assert.match(trustHero, /href="\/pricing" class="btn btn-secondary"/,
-    'trust.html must offer pricing from the hero as well');
-
-  // "the operator who runs the relay" was the first sentence under the hero, and
-  // relay is not a word a supplier reviewer knows.
-  const trustFirstScreen = trustRaw.slice(0, trustRaw.indexOf('<h3>How to read this page</h3>'));
-  assert.doesNotMatch(trustFirstScreen, /the operator who runs the relay/,
-    'trust.html must not open on undefined jargon; say which server is meant');
-
-  // /pricing sells four ParaSign tiers. "Businesses pay for Pro or Enterprise"
-  // silently dropped Business, and the sentence sat on the page that exists to
-  // be checkable.
-  for (const name of ['ParaSign Community', 'ParaSend Community', 'Firm, ParaSign Business and Enterprise']) {
-    assert.ok(trustRaw.includes(name), `trust.html must name the plans as /pricing names them: "${name}"`);
-  }
-  assert.doesNotMatch(trustRaw, /Businesses pay for Pro or Enterprise/,
-    'trust.html must not name two of the three paid ParaSign tiers as if they were all of them');
 
   console.log('ui-truthfulness: the trust pages answer who, what and what next above the fold');
 }
@@ -1520,27 +1817,52 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 // Wrapped in a named IIFE, the convention #359 settled for this file. It is a
 // flat script, so every const in it is a top-level binding and two sections
 // arriving from parallel branches collide with "has already been declared".
-(function pinDownloadPage() {
-  const downloadHtml = read('frontend/download.html');
+// Runs on the English copy and on the Dutch page; L holds the words per language.
+const DOWNLOAD_EN = {
+  unmaintained: /The Paramant desktop app is no longer maintained/,
+  lastDate: /28 March 2026/,
+  current: /\b(?:latest|current|newest)\s+(?:version|build|release)\s+of\s+the\s+desktop\b/i,
+  invite: /\bdownload the (?:desktop |native )?app\b/i,
+  claim: /\bGPG[- ]?signed\b|\bGOODSIG\b|\bpackage was signed\b/i,
+  wasSigned: /v0\.2\.0 package was signed/i,
+  lost: /v0\.2\.1 package[\s\S]{0,120}?has no such member/i,
+  notSigned: /paramant_0\.2\.1_amd64\.deb[\s\S]{0,400}?Not signed/,
+  selfSigned: /self-signed/i,
+  anchor: /\bsigned and verified\b|\bverified publisher\b|\btrusted publisher\b/i,
+};
+const DOWNLOAD_NL = {
+  unmaintained: /De desktop-app van Paramant wordt niet meer onderhouden/,
+  lastDate: /28 maart 2026/,
+  current: /\b(?:latest|current|newest)\s+(?:version|build|release)\s+of\s+the\s+desktop\b|\b(?:nieuwste|huidige|actuele)\s+(?:versie|build|release)\s+van\s+de\s+desktop/i,
+  invite: /\bdownload the (?:desktop |native )?app\b|\bdownload de (?:desktop-|native )?app\b/i,
+  claim: /\bGPG[- ]?signed\b|\bGOODSIG\b|\bpackage was signed\b|\bGPG-ondertekend\b|\bpakket was ondertekend\b/i,
+  wasSigned: /v0\.2\.0-pakket was ondertekend/i,
+  lost: /v0\.2\.1-pakket[\s\S]{0,120}?heeft zo'n onderdeel niet/i,
+  notSigned: /paramant_0\.2\.1_amd64\.deb[\s\S]{0,400}?Niet ondertekend/,
+  selfSigned: /zelf ondertekend/i,
+  anchor: /\bsigned and verified\b|\bverified publisher\b|\btrusted publisher\b|ondertekend en geverifieerd|geverifieerde uitgever|vertrouwde uitgever/i,
+};
+function pinDownloadPage(file, L) {
+  const downloadHtml = read(file);
   const downloadVisible = downloadHtml.replace(/<!--[\s\S]*?-->/g, '');
 
   // 1. The status sentence. The last release is v0.2.1 of 28 March 2026 and none
   //    has followed it; the repository has no build pipeline that would produce
   //    one. If the app is ever picked up again this assertion is the thing that
   //    fails first, which is the point.
-  assert.match(downloadVisible, /The Paramant desktop app is no longer maintained/,
-    'download.html must open by saying the desktop app is not maintained');
+  assert.match(downloadVisible, L.unmaintained,
+    `${file} must open by saying the desktop app is not maintained`);
   assert.match(downloadVisible, /v0\.2\.1/,
-    'download.html must name the last release, v0.2.1');
-  assert.match(downloadVisible, /28 March 2026/,
-    'download.html must date the last release');
+    `${file} must name the last release, v0.2.1`);
+  assert.match(downloadVisible, L.lastDate,
+    `${file} must date the last release`);
 
   // The old contradiction, in both directions: the page may not recommend the
   // desktop app, and may not sell it as current.
-  assert.doesNotMatch(downloadVisible, /\b(?:latest|current|newest)\s+(?:version|build|release)\s+of\s+the\s+desktop\b/i,
-    'download.html must not present the archived build as current');
-  assert.doesNotMatch(downloadVisible, /\bdownload the (?:desktop |native )?app\b/i,
-    'download.html must not invite a download as its call to action');
+  assert.doesNotMatch(downloadVisible, L.current,
+    `${file} must not present the archived build as current`);
+  assert.doesNotMatch(downloadVisible, L.invite,
+    `${file} must not invite a download as its call to action`);
 
   // 2. The archive equals what was actually published. Filename, version and
   //    sha256 together: a version bump on the page without a new artifact, or a
@@ -1565,9 +1887,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   };
   for (const [file, want] of Object.entries(publishedInstallers)) {
     assert.ok(downloadVisible.includes(`/dl/${file}`),
-      `download.html must link the archived installer /dl/${file}`);
+      `${file} must link the archived installer /dl/${file}`);
     assert.ok(downloadVisible.includes(want.sha256),
-      `download.html must carry the measured sha256 of ${file}`);
+      `${file} must carry the measured sha256 of ${file}`);
   }
   // No sixth link creeping in, and no Android installer: v0.2.1 shipped an .apk,
   // but on Android the app runs in the system webview, so the "own process, no
@@ -1578,12 +1900,12 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   assert.deepEqual(
     [...new Set(linkedInstallers)].sort(),
     Object.keys(publishedInstallers).sort(),
-    'download.html links installers that are not in the pinned release list, or is missing one');
+    `${file} links installers that are not in the pinned release list, or is missing one`);
   // The .apk may be named as a fact (v0.2.1 shipped one), never offered as a
   // link: on Android the app runs in the system webview, so the "own process,
   // no browser" argument that justifies the desktop archive does not apply.
   assert.doesNotMatch(downloadVisible, /href="[^"]*\.apk"/i,
-    'download.html must not link the Android build; the web app is current there');
+    `${file} must not link the Android build; the web app is current there`);
 
   // 3. The signing truth, measured on the artifacts themselves:
   //      .deb 0.2.1  no _gpgbuilder and no _gpgorigin. Not signed.
@@ -1602,7 +1924,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   //    claim, and the yardstick has to name both members or the next reader
   //    repeats the mistake.
   assert.ok(downloadVisible.includes('_gpgbuilder') && downloadVisible.includes('_gpgorigin'),
-    'download.html must name both _gpgbuilder (dpkg-sig) and _gpgorigin (debsigs); '
+    `${file} must name both _gpgbuilder (dpkg-sig) and _gpgorigin (debsigs); `
     + 'checking for only one is how the first version of this page got it wrong');
 
   // A signature may be claimed for v0.2.0, never for the v0.2.1 package on
@@ -1611,9 +1933,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .split(/(?<=\.)\s+/)
-    .filter((line) => /\bGPG[- ]?signed\b|\bGOODSIG\b|\bpackage was signed\b/i.test(line));
+    .filter((line) => L.claim.test(line));
   assert.ok(signingClaims.length > 0,
-    'download.html must still explain that the Debian package used to be signed');
+    `${file} must still explain that the Debian package used to be signed`);
   for (const line of signingClaims) {
     assert.match(line, /v0\.2\.0/,
       `a signing claim on download.html must name the release it holds for: "${line.trim()}"`);
@@ -1621,16 +1943,16 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // The contrast itself, which is the whole point of the paragraph: one release
   // carried the signature, the next did not. Softening either half turns a
   // reported regression back into a vague "not signed" and loses the reason.
-  assert.match(downloadVisible, /v0\.2\.0 package was signed/i,
-    'download.html must say the v0.2.0 package was signed, because it was');
-  assert.match(downloadVisible, /v0\.2\.1 package[\s\S]{0,120}?has no such member/i,
-    'download.html must say the v0.2.1 package it serves lost that signature');
-  assert.match(downloadVisible, /paramant_0\.2\.1_amd64\.deb[\s\S]{0,400}?Not signed/,
+  assert.match(downloadVisible, L.wasSigned,
+    `${file} must say the v0.2.0 package was signed, because it was`);
+  assert.match(downloadVisible, L.lost,
+    `${file} must say the v0.2.1 package it serves lost that signature`);
+  assert.match(downloadVisible, L.notSigned,
     'the archive entry for the served .deb must say it is not signed');
-  assert.match(downloadVisible, /self-signed/i,
-    'download.html must say the one signed installer is self-signed');
-  assert.doesNotMatch(downloadVisible, /\bsigned and verified\b|\bverified publisher\b|\btrusted publisher\b/i,
-    'download.html must not imply a signature a stranger can verify against a trust anchor');
+  assert.match(downloadVisible, L.selfSigned,
+    `${file} must say the one signed installer is self-signed`);
+  assert.doesNotMatch(downloadVisible, L.anchor,
+    `${file} must not imply a signature a stranger can verify against a trust anchor`);
 
   // 4. No jargon in the first screenful. The rule is docs/brand/messaging.md
   //    section 6: "Cryptography names, standard numbers and RAM-only appear
@@ -1646,7 +1968,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   const heroStart = downloadVisible.indexOf('<main');
   const heroEnd = downloadVisible.indexOf('</header>', heroStart);
   assert.ok(heroStart !== -1 && heroEnd !== -1,
-    'download.html must open <main> with a <header class="dl-lead"> block');
+    `${file} must open <main> with a <header class="dl-lead"> block`);
   const heroText = downloadVisible
     .slice(heroStart, heroEnd)
     .replace(/<[^>]+>/g, ' ')
@@ -1677,9 +1999,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   const lede = (downloadVisible.slice(heroStart, heroEnd).match(/<p class="dl-sub">([\s\S]*?)<\/p>/) || [])[1] || '';
   const ledeText = lede.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   assert.ok(ledeText.length > 0 && ledeText.length <= 200,
-    `download.html lede must stay short enough for one mobile screen, is ${ledeText.length} chars`);
+    `${file} lede must stay short enough for one mobile screen, is ${ledeText.length} chars`);
   assert.ok((ledeText.match(/\./g) || []).length <= 2,
-    `download.html lede must be at most two sentences: "${ledeText}"`);
+    `${file} lede must be at most two sentences: "${ledeText}"`);
 
   // 5. The page is a whole document. The version this replaced was truncated
   //    mid-word ("geen installatie verei") with no </main>, </body> or </html>,
@@ -1688,13 +2010,15 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   //    HTML for well-formedness, so it is checked here.
   for (const tag of ['</main>', '</body>', '</html>']) {
     assert.ok(downloadHtml.includes(tag),
-      `download.html must be a complete document: ${tag} is missing`);
+      `${file} must be a complete document: ${tag} is missing`);
   }
   for (const src of ['/nav.js', '/js/nav-auth.js']) {
     assert.ok(downloadHtml.includes(`src="${src}`),
-      `download.html must load ${src}; without a </body> the nav generator skips it`);
+      `${file} must load ${src}; without a </body> the nav generator skips it`);
   }
-})();
+}
+pinDownloadPage('frontend/en/download.html', DOWNLOAD_EN);
+pinDownloadPage('frontend/download.html', DOWNLOAD_NL);
 
 console.log('ui-truthfulness: /download says the desktop app is unmaintained, and the archive matches the artifacts');
 
@@ -1745,6 +2069,9 @@ console.log('ui-truthfulness: /download says the desktop app is unmaintained, an
   for (const file of files) {
     const m = /unlimited(?:\s|&nbsp;|<[^>]+>)+(?:\w+(?:\s|&nbsp;)+)?transfers/i.exec(strip(read(file)));
     if (m) hits.push(`${file}: "${m[0].replace(/\s+/g, ' ')}"`);
+    // Dutch pages: the same promise in Dutch words.
+    const nl = /onbeperkt[a-z]*(?:\s|&nbsp;|<[^>]+>)+(?:\w+(?:\s|&nbsp;)+)?(?:overdrachten|verzendingen)/i.exec(strip(read(file)));
+    if (nl) hits.push(`${file}: "${nl[0].replace(/\s+/g, ' ')}"`);
   }
   assert.deepEqual(hits, [],
     'no frontend page or script may promise transfers without a ceiling; tiers.js caps every tier ' +
@@ -1755,7 +2082,8 @@ console.log('ui-truthfulness: /download says the desktop app is unmaintained, an
   // Pro tier, both describing the ParaSend capacity the relay actually enforces.
   const proTransfers = 500; // relay/lib/tiers.js pro.transfers_month, pinned to the module in relay/test/
   for (const [file, rx] of [
-    ['frontend/docs/paramant-ot-brief.html', new RegExp(`<li>${proTransfers} transfers a month</li>`)],
+    ['frontend/en/docs/paramant-ot-brief.html', new RegExp(`<li>${proTransfers} transfers a month</li>`)],
+    ['frontend/docs/paramant-ot-brief.html', new RegExp(`<li>${proTransfers} overdrachten per maand</li>`)],
     ['frontend/docs/self-hosting.md', new RegExp(`\\| \`pro\` \\| ${proTransfers} \\|`)],
   ]) {
     assert.match(read(file), rx,
@@ -1887,8 +2215,10 @@ console.log('ui-truthfulness: no page bills for something billing-catalog.js can
   assert.equal(afterBuying('parasign', 'pro'), PARASEND.community.quotas.transfers_month,
     'a bare parasign=pro grant still moves nothing on ParaSend; that is what makes this gate necessary');
 
-  const TRANSFER_FIGURE = /([\d][\d,]*)\s*(?:ParaSend\s+)?transfers/i;
-  const pricingHtml = read('frontend/pricing.html');
+  // Dutch too: /parasign names the ParaSend allowance as "verzendingen", with a
+  // dot as the thousands separator.
+  const TRANSFER_FIGURE = /([\d][\d,.]*)\s*(?:ParaSend\s+)?(?:transfers|verzendingen)/i;
+  const pricingHtml = read('frontend/en/pricing.html');
   const between = (src, a, b) => src.slice(src.indexOf(a), b ? src.indexOf(b) : undefined);
   const dashJs = read('frontend/js/dashboard.js');
   const quotaJs = read('frontend/js/quota-upgrade.js');
@@ -1908,7 +2238,7 @@ console.log('ui-truthfulness: no page bills for something billing-catalog.js can
   for (const [name, scope] of scopes) {
     const m = TRANSFER_FIGURE.exec(scope);
     if (!m) continue;
-    if (Number(m[1].replace(/,/g, '')) !== delivered) wrong.push(`${name}: "${m[0]}" against ${delivered} delivered`);
+    if (Number(m[1].replace(/[,.]/g, '')) !== delivered) wrong.push(`${name}: "${m[0]}" against ${delivered} delivered`);
   }
   assert.deepEqual(wrong, [],
     'a signing surface prints a transfers figure the plan it pitches does not deliver:\n  ' + wrong.join('\n  '));
@@ -1962,22 +2292,24 @@ console.log('ui-truthfulness: no ParaSign surface sells a transfers ceiling the 
 
   // The legal term, glossed. A gloss on the first mention is what makes the
   // term readable; a bare mention on a page that never defines it is not.
-  const LEGAL = new Set(['terms.html', 'privacy.html', 'dpa.html']);
-  const REGISTER = 'crypto-agility.html';
-  const GLOSS = 'ParaShare (the ParaSend web app)';
+  // English copies under en/ carry the English gloss, the Dutch pages the Dutch one.
+  const LEGAL = new Set(['terms.html', 'privacy.html', 'dpa.html', 'en/terms.html', 'en/privacy.html', 'en/dpa.html']);
+  const REGISTERS = new Set(['crypto-agility.html', 'en/crypto-agility.html']);
+  const glossFor = (page) => (page.startsWith('en/') ? 'ParaShare (the ParaSend web app)' : 'ParaShare (de webapp van Versturen)');
 
   const strays = [];
   for (const page of pages) {
     const html = read('frontend/' + page);
     if (!html.includes('ParaShare')) continue;
     if (LEGAL.has(page)) {
+      const GLOSS = glossFor(page);
       assert.ok(html.includes(GLOSS),
         `${page} uses ParaShare as a contract term without ever defining it; it must read "${GLOSS}" at least once`);
       continue;
     }
-    if (page === REGISTER) {
+    if (REGISTERS.has(page)) {
       assert.ok(/<td>ParaShare \(webapp\)<\/td>/.test(html),
-        'crypto-agility.html may carry ParaShare only as the register row two other gates read by that label');
+        `${page} may carry ParaShare only as the register row two other gates read by that label`);
       continue;
     }
     strays.push(page);
@@ -2017,10 +2349,15 @@ console.log('ui-truthfulness: ParaSend and ParaSign are the only two product nam
 // someone tidies the redirect away.
 (function rulesPageMoved() {
   const rules = read('frontend/rules.html');
-  assert.match(rules, /<h1>Our rules<\/h1>/, 'frontend/rules.html must carry the H1 the page is named for');
+  const rulesEn = read('frontend/en/rules.html');
+  assert.match(rulesEn, /<h1>Our rules<\/h1>/, 'frontend/en/rules.html must carry the H1 the page is named for');
+  assert.match(rules, /<h1>Onze regels<\/h1>/, 'frontend/rules.html must carry the H1 the page is named for');
   assert.match(rules, /<link rel="canonical" href="https:\/\/paramant\.app\/rules">/,
     'rules.html must point its canonical at the new URL, or the 301 sends the signal back and forth');
+  assert.match(rulesEn, /<link rel="canonical" href="https:\/\/paramant\.app\/en\/rules">/,
+    'en/rules.html must point its canonical at the new URL under /en');
   assert.ok(!/ParaRule/i.test(rules), 'rules.html carries the retired name again');
+  assert.ok(!/ParaRule/i.test(rulesEn), 'en/rules.html carries the retired name again');
 
   const sitemap = read('frontend/sitemap.xml');
   assert.ok(sitemap.includes('<loc>https://paramant.app/rules</loc>'), '/rules is missing from the sitemap');
@@ -2076,15 +2413,22 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
   assert.doesNotMatch(themeJs, /fetch\(|XMLHttpRequest|navigator\.sendBeacon/,
     'theme.js must not send the choice anywhere; /account and /privacy both say it stays in the browser');
 
-  assert.match(account, /Dark is the default and it stays dark until you change it here/,
-    '/account must say that the night is the default, because app-2026.css makes it so');
-  assert.match(account, /kept in this\s+browser only/,
+  const accountEn = read('frontend/en/account.html');
+  assert.match(accountEn, /Without a choice the site follows your system/,
+    '/en/account must say that no choice follows the system, because theme.js makes it so');
+  assert.match(accountEn, /kept in this browser only/,
+    '/en/account must say the choice never leaves the browser');
+  assert.match(accountEn, /applies to every page/,
+    '/en/account promises the choice holds on every page; tests/app-theme.test.mjs measures that');
+  assert.match(account, /Zonder keuze volgt de site uw systeem/,
+    '/account must say that no choice follows the system, because theme.js makes it so');
+  assert.match(account, /alleen in deze\s+browser bewaard/,
     '/account must say the choice never leaves the browser');
-  assert.match(account, /The public pages stay dark\./,
-    '/account promises the marketing pages stay on the night; tests/app-theme.test.mjs measures that');
+  assert.match(account, /geldt voor elke pagina/,
+    '/account promises the choice holds on every page; tests/app-theme.test.mjs measures that');
 })();
 
-console.log('ui-truthfulness: the appearance switch says only what theme.js and app-2026.css do');
+console.log('ui-truthfulness: the appearance switch says only what theme.js and design-system.css do');
 
 // ── /parashare says up front that this is a live handshake ──────────────────
 // A buyer reached step 2 before finding out that the other person has to be at
@@ -2102,36 +2446,41 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
 // step, and this block goes red.
 (() => {
   const parashare = read('frontend/parashare.html');
+  const parashareEn = read('frontend/en/parashare.html');
   const psJs = read('frontend/js/parashare.page.js');
 
-  assert.match(parashare, /The person you send to has to be online while you send; you confirm a short code together\./,
-    '/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
-
-  // The sentence above became a sentence about ONE of two stands the moment
-  // /parashare grew "Send a link", so it may only be shown while that stand is
-  // chosen. Three things have to hold together or the page starts lying in one
-  // direction or the other: the chooser exists and offers both, the live
-  // sentence is the DEFAULT (the live stand is the one selected on arrival, so
-  // a sender who chooses nothing reads the promise that is true of what he is
-  // about to do), and the sentence is really swapped when the other stand is
-  // picked rather than left standing over a flow it does not describe.
-  // Sabotage: delete either mode card, flip aria-checked to the link card, or
-  // take the swap out of setSendMode, and this goes red.
-  assert.match(parashare, /id="ps-mode-live"[^>]*aria-checked="true"/,
-    'the live stand must be the one selected on arrival: it is the stand the sentence above step 1 describes');
-  assert.match(parashare, /id="ps-mode-link"[^>]*aria-checked="false"/,
-    'the "Send a link" stand must not be pre-selected while the live sentence stands above step 1');
-  assert.match(psJs, /note\.textContent = \(sendMode === 'link'\)/,
-    'setSendMode no longer swaps the live-handshake sentence; choosing "Send a link" would leave a promise on screen that that stand does not keep');
-  assert.match(psJs, /does not have to be online/,
-    'the "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
-  // Above step 1 means above it, not somewhere on the page: the sentence has to
-  // sit before the step-1 guide inside #step-setup.
-  const setupAt = parashare.indexOf('id="step-setup"');
-  const noteAt = parashare.indexOf('The person you send to has to be online');
-  const guideAt = parashare.indexOf('Step 1 of 5');
-  assert.ok(setupAt > 0 && noteAt > setupAt && noteAt < guideAt,
-    'the sentence must stand inside #step-setup and above the step-1 guide, which is where a sender reads before choosing a file');
+  // Since 24 September 2026 the page opens on "To one person" with a plain
+  // link, and the live hand-over is a tick box under it, "Extra safe". The
+  // promise that belongs above step 1 is now the label of that box: the other
+  // person has to be reachable now, and the two of you check a short code. It
+  // must stand inside #step-setup and above the file picker, the box must be
+  // unticked on arrival (the link is the default, and a sender who ticks
+  // nothing must not read a promise about a live wait), and the page must
+  // really derive the live stand from that box and nothing else.
+  // Sabotage: drop the label, pre-tick the box, or let sendMode go live
+  // without extraSafe, and this goes red.
+  // Acceptatie 3.1.1 (taal 36): a condition, not a claim. "The other person is
+  // available right now" read as a statement the page made about him.
+  const LIVE_EN = /<strong>Extra safe<\/strong>: choose this when the other person is at a screen right now too\. You compare a short code together, and nothing is stored\./;
+  const LIVE_NL = /<strong>Extra veilig<\/strong>: kies dit als de ontvanger nu ook achter een scherm zit\. U vergelijkt samen een korte code, en er wordt niets bewaard\./;
+  for (const [naam, html, zin, box] of [['/en/parashare', parashareEn, LIVE_EN, 'Extra safe'], ['/parashare', parashare, LIVE_NL, 'Extra veilig']]) {
+    assert.match(html, zin, `${naam} must say, on the Extra safe box, that the other person has to be there now and that you check a code together`);
+    assert.match(html, /<input type="checkbox" id="ps-extra-safe"(?![^>]*checked)[^>]*>/,
+      `${naam}: Extra safe must be unticked on arrival; the plain link is the default`);
+    assert.match(html, /id="ps-mode-link"[^>]*aria-checked="true"/,
+      `${naam}: "To one person" must be the choice selected on arrival`);
+    assert.match(html, /id="ps-mode-group"[^>]*aria-checked="false"/,
+      `${naam}: "To several people" must not be pre-selected`);
+    const setupAt = html.indexOf('id="step-setup"');
+    const noteAt = html.indexOf(`<strong>${box}</strong>`);
+    const kiezerAt = html.indexOf('id="file-input"');
+    assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
+      `${naam}: the Extra safe promise must stand inside #step-setup and above the file picker`);
+  }
+  assert.match(psJs, /sendMode = \(audience === 'one' && extraSafe\) \? 'live' : 'link';/,
+    'the live stand must follow from the Extra safe box and nothing else; otherwise the page can wait for a receiver nobody told to be there');
+  assert.match(parashareEn, /Compare this code together/,
+    '/en/parashare: the card where the two of you compare must be named after what it asks you to do');
 
   // Claim 1: sending really does wait for the other person. createSession goes
   // to the waiting step and opens the socket, and nothing else advances.
@@ -2150,7 +2499,7 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
   // Claim 2: there really is a short code, and both sides work it out.
   assert.match(psJs, /async function genFingerprint\(/,
     'the short code the sentence promises is genFingerprint; without it the sentence describes nothing');
-  assert.match(parashare, /Compare this code together/,
+  assert.match(parashare, /Vergelijk deze controlecode samen/,
     'the card where the two of you compare must be named after what it asks you to do');
   assert.match(read('frontend/js/ontvang.page.js'), /genFingerprint|fp-display/,
     'the receiver side must compute a code too, otherwise "together" is one-sided');
@@ -2178,9 +2527,29 @@ console.log('ui-truthfulness: /parashare says the receiver has to be online, and
 // device_hash and coarsens the timestamp to the hour. Labelling the self-test
 // inside the log would undo exactly that, because every entry left unlabelled
 // would then be provably customer traffic. So the disclosure lives on the page.
-(() => {
-  const ctLogHtml = read('frontend/ct-log.html');
-  const ctLogJs = read('frontend/js/ct-log.page.js');
+// Runs on the English copy (with its .en.js twin) and on the Dutch page.
+const CTLOG_EN = {
+  selfTest: /self-test/i,
+  announce: /restarts?|announce/i,
+  notAMeasure: /not a measure of how much the service is used/i,
+  salesShapes: [],
+  running: /self-test (is )?(running|runs) (right )?now|every hour, (all day|around the clock)|around the clock/i,
+};
+const CTLOG_NL = {
+  selfTest: /self-test|zelftest/i,
+  announce: /restarts?|announce|herstart|aanmeld/i,
+  notAMeasure: /zegt niets over hoeveel de dienst wordt gebruikt/i,
+  salesShapes: [
+    /(toont|bewijst|weerspiegelt|meet)[^.<]{0,30}(echt|werkelijk|live)?\s*klant(en)?(gebruik|verkeer|activiteit|vraag)/i,
+    /laat zien hoe(veel| vaak)[^.<]{0,30}gebruikt/i,
+    /live klant(activiteit|verkeer)/i,
+    /groeit (gestaag|snel)/i,
+  ],
+  running: /self-test (is )?(running|runs) (right )?now|every hour, (all day|around the clock)|around the clock|zelftest (draait|loopt) (nu|op dit moment)|elk uur, (de hele dag|dag en nacht)|dag en nacht/i,
+};
+const checkCtLog = (htmlFile, jsFile, L) => {
+  const ctLogHtml = read(htmlFile);
+  const ctLogJs = read(jsFile);
   // Comments are not read by visitors and this page's comment quotes the very
   // sentences being required, so a gate that scanned the raw file would stay
   // green on a page that had lost them. Everything below reads what a person sees.
@@ -2216,7 +2585,7 @@ console.log('ui-truthfulness: /parashare says the receiver has to be online, and
   const heartbeat = read('.github/workflows/heartbeat.yml');
   const hbHostM = /PARAMANT_RELAY_URL:\s*https:\/\/([a-z0-9.-]+)/.exec(heartbeat);
   assert.ok(hbHostM, 'heartbeat.yml no longer names the relay it tests; this gate reads the host from there');
-  if (/self-test/i.test(ctLogSeen)) {
+  if (L.selfTest.test(ctLogSeen)) {
     assert.equal(hbHostM[1], ctHost,
       `ct-log blames the hourly self-test for its entries, but the self-test writes to ${hbHostM[1]} and this page reads ${ctHost}`);
     assert.match(heartbeat, /- cron: '\d+ \* \* \* \*'/,
@@ -2228,7 +2597,7 @@ console.log('ui-truthfulness: /parashare says the receiver has to be online, and
   //    b. Relay announcements, which is what this log is actually full of. The
   //       claim only stands while relay.js still writes a CT entry when a relay
   //       announces itself, and while the relays still announce to this host.
-  if (/restarts?|announce/i.test(ctLogSeen)) {
+  if (L.announce.test(ctLogSeen)) {
     const relaySrc = read('relay/relay.js');
     assert.match(relaySrc, /function registerSelf/,
       'ct-log says our relays announce themselves; relay.js no longer has registerSelf');
@@ -2265,11 +2634,12 @@ console.log('ui-truthfulness: /parashare says the receiver has to be online, and
     /see how (much|often)[^.<]{0,30}is used/i,
     /live customer (activity|traffic)/i,
     /growing (steadily|fast)/i,
+    ...L.salesShapes,
   ]) {
     assert.doesNotMatch(ctLogSeen, shape,
       'ct-log must not present the entry count as customer use; most of the entries are not customer traffic');
   }
-  assert.match(ctLogSeen, /not a measure of how much the service is used/i,
+  assert.match(ctLogSeen, L.notAMeasure,
     'ct-log must say what the count is not, or the number sells activity the service does not have');
 
   // 5. The count is fetched, never typed, so it cannot age into a lie. Read the
@@ -2293,9 +2663,11 @@ console.log('ui-truthfulness: /parashare says the receiver has to be online, and
   // HEARTBEAT_ENABLED gates the workflow, /sla says the check is switched off
   // until its credentials are in place, and this page may not say otherwise.
   if (/vars\.HEARTBEAT_ENABLED\s*==\s*'true'/.test(heartbeat)) {
-    assert.doesNotMatch(ctLogSeen, /self-test (is )?(running|runs) (right )?now|every hour, (all day|around the clock)|around the clock/i,
+    assert.doesNotMatch(ctLogSeen, L.running,
       'the self-test is gated off, so ct-log must not imply it is running; /sla carries the same caveat');
   }
-})();
+};
+checkCtLog('frontend/en/ct-log.html', 'frontend/js/ct-log.page.en.js', CTLOG_EN);
+checkCtLog('frontend/ct-log.html', 'frontend/js/ct-log.page.js', CTLOG_NL);
 
 console.log('ui-truthfulness: /ct-log names the relay whose log it shows, and every claim about the mix is backed by code that writes into that log');

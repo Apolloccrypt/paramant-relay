@@ -49,13 +49,18 @@ check_lacks() { # file, pattern, name
 extract_snippet() {
   sed -n "/^NGINX_RESOLVE_SNIPPET=/,/^RESOLVER\$/p" "$SCRIPT" | sed '1d;$d'
 }
+# The seller snippet (#517), which remote_seller prepends to its blocks.
+extract_seller_snippet() {
+  sed -n "/^  cat <<'SELLER'\$/,/^SELLER\$/p" "$SCRIPT" | sed '1d;$d'
+}
 extract_remote() {
   local label="$1" line kind
-  line="$(grep -nE "^  remote(_nginx)? \"$label\"" "$SCRIPT" | head -1)"
+  line="$(grep -nE "^  remote(_nginx|_seller|_soft)? \"$label\"" "$SCRIPT" | head -1)"
   [ -n "$line" ] || return 1
   kind="$(printf '%s' "$line" | sed -E 's/^[0-9]+:[[:space:]]*([a-z_]+).*/\1/')"
   [ "$kind" = remote_nginx ] && extract_snippet
-  sed -n "/^  remote\(_nginx\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
+  [ "$kind" = remote_seller ] && extract_seller_snippet
+  sed -n "/^  remote\(_nginx\|_seller\|_soft\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
 }
 
 # resolve_conf_slots() is the function the script sends to the server. It is
@@ -235,7 +240,7 @@ check_has "$FULL" 'checkout_head = 41501bb'                      "falls back to 
 check_has "$FULL" 'services seen = 6'                            "asserts all six services were seen"
 check_has "$FULL" '"recurring":false'                            "asserts billing_config recurring:false"
 check_has "$FULL" '"mode_source":"inferred"'                     "asserts billing_config mode_source:inferred"
-check_has "$FULL" '"version":"3\.1\.0"'                          "asserts relay_started version 3.1.0"
+check_has "$FULL" '"version":"3\.1\.3"'                          "asserts relay_started version 3.1.3"
 check_has "$FULL" 'after manifest lines = 6'                     "asserts the manifest has six lines"
 check_has "$FULL" 'after tags for this TS = 6'                   "asserts six rollback IMAGES exist, not six lines of text"
 check_has "$FULL" 'after \.env backup bytes >= 1'                "asserts the .env backup has real bytes"
@@ -1533,7 +1538,7 @@ fi
 
 # And no remote call anywhere may be piped into again. Comment lines are left
 # out: the wrapper writes down the spelling that caused this, on purpose.
-PIPED="$(grep -nE '\|[[:space:]]*remote(_soft|_nginx)?[[:space:]]+"' "$SCRIPT" \
+PIPED="$(grep -nE '\|[[:space:]]*remote(_soft|_nginx|_seller)?[[:space:]]+"' "$SCRIPT" \
          | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
 if [ -n "$PIPED" ]; then
   fail "a remote call is piped into, which puts it in a subshell and loses REMOTE_OUT"
@@ -1800,9 +1805,9 @@ STDIN_AWK="$(cat <<'AWKPROG'
     re = "(^|[;&(`]|[[:space:]]|[$][(])" cmd "([[:space:]]+-[^[:space:]]+)*[[:space:]]*($|[;&)`>])"
     return (seg ~ re)
   }
-  /^  remote(_soft|_nginx)? ".*<<\047EOF\047$/ {
+  /^  remote(_soft|_nginx|_seller)? ".*<<\047EOF\047$/ {
     inb = 1; lbl = $0
-    sub(/^  remote(_soft|_nginx)? "/, "", lbl); sub(/".*$/, "", lbl)
+    sub(/^  remote(_soft|_nginx|_seller)? "/, "", lbl); sub(/".*$/, "", lbl)
     ln = 0; n = 0; delete body; delete bln
     next
   }
@@ -1877,11 +1882,11 @@ fi
 # extraction silently lost half of them, and losing the block that holds the
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
-SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "26" ]; then
-  pass "the scan walked all 26 remote blocks"
+SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx|_seller)? \".*<<'EOF'\$" "$SCRIPT" || true)"
+if [ "$SCAN_BLOCKS" = "34" ]; then
+  pass "the scan walked all 34 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 26; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 34; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -2437,10 +2442,13 @@ fi
 # Every zone is per client IP. /help/iot-integration says so in those words and
 # tests/site-claims.test.mjs holds it there, so a key change here would make
 # the site lie.
+# No exception: user_session was keyed on the session cookie for a while, and
+# a cookie is the client's choice (review #555, H1).
 if [ -n "$SNIP_DEF" ] \
    && [ "$(grep -cE '^[[:space:]]*limit_req_zone[[:space:]]+\$binary_remote_addr' "$SNIPPET")" \
-      = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET")" ]; then
-  pass "every zone in the snippet is keyed on \$binary_remote_addr, so the limits stay per IP"
+      = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET" | awk '{print $1}')" ] \
+   && ! grep -vE '^[[:space:]]*#' "$SNIPPET" | grep -q '\$cookie_'; then
+  pass "every zone in the snippet is keyed per IP, none on a cookie"
 else
   fail "a zone in the snippet is keyed on something other than \$binary_remote_addr"
 fi
@@ -3127,6 +3135,336 @@ fi
 check_lacks "$SCRIPT" '(^|[^-])cat[[:space:]]+[^|;]*\.env([^.a-zA-Z]|$)' \
   "the source never cats .env"
 
+# ------------------------------------------------------------- 6q. seller --
+echo ""
+echo "6q. The seller details (#517): a decision, compared and never printed, undone by --rollback"
+# From #517 on docker-compose.yml passes BILLING_SELLER_* to the relays, and
+# BILLING_SELLER_VAT decides whether a paid customer gets a VAT invoice and
+# whether reverse charge to an EU business can happen at all. So the btw-id is
+# written only with --seller-vat, a value that differs from the public details
+# stops the run, the checks compare instead of print, and --rollback puts the
+# .env from before step 1e back. Every block below is the real one, extracted
+# from the script and run against fixtures, with docker faked and node running
+# the relay's own lib/invoice.js.
+SVO="$WORK/sellervat.txt"
+( cd "$ROOT" && bash "$SCRIPT" --dry-run --seller-vat >"$SVO" 2>&1 ); SVO_RC=$?
+[ "$SVO_RC" -eq 0 ] && pass "--dry-run --seller-vat exits 0" || fail "--dry-run --seller-vat exits $SVO_RC"
+( cd "$ROOT" && bash "$SCRIPT" --dry-run --rollback 20260101-0000 --seller-vat >/dev/null 2>&1 ); RBSV_RC=$?
+[ "$RBSV_RC" -eq 2 ] && pass "--seller-vat is refused next to --rollback" || fail "--rollback with --seller-vat exits $RBSV_RC, expected 2"
+check_has "$FULL" '\[step\] 1e\. BILLING_SELLER_\* \(write, btw-id: nogo\)' "without --seller-vat step 1e runs with the btw-id held back"
+check_has "$SVO"  '\[step\] 1e\. BILLING_SELLER_\* \(write, btw-id: go\)'   "with --seller-vat step 1e may write the btw-id"
+check_has "$SVO"  'every new document is a VAT invoice'                     "with --seller-vat the run says in so many words that invoices and reverse charge start"
+check_lacks "$FULL" 'every new document is a VAT invoice'                   "without --seller-vat the run never says so"
+check_has "$PRE"  '\[step\] 1e\. BILLING_SELLER_\* \(report, btw-id: nogo\)' "--preflight-only runs 1e in report mode"
+check_has "$FULL" '\[step\] 6j\. the relays know the seller'                "phase 6 asks every relay whether it knows the seller"
+check_has "$FULL" "seller env %-24s %s"                                     "1b reports the seller in .env as empty, match or differs"
+check_has "$SCRIPT" 'echo "env source = pre-seller"'                     "the rollback names which .env it put back"
+
+extract_fn() {  # name: one function of the script, as written
+  awk -v n="$1" '
+    !f && index($0, n "() {") == 1 { f = 1; print; if ($0 ~ /}[[:space:]]*$/) exit; next }
+    f { print; if ($0 ~ /^}$/) exit }
+  ' "$SCRIPT"
+}
+
+S6Q="$WORK/s6q"
+mkdir -p "$S6Q/bk" "$S6Q/fakebin"
+for label in "seller details" "seller known" "seller presence" "rollback images and env"; do
+  f="$S6Q/$(printf '%s' "$label" | tr ' ' '_').sh"
+  extract_remote "$label" > "$f"
+  if [ -s "$f" ]; then pass "the '$label' block could be extracted"; else fail "could not extract the '$label' block"; fi
+done
+SNIP="$S6Q/snippet.sh"
+extract_seller_snippet > "$SNIP"
+[ -s "$SNIP" ] && pass "the seller snippet could be extracted" || fail "could not extract the seller snippet"
+
+PUBLIC_VALUES='Harderwijk|Meerkoetmeen|NL869798017B01|869798017|42115132|Paramantis'
+PLACEHOLDER_VALUES='NL000099998B57|000099998|00000000|Example Street|Acme'
+
+echo ""
+echo "6q-1. The comparison: formatting is not a difference, another value is"
+state_of() {  # env file content, variable -> empty | match | differs
+  local d; d="$(mktemp -d "$S6Q/state.XXXX")"
+  printf '%s\n' "$1" > "$d/.env"
+  ( cd "$d" && . "$SNIP" && seller_state "$2" )
+}
+while IFS='|' read -r want var line; do
+  [ -n "$var" ] || continue
+  got="$(state_of "$line" "$var")"
+  if [ "$got" = "$want" ]; then pass "$want: $line"; else fail "$line is $got, expected $want"; fi
+done <<'CASES'
+match|BILLING_SELLER_NAME|BILLING_SELLER_NAME="Paramantis Solutions B.V."
+match|BILLING_SELLER_NAME|BILLING_SELLER_NAME=Paramantis Solutions BV
+match|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"
+match|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS="Meerkoetmeen 47, 3844XM Harderwijk"
+match|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS= " Meerkoetmeen 47\n3844 XM Harderwijk\nNederland"
+match|BILLING_SELLER_KVK|export BILLING_SELLER_KVK=42115132
+match|BILLING_SELLER_VAT|BILLING_SELLER_VAT=nl869798017b01
+match|BILLING_SELLER_VAT|export BILLING_SELLER_VAT= "NL869798017B01"
+differs|BILLING_SELLER_VAT|BILLING_SELLER_VAT=NL000099998B57
+differs|BILLING_SELLER_KVK|BILLING_SELLER_KVK=00000000
+differs|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS="Street 1\n1234 AB City\nNetherlands"
+differs|BILLING_SELLER_NAME|BILLING_SELLER_NAME="Acme B.V."
+empty|BILLING_SELLER_VAT|BILLING_SELLER_VAT=
+empty|BILLING_SELLER_VAT|BILLING_SELLER_VAT=""
+empty|BILLING_SELLER_VAT|ADMIN_TOKEN=aaaa
+CASES
+got="$(state_of "$(printf 'BILLING_SELLER_VAT=NL000099998B57\nBILLING_SELLER_VAT=NL869798017B01')" BILLING_SELLER_VAT)"
+[ "$got" = match ] && pass "with two lines the last one counts, as docker compose reads it" || fail "two lines: $got, expected match"
+
+echo ""
+echo "6q-2. Step 1e without --seller-vat: name, address and KvK, never the btw-id"
+run_1e() {  # dir, mode, vatmode -> output; the run's TS is fixed
+  ( bash "$S6Q/seller_details.sh" "$1" "$2" "$3" 20260925-1200 "$S6Q/bk" </dev/null 2>&1 )
+}
+fresh_bk() { rm -rf "$S6Q/bk"; mkdir -p "$S6Q/bk"; }
+make_env() {  # dir, content (printf format)
+  rm -rf "$1"; mkdir -p "$1"
+  # shellcheck disable=SC2059
+  printf "$2" > "$1/.env"; chmod 640 "$1/.env"; cp -p "$1/.env" "$1.orig"
+}
+fresh_bk
+make_env "$S6Q/nogo" 'ADMIN_TOKEN=aaaa\nMOLLIE_API_KEY=live_bbbb'
+OUT="$(run_1e "$S6Q/nogo" write nogo)"
+for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK; do
+  printf '%s\n' "$OUT" | grep -qx "after $v = match" && printf '%s\n' "$OUT" | grep -qx "after $v lines = 1" \
+    && pass "$v written once and matching" || fail "$v was not written once and matching"
+done
+if printf '%s\n' "$OUT" | grep -qx 'after BILLING_SELLER_VAT = empty' && ! grep -q 'BILLING_SELLER_VAT' "$S6Q/nogo/.env"; then
+  pass "the btw-id stays out of .env: payment receipts, no reverse charge"
+else
+  fail "without --seller-vat the btw-id reached .env"
+fi
+printf '%s\n' "$OUT" | grep -q 'left empty: payment receipts, no reverse charge' && pass "the output says the btw-id was left out, and what that means" \
+  || fail "the output does not say the btw-id was left out"
+grep -qx 'MOLLIE_API_KEY=live_bbbb' "$S6Q/nogo/.env" && pass "a last line without a newline is still its own line" || fail "the last line of .env was damaged"
+BK1="$S6Q/bk/.env-pre-seller-20260925-1200"
+if [ -f "$BK1" ] && cmp -s "$BK1" "$S6Q/nogo.orig" && [ "$(stat -c %a "$BK1")" = 600 ]; then
+  pass "the .env from before 1e is kept under the run's TS, byte for byte, mode 600"
+else
+  fail "no 600 backup of the pre-1e .env under the run's TS"
+fi
+[ "$(stat -c %a "$S6Q/nogo/.env")" = 600 ] && pass ".env is 600 afterwards" || fail ".env is not 600 afterwards"
+printf '%s\n' "$OUT" | grep -qE "$PUBLIC_VALUES" && fail "1e printed a seller value" || pass "1e prints states and actions, never a value"
+
+echo ""
+echo "6q-3. Step 1e with --seller-vat: all four, and it says what starts"
+fresh_bk
+make_env "$S6Q/go" 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=\n'
+OUT="$(run_1e "$S6Q/go" write go)"
+printf '%s\n' "$OUT" | grep -qx 'after BILLING_SELLER_VAT = match' && [ "$(grep -c '^BILLING_SELLER_VAT=' "$S6Q/go/.env")" -eq 1 ] \
+  && pass "the empty BILLING_SELLER_VAT= line is replaced by the btw-id, one line" || fail "the btw-id was not written as one line"
+printf '%s\n' "$OUT" | grep -q 'action SET BILLING_SELLER_VAT: from the recreate on, VAT invoices and reverse charge' \
+  && pass "the block says that VAT invoices and reverse charge start" || fail "the block does not say what the btw-id starts"
+lines_ok=0
+while IFS= read -r want; do grep -qxF -- "$want" "$S6Q/go/.env" && lines_ok=$((lines_ok + 1)); done <<'LINES'
+BILLING_SELLER_NAME="Paramantis Solutions B.V."
+BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"
+BILLING_SELLER_KVK=42115132
+BILLING_SELLER_VAT=NL869798017B01
+LINES
+[ "$lines_ok" -eq 4 ] && pass "the four lines are the public details, the address in double quotes" || fail "$lines_ok of the four lines are as expected"
+
+echo ""
+echo "6q-4. A line that is already there"
+fresh_bk
+make_env "$S6Q/same" 'export BILLING_SELLER_NAME="Paramantis Solutions B.V."\nBILLING_SELLER_ADDRESS= "Meerkoetmeen 47, 3844XM Harderwijk"\nBILLING_SELLER_KVK=42115132\nBILLING_SELLER_VAT=NL869798017B01\n'
+OUT="$(run_1e "$S6Q/same" write go)"
+if cmp -s "$S6Q/same/.env" "$S6Q/same.orig" && [ ! -e "$S6Q/bk/.env-pre-seller-20260925-1200" ]; then
+  pass "matching lines, export and a leading blank included, are left alone byte for byte, no backup"
+else
+  fail "1e rewrote a .env whose seller lines already matched"
+fi
+OUT="$(run_1e "$S6Q/same" write nogo)"
+if printf '%s\n' "$OUT" | grep -q '^refuse vat without --seller-vat' && cmp -s "$S6Q/same/.env" "$S6Q/same.orig"; then
+  pass "a btw-id already in .env without --seller-vat is refused, and nothing is written"
+else
+  fail "a btw-id already in .env went through without --seller-vat"
+fi
+for mode in go nogo; do
+  fresh_bk
+  make_env "$S6Q/differs" 'BILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B57\n'
+  OUT="$(run_1e "$S6Q/differs" write "$mode")"
+  if printf '%s\n' "$OUT" | grep -qx 'refuse differs: BILLING_SELLER_KVK BILLING_SELLER_VAT' \
+     && cmp -s "$S6Q/differs/.env" "$S6Q/differs.orig" && [ ! -e "$S6Q/bk/.env-pre-seller-20260925-1200" ]; then
+    pass "($mode) a wrong old line is refused by name, nothing is written, no backup"
+  else
+    fail "($mode) a wrong old line was not refused, or something was written"
+  fi
+  printf '%s\n' "$OUT" | grep -qE "$PLACEHOLDER_VALUES" && fail "($mode) the refusal printed the wrong value" || pass "($mode) the refusal names the variable, not its value"
+done
+
+echo ""
+echo "6q-5. --preflight-only reports and writes nothing"
+fresh_bk
+make_env "$S6Q/report" 'ADMIN_TOKEN=aaaa\n'
+OUT="$(run_1e "$S6Q/report" report nogo)"
+if cmp -s "$S6Q/report/.env" "$S6Q/report.orig" && [ ! -e "$S6Q/bk/.env-pre-seller-20260925-1200" ] \
+   && [ "$(printf '%s\n' "$OUT" | grep -c 'action REPORT ONLY')" -eq 3 ]; then
+  pass "report mode names the three it would write, and writes nothing"
+else
+  fail "report mode wrote, or did not report the three missing variables"
+fi
+
+echo ""
+echo "6q-6. The judgements, handed a made-up server answer"
+# ok, note, warn and die as the script defines them, minus the log file.
+JLIB="$S6Q/judges.sh"
+{
+  echo 'ok()   { printf "  OK    %s\n" "$*"; }'
+  echo 'note() { printf "  note  %s\n" "$*"; }'
+  echo 'warn() { printf "  WARN  %s\n" "$*"; }'
+  echo 'die()  { printf "  STOP  %s\n" "$*"; exit 1; }'
+  for fn in remote_field expect expect_not expect_count expect_min expect_lines judge_seller_details judge_seller_known; do
+    extract_fn "$fn"
+  done
+} > "$JLIB"
+for fn in judge_seller_details judge_seller_known expect_lines; do
+  grep -q "^$fn() {" "$JLIB" && pass "$fn could be extracted" || fail "$fn could not be extracted"
+done
+judge() {  # function, vatgo, preflight, server answer -> the verdict line(s)
+  ( DRY_RUN=0; SELLER_VAT_GO="$2"; PREFLIGHT_ONLY="$3"; REMOTE_OUT="$4"
+    # shellcheck source=/dev/null
+    . "$JLIB"; "$1" && echo "VERDICT go" ) 2>&1 | tail -3
+}
+stops() { printf '%s\n' "$1" | grep -q 'STOP' && ! printf '%s\n' "$1" | grep -q 'VERDICT go'; }
+DET_NOGO='after BILLING_SELLER_NAME = match
+after BILLING_SELLER_NAME lines = 1
+after BILLING_SELLER_ADDRESS = match
+after BILLING_SELLER_ADDRESS lines = 1
+after BILLING_SELLER_KVK = match
+after BILLING_SELLER_KVK lines = 1
+after BILLING_SELLER_VAT = empty
+after BILLING_SELLER_VAT lines = 0'
+DET_GO="$(printf '%s\n' "$DET_NOGO" | sed 's/^after BILLING_SELLER_VAT = empty$/after BILLING_SELLER_VAT = match/; s/^after BILLING_SELLER_VAT lines = 0$/after BILLING_SELLER_VAT lines = 1/')"
+v="$(judge judge_seller_details 0 0 "$DET_NOGO")"; stops "$v" && fail "1e: a clean answer without --seller-vat stopped: $v" || pass "1e: a clean answer without --seller-vat goes on"
+v="$(judge judge_seller_details 1 0 "$DET_GO")";   stops "$v" && fail "1e: a clean answer with --seller-vat stopped: $v" || pass "1e: a clean answer with --seller-vat goes on"
+v="$(judge judge_seller_details 0 0 "$(printf '%s\n' "$DET_NOGO" | sed 's/^after BILLING_SELLER_KVK lines = 1$/after BILLING_SELLER_KVK lines = 2/')")"
+stops "$v" && pass "1e: a variable twice in .env stops the run" || fail "1e: a variable twice in .env went through"
+v="$(judge judge_seller_details 1 0 "$DET_NOGO")"; stops "$v" && pass "1e: --seller-vat with the btw-id still empty stops the run" || fail "1e: --seller-vat without a btw-id went through"
+v="$(judge judge_seller_details 0 0 "$DET_GO")";   stops "$v" && pass "1e: a btw-id in .env without --seller-vat stops the run" || fail "1e: a btw-id without --seller-vat went through"
+v="$(judge judge_seller_details 1 0 'refuse differs: BILLING_SELLER_VAT')"; stops "$v" && pass "1e: a refusal for a wrong line stops a full run" || fail "1e: a refusal for a wrong line went through"
+v="$(judge judge_seller_details 1 1 'refuse differs: BILLING_SELLER_VAT')"; printf '%s\n' "$v" | grep -q 'WARN' && ! stops "$v" && pass "1e: in preflight the same refusal is a warning" || fail "1e: preflight did not warn about a wrong line"
+v="$(judge judge_seller_details 0 0 'refuse vat without --seller-vat: BILLING_SELLER_VAT is already in .env')"; stops "$v" && pass "1e: a btw-id already in .env without --seller-vat stops the run" || fail "1e: that refusal went through"
+
+KNOWN_GO="compose seller vars declared = 5"
+KNOWN_NOGO="compose seller vars declared = 5"
+for r in relay-main relay-health relay-finance relay-legal relay-iot; do
+  KNOWN_GO="$KNOWN_GO
+$(printf 'seller %-14s name=match address=match kvk=match vat=match kind=invoice address_lines=3' "$r")"
+  KNOWN_NOGO="$KNOWN_NOGO
+$(printf 'seller %-14s name=match address=match kvk=match vat=empty kind=receipt address_lines=3' "$r")"
+done
+v="$(judge judge_seller_known 1 0 "$KNOWN_GO")";   stops "$v" && fail "6j: five good invoice lines stopped: $v" || pass "6j: five relays issuing invoices, with --seller-vat, go on"
+v="$(judge judge_seller_known 0 0 "$KNOWN_NOGO")"; stops "$v" && fail "6j: five good receipt lines stopped: $v" || pass "6j: five relays issuing receipts, without --seller-vat, go on"
+v="$(judge judge_seller_known 0 0 "$KNOWN_GO")";   stops "$v" && pass "6j: invoices without --seller-vat stop the run" || fail "6j: invoices without --seller-vat went through"
+v="$(judge judge_seller_known 1 0 "$KNOWN_NOGO")"; stops "$v" && pass "6j: receipts with --seller-vat stop the run" || fail "6j: receipts with --seller-vat went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed 's/^compose seller vars declared = 5$/compose seller vars declared = 0/')")"
+stops "$v" && pass "6j: a compose that does not pass the variables stops, it does not warn and skip" || fail "6j: a compose without the variables went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-iot/d')")"
+stops "$v" && pass "6j: four relays out of five stop the run" || fail "6j: four relays went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-legal/s/vat=match/vat=differs/')")"
+stops "$v" && pass "6j: one relay with a btw-id that differs stops the run" || fail "6j: a differing btw-id went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-health/s/name=match/name=differs/')")"
+stops "$v" && pass "6j: one relay with a name that differs stops the run" || fail "6j: a differing name went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-main/s/address_lines=3/address_lines=1/')")"
+stops "$v" && pass "6j: an address on one line stops the run" || fail "6j: an address on one line went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-finance/s/name=.*$/unreadable/')")"
+stops "$v" && pass "6j: a relay that does not answer stops the run" || fail "6j: a silent relay went through"
+v="$(judge judge_seller_known 1 0 "$KNOWN_GO
+seller relay-extra     name=match address=match kvk=match vat=match kind=invoice address_lines=3")"
+stops "$v" && pass "6j: a sixth answer is not five" || fail "6j: six answers went through as five"
+
+echo ""
+echo "6q-7. The real 1b and 6j blocks, with docker faked and the relay's own lib/invoice.js"
+if ! command -v node >/dev/null 2>&1; then
+  fail "node is needed to run the relay's lib/invoice.js for 6q-7; install it"
+else
+  cat > "$S6Q/fakebin/docker" <<'FAKE'
+#!/usr/bin/env bash
+# docker for the seller blocks and the rollback: exec runs the command here,
+# in the relay directory, with the -e variables added; config renders five
+# relays; ps, inspect, tag and up answer what phase 8b needs.
+if [ "$1" = compose ] && [ "$2" = config ]; then
+  [ "${FAKE_CONFIG_FAIL:-0}" = 1 ] && exit 1
+  for i in 1 2 3 4 5; do printf '      BILLING_SELLER_VAT: x%s\n' "$i"; done
+  exit 0
+fi
+if [ "$1" = compose ] && [ "$2" = exec ]; then
+  shift 2
+  [ "${1:-}" = -T ] && shift
+  while [ "${1:-}" = -e ]; do export "$2"; shift 2; done
+  shift
+  cd "$FAKE_RELAY_DIR" && exec "$@"
+fi
+if [ "$1" = compose ] && [ "$2" = ps ]; then echo "cid-$4"; exit 0; fi
+if [ "$1" = compose ] && [ "$2" = up ]; then exit 0; fi
+if [ "$1" = inspect ]; then echo "sha256:fake"; exit 0; fi
+if [ "$1" = tag ]; then exit 0; fi
+exit 1
+FAKE
+  chmod +x "$S6Q/fakebin/docker"
+  in_relays() {  # name, address, kvk, vat, then the block and its arguments
+    local n="$1" a="$2" k="$3" t="$4"; shift 4
+    env PATH="$S6Q/fakebin:$PATH" FAKE_RELAY_DIR="$ROOT/relay" \
+      BILLING_SELLER_NAME="$n" BILLING_SELLER_ADDRESS="$a" BILLING_SELLER_KVK="$k" BILLING_SELLER_VAT="$t" \
+      bash "$@" </dev/null 2>&1
+  }
+  ADDR_LINES="$(printf 'Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands')"
+  make_env "$S6Q/env6j" 'BILLING_SELLER_NAME="Paramantis Solutions B.V."\nBILLING_SELLER_ADDRESS="Meerkoetmeen 47\\n3844 XM Harderwijk\\nNetherlands"\nBILLING_SELLER_KVK=42115132\nBILLING_SELLER_VAT=NL869798017B01\n'
+  OUT="$(in_relays "Paramantis Solutions B.V." "$ADDR_LINES" 42115132 NL869798017B01 "$S6Q/seller_known.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE '^seller relay-[a-z]+ +name=match address=match kvk=match vat=match kind=invoice address_lines=3$')" -eq 5 ] \
+    && pass "6j: five relays with the public details answer match, invoice, three address lines" || fail "6j did not answer match for the public details: $(printf '%s' "$OUT" | head -3)"
+  printf '%s\n' "$OUT" | grep -qE "$PUBLIC_VALUES" && fail "6j printed a seller value" || pass "6j prints no seller value"
+  OUT="$(in_relays "Acme B.V." "$(printf 'Example Street 1\n1234 AB Example City')" 00000000 NL000099998B57 "$S6Q/seller_known.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE '^seller relay-[a-z]+ +name=differs address=differs kvk=differs vat=differs kind=invoice')" -eq 5 ] \
+    && pass "6j: placeholder values answer differs, every one" || fail "6j did not see the placeholders as different"
+  printf '%s\n' "$OUT" | grep -qE "$PLACEHOLDER_VALUES" && fail "6j printed a placeholder value" || pass "6j prints no placeholder value either"
+  OUT="$(in_relays "Paramantis Solutions B.V." "$ADDR_LINES" 42115132 "" "$S6Q/seller_known.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE 'vat=empty kind=receipt')" -eq 5 ] && pass "6j: no btw-id means empty and a payment receipt" || fail "6j: no btw-id did not read as a receipt"
+  if FAKE_CONFIG_FAIL=1 in_relays x x x x "$S6Q/seller_known.sh" "$S6Q/env6j" >/dev/null; then
+    fail "6j went on while docker compose config failed"
+  else
+    pass "6j stops when docker compose config fails"
+  fi
+  OUT="$(in_relays "Paramantis Solutions B.V." "$ADDR_LINES" 42115132 NL869798017B01 "$S6Q/seller_presence.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE '^seller env BILLING_SELLER_[A-Z]+ +match$')" -eq 4 ] && printf '%s\n' "$OUT" | grep -qE '^seller relay-main name=match' \
+    && pass "1b: .env and relay-main both answer match" || fail "1b did not report match: $(printf '%s' "$OUT" | head -3)"
+  printf '%s\n' "$OUT" | grep -qE "$PUBLIC_VALUES" && fail "1b printed a seller value" || pass "1b prints no seller value"
+  make_env "$S6Q/env1b" 'BILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B57\n'
+  OUT="$(in_relays "Acme B.V." x 00000000 NL000099998B57 "$S6Q/seller_presence.sh" "$S6Q/env1b")"
+  printf '%s\n' "$OUT" | grep -qE '^seller env BILLING_SELLER_VAT +differs$' && pass "1b: a wrong btw-id in .env reads differs" || fail "1b did not see the wrong btw-id"
+  printf '%s\n' "$OUT" | grep -qE "$PLACEHOLDER_VALUES" && fail "1b printed a placeholder value" || pass "1b prints no placeholder value either"
+fi
+
+echo ""
+echo "6q-8. --rollback puts back the .env from before step 1e"
+RBQ="$S6Q/rb"
+rollback_fixture() {  # with a pre-seller backup? yes|no
+  rm -rf "$RBQ"; mkdir -p "$RBQ/c" "$RBQ/bk"
+  printf 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=NL869798017B01\n' > "$RBQ/c/.env"
+  printf 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=NL869798017B01\n' > "$RBQ/bk/.env-pre-3.1-20260925-1200"
+  [ "$1" = yes ] && printf 'ADMIN_TOKEN=aaaa\n' > "$RBQ/bk/.env-pre-seller-20260925-1200"
+  for svc in relay-main relay-health relay-finance relay-legal relay-iot admin; do
+    printf '%s|paramant/%s:3.1.0|paramant-rollback/%s:20260925-1200\n' "$svc" "$svc" "$svc"
+  done > "$RBQ/bk/rollback-images-20260925-1200.txt"
+}
+rollback_fixture yes
+OUT="$(env PATH="$S6Q/fakebin:$PATH" bash "$S6Q/rollback_images_and_env.sh" "$RBQ/c" 20260925-1200 "$RBQ/bk" </dev/null 2>&1)"
+if printf '%s\n' "$OUT" | grep -qx 'env source = pre-seller' && cmp -s "$RBQ/c/.env" "$RBQ/bk/.env-pre-seller-20260925-1200"; then
+  pass "with a pre-1e backup the rollback restores that one: the seller lines of the run go"
+else
+  fail "the rollback did not restore the pre-1e .env: $(printf '%s' "$OUT" | grep 'env source' || echo none)"
+fi
+rollback_fixture no
+OUT="$(env PATH="$S6Q/fakebin:$PATH" bash "$S6Q/rollback_images_and_env.sh" "$RBQ/c" 20260925-1200 "$RBQ/bk" </dev/null 2>&1)"
+if printf '%s\n' "$OUT" | grep -qx 'env source = pre-3.1' && cmp -s "$RBQ/c/.env" "$RBQ/bk/.env-pre-3.1-20260925-1200"; then
+  pass "without one it restores the phase 2b backup, as before"
+else
+  fail "without a pre-1e backup the rollback did not fall back to the 2b backup"
+fi
+printf '%s\n' "$OUT" | grep -qx 'after recreated services = 6' && pass "the faked rollback still recreated all six" || fail "the faked rollback did not recreate six services"
+
 # ------------------------------------------------------------------- 8. safe --
 echo ""
 echo "8. A dry run reaches nothing"
@@ -3148,6 +3486,464 @@ if git -C "$ROOT" check-ignore -q deploy/logs/ 2>/dev/null; then
   pass "deploy/logs/ is gitignored"
 else
   fail "deploy/logs/ is not gitignored; a deploy log would be committable"
+fi
+
+# ------------------------------------------------------- 10. phase 5e --
+echo ""
+echo "10. Phase 5e places the whole repo site conf, and goes back on any fault"
+# The 5c edits left about 600 lines of the repo conf out of production (prodtest
+# 2026-10-05: /api/user/ on relay_auth, /parashare?t= without its redirect).
+# 5e copies the rendered conf whole. Its remote block runs here for real
+# against a synthetic sites-enabled, with nginx, systemctl and curl stubbed.
+check_has "$FULL" '\[step\] 5e\. the whole site conf from the repo' "a full dry run reaches step 5e"
+check_has "$FULL" 'zone  /api/user/ +user_session' "5e gates on /api/user/ being on user_session before anything is sent"
+check_has "$FULL" 'zone  /api/user/login +relay_login' "5e gates on the login door staying on its strict zone"
+
+N5="$WORK/n5e"
+mkdir -p "$N5/bin" "$N5/available" "$N5/sites" "$N5/bk" "$N5/snippets"
+extract_remote "nginx full conf" > "$N5/5e.sh"
+if [ -s "$N5/5e.sh" ] && grep -q 'pre-nginx-sync-' "$N5/5e.sh"; then
+  pass "the 5e remote block could be extracted from the script"
+else
+  fail "could not extract the 5e remote block from the script"
+fi
+# nginx -t answers what NGINX_T says; curl answers per path what the test asks.
+cat > "$N5/bin/nginx" <<'STUB'
+#!/bin/sh
+[ "${1:-}" = "-T" ] && { cat "${NGINX_T_DUMP:-/dev/null}"; exit 0; }
+[ "${1:-}" = "-t" ] && [ -n "${NGINX_T_FAIL:-}" ] && { echo "nginx: [emerg] stub says no"; exit 1; }
+exit 0
+STUB
+cat > "$N5/bin/systemctl" <<'STUB'
+#!/bin/sh
+echo "systemctl $*" >> "${STUB_LOG:-/dev/null}"
+exit 0
+STUB
+cat > "$N5/bin/curl" <<'STUB'
+#!/bin/sh
+for a in "$@"; do last="$a"; done
+# CURL_STALE=n: the first n calls get the answer of the old workers, the way
+# they still answer for a moment after systemctl reload (review #569, B1).
+if [ -n "${CURL_STALE:-}" ]; then
+  c=$(( $(cat "$CURL_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$c" > "$CURL_COUNT"
+  if [ "$c" -le "$CURL_STALE" ]; then
+    case "$last" in */parashare*) printf '302 https://paramant.app/auth/login?next=/parashare' ;; *) printf '200 ' ;; esac
+    exit 0
+  fi
+fi
+case "$last" in
+  */parashare*) printf '%s' "${CURL_SHARE:-302 https://paramant.app/get?t=deploycheck5e}" ;;
+  *) printf '%s' "${CURL_HOME:-200 }" ;;
+esac
+STUB
+chmod +x "$N5/bin/nginx" "$N5/bin/systemctl" "$N5/bin/curl"
+bash "$ROOT/deploy/nginx-render.sh" > "$N5/rendered.conf"
+cp "$ROOT/deploy/nginx/snippets/paramant-security-headers.conf" "$N5/repo-snip.conf"
+printf 'server {\n    listen 127.0.0.1:8080;\n    location /api/user/ { limit_req zone=relay_auth burst=5; }\n}\n' > "$N5/old.conf"
+printf 'add_header X-Old "1" always;\n' > "$N5/old-snip.conf"
+
+run_5e() {   # ts -> output in OUT5E, rc in RC5E
+  cp "$N5/old.conf" "$N5/available/paramant.conf"
+  cp "$N5/old-snip.conf" "$N5/snippets/paramant-security-headers.conf"
+  ln -sfn "$N5/available/paramant.conf" "$N5/sites/paramant.conf"
+  OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+           WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" \
+           WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+           NGINX_T_DUMP="${NGINX_T_DUMP:-$ROOT/deploy/nginx/snippets/paramant-limit-req.conf}" \
+           PATH="$N5/bin:$PATH" bash "$N5/5e.sh" "$1" "$N5/sites" "$N5/bk" \
+           "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+}
+
+run_5e 20260101-0500
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/repo-snip.conf"; then
+  pass "5e writes the rendered repo conf and the snippet, through the symlink"
+else
+  fail "5e did not leave the repo conf and snippet in place (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -v 'diff ' | sed 's/^/        /' | head -15
+fi
+if [ -L "$N5/sites/paramant.conf" ]; then pass "the sites-enabled symlink is still a symlink"; else fail "5e replaced the symlink with a file"; fi
+if cmp -s "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0500" "$N5/old.conf" \
+   && cmp -s "$N5/bk/paramant-security-headers.conf.pre-nginx-sync-20260101-0500" "$N5/old-snip.conf"; then
+  pass "5e backs up the old conf and the old snippet under the run TS"
+else
+  fail "5e left no exact backup of the old conf and snippet"
+fi
+if grep -qE '^  confdiff [-+] +location /api/user/' <<< "$OUT5E" \
+   && grep -q '^reloaded nginx for the full conf$' <<< "$OUT5E"; then
+  pass "5e prints the diff before it writes, and reloads"
+else
+  fail "5e printed no diff or did not reload"
+fi
+
+NGINX_T_FAIL=1 run_5e 20260101-0501
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+   && grep -q '^FATAL nginx -t failed' <<< "$OUT5E"; then
+  pass "a failing nginx -t puts the old conf and snippet back and stops"
+else
+  fail "a failing nginx -t did not restore the old conf (rc $RC5E)"
+fi
+
+LB_TRIES=2 CURL_SHARE="302 https://paramant.app/auth/login?next=/parashare" run_5e 20260101-0502
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "/parashare?t= losing its token after the reload puts the old conf back"
+else
+  fail "a wrong /parashare answer did not restore the old conf (rc $RC5E)"
+fi
+
+LB_TRIES=2 CURL_HOME="502 " run_5e 20260101-0503
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf"; then
+  pass "a home page that no longer answers 200 puts the old conf back"
+else
+  fail "a broken home page did not restore the old conf (rc $RC5E)"
+fi
+
+# B1 (review #569): right after the reload the old workers still answer for a
+# moment. 5e waits for the new conf instead of rolling back on that.
+rm -f "$N5/curlcount"
+CURL_STALE=6 CURL_COUNT="$N5/curlcount" run_5e 20260101-0510
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && grep -q '^after loopback tries = 4$' <<< "$OUT5E" && ! grep -q '^FATAL' <<< "$OUT5E"; then
+  pass "a slow reload (old workers answer 3 rounds) is waited out, not rolled back"
+else
+  fail "a slow reload gave a false FATAL or a rollback (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -E '^(FATAL|after loopback)' | sed 's/^/        /' | head -6
+fi
+rm -f "$N5/curlcount"
+LB_TRIES=3 CURL_STALE=1000 CURL_COUNT="$N5/curlcount" run_5e 20260101-0511
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^after loopback tries = 3$' <<< "$OUT5E" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "an old answer that never goes away still rolls back, after the wait"
+else
+  fail "a lasting wrong answer after the wait did not roll back (rc $RC5E)"
+fi
+rm -f "$N5/curlcount"
+
+# B2 (review #569): a write that fails after the backups (disk full, read-only)
+# ends the block under set -e. The traps put conf and snippet back together.
+# A cat that writes half the conf and then fails, like a full disk.
+mkdir -p "$N5/halfbin"
+cat > "$N5/halfbin/cat" <<'STUB'
+#!/bin/sh
+case "${1:-}" in
+  */paramant-5e.*/conf) head -c 2000 "$1"; echo "cat: write error: No space left on device" >&2; exit 1 ;;
+esac
+exec /bin/cat "$@"
+STUB
+chmod +x "$N5/halfbin/cat"
+OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+         WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+         NGINX_T_DUMP="$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" \
+         PATH="$N5/halfbin:$N5/bin:$PATH" bash "$N5/5e.sh" 20260101-0512 "$N5/sites" "$N5/bk" \
+         "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+   && grep -q '^FATAL a command failed at line [0-9]* after the backups' <<< "$OUT5E" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "a half written conf (disk full) puts the old conf and the old snippet back together"
+else
+  fail "a write fault after the backups left a mixed state on disk (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -E '^(FATAL|restored)' | sed 's/^/        /' | head -6
+fi
+# The review's own case: the conf is read-only, the snippet is not.
+cp "$N5/old.conf" "$N5/old-ro.conf"
+run_5e_ro() {
+  cp "$N5/old-snip.conf" "$N5/snippets/paramant-security-headers.conf"
+  rm -f "$N5/available/paramant.conf"; cp "$N5/old.conf" "$N5/available/paramant.conf"; chmod 0444 "$N5/available/paramant.conf"
+  ln -sfn "$N5/available/paramant.conf" "$N5/sites/paramant.conf"
+  OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+           WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+           NGINX_T_DUMP="$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" \
+           PATH="$N5/bin:$PATH" bash "$N5/5e.sh" "$1" "$N5/sites" "$N5/bk" \
+           "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+  chmod 0644 "$N5/available/paramant.conf"
+}
+if [ "$(id -u)" -ne 0 ]; then
+  run_5e_ro 20260101-0513
+  if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+     && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+     && grep -q '^FATAL a command failed at line' <<< "$OUT5E"; then
+    pass "a read-only conf takes the already written snippet back with it"
+  else
+    fail "a read-only conf left the new snippet next to the old conf (rc $RC5E)"
+    printf '%s\n' "$OUT5E" | grep -E '^(FATAL|restored)' | sed 's/^/        /' | head -6
+  fi
+else
+  pass "read-only case skipped: root writes through 0444"
+fi
+
+# B3 (review #569): another enabled conf that proxies to 127.0.0.1:808[1-6]
+# stops 5e before a backup, read-only, unless someone accepted it.
+printf 'server {\n    # proxy_pass http://127.0.0.1:8086; (old, commented out)\n    location / { proxy_pass http://127.0.0.1:3002; }\n}\n' > "$N5/available/paramant-public.conf"
+ln -sfn "$N5/available/paramant-public.conf" "$N5/sites/paramant-public.conf"
+run_5e 20260101-0514
+if [ "$RC5E" -eq 0 ] && grep -q '^before public 808x hits = 0$' <<< "$OUT5E"; then
+  pass "a public conf that only mentions :8086 in a comment does not stop 5e"
+else
+  fail "a commented :8086 in the public conf stopped 5e (rc $RC5E)"
+fi
+printf 'server {\n    location /v2/ { proxy_pass http://127.0.0.1:8086; }\n}\n' > "$N5/available/paramant-public.conf"
+run_5e 20260101-0515
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^  public808x paramant-public.conf:2:' <<< "$OUT5E" \
+   && grep -q '^FATAL another enabled conf proxies to 127.0.0.1:808\[1-6\]' <<< "$OUT5E" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0515" ]; then
+  pass "a public conf that proxies to :8086 stops 5e before a backup or a write, with the line"
+else
+  fail "5e went ahead while the public conf proxies to :8086 (rc $RC5E)"
+fi
+PUBLIC_808X_OK=1 run_5e 20260101-0516
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && grep -q '^after public 808x = accepted' <<< "$OUT5E"; then
+  pass "PARAMANT_NGINX_PUBLIC_808X_OK=1 lets 5e go ahead after the comparison"
+else
+  fail "the 808x acceptance did not let 5e go ahead (rc $RC5E)"
+fi
+rm -f "$N5/sites/paramant-public.conf" "$N5/available/paramant-public.conf"
+if grep -qE '^ *location /v2/ \{' "$N5/rendered.conf" \
+   && ! awk '/listen 127.0.0.1:8086/ {s=1} s && /location \/v2\/ \{/ {l=1} l && /limit_req/ {f=1} l && /^    \}/ {exit} END {exit !f}' "$N5/rendered.conf"; then
+  pass ":8086 /v2/ has no limit_req, as on production (no 429 halfway an upload)"
+else
+  fail ":8086 /v2/ carries a limit_req that production does not have"
+fi
+
+# A zone the loaded config does not bind stops 5e before the first write.
+grep -v 'zone=relay_login' "$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" > "$N5/zones-no-login.conf"
+NGINX_T_DUMP="$N5/zones-no-login.conf" run_5e 20260101-0505
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^FATAL the repo conf limits on zone(s) the loaded config does not bind: relay_login' <<< "$OUT5E" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0505" ]; then
+  pass "a zone nginx does not bind (relay_login) stops 5e before a backup or a write"
+else
+  fail "5e went ahead with a zone the loaded config does not bind (rc $RC5E)"
+fi
+
+# A conf that arrives damaged is never written.
+cp "$N5/old.conf" "$N5/available/paramant.conf"
+OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+         WANT_CONF=0000 WANT_SNIP=0000 PATH="$N5/bin:$PATH" bash "$N5/5e.sh" 20260101-0504 "$N5/sites" "$N5/bk" \
+         "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0504" ]; then
+  pass "a checksum mismatch stops 5e before a backup or a write"
+else
+  fail "5e wrote a conf whose checksum did not match (rc $RC5E)"
+fi
+
+# --nginx-sync: phase 5e alone, and its dry run shows the diff against a copy.
+# Here-strings, not printf | grep -q: the output is long, grep -q stops reading
+# at the first match, and under pipefail the SIGPIPE to printf fails the check.
+NS="$(PARAMANT_NGINX_LIVE_COPY="$N5/old.conf" bash "$SCRIPT" --dry-run --nginx-sync 2>&1)"; NSRC=$?
+if [ "$NSRC" -eq 0 ] && grep -q '^PHASE 5e:' <<< "$NS" \
+   && ! grep -qE '^PHASE [0-46-8]' <<< "$NS"; then
+  pass "--dry-run --nginx-sync runs phase 5e and no other phase"
+else
+  fail "--dry-run --nginx-sync exited $NSRC or ran other phases"
+  printf '%s\n' "$NS" | grep -E '^PHASE|STOP' | sed 's/^/        /' | head -8
+fi
+if grep -qE '^  confdiff \+ +limit_req +zone=user_session' <<< "$NS" \
+   && grep -q 'would change against' <<< "$NS"; then
+  pass "the dry run shows the diff against PARAMANT_NGINX_LIVE_COPY without writing"
+else
+  fail "the dry run showed no diff against the server copy"
+fi
+if grep -qE '^  \| |[0-9a-f]{32,}' <<< "$NS"; then
+  fail "the --nginx-sync dry run made an ssh call or printed a long hex run"
+else
+  pass "the --nginx-sync dry run made no ssh call and printed no long hex run"
+fi
+for combo in "--nginx-sync --verify-only" "--nginx-sync --rollback 20260101-0000" "--nginx-sync --preflight-only"; do
+  # shellcheck disable=SC2086
+  if bash "$SCRIPT" --dry-run $combo >/dev/null 2>&1; then
+    fail "$combo was accepted; --nginx-sync is its own run"
+  else
+    pass "$combo is refused"
+  fi
+done
+
+# --------------------------------------------- 6l. host hardening (/dpa) --
+echo ""
+echo "6l-host. the host promises on /dpa are measured in --verify-only, per point, and a miss stops"
+VOH="$(cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only 2>&1)"
+grep -q '^\[step\] 6l\. host hardening that /dpa promises: auditd, AIDE, AppArmor (read-only)' <<< "$VOH" \
+  && pass "--verify-only reaches step 6l, the host check" || fail "--verify-only never reaches step 6l"
+grep -q '# host hardening$' <<< "$VOH" \
+  && pass "6l reads the host over the script's own ssh call" || fail "6l does not go through remote_soft"
+HH="$(mktemp -d)"
+if extract_remote "host hardening" > "$HH/6l.sh" && [ -s "$HH/6l.sh" ]; then
+  pass "the 6l remote block could be extracted"
+else
+  fail "the 6l remote block could not be extracted"
+fi
+grep -qE 'systemctl (start|stop|restart|enable|disable)|aide (--init|--update|--check|-i|-u|-C)|aa-(enforce|complain|disable)|apparmor_parser|> */(etc|var)' "$HH/6l.sh" \
+  && fail "6l changes something on the host; it must only read" \
+  || pass "6l starts, stops, writes and rebuilds nothing on the host"
+eval "$(sed -n '/^remote_field()/p' "$SCRIPT")"
+eval "$(sed -n '/^judge_host_hardening()/,/^}/p' "$SCRIPT")"
+# A host with every promise holding, and one with every promise broken.
+mkdir -p "$HH/good/bin" "$HH/good/db" "$HH/good/log" "$HH/bad/bin" "$HH/bad/db" "$HH/bad/log"
+cat > "$HH/good/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in is-active) echo active ;; show) echo "" ;; esac
+STUB
+cat > "$HH/good/bin/aa-status" <<'STUB'
+#!/usr/bin/env bash
+[ "${1:-}" = --enabled ] && exit 0
+echo "apparmor module is loaded."; echo "121 profiles are loaded."; echo "119 profiles are in enforce mode."
+STUB
+printf '#!/usr/bin/env bash\nexit 0\n' > "$HH/good/bin/aide"
+cat > "$HH/bad/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in is-active) echo inactive; exit 3 ;; show) echo "" ;; esac
+STUB
+printf '#!/usr/bin/env bash\nexit 1\n' > "$HH/bad/bin/aa-status"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$HH/bad/bin/aide"
+chmod +x "$HH"/good/bin/* "$HH"/bad/bin/*
+: > "$HH/good/db/aide.db"; : > "$HH/good/log/aide.log"
+: > "$HH/bad/db/aide.db"; : > "$HH/bad/log/aide.log"; touch -d '10 days ago' "$HH/bad/log/aide.log"
+echo N > "$HH/bad/aa-enabled"
+hh_ok() { printf '  OK    %s\n' "$*"; }
+GOOD="$(PATH="$HH/good/bin:/usr/bin:/bin" bash "$HH/6l.sh" "$HH/good/db" "$HH/good/log" "$HH/nonexistent" 2>&1)"
+BAD="$(PATH="$HH/bad/bin:/usr/bin:/bin" bash "$HH/6l.sh" "$HH/bad/db" "$HH/bad/log" "$HH/bad/aa-enabled" 2>&1)"
+for f in 'host auditd = active' 'host aide binary = yes' 'host aide db = yes' 'host aide last run age days = 0' \
+         'host apparmor enabled = yes' 'host apparmor enforce profiles = 119'; do
+  grep -qxF "$f" <<< "$GOOD" && pass "good host prints '$f'" || fail "good host does not print '$f' (got: $(tr '\n' '|' <<< "$GOOD"))"
+done
+for f in 'host auditd = inactive' 'host aide last run age days = 10' 'host apparmor enabled = no' 'host apparmor enforce profiles = unknown'; do
+  grep -qxF "$f" <<< "$BAD" && pass "broken host prints '$f'" || fail "broken host does not print '$f' (got: $(tr '\n' '|' <<< "$BAD"))"
+done
+if declare -F judge_host_hardening >/dev/null; then
+  ok() { hh_ok "$@"; }
+  REMOTE_OUT="$GOOD"; J1="$(judge_host_hardening 2)"; R1=$?
+  [ "$R1" -eq 0 ] && pass "a host that keeps all three promises passes 6l" || fail "a good host fails 6l with $R1"
+  [ "$(grep -c '^  OK    host: ' <<< "$J1")" -eq 3 ] && pass "6l logs one OK line per promise" || fail "6l did not log three OK lines: $J1"
+  REMOTE_OUT="$BAD"; J2="$(judge_host_hardening 2)"; R2=$?
+  [ "$R2" -eq 3 ] && pass "a host that breaks all three promises fails 6l three times" || fail "a broken host returned $R2, expected 3"
+  grep -q 'FAIL  host: auditd is inactive' <<< "$J2" && pass "6l names the auditd miss" || fail "6l does not name the auditd miss: $J2"
+  grep -q 'FAIL  host: the last AIDE check ran 10 days ago, more than 2' <<< "$J2" && pass "6l names the stale AIDE check" || fail "6l does not name the stale AIDE check: $J2"
+  grep -q 'FAIL  host: AppArmor is not enabled' <<< "$J2" && pass "6l names the AppArmor miss" || fail "6l does not name the AppArmor miss: $J2"
+  REMOTE_OUT="$(sed 's/^host aide binary = yes/host aide binary = no/' <<< "$GOOD")"; judge_host_hardening 2 >/dev/null; R3=$?
+  [ "$R3" -eq 1 ] && pass "a host without aide fails 6l on that point alone" || fail "a host without aide returned $R3, expected 1"
+  unset -f ok
+else
+  fail "judge_host_hardening could not be extracted"
+fi
+grep -q 'judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS" || host_fails=$?' "$SCRIPT" \
+  && grep -q 'host promises on /dpa do not hold' "$SCRIPT" \
+  && pass "phase 6 reports a broken host promise" \
+  || fail "phase 6 does not report a broken host promise"
+# review-574 N1: a miss is a WARN that still lets phase 7 write the marker;
+# --host-strict turns it into a STOP.
+hasF() { if grep -qF -- "$1" "$SCRIPT"; then pass "$2"; else fail "$2 (missing: $1)"; fi; }
+hasF 'warn "6l host NOT PROVEN: $host_msg"' "a host miss is a WARN in the log and the summary"
+hasF '[ "$HOST_STRICT" -eq 1 ] && die "$host_msg (--host-strict)"' "--host-strict makes a host miss a STOP"
+hasF 'HOST NOT PROVEN (step 6l, a warning, not a stop):' "the end summary repeats an unproven host"
+if grep -qF '|| die "$host_fails of the three host promises' "$SCRIPT"; then
+  fail "a host miss without --host-strict still dies before phase 7"
+else pass "a host miss without --host-strict no longer dies before phase 7"; fi
+( cd "$ROOT" && bash "$SCRIPT" --host-strict --preflight-only >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--host-strict with --preflight-only exits 2" || fail "--host-strict was accepted with --preflight-only"
+( cd "$ROOT" && bash "$SCRIPT" --host-strict --rollback 20260101-0000 >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--host-strict with --rollback exits 2" || fail "--host-strict was accepted with --rollback"
+VOS="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only --host-strict 2>&1 )"
+grep -q '^\[step\] 6l\. host hardening' <<< "$VOS" \
+  && pass "--dry-run --verify-only --host-strict reaches 6l" || fail "--host-strict breaks --verify-only"
+rm -rf "$HH"
+
+# ------------------------------------- release tag gate before phase 5 (N2) --
+echo ""
+echo "N2. the tag the installers pin must exist on origin and name the deploy commit"
+eval "$(sed -n '/^release_tag_verdict()/,/^}/p' "$SCRIPT")"
+if declare -F release_tag_verdict >/dev/null && declare -F sha_eq >/dev/null; then
+  S1=1111111aaaaaaaabbbbbbbbccccccccdddddddd; S2=2222222aaaaaaaabbbbbbbbccccccccdddddddd
+  T="$(release_tag_verdict v3.1.1 "$S1" "$S1")" && grep -q '^OK tag v3.1.1' <<< "$T" \
+    && pass "a tag on the deploy commit passes" || fail "a correct tag did not pass: $T"
+  T="$(release_tag_verdict v3.1.1 "" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && grep -q "STOP tag v3.1.1 does not exist on origin" <<< "$T" \
+    && grep -qF "git tag -a v3.1.1 $S1 -m \"Release 3.1.1\" && git push origin v3.1.1" <<< "$T" \
+    && pass "a missing tag stops with the exact tag command" || fail "a missing tag: rc $R, $T"
+  T="$(release_tag_verdict v3.1.1 "$S2" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && grep -q "points at 2222222" <<< "$T" \
+    && pass "a tag on another commit stops" || fail "a tag on another commit: rc $R, $T"
+  T="$(release_tag_verdict "" "" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && pass "installers that disagree on the tag stop" || fail "disagreeing installers passed"
+else
+  fail "release_tag_verdict could not be extracted"
+fi
+grep -q '^release_tag_gate "5-pre"$' "$SCRIPT" && grep -B1 '^phase_5$' "$SCRIPT" | grep -q 'release_tag_gate "5-pre"' \
+  && pass "the tag gate runs right before phase 5" || fail "the tag gate does not run right before phase 5"
+grep -B1 '^phase_2$' "$SCRIPT" | grep -q 'release_tag_gate "1z"' \
+  && pass "the tag gate also runs before phase 2 writes anything" || fail "the tag gate does not run before phase 2"
+grep -q "git ls-remote --tags origin \"refs/tags/\$tag\"" "$SCRIPT" \
+  && pass "the gate asks origin, not the local tag list" || fail "the gate does not use git ls-remote on origin"
+
+# ------------------------- #576: relay NODE_ENV gate and peer-sths backup --
+echo ""
+echo "#576. NODE_ENV of the relays is read before the gossip gate can go silent, and /data/peer-sths is backed up before phase 4"
+eval "$(sed -n '/^node_env_verdict()/,/^}/p' "$SCRIPT")"
+if declare -F node_env_verdict >/dev/null; then
+  OKIN=$'nodeenv relay-main unset\nfleetgossip relay-main unset\nnodeenv relay-health production\nfleetgossip relay-health unset\nnodeenv relay-legal unset\nfleetgossip relay-legal 1'
+  T="$(printf '%s\n' "$OKIN" | node_env_verdict)" && grep -q '^OK NODE_ENV of 3 relay' <<< "$T" \
+    && pass "empty or production NODE_ENV passes" || fail "a clean fleet did not pass: $T"
+  T="$(printf '%s\nnodeenv relay-iot test\nfleetgossip relay-iot unset\n' "$OKIN" | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && grep -q 'STOP relay-iot=NODE_ENV:test' <<< "$T" && grep -q 'gossip of health.paramant.app goes silent' <<< "$T" \
+    && pass "NODE_ENV=test stops with the reason" || fail "NODE_ENV=test: rc $R, $T"
+  T="$(printf 'nodeenv relay-health Development\nfleetgossip relay-health unset\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "NODE_ENV=Development stops (case does not matter)" || fail "Development passed: $T"
+  T="$(printf 'nodeenv relay-health unset\nfleetgossip relay-health 0\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && grep -q 'PARAMANT_FLEET_GOSSIP:0' <<< "$T" && pass "PARAMANT_FLEET_GOSSIP=0 stops" || fail "gossip=0 passed: $T"
+  T="$(printf 'nodeenv relay-health MISSING\nnodeenv relay-main unset\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "a relay without a container stops" || fail "a missing container passed: $T"
+  T="$(printf 'nothing here\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "no NODE_ENV lines at all stops (not proven is not green)" || fail "empty output passed: $T"
+else
+  fail "node_env_verdict could not be extracted"
+fi
+grep -q '^\[step\] 1a2\. NODE_ENV of the relay containers' "$FULL" \
+  && pass "phase 1 reads the NODE_ENV of the relays (step 1a2)" || fail "step 1a2 is not in the full dry run"
+grep -q '^\[step\] 2c\. back up the peer STH mirror' "$FULL" \
+  && pass "phase 2 backs up /data/peer-sths (step 2c)" || fail "step 2c is not in the full dry run"
+grep -q '^\[step\] 6k0\. NODE_ENV of the relay containers' "$FULL" \
+  && pass "phase 6 reads NODE_ENV again after the recreate (step 6k0)" || fail "step 6k0 is not in the full dry run"
+VO576="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only 2>&1 )"
+grep -q '^\[step\] 6k0\. NODE_ENV' <<< "$VO576" && pass "--verify-only also reads NODE_ENV" || fail "--verify-only skips the NODE_ENV check"
+PO576="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --preflight-only 2>&1 )"
+grep -q '^\[step\] 1a2\. NODE_ENV' <<< "$PO576" && pass "--preflight-only also reads NODE_ENV" || fail "--preflight-only skips the NODE_ENV check"
+L2=$(grep -n '^\[step\] 2c\.' "$FULL" | head -1 | cut -d: -f1); L4=$(grep -n '^PHASE 4:' "$FULL" | head -1 | cut -d: -f1)
+[ -n "$L2" ] && [ -n "$L4" ] && [ "$L2" -lt "$L4" ] && pass "the peer-sths backup runs before phase 4" || fail "the peer-sths backup does not run before phase 4"
+
+# Run the 2c block itself against a fake docker: five relays and admin, one
+# relay without a mirror directory.
+P2C="$WORK/p2c"
+mkdir -p "$P2C/bk" "$P2C/fakebin" "$P2C/compose" "$P2C/src/peer-sths"
+printf '{"x":1}\n' > "$P2C/src/peer-sths/$(printf 'a%.0s' $(seq 64)).jsonl"
+cat > "$P2C/fakebin/docker" <<FAKE
+#!/usr/bin/env bash
+case "\$1" in
+  compose) [ "\$2" = ps ] && echo "cid-\$4" ;;
+  inspect) [ "\${*: -1}" = cid-relay-iot ] && echo "PEER_STH_DIR=/data/nowhere"; echo "PATH=/usr/bin" ;;
+  cp) case "\$2" in cid-relay-iot:*) exit 1 ;; esac; tar cf - -C "$P2C/src" peer-sths ;;
+  exec) exit 1 ;;
+esac
+FAKE
+chmod +x "$P2C/fakebin/docker"
+extract_remote "peer sths backup" > "$P2C/2c.sh"
+if [ -s "$P2C/2c.sh" ]; then
+  OUT2C="$(cd "$P2C/compose" && PATH="$P2C/fakebin:$PATH" bash "$P2C/2c.sh" "$P2C/compose" T576 "$P2C/bk" "relay-main relay-health relay-finance relay-legal relay-iot admin" 2>&1)"; R=$?
+  [ "$R" -eq 0 ] && grep -q '^after peer sths backups = 5$' <<< "$OUT2C" && grep -q '^relay services = 5$' <<< "$OUT2C" \
+    && pass "2c makes one backup per relay and counts five" || fail "2c: rc $R, $OUT2C"
+  grep -q 'peersths relay-iot /data/nowhere absent' <<< "$OUT2C" \
+    && pass "2c reads PEER_STH_DIR from the container and accepts an absent directory" || fail "2c PEER_STH_DIR: $OUT2C"
+  [ "$(ls "$P2C/bk" | grep -c '^peer-sths-relay-.*-pre-3.1-T576.tar$')" = 4 ] \
+    && tar tf "$P2C/bk/peer-sths-relay-health-pre-3.1-T576.tar" | grep -q '\.jsonl$' \
+    && pass "2c leaves a real tar with the mirror files per relay" || fail "2c tars: $(ls "$P2C/bk")"
+  ! grep -q 'peersths admin' <<< "$OUT2C" && pass "2c skips admin" || fail "2c touched admin"
+  head -1 "$P2C/2c.sh" | grep -q 'set -euo pipefail' && pass "2c runs under set -euo pipefail" || fail "2c lacks set -euo pipefail"
+else
+  fail "could not extract the 'peer sths backup' block"
 fi
 
 # ------------------------------------------------------------------- result --

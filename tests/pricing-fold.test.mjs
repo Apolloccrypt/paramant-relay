@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2', '.json':'application/json' };
-const aliases = { '/pricing':'/pricing.html', '/signup':'/signup.html' };
+const aliases = { '/pricing':'/pricing.html', '/en/pricing':'/en/pricing.html', '/signup':'/signup.html', '/en/signup':'/en/signup.html' };
 const FOLD = { width: 390, height: 844 };
 
 const server = http.createServer((req, res) => {
@@ -59,7 +59,10 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const ORIGIN = `http://localhost:${server.address().port}`;
 const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePath: EXE } : {}) });
 
-async function open(width, height, slug = 'pricing') {
+// Since 23 September 2026 /pricing is Dutch and sells one offer; the English
+// page with the full tier table is /en/pricing. The English tests below keep
+// measuring that page; the Dutch first screen has its own test at the end.
+async function open(width, height, slug = 'en/pricing') {
   const page = await browser.newPage({ viewport: { width, height } });
   await page.route('**/api/user/session/verify', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: '{"authenticated":false}' }));
   await page.goto(`${ORIGIN}/${slug}`, { waitUntil: 'networkidle' });
@@ -121,7 +124,8 @@ test('the first screen at 390px carries the amount, the audience, the company an
     // and false of a one-time link, and a bare figure would be wrong about one
     // of them. The other way's 5 MB is named further down the page and pinned by
     // relay/test/pricing-page.test.js.
-    ['limit', '2 signatures a month, 50 transfers a month, and files up to 500 MB'],
+    // Since acceptatie 3.1.1 (taal 33) both ways are named in the line itself.
+    ['limit', '2 signatures a month, 50 transfers a month, files up to 5 MB over a link or 500 MB with Extra safe'],
     // The paid amount. It used to be two, because sending and signing were two
     // purchases and a buyer who only saw €15 had been told the price of the
     // other one. Firm is one plan over both products, so there is one figure
@@ -136,7 +140,8 @@ test('the first screen at 390px carries the amount, the audience, the company an
   const cta = await page.evaluate(() => {
     // The hero's own action, not the nav's: the nav carries a /signup link on
     // every page and would make this check pass on a page with no CTA at all.
-    const link = [...document.querySelectorAll('#main-content a[href="/signup"]')][0];
+    // The English page leads to the English signup (fase 2, SITE-03-F).
+    const link = [...document.querySelectorAll('#main-content a[href="/en/signup"]')][0];
     if (!link) return null;
     const rect = link.getBoundingClientRect();
     return { top: Math.round(rect.top + window.scrollY), bottom: Math.round(rect.bottom + window.scrollY) };
@@ -146,7 +151,7 @@ test('the first screen at 390px carries the amount, the audience, the company an
   const required = { ...seen, cta };
   delete required.foldText;
   for (const [name, hit] of Object.entries(required)) {
-    assert.ok(hit, `/pricing must carry the ${name} line; it is missing entirely`);
+    assert.ok(hit, `/en/pricing must carry the ${name} line; it is missing entirely`);
     assert.ok(hit.bottom <= FOLD.height,
       `the ${name} line ends at y=${hit.bottom}, past the ${FOLD.height}px first screen: a buyer has to scroll for it`);
   }
@@ -183,7 +188,7 @@ test('the first screen at 390px spends no words on jargon', async () => {
 
 test('pricing and signup use one term for what a free account gives', async () => {
   const pricing = await open(FOLD.width, FOLD.height);
-  const signup = await open(FOLD.width, FOLD.height, 'signup');
+  const signup = await open(FOLD.width, FOLD.height, 'en/signup');
   const text = async (page) => page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
   const [pricingText, signupText] = [await text(pricing), await text(signup)];
   await pricing.close();
@@ -194,6 +199,23 @@ test('pricing and signup use one term for what a free account gives', async () =
   for (const [label, body] of [['pricing', pricingText], ['signup', signupText]]) {
     assert.doesNotMatch(body, /\d+ documents a month/,
       `/${label} says "documents a month" where the rest of the site says "${TERM}"; one term, one product`);
+  }
+});
+
+// The Dutch pair since 23 September 2026: /pricing and /signup, one Dutch term.
+test('the Dutch pricing and signup pages use one term too', async () => {
+  const pricing = await open(FOLD.width, FOLD.height, 'pricing');
+  const signup = await open(FOLD.width, FOLD.height, 'signup');
+  const text = async (page) => page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
+  const [pricingText, signupText] = [await text(pricing), await text(signup)];
+  await pricing.close();
+  await signup.close();
+  const TERM = '2 handtekeningen per maand';
+  assert.ok(pricingText.includes(TERM), `/pricing must say "${TERM}"`);
+  assert.ok(signupText.includes(TERM), `/signup must use the same words as /pricing: "${TERM}"`);
+  for (const [label, body] of [['pricing', pricingText], ['signup', signupText]]) {
+    assert.doesNotMatch(body, /\d+ documenten per maand/,
+      `/${label} says "documenten per maand" where the rest of the site says "${TERM}"`);
   }
 });
 
@@ -217,6 +239,46 @@ test('no tier card is wider than the grid that holds it', async () => {
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+
+// The Dutch /pricing, 23 September 2026: one offer. On a phone the first screen
+// has to carry what the product does, the one amount, what it costs with btw,
+// the one button, and the free plan beside it, in that order.
+test('the Dutch first screen at 390px carries the one offer, its button and Community', async () => {
+  const page = await open(FOLD.width, FOLD.height, 'pricing');
+  const seen = await measure(page, [
+    ['h1', '^Prijzen$'],
+    ['what', 'Documenten laten tekenen en bestanden versturen die zichzelf wissen na het lezen'],
+    ['offer', '^Voor uw kantoor: 29 euro per maand\\.$'],
+    ['btw', 'Excl\\. btw\\. U betaalt €35,09 per maand, inclusief 21% btw\\.'],
+    ['community', 'Community is €0 per maand, voor altijd:'],
+  ]);
+  const cta = await page.evaluate(() => {
+    const links = [...document.querySelectorAll('#main-content a.btn-primary')];
+    if (links.length !== 1) return { count: links.length };
+    const rect = links[0].getBoundingClientRect();
+    return { count: 1, top: Math.round(rect.top + window.scrollY), bottom: Math.round(rect.bottom + window.scrollY), plan: links[0].getAttribute('data-billing-plan') };
+  });
+  const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  await page.close();
+  assert.equal(cta.count, 1, `the Dutch /pricing carries ${cta.count} primary buttons; the decision is one`);
+  assert.equal(cta.plan, 'firm', 'the one primary button buys Firm');
+  const required = { ...seen, cta };
+  delete required.foldText;
+  for (const [name, hit] of Object.entries(required)) {
+    assert.ok(hit, `/pricing must carry the ${name} line; it is missing entirely`);
+    assert.ok(hit.bottom <= FOLD.height, `the ${name} line ends at y=${hit.bottom}, past the ${FOLD.height}px first screen`);
+  }
+  assert.ok(seen.what.top < seen.offer.top && seen.offer.top < seen.btw.top && seen.btw.top < cta.top,
+    'what it does, then the amount, then the amount with btw, then the button');
+  assert.equal(width.scroll, width.client, 'the Dutch /pricing scrolls sideways on a phone');
+  // Firm left this list in acceptatie 3.1.1 (taal 4): the customer bought a
+  // "kantoorplan" here and read "Firm" everywhere after it. Firm is now the
+  // one name, introduced as "Firm, het kantoorplan".
+  for (const rx of [/\bML-DSA\b/i, /\bML-KEM\b/i, /\bAPI\b/, /\brelay\b/i]) {
+    assert.doesNotMatch(seen.foldText, rx, `the Dutch first screen reads "${seen.foldText}" and carries ${rx}`);
+  }
 });
 
 test.after(async () => { await browser.close(); server.close(); });

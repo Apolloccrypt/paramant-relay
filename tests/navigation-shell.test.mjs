@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/en/account':'/en/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html', '/en/docs':'/en/docs.html', '/en/pricing':'/en/pricing.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -28,8 +28,11 @@ function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, 
 
 const publicPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await publicPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
-await publicPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
-await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Product,Tools,Security,Pricing,Docs');
+// The public checks below were written for the English homepage, which lives
+// at /en since 23 September 2026. The Dutch homepage at / has its own bar,
+// checked right after them.
+await publicPage.goto(ORIGIN + '/en', { waitUntil:'domcontentloaded' });
+await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Send,Sign,Tools,Security,Pricing');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 // The bar carries the free tools as their own destination. Everything a
 // visitor can use without an account lived one level down, behind /pricing or
@@ -39,12 +42,13 @@ const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').a
 // Dutch because the paid work behind it is, and this is the one word that
 // reads the same in both languages, so the bar stays English on the 42 English
 // pages that also carry it.
-ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Tools','Security','Pricing','Docs']), publicDesktop.join(', '));
-// The signed-out hero now offers ONE primary action and one secondary, not
-// three. Three equal buttons is three decisions before the visitor knows what
-// the product is; ParaSend keeps its own call to action further down the page,
-// where it is next to the three lines that explain it.
-ok('public homepage leads with one primary action and one secondary', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/pricing']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Send','Sign','Tools','Security','Pricing']), publicDesktop.join(', '));
+// Signed out, the visitor lands in the demo dashboard (Mick, 5 October 2026),
+// and its head carries ONE primary action and one secondary, not three: make
+// an account, or try it yourself. Both sit inside the dashboard, and there is
+// no hero above it; the dashboard is the first thing in <main>.
+ok('public homepage leads with one primary action and one secondary, inside the demo dashboard', JSON.stringify(await publicPage.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((node) => [node.getAttribute('href'), node.className, node.textContent.trim()]))) === JSON.stringify([['/en/signup','hp-btn hp-btn-fill','Create account'],['/en/sign?mode=invite','hp-btn hp-btn-line','Try it yourself']]), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+ok('public homepage opens on the demo dashboard, with nothing above it', await publicPage.evaluate(() => { const out = document.querySelector('[data-home="out"]'); return !!out && out.firstElementChild === document.querySelector('.wp-demo-top') && !!document.querySelector('.wp-demo-top h1'); }), 'the first child of [data-home="out"] must be .wp-demo-top, holding the h1');
 // Both product PAGES have to be reachable from the homepage, not just the two
 // apps. /parasend shipped with no inbound link anywhere on the site and
 // /parasign had exactly one, from /sign: a product page nothing links to is a
@@ -53,8 +57,27 @@ ok('public homepage leads with one primary action and one secondary', JSON.strin
 // pins the order: explain first, app second, per card.
 await (async () => {
   const ctas = await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
-  ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/parasign','/sign','/parasend','/parashare']), await publicPage.locator('#products').innerText());
-  ok('the homepage still routes to ParaSend from its own section', ctas.includes('/parashare'), await publicPage.locator('#products').innerText());
+  // Since acceptance 3.1.1 the English homepage has the Dutch one's cards:
+  // one button per product, to the page that explains it, sending first.
+  ok('the homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/en/parasend','/en/parasign']), await publicPage.locator('#products').innerText());
+})();
+// The Dutch homepage: the same bar in Dutch, with the two outward product
+// names, re-rendered identically by js/nav-auth.js after the session check;
+// and in the demo dashboard one primary action (Account maken) and one secondary (Probeer het zelf).
+await (async () => {
+  const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+  await nl.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+  const want = 'Versturen,Ondertekenen,Gereedschap,Beveiliging,Prijzen';
+  const got = await nl.waitForFunction((w) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((n) => n.textContent).join(',') === w, want, { timeout:10000 }).then(() => true, () => false);
+  ok('the Dutch homepage names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
+  const authText = await nl.locator('#nav-auth').evaluate((n) => n.textContent);
+  ok('the Dutch bar says Hulp, Inloggen and Account maken after the session check', /Hulp/.test(authText) && /Inloggen/.test(authText) && /Account maken/.test(authText), authText);
+  const actions = await nl.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className, n.textContent.trim()]));
+  ok('the Dutch homepage leads with Account maken and Probeer het zelf, inside the demo dashboard', JSON.stringify(actions) === JSON.stringify([['/signup','hp-btn hp-btn-fill','Account maken'],['/sign?mode=invite','hp-btn hp-btn-line','Probeer het zelf']]), JSON.stringify(actions));
+  const ctas = await nl.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
+  ok('the Dutch homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/parasend','/parasign']), JSON.stringify(ctas));
+  await nl.close();
 })();
 const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
   background: getComputedStyle(node).backgroundColor,
@@ -62,11 +85,8 @@ const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) =>
   webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
   paper: getComputedStyle(document.body).backgroundColor,
 }));
-// The pin was loosened to "any opaque rgb" while the homepage painted the bar
-// itself and the rest of the site was still bone. The night is the design
-// system now, so the bar has one colour on every page again and the hex can be
-// named: nav.css paints it with --bone under 1024px, and --bone is the night.
-ok('mobile navigation is opaque before opening the menu', publicMobilePaint.background === 'rgb(21, 25, 28)' && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
+// Pinned to the bone hex until 4 September 2026; the homepage now paints the bar in the night colour, so the pin is what it always guarded: fully opaque, no blur.
+ok('mobile navigation is opaque before opening the menu', /^rgb\(/.test(publicMobilePaint.background) && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => {
   const nav = document.querySelector('nav.nav')?.getBoundingClientRect();
@@ -134,7 +154,7 @@ ok('closing the mobile menu restores the page position', await publicPage.evalua
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => document.querySelector('#nav-mobile')?.classList.contains('open'));
 const phoneHelp = await publicPage.evaluate(() => {
-  const links = Array.from(document.querySelectorAll('nav.nav a[href="/help"], .nav-mobile-tail a[href="/help"]'));
+  const links = Array.from(document.querySelectorAll('nav.nav a[href="/help"], .nav-mobile-tail a[href="/help"], nav.nav a[href="/en/help"], .nav-mobile-tail a[href="/en/help"]'));
   return links.map((link) => {
     const box = link.getBoundingClientRect();
     return { display:getComputedStyle(link).display, width:Math.round(box.width), height:Math.round(box.height) };
@@ -238,9 +258,11 @@ const hamburgerWithoutTail = everyPage
   .filter(([, html]) => html.includes('id="nav-hamburger"') && !html.includes('id="nav-mobile-tail"'))
   .map(([name]) => name);
 ok('no page carries a menu button without the strip that catches what it takes away', hamburgerWithoutTail.length === 0, hamburgerWithoutTail.join(', ') || `${everyPage.filter(([, html]) => html.includes('id="nav-hamburger"')).length} pages with a menu button`);
-const withoutHelp = stamped.filter(([, html]) => !/<a href="\/help"/.test(html)).map(([name]) => name);
+// An English page links the English help centre (fase 2 SITE-03-F*).
+const withoutHelp = stamped.filter(([name, html]) => !(/^en\//.test(name) ? /<a href="\/en\/help"/ : /<a href="\/help"/).test(html)).map(([name]) => name);
 ok('every stamped page links support', stamped.length > 0 && withoutHelp.length === 0, withoutHelp.join(', ') || `${stamped.length} pages`);
-const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${href}"`))).map(([name]) => name);
+// A page that declares lang="en" names the English legal texts, under /en.
+const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${/<html\b[^>]*\blang="en/i.test(html) ? '/en' + href : href}"`))).map(([name]) => name);
 ok('every stamped page names privacy, dpa and terms', withoutLegal.length === 0, withoutLegal.join(', ') || `${stamped.length} pages`);
 
 const homePage = await browser.newPage({ viewport:{ width:390, height:844 } });
@@ -270,7 +292,7 @@ const homeSections = await homePage.evaluate(() => {
 ok('the signed-in homepage stops after the hero', homeSections.total > 1 && JSON.stringify(homeSections.visible) === JSON.stringify(['home-hero']), JSON.stringify(homeSections));
 // Mick, 4 September: one note is enough. The founder line left both hero states,
 // so what the signed-in hero has to carry is the workspace a customer came for.
-ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Your documents'), await homePage.locator('[data-home="in"]').innerText());
+ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Uw documenten'), await homePage.locator('[data-home="in"]').innerText());
 if (process.env.PARAMANT_HOME_SCREENSHOT_PATH) await stableScreenshot(homePage, { path:process.env.PARAMANT_HOME_SCREENSHOT_PATH });
 await homePage.close();
 
@@ -343,8 +365,28 @@ const artIn = await artInsideTheClip(true);
 ok('signed in at 1440, no part of the hero art is cut off by the clip', artIn.cut.length === 0, JSON.stringify(artIn));
 // And the measurement above is capable of finding a box, which a vacuous pass
 // on an empty node list would not prove. Signed out the art is drawn, in full.
+//
+// Signed out, the drawn document retired on 5 October 2026: the hero now holds
+// the dashboard itself in a demo state (.wp-demo, js/home-demo.js), which shows
+// the real screens instead of a picture of a document. So signed out the art
+// draws nothing, and the measurement above is proven capable on the demo: its
+// three tiles are drawn, and drawn whole inside the same clip.
 const artOut = await artInsideTheClip(false);
-ok('signed out at 1440, the hero art is drawn and drawn whole', artOut.drawn > 0 && artOut.cut.length === 0, JSON.stringify(artOut));
+ok('signed out at 1440, the retired hero art draws nothing', artOut.drawn === 0, JSON.stringify(artOut));
+const demoPage = await browser.newPage({ viewport:{ width:1440, height:900 } });
+await demoPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await demoPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+await demoPage.locator('[data-home="out"]:not([hidden])').waitFor();
+const demoOut = await demoPage.evaluate(() => {
+  const main = document.querySelector('main').getBoundingClientRect();
+  const tiles = Array.from(document.querySelectorAll('[data-home="out"] .wp-demo .wp-tile')).map((tile) => tile.getBoundingClientRect());
+  return {
+    tiles: tiles.filter((box) => box.width > 0 && box.height > 0).length,
+    cut: tiles.filter((box) => box.bottom > main.bottom || box.top < main.top || box.left < main.left || box.right > main.right).length,
+  };
+});
+await demoPage.close();
+ok('signed out at 1440, the demo dashboard draws its three tiles whole', demoOut.tiles === 3 && demoOut.cut === 0, JSON.stringify(demoOut));
 
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
@@ -357,16 +399,25 @@ await appPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
 // do, then Verify and Settings. It went from five entries to six when /vault
 // joined Send and Sign as the third verb ("Lock a file"), so this list and
 // APP_NAV in frontend/js/nav-auth.js are updated together or not at all.
-const WORKSPACE_NAV = ['Documents','Send','Sign','Lock a file','Verify','Settings'];
+// Since 23 September 2026 the bar speaks the page's own <html lang>: Dutch by
+// default, English on a page that declares lang="en". Same six, same order.
+const WORKSPACE = {
+  nl: ['Documenten','Versturen','Ondertekenen','Bestand vergrendelen','Controleren','Instellingen'],
+  en: ['Documents','Send','Sign','Lock a file','Verify','Settings'],
+};
+const DEV_SETTINGS = { nl: 'Ontwikkelaarsinstellingen', en: 'Developer settings' };
+const appLang = await appPage.evaluate(() => (/^en/i.test(document.documentElement.lang) ? 'en' : 'nl'));
+const WORKSPACE_NAV = WORKSPACE[appLang];
+const WORKSPACE_NAV_EN = WORKSPACE.en;
 await appPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV.join(','));
 const appDesktop = await appPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 ok('signed-in navigation follows document work', JSON.stringify(appDesktop) === JSON.stringify(WORKSPACE_NAV), appDesktop.join(', '));
-ok('locking a file is a verb in the bar, next to the other two', appDesktop.indexOf('Lock a file') === appDesktop.indexOf('Sign') + 1 && await appPage.locator('nav.nav .nav-links a[href="/vault"]').count() === 1, appDesktop.join(', '));
+ok('locking a file is a verb in the bar, next to the other two', appDesktop.indexOf(WORKSPACE_NAV[3]) === appDesktop.indexOf(WORKSPACE_NAV[2]) + 1 && await appPage.locator('nav.nav .nav-links a[href="/vault"]').count() === 1, appDesktop.join(', '));
 ok('dashboard removes its duplicate marketing drawer', await appPage.locator('#nav-mobile-marketing').count() === 0 && await appPage.locator('nav.nav .nav-links').count() === 1, await appPage.locator('nav.nav .nav-links').count());
 await appPage.locator('#nav-hamburger').click();
 const appMobile = await appPage.locator('#nav-mobile a').allInnerTexts();
 ok('signed-in mobile menu matches the workspace', appMobile.map((item) => item.toLowerCase()).join(',') === appDesktop.map((item) => item.toLowerCase()).join(','), appMobile.join(', '));
-ok('developer tools are settings, not a sixth product', await appPage.locator('.nav-user-menu a', { hasText:'Developer settings' }).count() === 1 && !appMobile.includes('Developer settings'), appMobile.join(', '));
+ok('developer tools are settings, not a sixth product', await appPage.locator('.nav-user-menu a', { hasText:DEV_SETTINGS[appLang] }).count() === 1 && !appMobile.includes(DEV_SETTINGS[appLang]), appMobile.join(', '));
 
 // Support survives signing in, and it is measured in TAPS.
 //
@@ -498,23 +549,70 @@ await accountPage.route('**/api/user/billing/status', (route) => route.fulfill({
 await accountPage.goto(ORIGIN + '/account', { waitUntil:'domcontentloaded' });
 await accountPage.locator('#state-account:not(.hidden)').waitFor();
 await accountPage.locator('.nav-user').waitFor();
-ok('account, billing and developer are one settings hierarchy', JSON.stringify(await accountPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await accountPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/account', await accountPage.locator('.settings-tabs').innerText());
-ok('legacy account key is advanced instead of the first task', await accountPage.locator('details.acct-advanced:not([open])').count() === 1 && await accountPage.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Security.', await accountPage.locator('main').innerText());
+ok('account, billing and developer are one settings hierarchy', JSON.stringify(await accountPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account en beveiliging','Plan en betalingen','Instellingen voor ontwikkelaars']) && await accountPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/account', await accountPage.locator('.settings-tabs').innerText());
+ok('legacy account key is advanced instead of the first task', await accountPage.locator('details.acct-advanced:not([open])').count() === 1 && await accountPage.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Beveiliging.', await accountPage.locator('main').innerText());
 ok('billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPage.locator('#billing-section').innerText()), await accountPage.locator('#billing-section').innerText());
-ok('account action describes deactivation instead of erasure', /account record is retained/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
+ok('account action describes deactivation instead of erasure', /persoonsgegevens wissen we/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account|definitief|account verwijderen/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
 ok('settings fit the phone viewport', await accountPage.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 if (process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH) await stableScreenshot(accountPage, { path:process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH, fullPage:true });
 await accountPage.close();
+// /account is Dutch since 23 September 2026; its English copy under /en/ is held
+// to the same settings shape, in English.
+const accountPageEn = await browser.newPage({ viewport:{ width:390, height:844 } });
+await accountPageEn.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await accountPageEn.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await accountPageEn.route('**/api/user/account', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"email":"demo@example.com","api_key_masked":"pgp_demo...","plan":"pro","label":"Demo","created_at":"2026-06-01T10:00:00.000Z","backup_codes_remaining":8,"session_expires_at":"2026-07-21T16:00:00.000Z","sessions":[]}' }));
+await accountPageEn.route('**/api/user/billing/status', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"current_plan":"pro"}' }));
+await accountPageEn.goto(ORIGIN + '/en/account', { waitUntil:'domcontentloaded' });
+await accountPageEn.locator('#state-account:not(.hidden)').waitFor();
+await accountPageEn.locator('.nav-user').waitFor();
+ok('en: account, billing and developer are one settings hierarchy', JSON.stringify(await accountPageEn.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings (in Dutch)']) && await accountPageEn.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/en/account', await accountPageEn.locator('.settings-tabs').innerText());
+ok('en: legacy account key is advanced instead of the first task', await accountPageEn.locator('details.acct-advanced:not([open])').count() === 1 && await accountPageEn.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Security.', await accountPageEn.locator('main').innerText());
+ok('en: billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPageEn.locator('#billing-section').innerText()), await accountPageEn.locator('#billing-section').innerText());
+ok('en: account action describes deactivation instead of erasure', /erase your email address and other personal data/i.test(await accountPageEn.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPageEn.locator('.acct-card.danger').innerText()), await accountPageEn.locator('.acct-card.danger').innerText());
+ok('en: settings fit the phone viewport', await accountPageEn.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPageEn.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
+await accountPageEn.close();
 
 const developerPage = await browser.newPage({ viewport:{ width:1280, height:900 } });
 await developerPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
 await developerPage.route('**/api/developer/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
 await developerPage.goto(ORIGIN + '/developer', { waitUntil:'domcontentloaded' });
-await developerPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV.join(','));
+await developerPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE.nl.join(','));
 const developerNav = await developerPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
-ok('developer page is presented as settings inside the same shell', await developerPage.title() === 'Developer settings · Paramant' && developerNav.map((item) => item.toLowerCase()).join(',') === WORKSPACE_NAV.map((item) => item.toLowerCase()).join(','), await developerPage.title());
-ok('developer page shares the settings hierarchy', JSON.stringify(await developerPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await developerPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/developer', await developerPage.locator('.settings-tabs').innerText());
+ok('developer page is presented as settings inside the same shell', await developerPage.title() === 'Ontwikkelaarsinstellingen · Paramant' && developerNav.map((item) => item.toLowerCase()).join(',') === WORKSPACE.nl.map((item) => item.toLowerCase()).join(','), await developerPage.title());
+ok('developer page shares the settings hierarchy', JSON.stringify(await developerPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account en beveiliging','Abonnement en betaling','Ontwikkelaarsinstellingen']) && await developerPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/developer', await developerPage.locator('.settings-tabs').innerText());
 await developerPage.close();
+
+// The English pages keep the English workspace bar and account menu, signed in.
+const enAppPage = await browser.newPage({ viewport:{ width:1280, height:900 } });
+await enAppPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await enAppPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await enAppPage.goto(ORIGIN + '/en/docs', { waitUntil:'domcontentloaded' });
+await enAppPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV_EN.join(','));
+ok('an English page keeps the English workspace bar', JSON.stringify(await enAppPage.locator('nav.nav .nav-links .nav-link').allInnerTexts()) === JSON.stringify(WORKSPACE_NAV_EN));
+ok('and the English account menu', await enAppPage.locator('.nav-user-menu a', { hasText:'Developer settings' }).count() === 1 && await enAppPage.locator('#nav-signout').innerText() === 'Sign out', await enAppPage.locator('.nav-user-menu').innerText());
+await enAppPage.close();
+
+// The language switch. On a desktop it sits in the bar and takes you to the
+// same page in the other language; on a phone the bar keeps its one action and
+// the switch is in the strip under the drawer, next to Sign in and Help.
+const langDesk = await browser.newPage({ viewport:{ width:1280, height:900 } });
+await langDesk.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await langDesk.goto(ORIGIN + '/pricing', { waitUntil:'domcontentloaded' });
+const deskSwitch = langDesk.locator('nav.nav .nav-lang');
+ok('the desktop bar shows NL | EN with Dutch marked current', await deskSwitch.isVisible() && await deskSwitch.getAttribute('aria-label') === 'Taal / Language' && await deskSwitch.locator('a[aria-current]').innerText() === 'NL', await deskSwitch.innerText());
+await Promise.all([langDesk.waitForURL(ORIGIN + '/en/pricing'), deskSwitch.locator('a', { hasText:'EN' }).click()]);
+ok('EN goes to the same page in English, and marks EN current there', await langDesk.evaluate(() => document.documentElement.lang) === 'en' && await langDesk.locator('nav.nav .nav-lang a[aria-current]').innerText() === 'EN', langDesk.url());
+await langDesk.close();
+const langPhone = await browser.newPage({ viewport:{ width:390, height:844 } });
+await langPhone.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await langPhone.goto(ORIGIN + '/pricing', { waitUntil:'domcontentloaded' });
+ok('the phone bar leaves the switch to the drawer', !(await langPhone.locator('nav.nav .nav-lang').isVisible()));
+await langPhone.locator('#nav-hamburger').click();
+const tailSwitch = langPhone.locator('#nav-mobile-tail .nav-lang');
+const tailBox = await tailSwitch.boundingBox();
+ok('the drawer strip carries NL | EN, 44px tall', await tailSwitch.isVisible() && tailBox && tailBox.height >= 44 && await tailSwitch.locator('a[href="/en/pricing"]').count() === 1, JSON.stringify(tailBox));
+await langPhone.close();
 
 for (const check of checks) console.log(`${check.pass ? 'PASS' : 'FAIL'} ${check.name}${check.detail ? ' :: ' + check.detail : ''}`);
 await browser.close();

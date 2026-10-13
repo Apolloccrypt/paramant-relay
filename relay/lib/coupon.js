@@ -95,6 +95,15 @@ function humanDuration(days) {
   return `${d} ${d === 1 ? 'day' : 'days'}`;
 }
 
+// "3 maanden", the Dutch twin of humanDuration, for the Dutch half of the mail.
+function humanDurationNl(days) {
+  const d = Math.round(Number(days) || 0);
+  if (d <= 0) return '0 dagen';
+  if (d % 365 === 0) { const y = d / 365; return `${y} jaar`; }
+  if (d % 30 === 0) { const m = d / 30; return `${m} ${m === 1 ? 'maand' : 'maanden'}`; }
+  return `${d} ${d === 1 ? 'dag' : 'dagen'}`;
+}
+
 // "3 months of ParaSign Pro and ParaSend Pro". One sentence fragment that reads
 // the same in the mail, in the billing history and in the answer to the browser.
 function describeGrants(grants) {
@@ -107,6 +116,18 @@ function describeGrants(grants) {
   // Every grant on this coupon runs for the same number of days in every case
   // the admin route allows, so the duration is stated once.
   return `${humanDuration(list[0].days)} of ${names}`;
+}
+
+// "3 maanden Ondertekenen Pro en Versturen Pro". Only used in the mail; the
+// billing history and the browser answer keep the English fragment.
+function describeGrantsNl(grants) {
+  const list = Array.isArray(grants) ? grants : [];
+  if (list.length === 0) return 'niets';
+  const plans = list.map((g) => planExpiry.planLabelNl(g.product, g.tier));
+  const names = plans.length === 1
+    ? plans[0]
+    : `${plans.slice(0, -1).join(', ')} en ${plans[plans.length - 1]}`;
+  return `${humanDurationNl(list[0].days)} ${names}`;
 }
 
 // The line that goes in the billing history. It names the code on purpose: a
@@ -337,12 +358,32 @@ function redeemMail({ code, grants, ends, siteUrl } = {}) {
   const list = Array.isArray(grants) ? grants : [];
   if (list.length === 0) return null;
   const site = String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '');
+  // The English half names the plan the way the site does, like the Dutch
+  // half (acceptatie 3.1.1, taal #4 and #47). describeGrants() stays as it is
+  // for the billing history and the answer to the browser.
   const lines = list
-    .map((g) => `${planExpiry.planLabel(g.product, g.tier)} until ${planExpiry.formatDate(g.ends || ends)}`)
+    .map((g) => `${planExpiry.planLabelMail(g.product, g.tier)} until ${planExpiry.formatDate(g.ends || ends)}`)
     .join('\n');
-  const subject = `Your code ${code} is redeemed`;
+  const namesEn = list.map((g) => planExpiry.planLabelMail(g.product, g.tier));
+  const describedEn = `${humanDuration(list[0].days)} of ${namesEn.length === 1 ? namesEn[0] : `${namesEn.slice(0, -1).join(', ')} and ${namesEn[namesEn.length - 1]}`}`;
+  const linesNl = list
+    .map((g) => `${planExpiry.planLabelNl(g.product, g.tier)} tot ${planExpiry.formatDateNl(g.ends || ends)}`)
+    .join('\n');
+  const subjectNl = `Uw code ${code} is ingewisseld`;
+  const subjectEn = `Your code ${code} is redeemed`;
+  const textNl = [
+    `Dank u. Uw code ${code} geeft u ${describeGrantsNl(list)}.`,
+    '',
+    linesNl,
+    '',
+    'Er is niets afgeschreven en dat gebeurt ook niet. Dit is een cadeauperiode, geen abonnement. Die stopt vanzelf op de datum hierboven en uw account gaat dan terug naar Community.',
+    '',
+    `Uw account vindt u hier: ${site}/account`,
+    '',
+    'Paramant',
+  ].join('\n');
   const text = [
-    `Thank you. Your code ${code} gives you ${describeGrants(list)}.`,
+    `Thank you. Your code ${code} gives you ${describedEn}.`,
     '',
     lines,
     '',
@@ -352,25 +393,11 @@ function redeemMail({ code, grants, ends, siteUrl } = {}) {
     '',
     'Paramant',
   ].join('\n');
-  return { subject, text, html: _html(subject, text, `${site}/account`) };
-}
-
-const escHtml = (s) => String(s === null || s === undefined ? '' : s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-function _html(subject, text, link) {
-  const paragraphs = text.split('\n\n')
-    .filter((p) => p && p !== 'Paramant')
-    .map((p) => `<p style="margin:0 0 16px;line-height:1.6">${escHtml(p).replace(/\n/g, '<br>')}</p>`)
-    .join('\n');
-  return [
-    '<div style="font-family:system-ui,-apple-system,\'Segoe UI\',sans-serif;color:#0B3A6A;max-width:520px">',
-    `<h1 style="font-size:18px;margin:0 0 16px">${escHtml(subject)}</h1>`,
-    paragraphs,
-    `<p style="margin:0"><a href="${escHtml(link)}" style="color:#0B3A6A">${escHtml(link)}</a></p>`,
-    '</div>',
-  ].join('\n');
+  return {
+    subject: planExpiry.bilingualSubject(subjectNl, subjectEn),
+    text: planExpiry.bilingualText(textNl, text),
+    html: planExpiry.htmlBody([[subjectNl, textNl], [subjectEn, text]], `${site}/account`),
+  };
 }
 
 // ── What the browser is told ─────────────────────────────────────────────────
@@ -386,29 +413,115 @@ const MESSAGES = Object.freeze({
   exhausted: 'That code has been fully claimed. It has run out.',
   no_redis: 'We cannot check codes right now. Please try again in a minute.',
   grant_failed: 'We could not add the term to your account. Nothing was changed, please try again.',
+  nothing_to_add: 'This code adds nothing to what you already have, so it was not used.',
 });
 
 function messageFor(error) {
   return MESSAGES[error] || MESSAGES.unknown;
 }
 
-// The sentence the browser prints on success: what was given, and until when.
-function successMessage(grants) {
+// The same sentences for the Dutch pages. /pricing, /account and /redeem are
+// Dutch and printed these English answers word for word (fase 1, PLAN-28/29/31):
+// a Dutch customer who typed in a code was told "Your code is redeemed" or
+// "We do not know that code". The relay sends both, `message` and `message_nl`,
+// and the page picks the one for its own language; an API client that only
+// reads `message` sees exactly what it always saw.
+const MESSAGES_NL = Object.freeze({
+  unknown: 'Deze code kennen we niet. Controleer de spelling en probeer het opnieuw.',
+  bad_code: 'Deze code kennen we niet. Controleer de spelling en probeer het opnieuw.',
+  revoked: 'Deze code is niet meer geldig.',
+  expired: 'Deze code is verlopen.',
+  already_used: 'U heeft deze code al gebruikt op dit account.',
+  exhausted: 'Deze code is op: alle plaatsen zijn al gebruikt.',
+  no_redis: 'We kunnen codes nu niet controleren. Probeer het over een minuut opnieuw.',
+  grant_failed: 'We konden de termijn niet aan uw account toevoegen. Er is niets veranderd, probeer het opnieuw.',
+  nothing_to_add: 'Deze code voegt niets toe aan wat u al heeft, dus hij is niet gebruikt.',
+});
+
+function messageForNl(error) {
+  return MESSAGES_NL[error] || MESSAGES_NL.unknown;
+}
+
+function joinPlansNl(parts) {
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} en ${parts[parts.length - 1]}`;
+}
+
+function keptPhraseNl(kept) {
+  const list = Array.isArray(kept) ? kept : [];
+  if (list.length === 0) return '';
+  return joinPlansNl(list.map((k) => {
+    const date = k.ends ? planExpiry.formatDateNl(k.ends) : null;
+    return `${planExpiry.planLabel(k.product, k.tier)}${date ? ` tot ${date}` : ''}`;
+  }));
+}
+
+// The product names stay ParaSign and ParaSend: that is what /pricing and
+// /account call them on the Dutch site too.
+function successMessageNl(grants, kept) {
+  const list = Array.isArray(grants) ? grants : [];
+  if (list.length === 0) return 'Uw code is ingewisseld.';
+  const joined = joinPlansNl(list.map((g) => `${planExpiry.planLabel(g.product, g.tier)} tot ${planExpiry.formatDateNl(g.ends)}`));
+  const keep = keptPhraseNl(kept);
+  return `Uw code is ingewisseld. U heeft nu ${joined}.${keep ? ` U houdt ${keep}.` : ''} Er is niets afgeschreven.`;
+}
+
+function nothingToAddMessageNl(kept) {
+  const keep = keptPhraseNl(kept);
+  if (!keep) return MESSAGES_NL.nothing_to_add;
+  return `Deze code voegt niets toe aan wat u al heeft (${keep}), dus hij is niet gebruikt.`;
+}
+
+// The billing-history line on the Dutch /account. Same facts as historyLabel.
+function historyLabelNl(code, grants) {
+  const list = Array.isArray(grants) ? grants : [];
+  const plans = list.map((g) => planExpiry.planLabel(g.product, g.tier));
+  const what = list.length ? `${humanDurationNl(list[0].days)} ${joinPlansNl(plans)}` : 'niets';
+  return `Cadeau: ${what}, code ${code}`;
+}
+
+function joinPlans(parts) {
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+// What a code left alone because the account already holds something a gift
+// may not replace (POST /v2/billing/redeem: a gift only adds to the same tier
+// or fills an empty product). "ParaSign Business until 25 October 2026".
+function keptPhrase(kept) {
+  const list = Array.isArray(kept) ? kept : [];
+  if (list.length === 0) return '';
+  return joinPlans(list.map((k) => {
+    const date = k.ends ? planExpiry.formatDate(k.ends) : null;
+    return `${planExpiry.planLabel(k.product, k.tier)}${date ? ` until ${date}` : ''}`;
+  }));
+}
+
+// The sentence the browser prints on success: what was given, and until when,
+// and what the account keeps. Before 2026-09-25 a Business customer who typed
+// in a Pro code was told "You now have ParaSign Pro", and that was the truth
+// on one relay and a lie on the others (betaaltest R3).
+function successMessage(grants, kept) {
   const list = Array.isArray(grants) ? grants : [];
   if (list.length === 0) return 'Your code is redeemed.';
-  const parts = list.map((g) => `${planExpiry.planLabel(g.product, g.tier)} until ${planExpiry.formatDate(g.ends)}`);
-  const joined = parts.length === 1
-    ? parts[0]
-    : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-  return `Your code is redeemed. You now have ${joined}. Nothing was charged.`;
+  const joined = joinPlans(list.map((g) => `${planExpiry.planLabel(g.product, g.tier)} until ${planExpiry.formatDate(g.ends)}`));
+  const keep = keptPhrase(kept);
+  return `Your code is redeemed. You now have ${joined}.${keep ? ` You keep ${keep}.` : ''} Nothing was charged.`;
+}
+
+// The refusal when a code would add nothing at all. The seat is given back, so
+// the code is not spent on an account it did nothing for.
+function nothingToAddMessage(kept) {
+  const keep = keptPhrase(kept);
+  if (!keep) return MESSAGES.nothing_to_add;
+  return `This code adds nothing to what you already have (${keep}), so it was not used.`;
 }
 
 module.exports = {
   K, CODE_RE, CLAIM_LUA,
   DEFAULT_DAYS, DEFAULT_MAX_REDEMPTIONS, DEFAULT_GRANTS,
   MAX_REDEMPTIONS_CEILING, MAX_DAYS, MESSAGES,
-  normaliseCode, humanDuration, describeGrants, historyLabel,
+  normaliseCode, humanDuration, humanDurationNl, describeGrants, describeGrantsNl, historyLabel,
   validateGrants, validateMax, validateValidUntil,
   createCoupon, getCoupon, listCoupons, revokeCoupon, redemptionsOf,
-  claim, release, grantEnd, redeemMail, messageFor, successMessage,
+  claim, release, grantEnd, redeemMail, messageFor, successMessage, nothingToAddMessage,
+  MESSAGES_NL, messageForNl, successMessageNl, nothingToAddMessageNl, historyLabelNl,
 };

@@ -598,7 +598,9 @@ test('no page names a cryptographic primitive the code behind that page does not
   // and says to delete the line. The register can only shrink, and it cannot
   // rot, because it is checked against the code on every run.
   const AWAITING_DECISION = [
-    'audit-log-export: names ML-KEM-768 and ML-DSA-65 for a workflow its own steps describe as a ParaSend web app upload opened through a one-time link. Making it true needs the regulator to hold a device key, which is the convenience the page sells. Raised 5 September 2026.',
+    // audit-log-export and en/audit-log-export left this register on 23 September
+    // 2026: both pages now name AES-256-GCM with the key in the link, and say this
+    // route makes no signed receipt.
   ];
   const expected = new Set(AWAITING_DECISION.map((line) => line.split(':')[0]));
   const unexpected = pathProblems.filter((line) => !expected.has(line.split(':')[0]));
@@ -662,12 +664,25 @@ test('no page makes the zero-knowledge claim about the relay as such without nam
     /no access to (?:keys or plaintext|plaintext or keys)/i,
     /cannot access the content/i,
     /does not receive the decryption key/i,
+    // Fase 2 (2026-10-04, SITE-30): /terms said "Wij kunnen dus niet zien wat u
+    // verstuurt" and "we cannot see what you send" with no exception at all,
+    // and the Dutch wordings were not in this list. Sending to named recipients
+    // is a second exception: the token that unwraps the file key passes the
+    // relay once to be mailed (frontend/js/parashare.page.js, relay.js /ontvang).
+    /cannot see what you send/i,
+    /(?:kunnen|kan) (?:dus )?niet zien wat u verstuurt/i,
+    /nooit (?:de )?leesbare tekst/i,
+    /(?:heeft|hebben|bewaart|bewaren) (?:hij |de relay |wij )?(?:dus )?alleen versleutelde (?:gegevens|data)/i,
+    /geen toegang tot sleutels of leesbare inhoud/i,
+    /niet bij de inhoud/i,
+    // About our service, not about a third-party app a help page recommends.
+    /\b(?:is|wordt|zijn|are)\b[^.]{0,40}end-to-end (?:versleuteld|encrypted)/i,
   ];
   // Naming the exception. Either form will do; both point a reader at it.
-  const EXCEPTION = /\/v1\b|hosted signing ceremony|hosted ceremony/i;
+  const EXCEPTION = /\/v1\b|hosted signing ceremony|hosted ceremony|gehoste ondertekenprocedure|uitzondering|exception/i;
   // Scoping the sentence to a path instead. A passage that says which route it
   // is talking about is not making the absolute claim and needs no exception.
-  const SCOPED = /ParaSend|ParaShare|Ghost Pipe|web app|browser-encrypted|browser-created|created in a browser|SDK|extension|sensor|DICOM|on that path|this stand|on this page/i;
+  const SCOPED = /ParaSend|ParaShare|Ghost Pipe|web app|browser-encrypted|browser-created|created in a browser|SDK|extension|sensor|DICOM|on that path|this stand|on this page|Versturen|in een browser|eenmalige link|webapp|extensie/i;
 
   const problems = [];
   for (const slug of allPages()) {

@@ -1,34 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Certificate transparency log · Paramant</title>
+<title>Certificate transparency-log · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta name="description" content="Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#15191C">
+<meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=24">
-<link rel="stylesheet" href="/relay-pulse.css?v=4">
-<meta property="og:title" content="Certificate transparency log · Paramant">
-<meta property="og:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<meta property="og:title" content="Certificate transparency-log · Paramant">
+<meta property="og:description" content="Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien.">
 <meta property="og:url" content="https://paramant.app/ct-log">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Certificate transparency log · Paramant">
-<meta name="twitter:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta name="twitter:title" content="Certificate transparency-log · Paramant">
+<meta name="twitter:description" content="Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien.">
 <link rel="canonical" href="https://paramant.app/ct-log">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/ct-log">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/ct-log">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/ct-log">
   <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { min-height:100vh; }
@@ -66,6 +69,9 @@ body { min-height:100vh; }
 .verify-result { margin-top:10px; font-size:var(--text-sm); display:none; padding:14px 16px; }
 .verify-result.found { border:1px solid var(--ink-hair); color:var(--ink); }
 .verify-result.notfound { border:1px solid var(--ink-ghost); color:var(--ink-dim); }
+.verify-result.listed { border:1px dashed var(--ink-ghost); color:var(--ink-dim); }
+.verify-result .verify-steps { margin:10px 0 6px; padding-left:0; list-style:none; line-height:1.7; }
+.verify-result .verify-why { display:block; margin-top:6px; color:var(--ink-dim); font-size:var(--text-xs); }
 .verify-result pre { margin-top:10px; color:var(--ink-dim); font-size:var(--text-xs); white-space:pre-wrap; word-break:break-all; line-height:1.7; }
 
 .search-bar { display:flex; gap:0; margin:0 40px 28px; }
@@ -84,10 +90,10 @@ body { min-height:100vh; }
 .tf.active { border-color:var(--ink); color:var(--ink); }
 
 .table-wrap { margin:0 40px 40px; border:1px solid var(--ink-hair); }
-.table-head { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
+.table-head { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
 .table-head span { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
 
-.entry { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:14px 16px;
+.entry { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:14px 16px;
   border-top:1px solid var(--ink-ghost); cursor:pointer; transition:background .1s; }
 .entry:hover { background:var(--ink-ghost); }
 .entry .idx { font-size:var(--text-xs); color:var(--ink-dim); }
@@ -142,8 +148,7 @@ body { min-height:100vh; }
   .relay-table-wrap { margin:0 20px 40px; }
   .table-wrap { margin:0 20px 40px; }
   .table-head, .entry { grid-template-columns:40px 1fr 130px; }
-  .table-head span:nth-child(3), .table-head span:nth-child(4),
-  .entry > *:nth-child(3), .entry > *:nth-child(4) { display:none; }
+  .table-head span:nth-child(3), .entry > *:nth-child(3) { display:none; }
   .relay-table-head, .relay-row { grid-template-columns:1fr 80px 70px; }
   .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
 }
@@ -181,7 +186,7 @@ body { min-height:100vh; }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(217, 164, 65, 0.08);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -204,7 +209,7 @@ body { min-height:100vh; }
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(217, 164, 65, 0.08);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -218,15 +223,15 @@ body { min-height:100vh; }
       "@type": "WebPage",
       "@id": "https://paramant.app/ct-log#webpage",
       "url": "https://paramant.app/ct-log",
-      "name": "Certificate transparency log · Paramant",
+      "name": "Certificate transparency-log · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload."
+      "inLanguage": "nl",
+      "description": "Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien."
     },
     {
       "@type": "Organization",
@@ -234,7 +239,7 @@ body { min-height:100vh; }
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -260,52 +265,58 @@ body { min-height:100vh; }
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ct-log" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ct-log" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ct-log" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ct-log" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
+<main id="main-content" tabindex="-1">
 
 <div class="hero">
-  <div class="tag">Public Audit Log</div>
-  <h1>Certificate <span>Transparency</span></h1>
-  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload, the way HTTPS certificate transparency logs work.</p>
+  <div class="tag">Openbaar auditlog</div>
+  <h1>Certificate <span>transparency</span></h1>
+  <p>Registraties van sleutels, overdrachten en aanmeldingen van relays komen allemaal in één Merkle-boom waarin elke wijziging zichtbaar is. Iedereen kan nagaan dat een vermelding in de boom staat, zonder de inhoud te zien. De wiskunde is dezelfde als bij de certificate transparency-logs van HTTPS (RFC 6962): een Merkle-boom met ondertekende boomstanden. Het verschil is wie meekijkt. Bij HTTPS zijn er meerdere onafhankelijke logs en monitors; hier is er één beheerder, Paramant, en nog geen onafhankelijke bewaarder van de boomstanden.</p>
 </div>
 
 <div class="tabs">
-  <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Log entries</button>
-  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Registered Relays</button>
+  <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Vermeldingen</button>
+  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Geregistreerde relays</button>
 </div>
 
 <div id="pane-log">
@@ -350,46 +361,52 @@ body { min-height:100vh; }
 -->
 <div class="notice" id="composition-notice">
   <div class="body">
-    <strong>What is in this log, and whose it is</strong>
-    <span>You are looking at the log of one relay, <code>health.paramant.app</code>, the one
-    the web app on this site sends through. Each of the relays we run keeps its own log, so
-    this is not a total. Most of the <span id="composition-count">entries</span> below are not
-    transfers at all: they are our own relays announcing themselves. Every entry here is
-    something a relay said about itself, and for a long time each of them said it again on
-    every restart, which is why the number below is as large as it is. A relay that announces
-    itself and has nothing new to say no longer writes a line. Either way, the number of
-    entries is not a measure of how much the service is used.</span>
+    <strong>Wat er in dit log staat, en van wie het is</strong>
+    <span>U ziet het log van één relay, <code>health.paramant.app</code>, de relay waarlangs
+    de webapp op deze site verstuurt. Elke relay die we draaien houdt een eigen log bij, dus
+    dit is geen totaal. De meeste van de <span id="composition-count">vermeldingen</span> hieronder zijn
+    helemaal geen overdrachten: het zijn onze eigen relays die zich aanmelden. Elke vermelding
+    hier is iets wat een relay over zichzelf meldde, en lange tijd deed elke relay dat opnieuw bij
+    elke herstart. Daarom is het getal hieronder zo groot. Een relay die zich aanmeldt en niets
+    nieuws te melden heeft, schrijft nu geen regel meer. Hoe dan ook: het aantal vermeldingen
+    zegt niets over hoeveel de dienst wordt gebruikt.</span>
   </div>
 </div>
 <div class="notice" id="persistence-notice">
   <div class="body">
-    <strong>Persistent log: survives relay restarts</strong>
-    <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
-    and reloaded on startup. No payload content is ever stored: only cryptographic hashes.
-    The log resets only when the relay volume is deleted.</span>
+    <strong>Blijvend log: overleeft een herstart van de relay</strong>
+    <span>Bij elke registratie worden hashes naar schijf geschreven (<code>/data/ct-log.json</code>)
+    en bij het opstarten opnieuw ingelezen. Er wordt nooit inhoud opgeslagen, alleen cryptografische hashes.
+    In april 2026 is het log wel opnieuw begonnen, tijdens tests:
+    de boom van <code>health.paramant.app</code> is toen opnieuw gestart. 39 vermeldingen uit die tijd
+    (posities 1 tot en met 34 en 42 tot en met 46) hebben een opgeslagen bewijs dat niet op de huidige boom past.
+    Voor vijf ervan (42 tot en met 46) is aangetoond dat dat bewijs uit de herstarte boom komt; voor de andere 34
+    is dat waarschijnlijk, maar niet aangetoond. De lijst hieronder en het inclusiebewijs rekenen voor alle 39
+    met de huidige boom en tonen de oude waarde apart. Van elke latere vermelding past de opgeslagen boomstand wel op de huidige boom
+    (onafhankelijk nagerekend op 6 oktober 2026). Verder begint het log alleen opnieuw als het volume van de relay wordt verwijderd.</span>
   </div>
 </div>
 
 <div class="stats">
   <div class="stat">
     <div class="val" id="stat-total">n/a</div>
-    <div class="lbl">Log entries</div>
+    <div class="lbl">Vermeldingen</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-count">n/a</div>
-    <div class="lbl">Key registrations</div>
+    <div class="lbl">Sleutelregistraties</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-transfers">n/a</div>
-    <div class="lbl">Transfer proofs</div>
+    <div class="lbl">Overdrachtsbewijzen</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-relayreg">n/a</div>
-    <div class="lbl">Relay announcements</div>
+    <div class="lbl">Aanmeldingen van relays</div>
   </div>
   <div class="stat">
     <div class="val dim" id="stat-root">n/a</div>
-    <div class="lbl">Merkle Root</div>
+    <div class="lbl">Merkle-root</div>
   </div>
   <div class="stat">
     <div class="val green" id="stat-relay">n/a</div>
@@ -397,96 +414,97 @@ body { min-height:100vh; }
   </div>
   <div class="stat">
     <div class="val dim" id="stat-last">n/a</div>
-    <div class="lbl">Last Entry</div>
+    <div class="lbl">Laatste vermelding</div>
   </div>
 </div>
 
 <!-- Hash Verification Tool -->
 <div class="verify-section">
-  <h2>Verify a hash</h2>
+  <h2>Een hash controleren</h2>
   <div class="verify-bar">
-    <input id="verify-input" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." data-input="clearVerify">
-    <button data-click="verifyHash">VERIFY</button>
+    <input id="verify-input" placeholder="Plak een leaf_hash of tree_hash om te controleren of die in het log staat" data-input="clearVerify">
+    <button data-click="verifyHash">CONTROLEREN</button>
   </div>
   <div class="verify-result" id="verify-result"></div>
 </div>
 
 <div class="type-filter">
-  <button class="tf active" id="tf-all"      data-click="setTypeFilter" data-arg="all">All</button>
-  <button class="tf"        id="tf-relay_reg" data-click="setTypeFilter" data-arg="relay_reg">Relay reg</button>
-  <button class="tf"        id="tf-transfer"  data-click="setTypeFilter" data-arg="transfer">Transfer proofs</button>
+  <button class="tf active" id="tf-all"      data-click="setTypeFilter" data-arg="all">Alles</button>
+  <button class="tf"        id="tf-relay_reg" data-click="setTypeFilter" data-arg="relay_reg">Aanmeldingen</button>
+  <button class="tf"        id="tf-transfer"  data-click="setTypeFilter" data-arg="transfer">Overdrachtsbewijzen</button>
 </div>
 
 <div class="search-bar">
-  <input id="search" placeholder="Filter entries by hash or index..." data-input="filterEntries">
-  <button data-click="filterEntries">FILTER</button>
+  <input id="search" placeholder="Filter vermeldingen op hash of index" data-input="filterEntries">
+  <button data-click="filterEntries">FILTEREN</button>
 </div>
 
 <div class="table-wrap">
   <div class="table-head">
     <span>#</span>
-    <span>Leaf Hash</span>
-    <span>Tree Hash</span>
-    <span>Device Hash</span>
-    <span>Timestamp</span>
+    <span>Leaf-hash</span>
+    <span>Tree-hash</span>
+    <span>Tijdstip</span>
   </div>
-  <div id="entries"><div class="loading">Loading log…</div></div>
+  <div id="entries"><div class="loading">Log laden…</div></div>
 </div>
 
 <div class="pagination">
-  <button id="prev-btn" data-click="changePage" data-arg="-1" disabled>&#8592; Prev</button>
+  <button id="prev-btn" data-click="changePage" data-arg="-1" disabled>&#8592; Vorige</button>
   <span id="page-info">n/a</span>
-  <button id="next-btn" data-click="changePage" data-arg="1" disabled>Next &#8594;</button>
+  <button id="next-btn" data-click="changePage" data-arg="1" disabled>Volgende &#8594;</button>
 </div>
 
 </div><!-- /pane-log -->
 
 <div id="pane-relays" style="display:none">
   <div class="stats" id="relay-stats">
-    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Registered Relays</div></div>
-    <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectors</div></div>
-    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Last Registration</div></div>
+    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Geregistreerde relays</div></div>
+    <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectoren</div></div>
+    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Laatste registratie</div></div>
   </div>
   <div class="relay-table-wrap">
     <div class="relay-table-head">
-      <span>URL</span><span>Sector</span><span>Version</span><span>Edition</span>
-      <span>Verified Since</span><span>Last Seen</span>
+      <span>URL</span><span>Sector</span><span>Versie</span><span>Editie</span>
+      <span>Geverifieerd sinds</span><span>Laatst gezien</span>
     </div>
-    <div id="relay-entries"><div class="loading">Loading relay registry…</div></div>
+    <div id="relay-entries"><div class="loading">Relayregister laden…</div></div>
   </div>
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.js?v=3" defer></script>
+<script src="/js/ct-log.page.js?v=6" defer></script>
+</main>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
+          <a href="/partners">Partners</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/nav.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

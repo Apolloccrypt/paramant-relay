@@ -33,9 +33,13 @@ function counterIsAcceptable(stored, next) {
 // ── Per-IP / per-account rate limiting (fixed window via Redis INCR) ─────────
 // Exact limits are exported so callers (and reviewers) can see them; they are
 // enforced on BOTH /login/options and /login/verify.
+// Sign-in per IP was 30 options and 10 verifies per 15 minutes: an office of
+// thirty behind one NAT address at 9:00 ran out after ten (herreview #560,
+// N3). A passkey assertion is a signature and cannot be guessed, so the IP
+// cap only bounds load; the per-account caps stay where they were.
 const LIMITS = {
-  loginOptions:    { ip: 30, account: 15, windowSec: 900 },   // 15-min window
-  loginVerify:     { ip: 10, account: 5,  windowSec: 900 },
+  loginOptions:    { ip: 120, account: 15, windowSec: 900 },  // 15-min window
+  loginVerify:     { ip: 60,  account: 5,  windowSec: 900 },
   registerOptions: { ip: 20, account: 10, windowSec: 900 },
   registerVerify:  { ip: 10, account: 5,  windowSec: 900 },
 };

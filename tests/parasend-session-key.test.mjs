@@ -43,7 +43,11 @@ import { fileURLToPath } from 'node:url';
 
 const PS_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PS_JS = fs.readFileSync(path.join(PS_ROOT, 'frontend/js/parashare.page.js'), 'utf8');
-const PS_HTML = fs.readFileSync(path.join(PS_ROOT, 'frontend/parashare.html'), 'utf8');
+// De Engelse kopie: de pins in dit bestand zijn de Engelse zinnen, en de
+// harness draait de pagina standaard als lang="en". De Nederlandse /parashare
+// heeft een eigen test onderaan.
+const PS_HTML = fs.readFileSync(path.join(PS_ROOT, 'frontend/en/parashare.html'), 'utf8');
+const PS_HTML_NL = fs.readFileSync(path.join(PS_ROOT, 'frontend/parashare.html'), 'utf8');
 // The real error module, run INSIDE the context the way the page loads it: as a
 // plain script that assigns self.paramantErrors. Requiring it here instead would
 // close it over this process's console, and half of what this suite measures is
@@ -78,7 +82,7 @@ function makeElement(id) {
 }
 
 // A run of the page: the vm context, the DOM it saw, and what it asked for.
-function runPage({ keyResponses, sectorOk = true, relayStatus = null }) {
+function runPage({ keyResponses, sectorOk = true, relayStatus = null, lang = 'en', verifyBody = {}, meBody = {} }) {
   const elements = new Map();
   const getElementById = (id) => {
     if (!elements.has(id)) elements.set(id, makeElement(id));
@@ -113,6 +117,7 @@ function runPage({ keyResponses, sectorOk = true, relayStatus = null }) {
       removeItem: (k) => { calls.storage.push(['remove', k]); },
     },
     document: {
+      documentElement: { lang },
       getElementById,
       querySelector: () => null,
       querySelectorAll: () => [],
@@ -145,6 +150,12 @@ function runPage({ keyResponses, sectorOk = true, relayStatus = null }) {
         const spec = keyResponses[Math.min(keyTurn++, keyResponses.length - 1)];
         return respond(spec);
       }
+      // "Signed in as ...": the page asks the same session check the
+      // navigation asks. Not a relay call, so it is not counted as one; it
+      // answers "not signed in" here so the row keeps its plain sentence.
+      if (String(url).endsWith('/api/user/session/verify')) return respond({ status: 200, body: verifyBody });
+      // The account's per-product plans, read once for the line under the limits.
+      if (String(url).endsWith('/api/user/me')) return respond({ status: 200, body: meBody });
       const headers = (opts && opts.headers) || {};
       calls.relay.push({ url: String(url), method: (opts && opts.method) || 'GET', headers });
       calls.sector += 1;
@@ -212,10 +223,17 @@ test('a 200 from /api/user/parasend/token gives the slim row, a usable button, a
   const slim = run.getElementById('ps-key-slim');
   assert.equal(slim.hidden, false, 'the slim row is shown');
   assert.equal(slim.classList.contains('is-loading'), false, 'the slim row stops claiming to be loading');
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Using your account');
-  assert.equal(run.getElementById('ps-key-mask').hidden, false, 'the masked credential is shown next to the label');
-  assert.match(run.getElementById('ps-key-mask').textContent, /^pst_.*\.\.\..{4}$/,
-    'the row shows a masked session token, and it says pst_ because that is what the page is holding');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'You are signed in; we send on behalf of your account.');
+  // Hertest r2 T5-11: "pst_4b4b...c589" said nothing to a person. No token on screen.
+  assert.equal(run.getElementById('ps-key-mask').hidden, true, 'no session token on the screen');
+  assert.doesNotMatch(run.getElementById('ps-key-mask').textContent, /pst_/, 'not even masked');
+  // Since 24 September 2026 the token is not on screen at all, not even
+  // masked: "pst_1e99...c811" next to "Change" read like a fault code to the
+  // owner. The row says who is signed in; the credential stays in memory.
+  for (const [id, el] of run.elements) {
+    assert.ok(!String(el.textContent || '').includes('pst_') && !String(el.innerHTML || '').includes('pst_'),
+      `#${id} puts the session token on screen; the sender is told who is signed in, never the credential`);
+  }
   assert.equal(run.getElementById('step-setup').classList.contains('manual-key'), false,
     'the manual card stays closed: #step-setup only carries .manual-key when the user asks for the box');
   assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), false, 'no banner on the happy path');
@@ -268,9 +286,10 @@ test('a 500 on the session token shows the banner, hides the slim row, and offer
 
 // ── 4. The banner's words, and the default state of the markup ──────────────
 test('/parashare ships the banner copy and opens on the slim row, not the manual card', () => {
-  assert.ok(PS_HTML.includes('Your account session could not be started. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
+  // Mick 05-10: taalronde
+  assert.ok(PS_HTML.includes('We could not sign you in. Sign in again. If it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
     'the banner must name the one thing to do and the one address to write to');
-  assert.match(PS_HTML, /data-click="expandApiKeyCard">Use a key by hand</, 'the banner must carry the manual way out');
+  assert.match(PS_HTML, /data-click="expandApiKeyCard">Your own server\?</, 'the banner must carry the manual way out');
   // error-message.js is a plain script and parashare.page.js reads
   // window.paramantErrors at call time, so the order of these two tags is what
   // decides whether this page speaks the shared failure sentence or its own
@@ -319,7 +338,7 @@ test('a sector that will not answer leaves the button live and reports itself at
 
   await evalIn(run, 'createSession()');
   const status = run.getElementById('create-status');
-  assert.match(status.textContent, /No relay sector answered/, 'pressing the button states the sector failure');
+  assert.match(status.textContent, /Our server did not answer/, 'pressing the button states the sector failure');
   assert.equal(status.className, 'status-line err');
   assert.equal(run.getElementById('session-link').textContent, '', 'and no session is created on a dead sector');
 });
@@ -345,19 +364,19 @@ test('the key banner leads with signing in again, and says who the manual key is
   const bannerAt = PS_HTML.indexOf('id="ps-key-error"');
   assert.ok(bannerAt > 0, 'the banner markup must still be findable by its id');
   const banner = PS_HTML.slice(bannerAt, bannerAt + 900);
-  assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Sign in again</,
+  assert.match(banner, /class="ps-alert-primary" href="\/en\/auth\/login">Sign in again</,
     'signing in again is the action that works on the hosted relay, so it is the primary');
-  assert.match(banner, /data-click="expandApiKeyCard">Use a key by hand</,
-    'the manual card must stay reachable for a self-host with no /api/user/account/key');
-  assert.match(banner, /for self-hosted relays/,
-    'a hosted customer must be told the manual key is not meant for them');
+  // Acceptatie 3.1.1 (taal 36): the button names who it is for, in four
+  // words, without "key" in the main text.
+  assert.match(banner, /data-click="expandApiKeyCard">Your own server\?</,
+    'the manual card must stay reachable for a self-host, and say who it is for');
   // Compared inside the action row, not the whole banner: the sentence above it
   // also says "Sign in again", and matching that would pass whatever the buttons
   // do.
   const actionsAt = banner.indexOf('class="ps-alert-actions"');
   assert.ok(actionsAt > 0, 'the banner must group its actions, so their order is a fact and not an accident of wrapping');
   const actions = banner.slice(actionsAt);
-  assert.ok(actions.indexOf('href="/auth/login"') < actions.indexOf('data-click="expandApiKeyCard"'),
+  assert.ok(actions.indexOf('href="/en/auth/login"') < actions.indexOf('data-click="expandApiKeyCard"'),
     'the primary action must come first in the markup, which is the order a screen reader and a phone both follow');
 });
 
@@ -476,9 +495,9 @@ test('a relay connection that drops before the receiver arrives says so, and off
 // for someone who wants to send a file. Verified by sabotage: put any of the
 // four words back into the flow, or drop the panel, and this fails by word.
 test('steps 1 and 2 are written for the sender, with the jargon moved into "How this works"', () => {
-  assert.match(PS_HTML, /<h1>Send a file that deletes itself<\/h1>/,
+  assert.match(PS_HTML, /<h1>Send a file safely<\/h1>/,
     'the heading says what the tool does for the reader, not what it is made of');
-  assert.match(PS_HTML, /<details class="ps-how">[\s\S]*?<summary>How this works<\/summary>/,
+  assert.match(PS_HTML, /<details class="ps-how">[\s\S]*?<summary>How does this work\?<\/summary>/,
     'the technical account must still be on the page, one click away');
   // Both names, inside the panel. This used to be a 400-character window
   // between them, which is a proxy for "in the same panel" that breaks the
@@ -491,7 +510,7 @@ test('steps 1 and 2 are written for the sender, with the jargon moved into "How 
     assert.ok(howPanel[1].includes(name),
       `the panel must keep the real names: moving the jargon may not mean losing ${name}`);
   }
-  assert.match(PS_HTML, /Choose a file \(or several\)/,
+  assert.match(PS_HTML, /<span class="ps-drop-btn" id="ps-drop-btn">Choose a file<\/span>/,
     'the file label must ask for a file, not announce vault mode');
 
   // The flow itself, steps 1 and 2 only, with the panel cut out.
@@ -652,4 +671,80 @@ test('a token that expires during a long session is replaced, before and after t
   assert.equal(answer.status, 401);
   assert.equal(mintDown.calls.key - spent, 1,
     'a call whose refresh already failed must not mint a second time on the 401 it was always going to get');
+});
+
+// ── De Nederlandse /parashare ───────────────────────────────────────────────
+// Dezelfde pagina in het Nederlands: dezelfde banner, dezelfde uitweg met de
+// hand, dezelfde regel dat stap 1 en 2 geen jargon tonen, en dezelfde code die
+// met lang="nl" Nederlandse zinnen op het scherm zet.
+test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => {
+  assert.match(PS_HTML_NL, /<html lang="nl">/, 'de Nederlandse pagina moet lang="nl" dragen, anders spreekt de code Engels');
+  // Mick 05-10: taalronde
+  assert.ok(PS_HTML_NL.includes('We konden u niet aanmelden. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
+    'de banner noemt het ene dat u kunt doen en het ene adres om te mailen');
+  const bannerAt = PS_HTML_NL.indexOf('id="ps-key-error"');
+  const banner = PS_HTML_NL.slice(bannerAt, bannerAt + 900);
+  assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Opnieuw inloggen</, 'opnieuw inloggen is de hoofdactie');
+  // Acceptatie 3.1.1 (taal 36): de knop zegt voor wie hij is, zonder "sleutel".
+  assert.match(banner, /data-click="expandApiKeyCard">Eigen server\?</, 'de uitweg voor een eigen server blijft bereikbaar');
+  assert.match(PS_HTML_NL, /<details class="ps-how">[\s\S]*?<summary>Hoe werkt dit\?<\/summary>/, 'de techniek staat een klik verder');
+  const howPanel = /<details class="ps-how">([\s\S]*?)<\/details>/.exec(PS_HTML_NL);
+  for (const name of ['ML-KEM-768', 'ML-DSA-65', 'AES-256-GCM']) {
+    assert.ok(howPanel && howPanel[1].includes(name), `het paneel houdt de echte naam ${name}`);
+  }
+  const flowText = PS_HTML_NL
+    .slice(PS_HTML_NL.indexOf('id="step-setup"'), PS_HTML_NL.indexOf('id="step-encrypting"'))
+    .replace(/<details class="ps-how">[\s\S]*?<\/details>/, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  for (const word of ['keypair', 'key pair', 'sleutelpaar', 'plaintext', 'ML-KEM', 'ML-DSA', 'AES-256', 'fingerprint', 'vingerafdruk', 'vault mode', 'blob']) {
+    assert.ok(!new RegExp(word, 'i').test(flowText), `stap 1 en 2 zeggen nog "${word}"`);
+  }
+  assert.match(PS_HTML_NL, /<div class="card-head-title">Vergelijk deze controlecode samen<\/div>/, 'de controlekaart heet naar wat u doet');
+  assert.match(PS_HTML_NL, /<span class="ps-step-label">3 &middot; Vergelijken<\/span>/, 'de stepper noemt dezelfde stap zo');
+
+  const run = await loadPage({ keyResponses: [ok200], lang: 'nl' });
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'U bent ingelogd; we versturen namens uw account.');
+  const leeg = await loadPage({ keyResponses: [{ status: 500, body: {} }], lang: 'nl' });
+  evalIn(leeg, 'expandApiKeyCard()');
+  assert.equal(leeg.getElementById('key-status').textContent, 'Vul uw API-sleutel in om verder te gaan',
+    'een leeg veld krijgt een uitnodiging, geen oordeel');
+});
+
+// ── Acceptatie 3.1.1: signed out is not an error ────────────────────────────
+// "Try it yourself" on the home page sends a new visitor to /parashare. He has
+// never signed in, the token route answers 401, and the page used to greet him
+// with the red "We could not sign you in. Sign in again." That banner is now
+// only for a session that is there and still fails; a visitor without one gets
+// the explanation with Create account and Sign in.
+// Verified by sabotage: make the catch call setKeyError(true) unconditionally
+// again and the first case goes red; drop the session probe and the second.
+test('a visitor without a session gets the signed-out explanation, not the red banner', async () => {
+  const run = await loadPage({ keyResponses: [{ status: 401, body: {} }], verifyBody: { authenticated: false } });
+  assert.equal(run.getElementById('ps-signedout').hidden, false, 'the signed-out explanation is shown');
+  assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), false, 'no failure banner for someone who never signed in');
+  assert.equal(run.getElementById('ps-key-slim').hidden, true, 'no "getting your account" row either');
+  assert.equal(pickAFile(run), false, 'sending still needs an account');
+  assert.equal(run.getElementById('ps-go-why').textContent, 'Sign in first, or create a free account.');
+  assert.deepEqual(run.consoleErrors, [], 'and nothing is reported as a failure');
+});
+
+test('a session that exists and still gets no token keeps the failure banner', async () => {
+  const run = await loadPage({ keyResponses: [{ status: 401, body: {} }], verifyBody: { authenticated: true, email: 'demo@example.com' } });
+  assert.equal(run.getElementById('ps-signedout').hidden, true, 'a signed-in customer is not told he is signed out');
+  assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), true, 'the failure is stated');
+  assert.equal(run.getElementById('ps-go-why').textContent, 'Sign in again first.');
+});
+
+test('both /parashare pages ship the signed-out block with sign-in and create-account links back to the page', () => {
+  for (const [html, signup, login] of [
+    [PS_HTML, 'href="/en/signup?next=/en/parashare"', 'href="/en/auth/login?next=/en/parashare"'],
+    [PS_HTML_NL, 'href="/signup?next=/parashare"', 'href="/auth/login?next=/parashare"'],
+  ]) {
+    const at = html.indexOf('id="ps-signedout"');
+    assert.ok(at > 0, 'the block is there');
+    const block = html.slice(at, html.indexOf('id="ps-key-error"'));
+    assert.ok(block.includes(signup) && block.includes(login), block);
+    assert.match(block, /Community/, 'it says what it costs: Community is free');
+    assert.ok(!/niet aanmelden|could not sign you in|opnieuw|again/i.test(block), 'and it is not an error message');
+  }
 });

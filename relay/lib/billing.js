@@ -17,6 +17,7 @@
 const catalog = require('./billing-catalog');
 const creditNote = require('./credit-note');
 const invoice = require('./invoice');
+const vat = require('./vat');
 
 // ── has any money gone back, and was it all of it ────────────────────────────
 // The document layer (credit-note.js) and this layer must agree about what
@@ -104,11 +105,18 @@ function keepLonger(candidate, currentPaidUntil) {
 }
 
 // deps: {
-//   setProductPlan(accountId, product, tier) -> { ok, ... }  (sync or async)
+//   setProductPlan(accountId, product, tier, paidUntil, bundle) -> { ok, ... }
+//   currentTermEnd(accountId, product, tier) -> date | null  (async; optional)
+//   currentPaidUntil(accountId, product) -> date | null      (async; optional,
+//                                  the one-date-per-product fallback)
 //   isProcessed(paymentId) -> boolean                        (async; optional)
-//   markProcessed(paymentId, value) -> void                  (async; optional)
+//   markProcessed(paymentId, value, { grants }) -> void      (async; optional)
+//   periodOf(paymentId) -> [{ product, tier, from, until }]  (async; optional,
+//                                  what a payment bought; a revoke takes back
+//                                  only that)
 // }
-// Returns { result, level, account, product, tier, reason }.
+// Returns { result, level, account, product, tier, reason }, and on a grant
+// also grants and paidUntil.
 //   result: 'granted' | 'revoked' | 'refused' | 'ignored'
 //   level:  log level; 'error' marks the "paid but got nothing" alert cases.
 async function processPayment(payment, deps) {
@@ -152,9 +160,60 @@ async function processPayment(payment, deps) {
     // EVERY product the order bought goes back to its floor. A bundle that
     // granted two entitlements and revoked one would leave the customer holding
     // half a plan he has taken the money back for.
+    //
+    // UNLESS WE KNOW WHAT THIS PAYMENT BOUGHT. A chargeback on month 2 used to
+    // floor the product and clear paid_until, so the paid month 1 went with it
+    // while its invoice stood without a credit note. When the ledger has the
+    // period this payment bought (deps.periodOf), only that period comes off
+    // the end of the same tier's term; what is left is what was paid for by
+    // other payments. Without it (payments settled before the ledger existed)
+    // the old rule stands: floor.
     const revoked = [];
+    let periods = null;
+    if (typeof d.periodOf === 'function') { try { periods = await d.periodOf(payment.id); } catch { periods = null; } }
+    const nowR = d.now instanceof Date ? d.now : new Date();
     for (const g of order.grants) {
       const floor = catalog.floorTier(g.product);
+      const per = Array.isArray(periods) ? periods.find((p) => p && p.product === g.product && p.tier === g.tier) : null;
+      // An included grant this payment did not demonstrably buy stays: a
+      // Business payment from before Business carried ParaSend Pro has no
+      // parasend period on record (or no ledger at all), and flooring here
+      // wiped the ParaSend Pro of a paid Firm year (review #573, M2).
+      if (g.included && !per) continue;
+      let cur = null;
+      if (per && typeof d.currentTermEnd === 'function') { try { cur = await d.currentTermEnd(accountId, g.product, g.tier); } catch { cur = null; } }
+      const span = per ? (new Date(per.until).getTime() - new Date(per.from).getTime()) : NaN;
+      const curMs = cur ? new Date(cur).getTime() : NaN;
+      // Undo a pause this payment caused on lower tiers of the product.
+      if (per && Array.isArray(per.paused) && typeof d.currentTermEnd === 'function') {
+        for (const pz of per.paused) {
+          let pe = null;
+          try { pe = await d.currentTermEnd(accountId, g.product, pz.tier); } catch { pe = null; }
+          const peMs = pe ? new Date(pe).getTime() : NaN;
+          if (!Number.isFinite(peMs) || !(pz.by > 0)) continue;
+          const back = new Date(Math.max(peMs - pz.by, nowR.getTime()));
+          try { await d.setProductPlan(accountId, g.product, pz.tier, back, null, { shorten: true }); } catch { /* logged by caller */ }
+        }
+      }
+      // Only when paid time is LEFT after taking this payment's period off:
+      // otherwise this payment was the whole term and the old rule (floor,
+      // period cleared) is exactly right. A term shortened to "now" would still
+      // read as running for the rest of a day where periods resolve per day.
+      if (per && Number.isFinite(span) && span > 0 && Number.isFinite(curMs) && curMs - span > nowR.getTime() + 60_000) {
+        const left = new Date(curMs - span);
+        try { await d.setProductPlan(accountId, g.product, g.tier, left, g.included ? undefined : (order.bundle || null), { shorten: true }); } catch { /* logged by caller */ }
+        revoked.push({ product: g.product, tier: left.getTime() > nowR.getTime() ? g.tier : floor, paidUntil: left.toISOString(), partial: true });
+        continue;
+      }
+      // This payment was an upgrade that paused a lower paid term (Pro year,
+      // then Business month on top): the pause was undone above, so only this
+      // payment's own tier comes off. Flooring here wiped the Pro year the
+      // customer still paid for (review #555, M2).
+      if (per && Array.isArray(per.paused) && per.paused.length) {
+        try { await d.setProductPlan(accountId, g.product, g.tier, new Date(nowR.getTime() - 1000), null, { shorten: true }); } catch { /* logged by caller */ }
+        revoked.push({ product: g.product, tier: String(per.paused[0].tier), partial: true });
+        continue;
+      }
       // null clears the period along with the tier: money reclaimed leaves no
       // paid time on record.
       try { await d.setProductPlan(accountId, g.product, floor, null, null); } catch { /* logged by caller via reason */ }
@@ -180,13 +239,16 @@ async function processPayment(payment, deps) {
   }
 
   if (status === 'paid') {
-    // Rule 2: the amount + currency actually paid must match the catalog.
+    // Rule 2: the amount + currency actually paid must match the catalog. A
+    // reverse-charged sale (lib/vat.js; the marker is on the payment, set by
+    // our own checkout) was charged the catalog price without the VAT.
     const paid = payment.amount && payment.amount.value;
     const cur = payment.amount && payment.amount.currency;
-    if (cur !== order.currency || !catalog.amountsEqual(paid, order.amount)) {
+    const expected = vat.chargeAmount(order, vat.termsFromMetadata(md));
+    if (cur !== order.currency || !catalog.amountsEqual(paid, expected)) {
       return {
         result: 'refused', level: 'error', account: accountId, product,
-        reason: `amount_mismatch paid=${paid}/${cur} expected=${order.amount}/${order.currency}`,
+        reason: `amount_mismatch paid=${paid}/${cur} expected=${expected}/${order.currency}`,
       };
     }
     // The period this payment bought. Without it the grant never ends: Mollie is
@@ -196,26 +258,77 @@ async function processPayment(payment, deps) {
     //
     // One anchor for the whole order, so a bundle writes ONE term across the
     // products it covers instead of two dates that drift apart on every renewal.
+    //
+    // The anchor is the end of the term of the SAME tier this order buys, per
+    // product (deps.currentTermEnd). A product holds a term per tier
+    // (entitlements.termsOf) and a gate sees the highest one still running, so
+    // buying one tier never moves the term of another. Until 2026-09-25 the
+    // anchor was the product's one date, whatever tier it belonged to: a
+    // Business month bought over a Firm year then started at the end of that
+    // year and ran thirteen months (betaaltest R2), and writing it replaced the
+    // Pro year it sat on (R3). The first repair started the month now and still
+    // replaced the year, so eleven paid months of Pro were gone after it (review
+    // of #515). Now the month is a Business term of its own, the year stays a
+    // Pro term under it, and when the month ends the year is what is left.
+    //
+    // A caller that only knows one date per product (currentPaidUntil) still
+    // works, for a product that holds one tier.
     const now = d.now instanceof Date ? d.now : new Date();
     const currents = [];
     for (const g of order.grants) {
-      currents.push(typeof d.currentPaidUntil === 'function' ? await d.currentPaidUntil(accountId, g.product) : null);
+      let cur = null;
+      if (typeof d.currentTermEnd === 'function') cur = await d.currentTermEnd(accountId, g.product, g.tier);
+      else if (typeof d.currentPaidUntil === 'function') cur = await d.currentPaidUntil(accountId, g.product);
+      currents.push(cur);
     }
-    const paidUntil = periodEnd(bundleExtendFrom(currents, now), interval);
+    // An INCLUDED grant (the ParaSend half of Business, billing-catalog
+    // BUNDLES.business) does not anchor the term: the price is for the grant
+    // it rides on. Otherwise a Business customer from before Business carried
+    // ParaSend, renewing early, would anchor on the ParaSend term he never had
+    // (now) instead of on the end of his Business term, and lose the days in
+    // between.
+    const anchoring = currents.filter((_, i) => !order.grants[i].included);
+    const paidUntil = periodEnd(bundleExtendFrom(anchoring.length ? anchoring : currents, now), interval);
     if (!paidUntil) {
       return { result: 'refused', level: 'error', account: accountId, product, reason: `no_period_for_interval:${interval}` };
     }
 
     // Grant each product in the order. setProductPlan moves ONE product per
-    // call and never touches a product this order does not name, so a ParaSign
-    // Business holder buying nothing keeps what he has. `bundle` is passed on so
-    // the expiry index can tell the customer what he actually bought.
+    // call and never touches a product this order does not name, and with a
+    // date it writes the term of this tier alone, so a ParaSign Business holder
+    // buying Firm keeps his Business term and gets a Pro term under it. `bundle`
+    // is passed on so the expiry index can tell the customer what he actually
+    // bought.
+    const anchor = bundleExtendFrom(anchoring.length ? anchoring : currents, now);
+    const span = paidUntil.getTime() - anchor.getTime();
+    // Where each grant's term starts and ends. An anchoring grant: the term
+    // above. An included grant whose own term already runs past the anchor
+    // (the ParaSend Pro of a Firm that runs on under a new Business month):
+    // that time is paused, exactly as pauseLowerTerms pauses a lower tier, so
+    // the span is added to its own end. Without this a Firm customer who
+    // bought a Business month kept ParaSign Pro a month longer and lost the
+    // ParaSend half of the same Firm on the original day: two end dates on
+    // /account for one purchase (betaaltest 05-10, row 8).
+    // It is a pause, so it happens where pausing does: a caller that pauses
+    // lower terms (deps.pauseLowerTerms, the relay) pauses this one too, and
+    // a caller that does not, pauses neither.
+    const pauses = typeof d.pauseLowerTerms === 'function';
+    const spans = order.grants.map((g, i) => {
+      const cur = currents[i] ? new Date(currents[i]) : null;
+      const runsOn = g.included && cur && !Number.isNaN(cur.getTime()) && cur.getTime() > anchor.getTime();
+      if (pauses && runsOn) return { from: cur, until: new Date(cur.getTime() + span), extends: true };
+      return { from: anchor, until: keepLonger(paidUntil, currents[i]), extends: false, keepsBundle: !!runsOn };
+    });
     const granted = [];
     for (let i = 0; i < order.grants.length; i++) {
       const g = order.grants[i];
-      const until = keepLonger(paidUntil, currents[i]);
+      const until = spans[i].until;
+      // An included grant that extends a running term keeps that term's
+      // bundle (undefined leaves it alone): the expiry mail is about what the
+      // customer bought for the LAST day, and that is still his Firm.
+      const bundle = (spans[i].extends || spans[i].keepsBundle) ? undefined : (order.bundle || null);
       let set;
-      try { set = await d.setProductPlan(accountId, g.product, g.tier, until, order.bundle || null); }
+      try { set = await d.setProductPlan(accountId, g.product, g.tier, until, bundle); }
       catch (e) { set = { ok: false, reason: e.message }; }
       if (!set || !set.ok) {
         return {
@@ -226,7 +339,26 @@ async function processPayment(payment, deps) {
       }
       granted.push({ product: g.product, tier: g.tier, paidUntil: until.toISOString() });
     }
-    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted'); } catch { /* best effort */ } }
+    // The period this payment bought, per product, so a later chargeback can
+    // take back exactly this and nothing paid before it.
+    const bought = order.grants.map((g, i) => ({ product: g.product, tier: g.tier,
+      from: spans[i].from.toISOString(),
+      until: (spans[i].extends ? spans[i].until : paidUntil).toISOString() }));
+    // An UPGRADE pauses what runs under it. A Firm customer who buys a month
+    // of ParaSign Business holds a ParaSign Pro term under it; without this
+    // the Pro weeks under the Business month were paid for and never used.
+    // deps.pauseLowerTerms moves the end of every lower running term of the
+    // product out by the span this payment bought, and says what it moved so
+    // a chargeback can move it back.
+    if (typeof d.pauseLowerTerms === 'function') {
+      for (const b of bought) {
+        try {
+          const moved = await d.pauseLowerTerms(accountId, b.product, b.tier, span);
+          if (Array.isArray(moved) && moved.length) b.paused = moved;
+        } catch { /* nothing moved; the grant itself stands */ }
+      }
+    }
+    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted', { grants: bought }); } catch { /* best effort */ } }
     return {
       result: 'granted', level: 'info', account: accountId, product, tier: order.tier,
       bundle: order.bundle || null,

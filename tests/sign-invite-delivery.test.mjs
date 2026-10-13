@@ -7,6 +7,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadPdfLibs } from './helpers/sign-pdf-libs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
@@ -107,6 +108,7 @@ await page.locator('.ds-mode-card[data-mode="invite"]').click();
 // A .txt used to go straight to the recipients through the hash-only path.
 // /sign refuses anything that is not a PDF now (tests/sign-signed-out.test.mjs
 // covers the refusal), so the delivery run takes the road a customer takes.
+await loadPdfLibs(page);
 await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   while (!window.PDFLib) await sleep(20);
@@ -128,31 +130,44 @@ await page.locator('[data-field="label"]').fill('Signer Demo');
 await page.locator('[data-field="email"]').fill('signer@example.com');
 await page.locator('#ds-invite-message').fill('Reference ACME-001');
 ok('email delivery is the visible default', await page.locator('input[name="ds-delivery-mode"][value="email"]').isChecked(), 'email');
-ok('recipient identity requirement is shown before sending', /must sign in with the invited email address/i.test(await page.locator('#ds-invite-delivery').innerText()), await page.locator('#ds-invite-delivery').innerText());
+ok('recipient identity requirement is shown before sending', /logt in met het uitgenodigde e-mailadres/i.test(await page.locator('#ds-invite-delivery').innerText()), await page.locator('#ds-invite-delivery').innerText());
 await page.locator('#ds-recipients-continue').click();
 await page.locator('#step-done:not([hidden])').waitFor({ timeout: 15000 });
 
 const firstInvite = invitationCalls[0]?.invitations?.[0];
 const firstUrl = firstInvite ? new URL(firstInvite.invite_url) : null;
 ok('document is uploaded once as an encrypted capsule', documentUploads.length === 1 && documentUploads[0].body?.subarray(0, 4).toString() === 'PSDC', JSON.stringify({ count: documentUploads.length, magic: documentUploads[0]?.body?.subarray(0, 4).toString() }));
-// The email is the notice; the key is not in it. The browser cuts the fragment
-// off before the invitation is posted, so the document key never reaches our
-// own server and can never be forwarded to a mail provider outside the EU.
-// What the sender is given instead is the complete link, on the screen, to pass
-// on over a channel they choose.
-ok('the posted invitation carries no document key', firstUrl && firstUrl.hash === '' && !firstInvite.invite_url.includes('#'), firstInvite?.invite_url);
+// The email never carries the document key. Since 2026-10-04 it carries HALF
+// of a split key ('#ks='): the other half went to the relay with the capsule
+// and is released only to the signed-in invitee. Each half alone is random;
+// together (xor) they are exactly the key in the sender's own complete link.
+const b64u = (v) => Buffer.from(String(v || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+const shareA = /^#ks=v1\.([A-Za-z0-9_-]{43})$/.exec(firstUrl?.hash || '');
+const shareB = documentUploads[0]?.headers?.['x-document-key-share'] || '';
+ok('the posted invitation carries a key share, never the key', !!shareA && !firstInvite.invite_url.includes('doc='), firstInvite?.invite_url);
+ok('the other share goes to the relay with the capsule, not in the mail', /^[A-Za-z0-9_-]{43}$/.test(shareB) && shareB !== shareA?.[1], shareB);
 ok('the posted invitation still names the request itself', firstUrl?.pathname === '/co-sign' && firstUrl?.searchParams.get('env') === ENV_ID && /^t{43}$/.test(firstUrl?.searchParams.get('t') || ''), firstUrl?.href);
-ok('the sender is shown the complete link, key and all', /#doc=v1\.[A-Za-z0-9_-]{43}$/.test((await page.locator('.ds-pl-url').first().getAttribute('title')) || ''), await page.locator('.ds-pl-url').first().getAttribute('title'));
-ok('the screen says the sender has to hand that link over', /now send them the links|send each person their link|needs their link from you|the key is in the link/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
+const fullLink = (await page.locator('.ds-pl-url').first().getAttribute('title')) || '';
+ok('the sender is shown the complete link, key and all', /#doc=v1\.[A-Za-z0-9_-]{43}$/.test(fullLink), fullLink);
+{
+  const whole = b64u(/#doc=v1\.([A-Za-z0-9_-]{43})$/.exec(fullLink)?.[1]);
+  const a = b64u(shareA?.[1]), b = b64u(shareB);
+  const joined = Buffer.alloc(32); for (let i = 0; i < 32; i++) joined[i] = a[i] ^ b[i];
+  ok('the two shares together are exactly the document key', whole.length === 32 && joined.equals(whole), whole.length);
+}
+// This run has a failed mail: whoever did not get one still needs the link.
+ok('the screen says a signer without a delivered mail needs the link', /eigen link van u nodig|eigen link hieronder zelf|stuur de persoonlijke links hieronder zelf/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
 ok('email invitation is bound to the intended party and address', firstInvite?.party_index === 0 && firstInvite?.email === 'signer@example.com', JSON.stringify(firstInvite));
-ok('partial email failure is not shown as success', /not every notice was delivered/i.test(await page.locator('#ds-success-banner').innerText()), await page.locator('#ds-success-banner').innerText());
+ok('partial email failure is not shown as success', /niet elk bericht is bezorgd/i.test(await page.locator('#ds-success-banner').innerText()), await page.locator('#ds-success-banner').innerText());
 ok('failed email offers a retry', await page.locator('#ds-invite-retry').isVisible(), await page.locator('#ds-invite-retry').innerText());
 ok('sender still has a copy-link fallback', await page.locator('.ds-pl-copy').isVisible(), await page.locator('.ds-pl-copy').innerText());
 
 await page.locator('#ds-invite-retry').click();
-await page.waitForFunction(() => /all notices were delivered/i.test(document.querySelector('#ds-invite-delivery-result')?.textContent || ''));
+// After a good retry the heading says it once ("Uitnodigingen verstuurd."); the
+// green band and a tick per person no longer repeat it (acceptance 3.1.1, 13).
+await page.waitForFunction(() => /Uitnodigingen verstuurd\./.test(document.querySelector('#step-done')?.innerText || ''));
 ok('retry sends only failed parties', invitationCalls.length === 2 && invitationCalls[1].invitations.length === 1 && invitationCalls[1].invitations[0].party_index === 0, JSON.stringify(invitationCalls[1]?.invitations));
-ok('successful retry clears the warning', /all notices were delivered/i.test(await page.locator('#ds-invite-delivery-result').innerText()) && !(await page.locator('#ds-invite-retry').isVisible()), await page.locator('#ds-invite-delivery-result').innerText());
+ok('successful retry clears the warning', await page.locator('#ds-invite-delivery-result').isHidden() && await page.locator('#ds-success-banner').isHidden() && !(await page.locator('#ds-invite-retry').isVisible()) && (await page.locator('.ds-invite-status').count()) === 0, await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
 ok('phone viewport has no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 
 // ── PDF variant: the requester points at the spot where the other party signs ──
@@ -183,6 +198,7 @@ await pdfPage.route(`**/api/user/envelopes/${ENV_ID}/invitations`, async (route)
 await pdfPage.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
 await pdfPage.locator('.ds-mode-card[data-mode="invite"]').click();
 ok('the invite stepper shows the Place step', await pdfPage.locator('.ds-stepper li[data-step="place"]').isVisible(), await pdfPage.locator('.ds-stepper').innerText());
+await loadPdfLibs(pdfPage);
 await pdfPage.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   while (!window.PDFLib) await sleep(20);
@@ -215,8 +231,8 @@ ok('the document is above the fold at 390', fold.canvasTop > 0 && fold.canvasTop
 ok('the Place step has no phone-width overflow', fold.overflow <= 1, JSON.stringify(fold));
 
 await pdfPage.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="1"]').click({ position: { x: 170, y: 100 } });
-ok('placing the box says who it is for', /asking for a signature on page 2/i.test(await pdfPage.locator('#ds-place-hint').innerText()), await pdfPage.locator('#ds-place-hint').innerText());
-ok('the marker asks rather than signs', /SIGNATURE REQUESTED/.test(await pdfPage.locator('.ds-stamp-marker').innerText()), await pdfPage.locator('.ds-stamp-marker').innerText());
+ok('placing the box says who it is for', /om een handtekening op pagina 2/i.test(await pdfPage.locator('#ds-place-hint').innerText()), await pdfPage.locator('#ds-place-hint').innerText());
+ok('the marker asks rather than signs', /HANDTEKENING GEVRAAGD/.test(await pdfPage.locator('.ds-stamp-marker').innerText()), await pdfPage.locator('.ds-stamp-marker').innerText());
 
 await pdfPage.locator('#ds-place-continue').click();
 await pdfPage.locator('#step-recipients:not([hidden])').waitFor();
@@ -235,7 +251,7 @@ ok('the requested position names the page that was clicked', seal?.page_index ==
 ok('the requested position is fractions of the page, y from the top',
   seal && [seal.x, seal.y, seal.w, seal.h].every((n) => typeof n === 'number' && n >= 0 && n <= 1)
   && seal.x + seal.w <= 1.000001 && seal.y + seal.h <= 1.000001
-  && seal.y < 0.4 && Math.abs(seal.w - 0.8) < 0.01 && Math.abs(seal.h - 0.25) < 0.01,
+  && seal.y < 0.4 && Math.abs(seal.w - 170 / 300) < 0.01 && Math.abs(seal.h - 70 / 400) < 0.01,   // STAMP_PDF_W x STAMP_PDF_H on a 300 x 400 page
   JSON.stringify(seal));
 await pdfPage.close();
 

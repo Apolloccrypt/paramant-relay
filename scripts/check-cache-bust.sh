@@ -10,6 +10,13 @@
 #   1. MISSING  — a local asset link with no ?v=N at all.
 #   2. SPLIT    — the same asset referenced with >1 distinct ?v= value
 #                 (two cache keys for one file; the "double-key" bug).
+#   3. STALE    - the asset's content differs from the base ref, but its ?v= is
+#                 not higher than the ?v= the base ref serves. A merge that
+#                 resolves a conflict back to the old number lands here: the new
+#                 file would ship under the old, immutable-cached url.
+#                 Base ref: $CACHE_BUST_BASE, default origin/main (what prod
+#                 runs). Without that ref (shallow clone) check 3 is skipped
+#                 with a notice, never silently passed.
 #
 # Run: scripts/check-cache-bust.sh   (exit 0 = clean, 1 = violations)
 set -euo pipefail
@@ -37,6 +44,39 @@ if [ -n "$split" ]; then
   echo "FAIL: assets referenced with more than one ?v= version (one file, two cache keys — unify them):"
   printf '%s\n' "$split"
   fail=1
+fi
+
+# ── Check 3: STALE version (content changed against base, ?v= not bumped) ──
+BASE="${CACHE_BUST_BASE:-origin/main}"
+if git -C "$ROOT" rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
+  # Highest ?v= per asset path as the base ref has it, over all its html.
+  basevers="$(git -C "$ROOT" grep -hoE '(href|src)="(\.?/[^"/][^"]*)\.(css|js|mjs)\?v=[0-9]+"' "$BASE" -- 'frontend/*.html' 2>/dev/null \
+    | sed -E 's#^(href|src)="([^"?]+)\?v=([0-9]+)"$#\2\t\3#' \
+    | awk -F'\t' '{if(!($1 in m) || $2+0>m[$1]+0) m[$1]=$2} END{for(k in m) print k"\t"m[k]}' || true)"
+  stale=""
+  while IFS=$'\t' read -r loc asset ver; do
+    [ -n "$ver" ] || continue
+    bv="$(printf '%s\n' "$basevers" | awk -F'\t' -v a="$asset" '$1==a{print $2; exit}')"
+    [ -n "$bv" ] || continue
+    html="${loc%:*}"
+    case "$asset" in
+      /*) file="$DIR$asset" ;;
+      *)  file="$(dirname "$html")/${asset#./}" ;;
+    esac
+    [ -f "$file" ] || continue
+    rel="${file#"$ROOT"/}"
+    git -C "$ROOT" cat-file -e "$BASE:$rel" 2>/dev/null || continue
+    if ! git -C "$ROOT" diff --quiet "$BASE" -- "$rel" && [ "$ver" -le "$bv" ]; then
+      stale="$stale  $loc  ->  $asset  v$ver (base $BASE has v$bv, content changed)"$'\n'
+    fi
+  done <<< "$refs"
+  if [ -n "$stale" ]; then
+    echo "FAIL: assets whose content changed against $BASE but whose ?v= was not raised (old immutable url, new code):"
+    printf '%s' "$stale"
+    fail=1
+  fi
+else
+  echo "cache-bust guard: NOTICE - base ref $BASE not available, STALE check (3) skipped"
 fi
 
 if [ "$fail" -eq 0 ]; then

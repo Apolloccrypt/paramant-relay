@@ -176,6 +176,10 @@ test('specific migration cases match the brief', () => {
   assert.strictEqual(biz.parasend.quotas.transfers_month, 2000);
   assert.deepStrictEqual(biz.parasend.limits, {
     file_mb: 500, devices: 100, view_ttl_ms: 604_800_000, max_views: 25, outbound_per_hour: 2000,
+    // The capacity ceiling belongs here too. It was missing, so relay.js read
+    // undefined, Number.isFinite said false, and the guard that bounds RAM per
+    // tenant was skipped on every upload since the day it was written.
+    concurrent_blobs: 108,
   });
   // And it is not a tier anyone can be sold or granted.
   assert.strictEqual(ent.PARASEND_TIERS.includes('business'), false);

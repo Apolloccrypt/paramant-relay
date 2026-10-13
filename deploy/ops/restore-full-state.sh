@@ -7,8 +7,13 @@
 # do anything without an explicit --confirm.
 #
 # Usage:
-#   # Inspect only (decrypt + verify manifest, touch nothing live):
+#   # Inspect only (decrypt + verify manifest, touch nothing live). The
+#   # decrypted copy is removed again when the script exits:
 #   ./restore-full-state.sh --from /path/to/paramant-full-<ts>.tar.gz.age --inspect
+#
+#   # Inspect and KEEP the decrypted bundle, in a directory you name. It holds
+#   # private keys and secrets in the clear; remove it yourself when done:
+#   ./restore-full-state.sh --from ... --inspect --extract-to /root/restore-work
 #
 #   # Real restore (as root, on the prod host):
 #   ./restore-full-state.sh --from /path/to/paramant-full-<ts>.tar.gz.age --confirm
@@ -24,11 +29,14 @@ REDIS_CONTAINER="${REDIS_CONTAINER:-paramant-relay-redis}"
 
 FROM=""
 MODE="none"   # none | inspect | confirm
+EXTRACT_TO=""
+KEEP=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --from) FROM="$2"; shift 2 ;;
     --inspect) MODE="inspect"; shift ;;
     --confirm) MODE="confirm"; shift ;;
+    --extract-to) EXTRACT_TO="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -36,6 +44,13 @@ done
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 [[ "$MODE" != "none" ]] || die "pass --inspect (safe) or --confirm (destructive)"
+if [[ -n "$EXTRACT_TO" ]]; then
+  [[ "$MODE" == "inspect" ]] || die "--extract-to only goes with --inspect"
+  if [[ -e "$EXTRACT_TO" ]]; then
+    [[ -d "$EXTRACT_TO" && -z "$(ls -A "$EXTRACT_TO" 2>/dev/null)" ]] \
+      || die "--extract-to $EXTRACT_TO exists and is not an empty directory"
+  fi
+fi
 command -v age >/dev/null 2>&1 || die "age not installed"
 
 if [[ -z "$FROM" ]]; then
@@ -47,8 +62,19 @@ fi
 
 echo "Restore source: $FROM"
 
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+# The decrypted bundle is private keys and secrets in the clear. It only
+# outlives this script when the operator named a directory for it with
+# --extract-to; every other path, including --inspect and every error, removes it.
+if [[ -n "$EXTRACT_TO" ]]; then
+  mkdir -p "$EXTRACT_TO" || die "cannot create $EXTRACT_TO"
+  chmod 700 "$EXTRACT_TO"
+  WORK=$(cd "$EXTRACT_TO" && pwd)
+  # On failure, do not leave a half-extracted secret tree behind either.
+  trap '[[ "$KEEP" == 1 ]] || rm -rf "$WORK"/paramant-full-*' EXIT
+else
+  WORK=$(mktemp -d)
+  trap 'rm -rf "$WORK"' EXIT
+fi
 
 echo "Decrypting + extracting..."
 age -d -i "$KEYFILE" "$FROM" | tar -xz -C "$WORK" || die "decrypt/extract failed"
@@ -78,10 +104,23 @@ echo ""
 echo "Relays in bundle:"; echo "$RELAYS" | sed 's/^/  /'
 [[ -d "$ROOT/redis" ]] && echo "Redis data: present" || echo "Redis data: absent"
 
+if [[ -d "$ROOT/host" ]]; then
+  echo ""
+  echo "Host configuration in bundle (restored by hand, see RUNBOOK.md):"
+  find "$ROOT/host" -mindepth 1 -maxdepth 3 -type d | sed "s|^$ROOT/host||; s/^/  /"
+fi
+
 if [[ "$MODE" == "inspect" ]]; then
   echo ""
-  echo "INSPECT mode: nothing live was touched. Extracted at: $ROOT"
-  trap - EXIT
+  echo "INSPECT mode: nothing live was touched."
+  if [[ -n "$EXTRACT_TO" ]]; then
+    KEEP=1
+    echo "!!! The decrypted bundle was KEPT at: $ROOT"
+    echo "!!! It holds private keys and secrets in the clear. Remove it when done:"
+    echo "!!!   rm -rf \"$ROOT\""
+  else
+    echo "The decrypted copy is removed now. Use --extract-to <dir> to keep it."
+  fi
   exit 0
 fi
 

@@ -13,9 +13,23 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=15';
-import { promptTotp } from '/js/totp-prompt.js?v=1';
-import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=1';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=23';
+import { promptTotp } from '/js/totp-prompt.js?v=2';
+import { vaultDelete } from '/vendor/vault.js?v=5';
+import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
+import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
+import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, paraafInset } from '/js/paraaf-place.js?v=5';
+import { requestsForParties, pageListText } from '/js/cosign-layout.js?v=5';
+import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=5';
+import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
+import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=4';
+import { sealPut } from '/js/account-seal.js?v=1';
+
+// One file, two languages. /sign is Dutch and /en/sign is the English copy of
+// the same page; both load this script, and the page's own lang attribute picks
+// the words. Dutch is the default, so a page without a lang reads Dutch.
+const EN = document.documentElement.lang === 'en';
+const L = (nl, en) => (EN ? en : nl);
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -26,9 +40,37 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 // State
 // ====================================================================
 
-const STAMP_PDF_W = 240;
-const STAMP_PDF_H = 100;
-const MAX_PREVIEW_PAGES = 30;
+// The default seal: 170 x 70 pt, about 29% of an A4 width. It used to be
+// 240 x 100 pt (40% of the width) with a solid white body, which covered the
+// text under it (retest 2026-10-04, T1-10). The body is now see-through with
+// a thin line, and the signer can still drag the corner to make it larger.
+const STAMP_PDF_W = 170;
+const STAMP_PDF_H = 70;
+// The date as the signer reads it: local time, no UTC 'Z' (retest T5-11).
+// The .psign keeps the exact ISO time; only what is drawn or shown is local.
+function localStamp(iso, withTime = true) {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return String(iso || '');
+  const p2 = (n) => String(n).padStart(2, '0');
+  const day = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  return withTime ? day + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) : day;
+}
+
+const MAX_PREVIEW_PAGES = 30;   // the review preview (step 4)
+// The Place step shows every page up to 300, the same cap as /co-sign: a
+// sender with a 35-page contract could not point at page 31 (retest T2-B1).
+// The first 30 render straight away, the rest as they scroll near.
+const MAX_PLACE_PAGES = 300;
+const EAGER_PLACE_PAGES = 30;
+
+// Preview robustness (see js/preview-render.js). One generation per surface, so
+// a newer render of the same pane stops an older one that is still awaiting
+// pdf.js, and one layout frame before measuring a pane that just became visible.
+const docPreviewGen = renderGeneration();
+const signedPreviewGen = renderGeneration();
+function nextFrame() {
+  return new Promise((resolve) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => resolve()) : setTimeout(resolve, 0)));
+}
 // Reusable placement template: ONLY the seal's relative position + scale and the
 // sign-every-page toggle. Never the signer name or the signature image (privacy).
 const PLACEMENT_TPL_KEY = 'parasign.placement.tpl.v1';
@@ -49,7 +91,7 @@ const state = {
   doc:  null,            // { bytes (Uint8Array), name, size }
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
   stampPage: null,       // { width, height } of the page state.stamp sits on, in that page's own units.
-  stampAllPages: false,  // PDF mode: repeat the seal on every page at the same relative spot.
+  stampAllPages: false,  // PDF mode: the seal on its page plus a small paraaf in a free margin corner of every other page.
   sealPlacement: 'inline', // PDF mode: inline, sheet, or both.
   pdfPageCount: null,    // PDF source page count, used to identify the appended sheet in the receipt.
   extras: [],            // PDF mode only. Types (all baked as pdf-lib vectors):
@@ -84,13 +126,15 @@ function hasInlineSeal() {
 }
 
 function describePdfMode() {
-  if (state.sealPlacement === 'sheet') return 'PDF with a separate referenced signature sheet';
+  if (state.sealPlacement === 'sheet') return state.stampAllPages
+    ? L('pdf met een apart handtekeningblad waarnaar wordt verwezen en een paraaf op elke pagina', 'PDF with a separate referenced signature sheet and initials on every page')
+    : L('pdf met een apart handtekeningblad waarnaar wordt verwezen', 'PDF with a separate referenced signature sheet');
   const inline = state.stampAllPages
-    ? 'visual stamp on every page'
-    : 'visual stamp on page ' + (state.stamp.pageIndex + 1);
+    ? L('zichtbare stempel op pagina ', 'visual stamp on page ') + (state.stamp.pageIndex + 1) + L(" en een paraaf op de andere pagina's", ' and initials on the other pages')
+    : L('zichtbare stempel op pagina ', 'visual stamp on page ') + (state.stamp.pageIndex + 1);
   return state.sealPlacement === 'both'
-    ? 'PDF with ' + inline + ' and a separate referenced signature sheet'
-    : 'PDF with ' + inline;
+    ? L('pdf met ', 'PDF with ') + inline + L(' en een apart handtekeningblad waarnaar wordt verwezen', ' and a separate referenced signature sheet')
+    : L('pdf met ', 'PDF with ') + inline;
 }
 
 // ====================================================================
@@ -109,6 +153,9 @@ function setActive(stepId) {
   // hand: at full height it kept the whole uploaded PDF below the fold on a
   // 390px screen (measured: first page at y=1231 of an 844px viewport).
   document.body.setAttribute('data-ds-step', stepId);
+  // Back on Place: the markers were left alone while it was hidden; draw them
+  // again now that the pages have a size (name or signature may have changed).
+  if (stepId === 'step-place' && placeState) requestAnimationFrame(() => { reflowStampMarker(); reflowGhostStamps(); reflowExtras(); });
   // Move focus to the new step's heading so keyboard + screen-reader users land
   // on the freshly revealed content (skip the very first render at page load).
   if (!__firstStepRender) {
@@ -118,6 +165,23 @@ function setActive(stepId) {
       if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
       try { heading.focus({ preventScroll: false }); } catch (e) { heading.focus(); }
     }
+  }
+  // A phone: bring the step, and so page 1 of the document, to the top of
+  // the screen (hertest r2 T5-12c: the document began at the bottom edge).
+  if (stepId === 'step-place') {
+    try {
+      if (window.matchMedia && window.matchMedia('(max-width: 600px)').matches) {
+        // After page 1 has a size: before that the page is too short to scroll.
+        const el = document.getElementById('ds-place-hint') || document.getElementById('step-place');
+        const t0 = Date.now();
+        const tick = () => {
+          const c = document.querySelector('#ds-pdf-canvas-list .ds-page-wrap canvas');
+          if (c && c.getBoundingClientRect().height > 0) { el.scrollIntoView({ block: 'start', behavior: 'auto' }); return; }
+          if (Date.now() - t0 < 5000 && document.body.getAttribute('data-ds-step') === 'step-place') setTimeout(tick, 60);
+        };
+        tick();
+      }
+    } catch (e) { /* no scrolling, nothing lost */ }
   }
   __firstStepRender = false;
   document.querySelectorAll('.ds-stepper li').forEach(li => {
@@ -159,6 +223,80 @@ function hiDpiScale() {
   return Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
 }
 
+// ── Canvas limits (iOS) ──────────────────────────────────────────────────────
+// WebKit draws a canvas larger than about 4096 px a side or 16.7 M pixels as a
+// blank, silently: no error, just white (diagnosis of 2026-06-24, PR #249). At
+// devicePixelRatio 3 and some zoom a page passes that easily, and on an iPhone
+// the page, or the seal page in the review, came up empty. So every page canvas
+// is capped before it is drawn, devicePixelRatio included (the CSS size, and so
+// every coordinate, stays the same; only the sharpness gives), and checked
+// after it is drawn: still blank means render smaller, and in the end say so
+// on the page instead of showing a white sheet.
+// window.__paramantCanvasCap = { side, area } overrides the cap (tests only).
+function canvasCap() {
+  const o = window.__paramantCanvasCap;
+  return { side: (o && o.side) || 4096, area: (o && o.area) || 16000000 };
+}
+
+// The largest factor <= 1 by which a w x h backing store must shrink to fit.
+function canvasFit(w, h) {
+  const cap = canvasCap();
+  return Math.min(1, cap.side / Math.max(1, w), cap.side / Math.max(1, h), Math.sqrt(cap.area / Math.max(1, w * h)));
+}
+
+// True when nothing was drawn: every pixel of a small copy is transparent. A
+// rendered PDF page is opaque (pdf.js paints the paper white first).
+function canvasLooksBlank(canvas) {
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = 24; probe.height = 24;
+    const ctx = probe.getContext('2d');
+    ctx.drawImage(canvas, 0, 0, 24, 24);
+    const d = ctx.getImageData(0, 0, 24, 24).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] !== 0) return false;
+    return true;
+  } catch (e) {
+    return false;   // cannot tell: assume it drew
+  }
+}
+
+// Render one pdf.js page into canvas at (up to) scale, within the canvas cap,
+// retrying smaller while the result is blank. onTask(task) lets the caller
+// cancel. Returns { viewport, ok }. RenderingCancelledException propagates.
+async function renderPageCapped(page, canvas, scale, onTask) {
+  const base = page.getViewport({ scale: 1 });
+  let s = scale * canvasFit(base.width * scale, base.height * scale);
+  let viewport = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    viewport = page.getViewport({ scale: s });
+    canvas.width = Math.max(1, Math.floor(viewport.width));
+    canvas.height = Math.max(1, Math.floor(viewport.height));
+    const task = page.render({ canvasContext: canvas.getContext('2d'), viewport });
+    if (onTask) onTask(task);
+    await task.promise;
+    if (!canvasLooksBlank(canvas)) { clearBlankNote(canvas); return { viewport, ok: true }; }
+    s /= 2;
+  }
+  showBlankNote(canvas);
+  return { viewport, ok: false };
+}
+
+function clearBlankNote(canvas) {
+  const host = canvas.parentElement;
+  const n = host && host.querySelector(':scope > .ds-blank-note');
+  if (n) n.remove();
+}
+
+function showBlankNote(canvas) {
+  const host = canvas.parentElement;
+  if (!host || host.querySelector(':scope > .ds-blank-note')) return;
+  const n = document.createElement('div');
+  n.className = 'ds-blank-note';
+  n.setAttribute('role', 'note');
+  n.textContent = L('Deze browser kan deze pagina niet tonen. Het document zelf is in orde en wordt volledig ondertekend. Zoom uit, of open de pagina op een computer om hem te zien.', 'This browser cannot show this page. The document itself is fine and is signed in full. Zoom out, or open the page on a computer to see it.');
+  host.appendChild(n);
+}
+
 // CSP on this site allows img-src 'self' data: (no blob:), so previews for
 // drawn/uploaded signatures and for image documents must go through a
 // data: URL or they fail silently and only show the alt text.
@@ -175,23 +313,253 @@ function bytesToDataUrl(bytes, mime) {
 // Async libraries
 // ====================================================================
 
+// Both PDF libraries are loaded on demand, the first time a document is
+// picked, and not with the page: together with the PDF.js worker they are
+// about 2.2 MB that a visitor who only reads /sign never needs. Asking twice
+// is harmless: the tag is added once and the sticky signal (js/ready.js)
+// answers everyone who waits on it.
+const PDFJS_LOADER = '/vendor/pdfjs/pdfjs-loader.js?v=3';
+const PDFLIB_SRC = '/vendor/pdf-lib/pdf-lib.min.js?v=1';
+
+function loadScriptOnce(src, isModule) {
+  if (document.querySelector('script[src="' + src + '"]')) return;
+  const el = document.createElement('script');
+  if (isModule) el.type = 'module';
+  el.src = src;
+  document.head.appendChild(el);
+}
+
+// Called when a file is chosen, so the libraries are on their way while the
+// bytes are still being read.
+function preloadPdfLibs() {
+  loadScriptOnce(PDFJS_LOADER, true);
+  loadScriptOnce(PDFLIB_SRC, false);
+}
+
+// And once the page has painted, in idle time: the first screen stays light,
+// but by the time someone has picked a file the libraries are already here.
+// Loading them only on the pick made the step after it wait for 2 MB, which
+// sign-e2e caught on 2026-09-23.
+(function preloadWhenIdle() {
+  const go = () => preloadPdfLibs();
+  const idle = () => ('requestIdleCallback' in window) ? requestIdleCallback(go, { timeout: 2000 }) : setTimeout(go, 200);
+  if (document.readyState === 'complete') idle();
+  else window.addEventListener('load', idle, { once: true });
+})();
+
 async function waitForPdfjs() {
   // Sticky signal, so it does not matter whether the loader module ran before
   // or after this file. See js/ready.js.
+  loadScriptOnce(PDFJS_LOADER, true);
   return window.ready.within('pdfjs', 10000, 'PDF.js');
 }
 
 async function waitForPdfLib() {
   if (window.PDFLib) return window.PDFLib;
+  loadScriptOnce(PDFLIB_SRC, false);
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const tick = () => {
       if (window.PDFLib) return resolve(window.PDFLib);
-      if (Date.now() - start > 10000) return reject(new Error('pdf-lib failed to load'));
+      if (Date.now() - start > 10000) return reject(new Error(L('De pdf-lezer laadde niet', 'The PDF reader did not load')));
       setTimeout(tick, 50);
     };
     tick();
   });
+}
+
+// ====================================================================
+// Paraaf placement: the text layer of every page, read once per document
+// ====================================================================
+
+// The paraaf on the "other" pages goes in a free margin corner (see
+// js/paraaf-place.js). Finding a free corner needs the text positions, which
+// pdf.js gives per page. They are read ONCE per document and shared by the
+// placement preview, the review preview and the baked PDF, so all three put the
+// paraaf on the same spot. A page whose text cannot be read gets null, which
+// means bottom right (a scanned page has no text layer to avoid).
+let _textBoxCache = null;   // { bytes, promise, value, geoms }
+
+// The boxes come back in VIEW space (the page as pdf.js shows it: the visible
+// box, turned by /Rotate), the space every on-screen position lives in. The
+// page geometry pdf.js used is kept next to them (entry.geoms), so the bake
+// maps view space onto the PDF with exactly the box and rotation the signer
+// was shown, never a second opinion from another library.
+function loadTextBoxes(bytes) {
+  if (_textBoxCache && _textBoxCache.bytes === bytes) return _textBoxCache.promise;
+  const entry = { bytes, value: null, promise: null, geoms: [] };
+  entry.promise = (async () => {
+    try {
+      const pdfjs = await waitForPdfjs();
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
+      const out = [];
+      // The same cap as the pages shown, and the page free between pages: a
+      // pdf of 2.000 empty pages was rendered page after page (review r2 (g)).
+      const n = Math.min(pdf.numPages, MAX_PLACE_PAGES);
+      for (let i = 1; i <= n; i++) {
+        if (i > 1) await new Promise((r) => setTimeout(r, 0));
+        try {
+          const page = await pdf.getPage(i);
+          const geom = { view: Array.from(page.view), rotate: normaliseRotation(page.rotate), uu: validUserUnit(page.userUnit) };
+          entry.geoms[i - 1] = geom;
+          // pdf.js shows a /UserUnit page enlarged (the viewport, and so every
+          // on-screen position, is userUnit x user space); the text matrices are
+          // in plain user space. Bring the text into the viewport's units.
+          let boxes = scaleBoxes(userBoxesToView(textBoxesFromItems((await page.getTextContent()).items), geom), geom.uu);
+          // A scanned page has no text to read: look at it instead, so the
+          // paraaf does not land on its page number (acceptance test 2026-10-04).
+          if (!boxes.length) boxes = await inkBoxesOfPage(page);
+          out.push(boxes);
+        } catch (e) { out.push(null); }
+      }
+      return out;
+    } catch (e) {
+      return null;   // no text layer at all: every paraaf goes bottom right
+    }
+  })().then((v) => { entry.value = v || []; return entry.value; });
+  _textBoxCache = entry;
+  return entry.promise;
+}
+
+// Dark pixels on a small render of the page, as boxes in view-space points
+// (js/paraaf-place.js inkBoxesFromImageData).
+async function inkBoxesOfPage(page) {
+  try {
+    const vp1 = page.getViewport({ scale: 1 });
+    const scale = 360 / vp1.width;
+    if (!(Number.isFinite(scale) && scale > 0)) return null;
+    const vp = page.getViewport({ scale });
+    const c = document.createElement('canvas');
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    if (!(c.width > 0 && c.height > 0 && c.height <= 8192)) return null;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    return inkBoxesFromImageData(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, vp1.width, vp1.height);
+  } catch (e) { return null; }   // unknown, not "empty"
+}
+
+// The cached boxes when they are already read, else undefined.
+function textBoxesIfReady(bytes) {
+  return (_textBoxCache && _textBoxCache.bytes === bytes && _textBoxCache.value) || undefined;
+}
+
+// The view geometry of every page of bytes, as pdf.js read it in
+// loadTextBoxes; a page pdf.js could not read falls back to pdf-lib's boxes
+// under the same rule (see geomFromBoxes).
+async function pageGeoms(bytes, pdfLibPages) {
+  await loadTextBoxes(bytes);
+  const fromPdfjs = (_textBoxCache && _textBoxCache.bytes === bytes) ? _textBoxCache.geoms : [];
+  return pdfLibPages.map((pg, i) => {
+    if (fromPdfjs[i]) return fromPdfjs[i];
+    const box = (b) => { try { const r = b(); return [r.x, r.y, r.x + r.width, r.y + r.height]; } catch (e) { return null; } };
+    let rot = 0; try { rot = pg.getRotation().angle; } catch (e) { /* unturned */ }
+    let uu = 1;
+    try { const v = pg.node.lookup(window.PDFLib.PDFName.of('UserUnit')); uu = validUserUnit(v && v.asNumber ? v.asNumber() : 1); } catch (e) { /* 1 */ }
+    return { ...geomFromBoxes(box(() => pg.getMediaBox()), box(() => pg.getCropBox()), rot), uu };
+  });
+}
+
+// ── /UserUnit (PDF 1.6): one user-space unit is userUnit/72 inch ─────────────
+// pdf.js scales the viewport by it, so every position the signer makes is in
+// "view units" = userUnit x user space; pdf-lib draws in user space. The sweep
+// of 2026-10-04 found the seal off the page (userunit-2) or missing
+// (userunit-10). js/paraaf-place.js knows nothing of it (co-sign shares that
+// module), so the scaling lives here: geom.uu next to view and rotate.
+function validUserUnit(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 && n <= 75000 ? n : 1;
+}
+function scaleBoxes(boxes, k) {
+  if (!Array.isArray(boxes) || k === 1) return boxes;
+  return boxes.map((b) => ({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k }));
+}
+function geomUU(g) { return g && g.uu > 0 ? g.uu : 1; }
+// The page as the signer sees it, in view units.
+function geomViewSize(g) {
+  const s = viewSize(g), k = geomUU(g);
+  return k === 1 ? s : { width: s.width * k, height: s.height * k };
+}
+// View units -> user space: first undo the userUnit, then the rotation/crop.
+function geomMatrix(g) {
+  const m = viewToUserMatrix(g), k = 1 / geomUU(g);
+  return k === 1 ? m : [m[0] * k, m[1] * k, m[2] * k, m[3] * k, m[4], m[5]];
+}
+function geomIsIdentity(g) { return geomUU(g) === 1 && isIdentityGeom(g); }
+
+// The paraaf plan for the current document: one box per page other than the
+// seal page. pages: [{width,height}] in PDF points, from whatever the caller
+// renders or bakes (pdf.js viewport in the preview, pdf-lib getSize when baking).
+// Without a seal in the document (signature sheet only) every page gets one:
+// the sheet carries the signature, the parafen still go on every page of the
+// document itself (acceptatie r4, Nieuw 2).
+function paraafPlanFor(pages, stamp, textBoxes) {
+  const plan = stamp
+    ? planParaafs(pages, stamp.pageIndex, { w: stamp.w, h: stamp.h }, textBoxes)
+    : planParaafs(pages, -1, null, textBoxes);
+  // planParaafs tries the four corners at three sizes and, when none is free,
+  // returns bottom right with free:false, over the text. Nobody read that flag,
+  // so the paraaf went over the contract text without a word (PDF sweep
+  // 2026-10-04, B1: a0-contract, mini-a7, cropbox-smaller). Look further first:
+  // smaller, and anywhere along the four margin bands. Still nothing free:
+  // keep the spot, but mark it overText so the signer is told, never silently.
+  return plan.map((box) => {
+    if (box.free !== false) return box;
+    const pg = pages[box.pageIndex];
+    const boxes = Array.isArray(textBoxes) ? textBoxes[box.pageIndex] : null;
+    const better = pg && Array.isArray(boxes) ? marginBandSpot(pg.width, pg.height, box.w / 0.65, box.h / 0.65, boxes) : null;
+    return better ? { ...box, ...better, free: true, band: true } : { ...box, overText: true };
+  });
+}
+
+// A free spot for a paraaf of base size w x h on a page, looked for along the
+// margin bands (right, left, bottom, top), from full size down to 40%. Same
+// inset and the same 3 pt breathing room as js/paraaf-place.js.
+function marginBandSpot(pageW, pageH, w0, h0, boxes) {
+  const pad = 3;
+  const m = paraafInset(pageW, pageH);
+  const hits = (b) => boxes.some((t) => b.x < t.x + t.w + pad && t.x < b.x + b.w + pad && b.y < t.y + t.h + pad && t.y < b.y + b.h + pad);
+  for (const k of [1, 0.8, 0.65, 0.5, 0.4]) {
+    const w = w0 * k, h = h0 * k;
+    if (!(w > 0 && h > 0) || w > pageW - 2 * m.x || h > pageH - 2 * m.y) continue;
+    const xs = [pageW - m.x - w, m.x];
+    const ys = [m.y, pageH - m.y - h];
+    const cands = [];
+    for (const x of xs) for (let y = m.y; y <= pageH - m.y - h; y += Math.max(2, h / 2)) cands.push({ x, y });
+    for (const y of ys) for (let x = m.x; x <= pageW - m.x - w; x += Math.max(2, w / 2)) cands.push({ x, y });
+    for (const c of cands) {
+      const b = { x: c.x, y: c.y, w, h };
+      if (!hits(b)) return b;
+    }
+  }
+  return null;
+}
+
+// The pages (1-based) where the paraaf could only go over the text.
+function paraafOverTextPages(plan) {
+  return (plan || []).filter((b) => b && b.overText).map((b) => b.pageIndex + 1);
+}
+
+// Say it where the signer looks: under the placement hint, and again on the
+// review step. Empty list: the notice goes away.
+function showParaafOverTextNotice(pagesOver) {
+  for (const [anchorId, noticeId] of [['ds-place-hint', 'ds-paraaf-over-text'], ['ds-review-doc-preview', 'ds-paraaf-over-text-review']]) {
+    const anchor = $(anchorId);
+    let el = $(noticeId);
+    if (!pagesOver.length) { if (el) el.remove(); continue; }
+    if (!anchor) continue;
+    if (!el) {
+      el = document.createElement('p');
+      el.id = noticeId;
+      el.className = 'ds-banner err';
+      el.setAttribute('role', 'alert');
+      anchor.insertAdjacentElement('afterend', el);
+    }
+    const list = pagesOver.length > 8 ? pagesOver.slice(0, 8).join(', ') + ' …' : pagesOver.join(', ');
+    el.textContent = (pagesOver.length === 1 ? L('Op pagina ', 'On page ') : L("Op pagina's ", 'On pages ')) + list
+      + L(' is in de marge geen vrije plek: de paraaf komt daar over de tekst (rood omlijnd). Wilt u dat niet, zet dan "Onderteken elke pagina" uit.',
+          ' the margin has no free spot: the initials go over the text there (outlined in red). If you do not want that, switch off "Sign every page".');
+  }
 }
 
 // ====================================================================
@@ -211,6 +579,7 @@ function initStepMode() {
 // Show only the stepper items this mode uses, and label the last one 'Send'
 // for the invite (request-signatures) flow.
 function setStepperForMode(mode) {
+  applyModeCopy(mode);
   const steps = {
     alone:  ['doc', 'place', 'identity', 'sign'],
     cosign: ['doc', 'place', 'recipients', 'identity', 'sign'],
@@ -221,22 +590,105 @@ function setStepperForMode(mode) {
   document.querySelectorAll('.ds-stepper li').forEach(li => { li.hidden = !steps.includes(li.dataset.step); });
   const stepper = $('ds-stepper'); if (stepper) stepper.hidden = false;
   const signLi = document.querySelector('.ds-stepper li[data-step="sign"]');
-  if (signLi) signLi.textContent = (mode === 'invite') ? 'Send' : 'Sign';
+  if (signLi) signLi.textContent = (mode === 'invite') ? L('Versturen', 'Send') : L('Ondertekenen', 'Sign');
+}
+
+// ── Server limits, said in words ──────────────────────────────────────────────
+// The signing chain throws Error(data.error || 'http_' + status), and a few
+// places showed that message as is: a customer read "http_429". A rate limit
+// and the sender's monthly allowance get their own sentence; any other bare
+// code (http_502, some_snake_code) is never put on screen.
+function waitPhrase(seconds) {
+  const s = Number(seconds);
+  if (!(s > 0) || s <= 75) return L('over een minuut', 'in a minute');
+  if (s < 3600) { const m = Math.ceil(s / 60); return L(`over ${m} minuten`, `in ${m} minutes`); }
+  const h = Math.ceil(s / 3600);
+  return h >= 20 ? L('morgen', 'tomorrow') : L(`over ${h} uur`, `in ${h} hours`);
+}
+
+function limitMessage(e) {
+  if (!e) return null;
+  const code = (e.data && e.data.error) || e.message || '';
+  if (e.status === 402 && code === 'sender_sign_quota_reached') {
+    return L('Het tegoed van de afzender voor deze maand is op; de afzender krijgt daar een e-mail over.', "The sender's signing allowance for this month is used up; the sender gets an email about it.");
+  }
+  // The relay refuses a request that needs more signatures than the plan has
+  // left this month (relay.js, sign_quota_insufficient), BEFORE anything is
+  // created. It sends the numbers; say them, and that nothing was sent.
+  if (code === 'sign_quota_insufficient') {
+    const d = e.data || {};
+    const needed = Number(d.needed), room = Number(d.room);
+    if (Number.isFinite(needed) && Number.isFinite(room)) {
+      return L(`Dit verzoek vraagt ${needed} handtekening${needed === 1 ? '' : 'en'} en uw plan heeft deze maand nog ruimte voor ${room}. Er is niets aangemaakt of verstuurd. Kies minder ondertekenaars, wacht tot open verzoeken klaar zijn of verhoog uw plan.`,
+        `This request needs ${needed} signature${needed === 1 ? '' : 's'} and your plan has room for ${room} this month. Nothing has been created or sent. Choose fewer signers, wait for open requests to finish, or upgrade your plan.`);
+    }
+    return L('Uw plan heeft deze maand niet genoeg handtekeningen meer voor dit verzoek. Er is niets aangemaakt of verstuurd.', 'Your plan does not have enough signatures left this month for this request. Nothing has been created or sent.');
+  }
+  // A document over the limit: the server says the limit and, for a request,
+  // that the empty request was withdrawn again (admin/server.js).
+  if (code === 'document_too_large') {
+    if (e.code === 'document_too_large' && e.message && !/^[a-z0-9_]+$/.test(e.message)) return null;
+    const mb = e.data && Number(e.data.max_mb) > 0 ? Number(e.data.max_mb) : 5;
+    return L(`Dit document is te groot (maximaal ${mb} MB). Er is niets verstuurd.`, `This document is too large (maximum ${mb} MB). Nothing has been sent.`);
+  }
+  if (e.status === 429 || code === 'http_429' || code === 'too_many_requests') {
+    // Retry-After as the relay and admin put it in the body (the header is not
+    // readable through the signing chain); nginx's own 429 has neither.
+    const wait = e.data && (e.data.retry_after_s != null ? e.data.retry_after_s : e.data.retry_after);
+    return L('Even te veel tegelijk. Probeer het ', 'Too much at once just now. Please try again ') + waitPhrase(wait) + L(' opnieuw.', '.');
+  }
+  return null;
+}
+
+// e.message when it is a sentence; the fallback when it is a bare code.
+function readableError(e, fallback) {
+  const lim = limitMessage(e);
+  if (lim) return lim;
+  const m = e && typeof e.message === 'string' ? e.message.trim() : '';
+  if (!m || /^http_\d+$/.test(m) || /^[a-z0-9]+(_[a-z0-9]+)+$/.test(m)) return fallback;
+  return m;
+}
+
+// The words of the document and recipients steps follow the chosen setup.
+// In the invite flow the requester signs nothing, so "the document you want to
+// sign" and "put your stamp on it" were wrong (retest T5-12d), and the line
+// that the key had to be passed on by hand no longer matched what the
+// invitation mail does: it opens the document for the invited account (T5-3).
+function applyModeCopy(mode) {
+  const set = (sel, text) => { const el = document.querySelector(sel); if (el && text) el.textContent = text; };
+  if (mode === 'invite') {
+    set('#step-doc h2', L('Kies het document dat anderen moeten tekenen', 'Choose the document others need to sign'));
+    set('#step-doc .ds-sub', L('ParaSign werkt met pdf-bestanden. Kies een pdf; daarna wijst u aan waar getekend moet worden. Het bestand blijft in deze browser tot u het versleuteld verstuurt.', 'ParaSign works with PDF files. Choose a PDF; next you point out where to sign. The file stays in this browser until you send it encrypted.'));
+    set('#step-recipients h2', L('Wie moet er tekenen?', 'Who needs to sign?'));
+    // The stepper tab says it the same way (hertest r2: it still read
+    // "Medeondertekenaars" while the sender signs nothing here).
+    set('.ds-stepper li[data-step="recipients"]', L('Ondertekenaars', 'Signers'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet tekenen. Ieder krijgt een eigen uitnodiging per e-mail. Het document opent na inloggen met dat e-mailadres. U hoeft daarna niets meer te sturen.', 'Add everyone who needs to sign. Each person gets their own invitation by email. The document opens once they sign in with that address. There is nothing more for you to send.'));
+  } else {
+    set('#step-doc h2', L('Kies het document dat u wilt ondertekenen', 'Choose the document you want to sign'));
+    set('#step-doc .ds-sub', L('ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.', 'ParaSign signs PDF files. Choose a PDF and put your stamp on a page of your choice. The file stays in this browser.'));
+    set('#step-recipients h2', L('Medeondertekenaars toevoegen (optioneel)', 'Add co-signers (optional)'));
+    set('.ds-stepper li[data-step="recipients"]', L('Medeondertekenaars', 'Co-signers'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. U tekent eerst. Daarna krijgt ieder een eigen uitnodiging per e-mail. Het document met uw handtekening opent na inloggen met dat e-mailadres.', 'Add everyone who needs to co-sign. You sign first. Then each person gets their own invitation by email. The document with your signature opens once they sign in with that address.'));
+  }
 }
 
 function enterRecipients() {
   setActive('step-recipients');
+  applyModeCopy(state.signingMode);
   const cont = $('ds-recipients-continue');
-  if (cont) { cont.textContent = (state.signingMode === 'invite') ? 'Send for signature' : 'Continue'; cont.disabled = false; }
+  if (cont) { cont.textContent = (state.signingMode === 'invite') ? L('Versturen om te laten tekenen', 'Send for signature') : L('Verder', 'Continue'); cont.disabled = false; }
   const hint = $('ds-recipients-hint'); if (hint) hint.hidden = true;
   const delivery = $('ds-invite-delivery');
-  if (delivery) delivery.hidden = state.signingMode !== 'invite';
+  // Both setups with other signers deliver the same way: one invitation per
+  // person that opens the document after sign-in (COSIGN-02).
+  if (delivery) delivery.hidden = state.signingMode !== 'invite' && state.signingMode !== 'cosign';
   // The default subject used to be 'Please sign: ' + the filename, which posted
   // the filename to a mail provider outside the EU without the sender ever
   // deciding to. A filename is content. The default says nothing about the file;
   // the sender can still type whatever they like in a field they can see.
-  if (state.signingMode === 'invite' && !state.inviteSubject && state.doc) {
-    state.inviteSubject = 'Signature requested';
+  if ((state.signingMode === 'invite' || state.signingMode === 'cosign') && !state.inviteSubject && state.doc) {
+    state.inviteSubject = L('Verzoek om te ondertekenen / Signature requested', 'Signature requested');
     const subject = $('ds-invite-subject'); if (subject) subject.value = state.inviteSubject;
   }
   renderRecipients();
@@ -252,27 +704,102 @@ function commitInviteDeliveryFromDom() {
   state.inviteMessage = ($('ds-invite-message')?.value || '').trim();
 }
 
-// The link that goes into an email is the notice, not the key. `sign_path`
-// carries the document key after the '#', and the mail leaves our infrastructure
-// through a US mail provider, so the fragment is cut off here, in the browser,
-// before the invitation is handed to our own server. The key stays on this
-// device and travels only over the channel the sender picks themselves; the
-// server refuses an invite_url that still carries a fragment, so a modified
-// client cannot put one back.
+// The link that goes into an email never carries the document key. `sign_path`
+// carries the whole key after the '#' (for links the sender passes on
+// themselves); that fragment is cut off here, in the browser. What the mail
+// gets instead is HALF of a split key ('#ks=', see js/parasign-ink.js): the
+// relay holds the other half and releases it only to the invited mailbox once
+// it is signed in. So the invitation opens the document for the invitee, and
+// the mail provider, holding one half and no ciphertext, can open nothing. The
+// server refuses any other fragment.
 function noticeUrl(signPath) {
-  return (location.origin + signPath).split('#')[0];
+  return (location.origin + signPath).split('#')[0] + (state.keyShareFragment || '');
+}
+
+// The same links, kept in THIS browser only, so the dashboard can send a
+// signer the invitation again with a link that opens the document (COSIGN-46,
+// DASH-15): the resend is built here, from this half, exactly like the first
+// invitation. The address (e) is kept beside it, because the mail route checks
+// it against the party. Only the #ks= half travels in them, which
+// opens nothing without the invited mailbox's login and the relay's half.
+// Kept until the request expires (at most eight days), wiped on sign-out and
+// on an account switch (nav-auth.js), never sent to a server.
+function rememberSignerLinks(envelopeId, partyLinks, expiresAt) {
+  if (!state.keyShareFragment || !Array.isArray(partyLinks)) return;
+  try {
+    const cap = Date.now() + 8 * 864e5;
+    const until = Date.parse(expiresAt || '');
+    const links = partyLinks
+      .filter((p) => recipientOfParty(p.party_index))
+      .map((p) => ({ i: p.party_index, label: recipientOfParty(p.party_index)?.label || recipientOfParty(p.party_index)?.email || '', e: recipientOfParty(p.party_index)?.email || '', url: noticeUrl(p.sign_path) }));
+    // Sealed under the account key, never readable (review #573, M4).
+    sealPut('paramant.cosign.links.v1:' + envelopeId, { links }, Number.isFinite(until) ? Math.min(until, cap) : cap).catch(() => {});
+  } catch { /* storage off: the dashboard says the links are not here */ }
+}
+
+// Where each party is asked to sign: the sender's box for the first party and
+// a slot of its own beside or under it for every next one, plus (with "every
+// page" on) a paraaf per party side by side in the margin. One box for all
+// parties made every signature land on the same spot (2026-10-04).
+async function partyRequests(base, { bytes = state.doc && state.doc.bytes, count = state.recipients.length, skipFirst = false } = {}) {
+  state.paraafCoveredPages = [];
+  if (state.mode !== 'pdf' || !bytes) return null;
+  const noBox = !base || !base.fields || !base.fields.length;
+  if (noBox && !state.stampAllPages) return null;
+  // The parafen are placed against the text of every page: wait for it, a
+  // missing text layer here once meant parafen slid over the last line.
+  if (state.stampAllPages) { try { await loadTextBoxes(bytes); } catch { /* bottom right */ } }
+  const anchor = noBox ? null : base.fields[0];
+  // Every page of the document, also those past the preview: the sizes pdf.js
+  // read with the text, else the rendered pages.
+  const geoms = (_textBoxCache && _textBoxCache.bytes === bytes) ? _textBoxCache.geoms : [];
+  const pages = geoms.length && geoms.every(Boolean)
+    ? geoms.map((g) => viewSize(g))
+    : (placeState && Array.isArray(placeState.pages))
+      ? placeState.pages.map((p) => ({ width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height }))
+      : [];
+  try {
+    const all = requestsForParties({
+      anchor, signPage: anchor ? anchor.page_index : 0, count: count + (skipFirst ? 1 : 0),
+      withParaaf: !!state.stampAllPages, pages, textBoxesPerPage: textBoxesIfReady(bytes),
+    });
+    state.paraafCoveredPages = all.paraafCoveredPages || [];
+    // "Samen ondertekenen": slot 0 is the sender, who signed on the box itself.
+    const reqs = skipFirst ? all.slice(1) : all;
+    // No box pointed at, only "a paraaf on every page": each party gets the
+    // paraaf and finds its own signature spot on /co-sign.
+    return noBox ? reqs.map((r) => ({ version: 2, fields: r.fields.filter((f) => f.all_pages) })) : reqs;
+  } catch { return null; }
+}
+
+// No margin was free on every page, so a paraaf lies over text there. Said
+// out loud, never silent (PDF sweep B1): the pages, and what the reader can do.
+function paraafCoveredNotice() {
+  const pages = state.paraafCoveredPages || [];
+  if (!pages.length) return '';
+  return L('Let op: op ' + pageListText(pages, false) + ' is in de marge geen vrije plek voor alle parafen. Daar staat een paraaf over de tekst. Wilt u dat niet, maak dan de marge van het document ruimer of vraag geen paraaf op elke pagina.',
+    'Note: on ' + pageListText(pages, true) + ' the margin has no free spot for every paraaf, so a paraaf lies over the text there. If you do not want that, widen the document margin or do not ask for initials on every page.');
+}
+
+// The recipient row behind a party of the envelope. "Handtekeningen vragen"
+// has recipients only (party i = row i); "Samen ondertekenen" has the sender
+// as party 0, so party i is row i - 1. Null for the sender.
+function recipientOfParty(partyIndex) {
+  const i = state.signingMode === 'invite' ? partyIndex : partyIndex - 1;
+  return i >= 0 ? (state.recipients[i] || null) : null;
 }
 
 async function deliverInviteEmails(partyIndexes) {
   const mp = state.result?.envelope?.multiparty;
-  if (!mp) throw new Error('The signing request is unavailable.');
+  if (!mp) throw new Error(L('Het verzoek om te ondertekenen is niet beschikbaar.', 'The signing request is unavailable.'));
   const wanted = Array.isArray(partyIndexes) ? new Set(partyIndexes) : null;
   const invitations = mp.party_links
-    .filter((p) => !wanted || wanted.has(p.party_index))
+    // "Samen ondertekenen": party 0 is the sender, who has signed already.
+    .filter((p) => recipientOfParty(p.party_index) && (!wanted || wanted.has(p.party_index)))
     .map((p) => ({
       party_index: p.party_index,
-      email: state.recipients[p.party_index]?.email || '',
-      label: state.recipients[p.party_index]?.label || '',
+      email: recipientOfParty(p.party_index)?.email || '',
+      label: recipientOfParty(p.party_index)?.label || '',
       invite_url: noticeUrl(p.sign_path),
     }));
   const response = await fetch('/api/user/envelopes/' + encodeURIComponent(mp.envelope_id) + '/invitations', {
@@ -295,6 +822,80 @@ function showRecipientsHint(msg, isErr) {
   el.textContent = msg; el.hidden = false; el.className = isErr ? 'ds-banner err' : 'ds-banner';
 }
 
+// The document every invited party opens, encrypted in this browser and
+// uploaded as an opaque capsule. The key is split: half B goes to the relay
+// with the ciphertext, half A into the invitation links (state.keyShareFragment,
+// see noticeUrl). The whole key stays in the sender's own links and on this
+// device, for the sender's result page. Shared by "Handtekeningen vragen"
+// (sendForSignature) and "Samen ondertekenen" (after the sender signed): the
+// second used to make an envelope with no capsule at all, so nobody it named
+// could open the document (matrix COSIGN-02, 2026-10-04).
+// Returns { fragment } (the whole key as '#doc=v1.<key>').
+async function shareEncryptedDocument({ envelopeId, bytes, filename, mime, docHash, onUpload }) {
+  const encrypted = await encryptDocumentCapsule({ bytes, filename, mime, envelopeId, docHash });
+  if (onUpload) onUpload();
+  const wholeKey = keyFromB64url(String(encrypted.fragment).replace(/^#doc=v1\./, ''));
+  const shares = splitKey(wholeKey);
+  wholeKey.fill(0);
+  state.keyShareFragment = keyShareFragment(shares.a);
+  const keyShareB = keyB64url(shares.b);
+  shares.a.fill(0); shares.b.fill(0);
+  // Kept only as long as needed and never longer than 24 hours: wiped once
+  // the request is complete, on sign-out, when the session runs out, or when
+  // another account signs in here (nav-auth.js; security review r2 a3, review
+  // #555 M4).
+  try {
+    const exp = Date.now() + 864e5;
+    localStorage.setItem('paramant.cosign.key.v1:' + envelopeId, JSON.stringify({ f: encrypted.fragment, exp }));
+  } catch { /* storage off: the sender opens the original file instead */ }
+  let upload;
+  try {
+    upload = await fetch('/api/user/envelopes/' + encodeURIComponent(envelopeId) + '/document', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Capsule-Sha256': encrypted.capsuleSha256,
+        'X-Document-Key-Share': keyShareB,
+      },
+      body: encrypted.capsule,
+    });
+  } finally {
+    encrypted.capsule.fill(0);
+  }
+  const uploadBody = await upload.json().catch(() => ({}));
+  if (!upload.ok) {
+    state.keyShareFragment = '';
+    const tooLarge = uploadBody.error === 'document_too_large' || uploadBody.error === 'payload_too_large' || upload.status === 413;
+    const maxMb = Number(uploadBody.max_mb) > 0 ? Number(uploadBody.max_mb) : 5;
+    const err = new Error(tooLarge
+      ? L(`Dit document is te groot om versleuteld mee te sturen (maximaal ${maxMb} MB).`, `This document is too large for encrypted co-sign delivery (maximum ${maxMb} MB).`)
+        + (uploadBody.envelope_withdrawn ? L(' Het lege verzoek is weer ingetrokken; er is niets verstuurd.', ' The empty request was withdrawn again; nothing has been sent.') : '')
+      : (uploadBody.error || L('Het versleutelde document kon niet worden opgeslagen.', 'Could not store the encrypted document.')));
+    err.status = upload.status;
+    err.data = uploadBody;
+    if (tooLarge) err.code = 'document_too_large';
+    throw err;
+  }
+  return { fragment: encrypted.fragment };
+}
+
+// The largest document that travels encrypted with a request: the relay
+// stores a capsule of at most MAX_BLOB (5 MB) plus a small header. Checked
+// BEFORE the request is made: a scan of 6 MB used to create the request,
+// fail the upload with "payload_too_large", and tell the sender to "try again
+// in a moment", which could never work (PDF sweep B4).
+const SHARE_MAX_BYTES = 5 * 1024 * 1024;
+function tooLargeToShare(bytes) {
+  const n = bytes ? bytes.length : 0;
+  if (n <= SHARE_MAX_BYTES) return null;
+  const mb = (n / (1024 * 1024)).toFixed(1).replace('.', EN ? '.' : ',');
+  const e = new Error(L('Dit document is ' + mb + ' MB. Versleuteld meesturen met een verzoek kan tot 5 MB. Maak de pdf kleiner (bijvoorbeeld opnieuw scannen op 150 dpi, of de functie pdf verkleinen van uw pdf-programma) en probeer het daarna opnieuw. Er is nog niets aangemaakt of verstuurd.',
+    'This document is ' + mb + ' MB. Sending it encrypted with a request works up to 5 MB. Make the PDF smaller (for example rescan at 150 dpi, or use the reduce-size function of your PDF app) and try again. Nothing has been created or sent yet.'));
+  e.code = 'document_too_large';
+  return e;
+}
+
 // Invite-to-sign: the requester coordinates but is not a signer. The envelope
 // therefore contains recipients only. Its document is encrypted in this browser
 // and uploaded as an opaque capsule. The key is appended to each personal link
@@ -302,17 +903,20 @@ function showRecipientsHint(msg, isErr) {
 async function sendForSignature() {
   const cont = $('ds-recipients-continue');
   if (cont) cont.disabled = true;
-  showRecipientsHint('Creating the signing request…', false);
+  showRecipientsHint(L('Het verzoek wordt aangemaakt…', 'Creating the signing request…'), false);
   try {
+    { const big = tooLargeToShare(state.doc.bytes); if (big) throw big; }
     const docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
-    // One requested position, identical for every party. Absent when the
-    // requester placed nothing, or when the document is not a PDF.
+    // The box the requester placed, and from it a spot of its own for every
+    // party. Absent when the requester placed nothing, or for a non-PDF. The
+    // envelope-wide box stays for readers that predate per-party spots.
     const requestedAppearance = state.mode === 'pdf'
       ? requestedAppearanceFromStamp(state.stamp, state.stampPage)
       : null;
+    const perParty = await partyRequests(requestedAppearance);
     const created = await createSigningEnvelope({
       docHash: docHashForEnvelope,
-      recipients: state.recipients,
+      recipients: perParty ? state.recipients.map((r, i) => ({ ...r, requested_appearance: perParty[i] })) : state.recipients,
       originalFilename: state.doc.name,
       signerLabel: 'Requester',
       creatorPublicKey: '',   // the requester does not sign
@@ -320,46 +924,21 @@ async function sendForSignature() {
       requestedAppearance,
     });
     const envelope = created.envelope;
-    showRecipientsHint('Encrypting the document for the recipients…', false);
+    showRecipientsHint(L('Het document wordt versleuteld voor de ontvangers…', 'Encrypting the document for the recipients…'), false);
     const mime = state.mode === 'pdf' ? 'application/pdf'
       : state.imageType === 'png' ? 'image/png'
       : state.imageType === 'jpg' ? 'image/jpeg'
       : 'application/octet-stream';
-    const encrypted = await encryptDocumentCapsule({
-      bytes: state.doc.bytes,
-      filename: state.doc.name,
-      mime,
-      envelopeId: envelope.id,
-      docHash: docHashForEnvelope,
+    const encrypted = await shareEncryptedDocument({
+      envelopeId: envelope.id, bytes: state.doc.bytes, filename: state.doc.name, mime, docHash: docHashForEnvelope,
+      onUpload: () => showRecipientsHint(L('Het versleutelde document wordt geüpload…', 'Uploading the encrypted document…'), false),
     });
-    showRecipientsHint('Uploading the encrypted document…', false);
-    let upload;
-    try {
-      upload = await fetch('/api/user/envelopes/' + encodeURIComponent(envelope.id) + '/document', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'X-Capsule-Sha256': encrypted.capsuleSha256,
-        },
-        body: encrypted.capsule,
-      });
-    } finally {
-      encrypted.capsule.fill(0);
-    }
-    const uploadBody = await upload.json().catch(() => ({}));
-    if (!upload.ok) {
-      const err = new Error(uploadBody.error === 'document_too_large'
-        ? 'This document is too large for encrypted co-sign delivery (maximum 5 MB).'
-        : (uploadBody.error || 'Could not store the encrypted document.'));
-      err.status = upload.status;
-      throw err;
-    }
     envelope.party_links = (envelope.party_links || []).map((p) => ({
       ...p,
       sign_path: p.sign_path + encrypted.fragment,
     }));
     state.envelope = envelope;
+    rememberSignerLinks(envelope.id, envelope.party_links, envelope.expires_at);
     state.result = {
       stampedBytes: null,
       fingerprint: '',
@@ -378,7 +957,7 @@ async function sendForSignature() {
     };
     commitInviteDeliveryFromDom();
     if (state.deliveryMode === 'email') {
-      showRecipientsHint('Sending personal email invitations…', false);
+      showRecipientsHint(L('De persoonlijke uitnodigingen worden gemaild…', 'Sending personal email invitations…'), false);
       state.inviteDelivery = await deliverInviteEmails();
     } else {
       state.inviteDelivery = null;
@@ -387,7 +966,38 @@ async function sendForSignature() {
     clearSensitiveDocState();
   } catch (e) {
     if (cont) cont.disabled = false;
-    showRecipientsHint((e && e.status === 401) ? 'Please sign in first (open /auth/login), then return here.' : ((e && e.message) ? e.message : 'Could not create the request.'), true);
+    if (e && e.status === 401) { showSessionLost($('ds-recipients-hint')); return; }
+    showRecipientsHint(readableError(e, L('Het verzoek kon niet worden aangemaakt. Probeer het zo nog eens.', 'Could not create the request. Please try again in a moment.')), true);
+  }
+}
+
+// After the sender signed in "Samen ondertekenen": upload the document as the
+// co-signers will open it and send the invitations. A failure here does not
+// undo the signature; the end screen says what did not happen and what to do.
+async function shareCosignDocument(env, mp, bytes, docHash) {
+  state.cosignShareError = '';
+  state.inviteDelivery = null;
+  const status = (m) => { const el = $('ds-sign-status'); if (el) { el.className = 'ds-banner'; el.textContent = m; } };
+  try {
+    status(L('Het document wordt versleuteld voor de medeondertekenaars…', 'Encrypting the document for the co-signers…'));
+    const mime = state.mode === 'pdf' ? 'application/pdf'
+      : state.mode === 'image' ? signedDocMime()
+      : 'application/octet-stream';
+    const name = state.mode === 'pdf' || state.mode === 'image' ? signedDocName() : state.doc.name;
+    const encrypted = await shareEncryptedDocument({
+      envelopeId: env.id, bytes, filename: name, mime, docHash,
+      onUpload: () => status(L('Het versleutelde document wordt geüpload…', 'Uploading the encrypted document…')),
+    });
+    mp.party_links = (mp.party_links || []).map((p) => ({ ...p, sign_path: p.sign_path + encrypted.fragment }));
+    rememberSignerLinks(env.id, mp.party_links, env.expires_at || mp.expires_at);
+    if (state.deliveryMode !== 'copy') {
+      status(L('De persoonlijke uitnodigingen worden gemaild…', 'Sending personal email invitations…'));
+      state.inviteDelivery = await deliverInviteEmails();
+    }
+  } catch (e) {
+    state.keyShareFragment = '';
+    state.inviteDelivery = null;
+    state.cosignShareError = readableError(e, L('Het versleutelde document kon niet worden opgeslagen.', 'Could not store the encrypted document.'));
   }
 }
 
@@ -450,50 +1060,93 @@ function clearDocError() {
 function describeFileType(bytes, name) {
   const b = bytes;
   const at = (offset, ...sig) => sig.every((v, i) => b[offset + i] === v);
-  if (b.length >= 4 && at(0, 0x89, 0x50, 0x4E, 0x47)) return 'a PNG image';
-  if (b.length >= 3 && at(0, 0xFF, 0xD8, 0xFF)) return 'a JPEG image';
-  if (b.length >= 3 && at(0, 0x47, 0x49, 0x46)) return 'a GIF image';
-  if (b.length >= 12 && at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return 'a WebP image';
+  if (b.length >= 4 && at(0, 0x89, 0x50, 0x4E, 0x47)) return L('een PNG-afbeelding', 'a PNG image');
+  if (b.length >= 3 && at(0, 0xFF, 0xD8, 0xFF)) return L('een JPEG-afbeelding', 'a JPEG image');
+  if (b.length >= 3 && at(0, 0x47, 0x49, 0x46)) return L('een GIF-afbeelding', 'a GIF image');
+  if (b.length >= 12 && at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return L('een WebP-afbeelding', 'a WebP image');
   // ISO base media: the brand at offset 8 says which flavour. HEIC is what an
   // iPhone hands over when the camera roll is not set to "most compatible".
   if (b.length >= 12 && at(4, 0x66, 0x74, 0x79, 0x70)) {
     const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
-    if (['heic', 'heix', 'heim', 'heis', 'hevc', 'mif1', 'msf1'].includes(brand)) return 'a HEIC photo';
-    return 'a video or media file';
+    if (['heic', 'heix', 'heim', 'heis', 'hevc', 'mif1', 'msf1'].includes(brand)) return L('een HEIC-foto', 'a HEIC photo');
+    return L('een video- of mediabestand', 'a video or media file');
   }
   // A zip container. Word, Excel, PowerPoint and OpenDocument are all zips, and
   // only the extension separates them from a plain archive at this depth.
   if (b.length >= 4 && at(0, 0x50, 0x4B, 0x03, 0x04)) {
     const ext = String(name || '').toLowerCase().split('.').pop();
-    if (ext === 'docx' || ext === 'doc' || ext === 'odt') return 'a Word document';
+    if (ext === 'docx' || ext === 'doc' || ext === 'odt') return L('een Word-document', 'a Word document');
     if (ext === 'xlsx' || ext === 'ods') return 'a spreadsheet';
     if (ext === 'pptx' || ext === 'odp') return 'a presentation';
-    return 'a ZIP archive';
+    return L('een ZIP-archief', 'a ZIP archive');
   }
   // The old Office compound-document container (.doc, .xls, .ppt).
-  if (b.length >= 8 && at(0, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)) return 'a Word document';
+  if (b.length >= 8 && at(0, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)) return L('een Word-document', 'a Word document');
   return null;
 }
 
+// Where %PDF- starts, within the first 2048 bytes, or -1. Acrobat allows the
+// header within the first 1024 bytes; pdf.js and poppler look further, and the
+// sweep's junk-prefix file (header at 1025) opens in all of them.
+function pdfHeaderOffset(bytes) {
+  const lim = Math.min(bytes.length - 5, 2048);
+  for (let i = 0; i <= lim; i++) {
+    if (bytes[i] === 0x25 && bytes[i + 1] === 0x50 && bytes[i + 2] === 0x44 && bytes[i + 3] === 0x46 && bytes[i + 4] === 0x2D) return i;
+  }
+  return -1;
+}
+
+// True when the ASCII text occurs in bytes (no decoding of the whole file).
+function bytesContain(bytes, text) {
+  const pat = new TextEncoder().encode(text);
+  for (let i = bytes.indexOf(pat[0]); i !== -1 && i <= bytes.length - pat.length; i = bytes.indexOf(pat[0], i + 1)) {
+    let ok = true;
+    for (let k = 1; k < pat.length; k++) if (bytes[i + k] !== pat[k]) { ok = false; break; }
+    if (ok) return true;
+  }
+  return false;
+}
+
+function showExistingSignatureNotice(on) {
+  for (const [anchorId, noticeId] of [['ds-place-hint', 'ds-existing-sig'], ['ds-review-doc-preview', 'ds-existing-sig-review']]) {
+    let el = $(noticeId);
+    if (!on) { if (el) el.remove(); continue; }
+    const anchor = $(anchorId);
+    if (!anchor) continue;
+    if (!el) {
+      el = document.createElement('p');
+      el.id = noticeId;
+      el.className = 'ds-banner err';
+      el.setAttribute('role', 'alert');
+      anchor.insertAdjacentElement('afterend', el);
+    }
+    el.textContent = L('Deze pdf heeft al een digitale handtekening. Wordt hij hier ondertekend, dan slaat ParaSign het bestand opnieuw op en geldt die bestaande digitale handtekening daarna niet meer: een pdf-lezer zoals Adobe meldt dan dat het document na ondertekening is gewijzigd. De nieuwe ParaSign-handtekening en het .psign-bewijs kloppen wel.',
+      'This PDF already carries a digital signature. If it is signed here, ParaSign saves the file anew and that existing digital signature no longer holds: a PDF reader such as Adobe will report that the document was changed after signing. The new ParaSign signature and the .psign proof do hold.');
+  }
+}
+
 async function onDocChosen(file) {
+  preloadPdfLibs();
   clearDocError();
   const bytes = new Uint8Array(await file.arrayBuffer());
   // Empty file: nothing to sign or attest. Reject with a clear message instead
   // of silently enabling Continue on a 0-byte document (QA).
   if (!bytes.length) {
-    showDocError('That file is empty (0 bytes). Pick a file that has content.');
+    showDocError(L('Dat bestand is leeg (0 bytes). Kies een bestand met inhoud.', 'That file is empty (0 bytes). Pick a file that has content.'));
     return;
   }
   // PDF or nothing, decided on the bytes. A refused file does not become
   // state.doc, does not get named on screen and does not advance the step: the
   // visitor stays on the picker with the reason in front of him, instead of
   // three steps deep into a flow that cannot end.
-  const looksPdf = bytes.length >= 5
-    && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2D;
+  // The header need not be at byte 0: some mail and document systems put a
+  // few hundred bytes in front, and pdf.js, poppler and mupdf open such files
+  // (PDF sweep 2026-10-04, B5: brokenxref-junkprefix, header at 1025).
+  const looksPdf = pdfHeaderOffset(bytes) >= 0;
   if (!looksPdf) {
     const what = describeFileType(bytes, file.name);
-    showDocError((what ? 'This is ' + what + ', not a PDF. ' : 'This file is not a PDF. ')
-      + 'ParaSign signs PDF documents. Export or print your file to PDF first.');
+    showDocError((what ? L('Dit is ', 'This is ') + what + L(', geen pdf. ', ', not a PDF. ') : L('Dit bestand is geen pdf. ', 'This file is not a PDF. '))
+      + L('ParaSign ondertekent alleen pdf. Zet uw bestand eerst om naar pdf: exporteer het, of druk het af als pdf.', 'ParaSign signs PDF only. Convert your file to PDF first: export it, or print it to PDF.'));
     return;
   }
   state.doc = { bytes, name: file.name, size: file.size };
@@ -506,7 +1159,14 @@ async function onDocChosen(file) {
   state.sealPlacement = 'inline';
   state.pdfPageCount = null;
 
-  const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+  const isPdf = looksPdf;
+  // An existing digital signature (PAdES/CMS) lives in a /Sig dictionary with
+  // a /ByteRange over the exact bytes of the file. pdf-lib writes the file
+  // anew, so that signature no longer holds after ParaSign signs (sweep B3:
+  // pyhanko intact=True before, False after; Adobe then shows "changed after
+  // signing"). Said before signing, never discovered afterwards.
+  state.doc.hasDigitalSignature = isPdf && bytesContain(bytes, '/ByteRange');
+  showExistingSignatureNotice(state.doc.hasDigitalSignature);
   const mimeGuess = guessMimeFromMagic(bytes);
   const isPng = mimeGuess === 'image/png';
   const isJpg = mimeGuess === 'image/jpeg';
@@ -524,6 +1184,9 @@ async function onDocChosen(file) {
 
   const toHashOnly = (note) => {
     state.mode = 'hash';
+    // The hash route signs the fingerprint and leaves the file as it is, so an
+    // existing digital signature keeps holding: no warning here.
+    showExistingSignatureNotice(false);
     state.stamp = null;
     state.stampPage = null;
     setActive('step-hash-only');
@@ -550,7 +1213,17 @@ async function onDocChosen(file) {
       else       await renderImageForPlacement();
     } catch (e) {
       const kind = isPdf ? 'PDF' : 'image';
-      toHashOnly('This file could not be opened as a ' + kind + ' (it looks corrupt or incomplete), so it gets a hash-only attestation instead of a visual signature.');
+      // A locked PDF is not a broken one: say which lock it is, and what the
+      // signer can still do. Neither can carry a visible signature (writing
+      // into an encrypted PDF needs its password and breaks the author's lock),
+      // so both get the hash route, said honestly.
+      if (isPdf && e && e.name === 'PasswordException') {
+        toHashOnly(L('Deze pdf is beveiligd met een wachtwoord. Een zichtbare handtekening kan er daarom niet op. U ondertekent een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, sla de pdf dan eerst zonder wachtwoord op (bijvoorbeeld met Afdrukken naar pdf) en kies dat bestand.', 'This PDF is protected with a password, so it cannot carry a visible signature. You sign a fingerprint of the file, and the proof belongs to exactly this file. For a visible signature, save the PDF without a password first (for example with Print to PDF) and pick that file.'));
+      } else if (isPdf && e && e.code === 'pdf_encrypted') {
+        toHashOnly(L('Deze pdf is beveiligd: de maker heeft wijzigen geblokkeerd. Een zichtbare handtekening zou het bestand wijzigen. Daarom ondertekent u een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, vraag de afzender dan om een versie zonder beveiliging.', 'This PDF is protected: its author blocked changes. A visible signature would change the file, so you sign a fingerprint of it. The proof belongs to exactly this file. For a visible signature, ask the sender for a version without the protection.'));
+      } else {
+        toHashOnly(L('Dit bestand kon niet worden geopend als ', 'This file could not be opened as a ') + kind + L(' (het lijkt beschadigd of onvolledig). U ondertekent daarom een vingerafdruk van het bestand, zonder zichtbare handtekening.', ' (it looks corrupt or incomplete). So you sign a fingerprint of the file, without a visible signature.'));
+      }
     }
   } else {
     toHashOnly('');
@@ -583,16 +1256,21 @@ function applyPlaceChromeForMode() {
   const hint = $('ds-place-hint');
   const tools = $('ds-invite-tools');
   if (tools) tools.hidden = !invite;
-  if (heading) heading.textContent = invite ? 'Show where they sign' : 'Place your signature';
+  if (heading) heading.textContent = invite ? L('Wijs aan waar zij tekenen', 'Show where they sign') : L('Plaats uw handtekening', 'Place your signature');
   if (subline && subline.firstChild) {
     subline.firstChild.textContent = invite
-      ? 'Tap where the other party signs. They can still move the box. '
-      : 'Click anywhere on a page to drop the stamp. Click another spot to move it. ';
+      ? L('Tik waar de andere partij tekent. Die kan het vak nog verplaatsen. ', 'Tap where the other party signs. They can still move the box. ')
+      : L('Klik ergens op een pagina om de stempel te plaatsen. Klik op een andere plek om hem te verplaatsen. ', 'Click anywhere on a page to drop the stamp. Click another spot to move it. ');
   }
   if (hint) {
     hint.textContent = invite
-      ? 'Optional: you can continue without asking for a spot.'
-      : 'Click a page to drop the signature stamp.';
+      ? L('Optioneel: u kunt ook verder zonder een plek aan te wijzen.', 'Optional: you can continue without asking for a spot.')
+      : L('Klik op een pagina om de stempel te plaatsen.', 'Click a page to drop the signature stamp.');
+  }
+  const invPar = $('ds-invite-paraaf');
+  if (invPar) {
+    invPar.checked = invite && !!state.stampAllPages;
+    invPar.onchange = () => { state.stampAllPages = !!invPar.checked; };
   }
   if (invite) {
     // Asking for a position is a courtesy, not a requirement: the requester may
@@ -600,11 +1278,11 @@ function applyPlaceChromeForMode() {
     const cont = $('ds-place-continue'); if (cont) cont.disabled = false;
     const btn = $('ds-invite-place');
     if (btn) {
-      btn.textContent = state.stamp ? 'Move the signature box' : 'Place the signature box';
+      btn.textContent = state.stamp ? L('Verplaats het handtekeningvak', 'Move the signature box') : L('Plaats het handtekeningvak', 'Place the signature box');
       btn.onclick = () => {
         const first = document.querySelector('#ds-pdf-canvas-list .ds-page-wrap');
         if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        if (hint) hint.textContent = 'Tap the spot on the page where their signature belongs.';
+        if (hint) hint.textContent = L('Tik op de plek op de pagina waar hun handtekening hoort.', 'Tap the spot on the page where their signature belongs.');
       };
     }
   }
@@ -629,9 +1307,12 @@ async function renderImageForPlacement() {
   // mode marker so onPlaceClick knows not to flip Y.
   wrap._pdfPage = { width: img.naturalWidth, height: img.naturalHeight, index: 0, isImage: true };
   const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  canvas.getContext('2d').drawImage(img, 0, 0);
+  // A phone photo can pass the iOS canvas limit: show it smaller, never blank.
+  // Coordinates stay in natural pixels (wrap._pdfPage), so the seal lands the same.
+  const fit = canvasFit(img.naturalWidth, img.naturalHeight);
+  canvas.width = Math.max(1, Math.floor(img.naturalWidth * fit));
+  canvas.height = Math.max(1, Math.floor(img.naturalHeight * fit));
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
   wrap.appendChild(canvas);
   container.appendChild(wrap);
   wrap.addEventListener('click', onPlaceClick);
@@ -645,7 +1326,7 @@ async function renderImageForPlacement() {
   if (zf) zf.onclick = () => setPlaceZoom(1);
   applyPlaceZoom();
 
-  $('ds-place-page-count').textContent = '1 image (' + img.naturalWidth + ' x ' + img.naturalHeight + ' pixels)';
+  $('ds-place-page-count').textContent = L('1 afbeelding (', '1 image (') + img.naturalWidth + ' x ' + img.naturalHeight + ' pixels)';
 }
 
 // ====================================================================
@@ -662,6 +1343,16 @@ async function renderPdfForPlacement() {
   // Seal tools (sign-every-page toggle + reuse-saved-position) are PDF-only,
   // and in invite mode there is no seal of the requester's to configure.
   { const st = $('ds-seal-tools'); if (st) st.hidden = inviteMode; }
+  {
+    const more = $('ds-more-tools');
+    if (more) {
+      more.hidden = inviteMode;
+      more.onclick = () => {
+        const open = $('step-place').classList.toggle('tools-open');
+        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+    }
+  }
   { const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages; }
   { const radio = $('ds-seal-' + state.sealPlacement); if (radio) radio.checked = true; }
   refreshApplyTplBtn();
@@ -669,12 +1360,23 @@ async function renderPdfForPlacement() {
   applyPlaceChromeForMode();
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
+  // Encrypted (an owner password, "no changes"): pdf.js can show it, but a
+  // visible signature means writing into the file, which pdf-lib cannot do to
+  // an encrypted PDF and which the author's lock forbids anyway. That used to
+  // surface only after the code, at the very end, as a passkey error. Say it
+  // now, at the door (onDocChosen turns this into the hash route).
+  let perms = null;
+  try { perms = await pdf.getPermissions(); } catch (e) { perms = null; }
+  if (perms !== null) { try { pdf.destroy(); } catch (e) { /* best effort */ } throw Object.assign(new Error('pdf is encrypted'), { code: 'pdf_encrypted' }); }
   state.pdfPageCount = pdf.numPages;
+  // Read the text layer now, in the background: the paraaf preview needs it the
+  // moment "sign every page" is ticked.
+  loadTextBoxes(state.doc.bytes);
 
   const container = $('ds-pdf-canvas-list');
   container.innerHTML = '';
-  const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
+  const maxPages = Math.min(pdf.numPages, MAX_PLACE_PAGES);
   const pages = [];
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
@@ -684,6 +1386,11 @@ async function renderPdfForPlacement() {
     wrap.dataset.pageIndex = String(i - 1);
     wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
     const canvas = document.createElement('canvas');
+    // The page has its final shape before a pixel is drawn: a canvas at its
+    // 300x150 default made a 40-page document jump by thousands of pixels
+    // while it rendered, under the signer's finger (retest T1-12).
+    canvas.style.aspectRatio = baseViewport.width + ' / ' + baseViewport.height;
+    wrap.style.width = Math.floor(baseViewport.width * fitScaleFor(baseViewport)) + 'px';
     wrap.appendChild(canvas);
     wrap.appendChild(buildPageBar(i - 1));
     container.appendChild(wrap);
@@ -697,8 +1404,8 @@ async function renderPdfForPlacement() {
   placeState = { pdf, pages, zoom: 1 };
 
   $('ds-place-page-count').textContent =
-    pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
-    (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
+    pdf.numPages + (pdf.numPages === 1 ? L(' pagina', ' page') : L(" pagina's", ' pages')) +
+    (pdf.numPages > maxPages ? L(' (eerste ', ' (showing first ') + maxPages + L(' getoond)', ')') : '');
 
   const zo = $('ds-zoom-out'), zi = $('ds-zoom-in'), zf = $('ds-zoom-fit');
   if (zo) zo.onclick = () => setPlaceZoom(placeState.zoom / 1.25);
@@ -712,7 +1419,7 @@ async function renderPdfForPlacement() {
 
 // Fit-to-width base scale (the original targetWidth logic), times the zoom factor.
 function fitScaleFor(baseViewport) {
-  const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+  const targetWidth = viewportTargetWidth(window.innerWidth);
   return targetWidth / baseViewport.width;
 }
 
@@ -731,56 +1438,114 @@ async function applyPlaceZoom() {
   if (placeState.isImage) {
     // Image: canvas is at natural resolution, CSS width:100% scales it; zoom =
     // set the wrap width. No re-render needed.
-    const fit = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    const fit = viewportTargetWidth(window.innerWidth);
     placeState.wrap.style.width = Math.floor(fit * z) + 'px';
     reflowStampMarker();
     return;
   }
   const token = ++placeRenderToken;
+  // Every page gets its final size first, so nothing below moves while the
+  // pages render (T1-12).
+  for (const p of placeState.pages) {
+    p.wrap.style.width = Math.floor(p.baseViewport.width * fitScaleFor(p.baseViewport) * z) + 'px';
+    p.renderedZoom = null;
+  }
   // Render at devicePixelRatio so the backing store has real pixels behind every
   // CSS pixel. The canvas is shown at the CSS width (wrap width + canvas{width:100%}),
   // but drawn at cssWidth*dpr, so it stays razor sharp on HiDPI/retina screens.
-  const dpr = hiDpiScale();
-  for (const p of placeState.pages) {
-    const cssScale = fitScaleFor(p.baseViewport) * z;
-    const cssW = Math.floor(p.baseViewport.width * cssScale);
-    const viewport = p.page.getViewport({ scale: cssScale * dpr });
-    p.wrap.style.width = cssW + 'px';                 // CSS size drives layout + coords
-    p.canvas.width = Math.floor(viewport.width);      // backing store = cssW * dpr
-    p.canvas.height = Math.floor(viewport.height);
-    if (p.task) { try { p.task.cancel(); } catch (e) {} }
-    p.task = p.page.render({ canvasContext: p.canvas.getContext('2d'), viewport });
-    try { await p.task.promise; }
-    catch (e) { if (e && e.name === 'RenderingCancelledException') return; }
+  const eager = placeState.pages.slice(0, EAGER_PLACE_PAGES);
+  for (const p of eager) {
+    if (!(await renderPlacePage(p))) return;
     if (token !== placeRenderToken) return;   // a newer zoom superseded this pass
   }
+  observeLazyPlacePages();
   reflowStampMarker();
   reflowExtras();                             // text/date objects follow the new scale too
   reflowGhostStamps();                        // repeated-seal ghosts on the other pages
 }
 
-// Sign-every-page ghosts: faint, non-interactive copies of the seal on every
-// page OTHER than the one it was placed on, at the same relative position. They
-// mirror exactly what buildStampedPdf bakes when state.stampAllPages is on.
+// One page of the Place step at the current zoom. False when a newer render
+// cancelled it. A long document draws at no more than 1.5x, to keep memory
+// in bounds on a phone.
+async function renderPlacePage(p) {
+  const z = placeState.zoom;
+  const cssScale = fitScaleFor(p.baseViewport) * z;
+  const dpr = placeState.pages.length > EAGER_PLACE_PAGES ? Math.min(1.5, hiDpiScale()) : hiDpiScale();
+  if (p.task) { try { p.task.cancel(); } catch (e) {} }
+  // backing store = cssW * dpr, within the canvas cap (see renderPageCapped)
+  try { await renderPageCapped(p.page, p.canvas, cssScale * dpr, (t) => { p.task = t; }); }
+  catch (e) { if (e && e.name === 'RenderingCancelledException') return false; }
+  p.renderedZoom = z;
+  return true;
+}
+
+// Pages past the first 30 render when they come near the screen, one at a time.
+let _lazyPlaceObserver = null;
+let _lazyPlaceChain = Promise.resolve();
+function observeLazyPlacePages() {
+  if (_lazyPlaceObserver) { try { _lazyPlaceObserver.disconnect(); } catch (e) { /* gone */ } _lazyPlaceObserver = null; }
+  if (!placeState || !placeState.pages || placeState.pages.length <= EAGER_PLACE_PAGES || typeof IntersectionObserver === 'undefined') return;
+  const byWrap = new Map(placeState.pages.map((p) => [p.wrap, p]));
+  _lazyPlaceObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      const p = byWrap.get(e.target);
+      if (!p || p.renderedZoom === placeState.zoom) continue;
+      _lazyPlaceChain = _lazyPlaceChain.then(async () => {
+        if (!placeState || p.renderedZoom === placeState.zoom) return;
+        try { await renderPlacePage(p); } catch (err) { /* the page stays blank-shaped; the note says so */ }
+      });
+    }
+  }, { root: null, rootMargin: '1500px 0px' });
+  placeState.pages.slice(EAGER_PLACE_PAGES).forEach((p) => _lazyPlaceObserver.observe(p.wrap));
+}
+
+// Sign-every-page preview: the paraaf on every page OTHER than the one the seal
+// was placed on, in the free margin corner buildStampedPdf will use. Same plan
+// function, same text boxes, so the spot shown is the spot baked.
+function placeStepHidden() {
+  const st = document.getElementById('step-place');
+  return !!(st && st.hidden);
+}
+
 function reflowGhostStamps() {
+  if (placeStepHidden()) return;   // a hidden page measures 0 wide; redrawn on entry
   document.querySelectorAll('.ds-stamp-ghost').forEach(el => el.remove());
-  if (!state.stampAllPages || !state.stamp || !placeState || placeState.isImage) return;
-  const src = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex);
-  if (!src) return;
-  const sw = src.wrap._pdfPage.width, sh = src.wrap._pdfPage.height;
-  const fx = state.stamp.x / sw, fy = state.stamp.y / sh, fw = state.stamp.w / sw, fh = state.stamp.h / sh;
-  for (const p of placeState.pages) {
-    if (p.wrap._pdfPage.index === state.stamp.pageIndex) continue;
+  showParaafOverTextNotice([]);
+  // In the invite flow nothing of the requester's is stamped: no solo paraaf
+  // preview there (acceptance r2, 3).
+  if (state.signingMode === 'invite') return;
+  if (!state.stampAllPages || !placeState || placeState.isImage || !state.doc) return;
+  // Sheet only: no seal on a page, a paraaf on every page. Otherwise the
+  // parafen are planned around the placed seal.
+  const sealInDoc = hasInlineSeal();
+  if (sealInDoc && !state.stamp) return;
+  const textBoxes = textBoxesIfReady(state.doc.bytes);
+  if (textBoxes === undefined) {
+    // Not read yet: draw once the text layer is in, never a guessed spot.
+    const bytes = state.doc.bytes;
+    loadTextBoxes(bytes).then(() => { if (state.doc && state.doc.bytes === bytes) reflowGhostStamps(); });
+    return;
+  }
+  const pages = [];
+  for (let i = 0; i < (state.pdfPageCount || placeState.pages.length); i++) {
+    const p = placeState.pages[i];
+    pages.push(p ? { width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height } : { width: 1, height: 1 });
+  }
+  if (sealInDoc && !pages[state.stamp.pageIndex]) return;
+  const ghostPlan = paraafPlanFor(pages, sealInDoc ? state.stamp : null, textBoxes);
+  showParaafOverTextNotice(state.stampAllPages ? paraafOverTextPages(ghostPlan) : []);
+  for (const box of ghostPlan) {
+    const p = placeState.pages[box.pageIndex];
+    if (!p) continue;   // past the preview cap
     const pw = p.wrap._pdfPage.width, ph = p.wrap._pdfPage.height;
     const rect = p.wrap.querySelector('canvas').getBoundingClientRect();
     const ratio = pw / rect.width;
-    const w = (fw * pw) / ratio, h = (fh * ph) / ratio;
-    const left = (fx * pw) / ratio;
-    const top = (ph - fy * ph - fh * ph) / ratio;
     const g = document.createElement('div');
-    g.className = 'ds-stamp-marker ds-stamp-ghost';
-    g.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
-    g.innerHTML = stampMockupHtml();
+    g.className = 'ds-stamp-ghost ds-paraaf';
+    g.style.cssText = `left:${box.x / ratio}px;top:${(ph - box.y - box.h) / ratio}px;width:${box.w / ratio}px;height:${box.h / ratio}px;font-size:${box.h / ratio}px`;
+    g.innerHTML = paraafMockupHtml();
+    if (box.overText) { g.style.outline = '2px solid #b42318'; g.style.outlineOffset = '1px'; g.dataset.overText = '1'; }
     p.wrap.appendChild(g);
   }
 }
@@ -826,17 +1591,23 @@ function applyPlacementTemplate() {
   const pw = p.wrap._pdfPage.width, ph = p.wrap._pdfPage.height;
   state.stamp = { pageIndex: p.wrap._pdfPage.index, x: tpl.fx * pw, y: tpl.fy * ph, w: tpl.fw * pw, h: tpl.fh * ph };
   reflowStampMarker();
-  setStampAllPages(!!tpl.allPages, false);   // don't re-save; we just loaded it
+  // Position and size only. "Every page" stays as the signer set it for THIS
+  // document: a saved template switched it back on without asking, a paraaf
+  // on every page of a contract nobody asked for (retest T1-11).
+  reflowGhostStamps();
   $('ds-place-continue').disabled = false;
-  setPlaceHint(tpl.allPages
-    ? 'Applied your saved signature position to every page. Click a page to move it.'
-    : 'Applied your saved signature position. Click a page to move it.');
+  setPlaceHint(L('Uw opgeslagen positie is toegepast. Klik op een pagina om hem te verplaatsen.', 'Applied your saved signature position. Click a page to move it.'));
 }
 
 // Toggle the sign-every-page mode; re-render ghosts and persist the choice.
 function setStampAllPages(on, save = true) {
   state.stampAllPages = !!on;
   const cb = $('ds-allpages'); if (cb) cb.checked = state.stampAllPages;
+  // The invite flow has its own box ("Paraaf verplicht voor iedereen"); a
+  // restored draft set only the solo one (acceptance r2, 3).
+  const inv = $('ds-invite-paraaf'); if (inv) inv.checked = state.signingMode === 'invite' && state.stampAllPages;
+  // With a signature sheet the tip says where the parafen go; keep it true.
+  if (state.signingMode !== 'invite' && state.sealPlacement === 'sheet') updateSignatureSheetControls();
   reflowGhostStamps();
   if (save) savePlacementTemplate();
 }
@@ -844,19 +1615,19 @@ function setStampAllPages(on, save = true) {
 function buildSignatureSheetPreview() {
   const preview = document.createElement('section');
   preview.className = 'ds-signature-sheet-preview';
-  preview.setAttribute('aria-label', 'Preview of the extra signature sheet');
+  preview.setAttribute('aria-label', L('Voorbeeld van het extra handtekeningblad', 'Preview of the extra signature sheet'));
   const sourceHash = toHex(sha3_256(state.doc.bytes));
   const finalPage = (state.pdfPageCount || 0) + 1;
   preview.innerHTML =
-    '<div class="ds-sheet-page-tag">Extra final page ' + finalPage + '</div>' +
-    '<h3 class="ds-sheet-title">ParaSign signature sheet</h3>' +
-    '<p class="ds-sheet-sub">This page will be appended behind the source document when you sign.</p>' +
+    L('<div class="ds-sheet-page-tag">Extra laatste pagina ', '<div class="ds-sheet-page-tag">Extra final page ') + finalPage + '</div>' +
+    L('<h3 class="ds-sheet-title">ParaSign-handtekeningblad</h3>', '<h3 class="ds-sheet-title">ParaSign signature sheet</h3>') +
+    L('<p class="ds-sheet-sub">Deze pagina komt achter het brondocument als u ondertekent.</p>', '<p class="ds-sheet-sub">This page will be appended behind the source document when you sign.</p>') +
     '<dl class="ds-sheet-fields">' +
-      '<dt>Source file</dt><dd>' + escapeHtml(state.doc.name) + '</dd>' +
-      '<dt>Source pages</dt><dd>' + escapeHtml(String(state.pdfPageCount || 0)) + '</dd>' +
+      L('<dt>Bronbestand</dt><dd>', '<dt>Source file</dt><dd>') + escapeHtml(state.doc.name) + '</dd>' +
+      L("<dt>Pagina's bron</dt><dd>", '<dt>Source pages</dt><dd>') + escapeHtml(String(state.pdfPageCount || 0)) + '</dd>' +
       '<dt>Source SHA3-256</dt><dd>' + escapeHtml(sourceHash) + '</dd>' +
     '</dl>' +
-    '<div class="ds-sheet-seal-label">Visible signature</div>' +
+    L('<div class="ds-sheet-seal-label">Zichtbare handtekening</div>', '<div class="ds-sheet-seal-label">Visible signature</div>') +
     '<div class="ds-sheet-seal">' + stampMockupHtml() + '</div>';
   return preview;
 }
@@ -882,18 +1653,23 @@ function updateSignatureSheetControls() {
   if (state.signingMode === 'invite') { applyPlaceChromeForMode(); return; }
   const sheetOnly = state.sealPlacement === 'sheet';
   const withSheet = hasSignatureSheet();
-  const allPages = $('ds-allpages'); if (allPages) allPages.disabled = sheetOnly;
-  const allPagesLabel = $('ds-allpages-label'); if (allPagesLabel) allPagesLabel.hidden = sheetOnly;
+  // "Onderteken elke pagina" stays available with a signature sheet: the sheet
+  // takes the signature, the parafen still go on every page (acceptatie r4,
+  // Nieuw 2). It used to be switched off here without a word.
+  const allPages = $('ds-allpages'); if (allPages) allPages.disabled = false;
+  const allPagesLabel = $('ds-allpages-label'); if (allPagesLabel) allPagesLabel.hidden = false;
   const applyTpl = $('ds-apply-tpl'); if (applyTpl) applyTpl.hidden = sheetOnly || !loadPlacementTemplate();
   const tip = $('ds-seal-tip');
   if (tip) tip.textContent = sheetOnly
-    ? 'Adds one final page with your seal and source details. The original pages remain unstamped.'
+    ? (state.stampAllPages
+      ? L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. Uw handtekening staat op dat blad; elke pagina van het document krijgt uw paraaf in een vrije hoek van de marge.", 'Adds one final page with your seal and source details. Your signature is on that sheet; every page of the document gets your initials in a free margin corner.')
+      : L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. De oorspronkelijke pagina's krijgen geen stempel.", 'Adds one final page with your seal and source details. The original pages remain unstamped.'))
     : withSheet
-      ? 'Keeps the placed seal in the document and adds one final page with the seal and source details.'
-      : 'Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).';
+      ? L('Houdt de geplaatste stempel in het document en voegt één laatste pagina toe met de stempel en de gegevens van de bron.', 'Keeps the placed seal in the document and adds one final page with the seal and source details.')
+      : L("Op de andere pagina's komt een kleine paraaf op een vrije plek in de marge. Is die er op een pagina niet, dan staat de paraaf daar over de tekst en ziet u dat hier in rood. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).", 'The other pages get small initials in a free spot of the margin. Where a page has none, the initials go over the text there and you see that here in red. Position and scale are remembered for next time (never your name or signature image).');
   const hint = $('ds-place-hint');
-  if (hint && sheetOnly) hint.textContent = 'Preview below: page ' + ((state.pdfPageCount || 0) + 1) + ' will be added as the final PDF page.';
-  else if (hint && withSheet) hint.textContent = 'The placed seal stays here. Preview below: page ' + ((state.pdfPageCount || 0) + 1) + ' will also be added.';
+  if (hint && sheetOnly) hint.textContent = L('Voorbeeld hieronder: pagina ', 'Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt als laatste pagina aan de pdf toegevoegd.', ' will be added as the final PDF page.');
+  else if (hint && withSheet) hint.textContent = L('De geplaatste stempel blijft hier. Voorbeeld hieronder: ook pagina ', 'The placed seal stays here. Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt toegevoegd.', ' will also be added.');
   const cont = $('ds-place-continue'); if (cont) cont.disabled = hasInlineSeal() && !state.stamp;
   document.querySelectorAll('.ds-stamp-marker').forEach(el => { el.hidden = sheetOnly; });
   renderPlacementSheetPreview();
@@ -901,16 +1677,17 @@ function updateSignatureSheetControls() {
 
 function setSealPlacement(placement) {
   state.sealPlacement = ['inline', 'sheet', 'both'].includes(placement) ? placement : 'inline';
-  if (state.sealPlacement === 'sheet') state.stampAllPages = false;
   for (const option of ['inline', 'sheet', 'both']) {
     const radio = $('ds-seal-' + option); if (radio) radio.checked = state.sealPlacement === option;
   }
   const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages;
   updateSignatureSheetControls();
   reflowGhostStamps();
+  if (!hasInlineSeal()) showStampOverTextNotice(0);
+  else if (state.stamp) scheduleSoloCoverCheck();
   if (hasInlineSeal()) {
     reflowStampMarker();
-    if (!hasSignatureSheet()) setPlaceHint(state.stamp ? 'Click a page to move the signature stamp.' : 'Click a page to drop the signature stamp.');
+    if (!hasSignatureSheet()) setPlaceHint(state.stamp ? L('Klik op een pagina om de stempel te verplaatsen.', 'Click a page to move the signature stamp.') : L('Klik op een pagina om de stempel te plaatsen.', 'Click a page to drop the signature stamp.'));
   }
 }
 
@@ -919,12 +1696,14 @@ function removeStamp() {
   state.stamp = null;
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
   const cont = $('ds-place-continue'); if (cont) cont.disabled = hasInlineSeal();
-  setPlaceHint('Signature removed. Click a page to place it again.');
+  setPlaceHint(L('Handtekening verwijderd. Klik op een pagina om hem opnieuw te plaatsen.', 'Signature removed. Click a page to place it again.'));
+  showStampOverTextNotice(0);
 }
 
 // Re-derive the marker's pixel box from the PDF-point state.stamp at the current
 // display width. Never mutates state.stamp.
 function reflowStampMarker() {
+  if (placeStepHidden()) return;   // measured once the step is visible again
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
   if (!hasInlineSeal() && state.mode === 'pdf') return;
   if (!state.stamp || !placeState) return;
@@ -933,6 +1712,10 @@ function reflowStampMarker() {
   else { const p = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex); wrap = p && p.wrap; }
   if (!wrap) return;
   const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  // A hidden step measures 0 wide: the ratio becomes Infinity and the seal a
+  // 0x0 dot (test report 2026-10-04: seal gone after Back). Leave the marker as
+  // it is; entering the step reflows it (see setActive).
+  if (!rect.width) return;
   const ratio = wrap._pdfPage.width / rect.width;            // natural units per CSS px
   const w = state.stamp.w / ratio, h = state.stamp.h / ratio;
   const left = state.stamp.x / ratio;
@@ -961,11 +1744,11 @@ const EDIT_TOOL_IDS = {
 
 function editToolPrompt(tool) {
   return {
-    text: 'Text tool active. Click the PDF where the text should appear.',
-    date: 'Date tool active. Click the PDF where the date should appear.',
-    highlight: 'Highlight tool active. Click the PDF, then drag and resize the highlight.',
-    note: 'Note tool active. Click the PDF where the note should appear.',
-    pen: 'Draw tool active. Draw anywhere on the PDF. Seals and existing objects stay visible but cannot block the pen.',
+    text: L('Tekst staat aan. Klik op de pdf waar de tekst moet komen.', 'Text tool active. Click the PDF where the text should appear.'),
+    date: L('Datum staat aan. Klik op de pdf waar de datum moet komen.', 'Date tool active. Click the PDF where the date should appear.'),
+    highlight: L('Markeren staat aan. Klik op de pdf en sleep of vergroot daarna de markering.', 'Highlight tool active. Click the PDF, then drag and resize the highlight.'),
+    note: L('Notitie staat aan. Klik op de pdf waar de notitie moet komen.', 'Note tool active. Click the PDF where the note should appear.'),
+    pen: L('Tekenen staat aan. Teken waar u wilt op de pdf. Stempels en andere objecten blijven zichtbaar maar houden de pen niet tegen.', 'Draw tool active. Draw anywhere on the PDF. Seals and existing objects stay visible but cannot block the pen.'),
   }[tool] || '';
 }
 
@@ -986,8 +1769,8 @@ function setEditTool(tool) {
     list.classList.toggle('edit-tool-active', !!next);
   }
   if (next) setPlaceHint(editToolPrompt(next));
-  else if (state.stamp) setPlaceHint('Select an object to move it, or choose a tool to add something.');
-  else setPlaceHint('Click a page to drop the signature stamp.');
+  else if (state.stamp) setPlaceHint(L('Kies een object om het te verplaatsen, of kies een hulpmiddel om iets toe te voegen.', 'Select an object to move it, or choose a tool to add something.'));
+  else setPlaceHint(L('Klik op een pagina om de stempel te plaatsen.', 'Click a page to drop the signature stamp.'));
 }
 
 // Place the selected tool where the user clicks. Fixed top-of-page defaults
@@ -1007,19 +1790,19 @@ function placeExtraAt(type, wrap, clientX, clientY) {
   } else if (type === 'note') {
     const size = Math.round(Math.max(9, Math.min(pageW, pageH) * 0.022));
     const w = Math.round(pageW * 0.28);
-    extra = { id: ++_extraSeq, type, pageIndex, x: Math.min(clickX, pageW - w), yTop: pageH - clickYTop, w, size, text: 'Note' };
+    extra = { id: ++_extraSeq, type, pageIndex, x: Math.min(clickX, pageW - w), yTop: pageH - clickYTop, w, size, text: L('Notitie', 'Note') };
   } else {
     const size = Math.round(Math.max(12, Math.min(pageW, pageH) * 0.035));
     const h = extraBoxH(size);
-    const text = type === 'date' ? new Date().toISOString().slice(0, 10) : 'Text';
+    const text = type === 'date' ? todayText() : L('Tekst', 'Text');
     const estimatedW = size * (type === 'date' ? 7.4 : 5);
     extra = { id: ++_extraSeq, type, pageIndex, x: Math.min(clickX, Math.max(0, pageW - estimatedW)), y: Math.max(0, pageH - clickYTop - h), size, text };
   }
   state.extras.push(extra);
   const el = renderExtraMarker(extra);
   setEditTool(null);
-  const label = type === 'date' ? 'Date' : type[0].toUpperCase() + type.slice(1);
-  setPlaceHint(label + ' added. Drag to move it, use the corner to resize, or use its edit and delete buttons.');
+  const label = { date: L('Datum', 'Date'), text: L('Tekst', 'Text'), note: L('Notitie', 'Note'), highlight: L('Markering', 'Highlight') }[type] || type;
+  setPlaceHint(label + L(' toegevoegd. Sleep om te verplaatsen, gebruik de hoek om het formaat te wijzigen, of gebruik de knoppen om te bewerken of te verwijderen.', ' added. Drag to move it, use the corner to resize, or use its edit and delete buttons.'));
   if (el && (type === 'text' || type === 'note')) beginEditExtra(el, extra);
   else if (el) { el.tabIndex = -1; el.focus({ preventScroll: true }); }
   return el;
@@ -1057,7 +1840,7 @@ function renderExtraMarker(extra) {
 
   const del = document.createElement('button');
   del.className = 'ds-anno-del'; del.type = 'button'; del.textContent = '×';
-  del.title = 'Remove'; del.setAttribute('aria-label', 'Remove this object');
+  del.title = L('Verwijderen', 'Remove'); del.setAttribute('aria-label', L('Dit object verwijderen', 'Remove this object'));
   del.addEventListener('pointerdown', e => { e.stopPropagation(); });
   del.addEventListener('click', e => { e.stopPropagation(); removeExtra(extra.id); });
   el.appendChild(del);
@@ -1067,7 +1850,7 @@ function renderExtraMarker(extra) {
   if (extra.type === 'text' || extra.type === 'date' || extra.type === 'note') {
     const ed = document.createElement('button');
     ed.className = 'ds-anno-edit'; ed.type = 'button'; ed.textContent = '✎';
-    ed.title = 'Edit text'; ed.setAttribute('aria-label', 'Edit this text');
+    ed.title = L('Tekst bewerken', 'Edit text'); ed.setAttribute('aria-label', L('Deze tekst bewerken', 'Edit this text'));
     ed.addEventListener('pointerdown', e => { e.stopPropagation(); });
     ed.addEventListener('click', e => { e.stopPropagation(); beginEditExtra(el, extra); });
     el.appendChild(ed);
@@ -1195,7 +1978,7 @@ function beginEditExtra(el, extra) {
     el.contentEditable = 'false';
     el.classList.remove('editing');
     extra.text = (el.textContent || '').replace(/\n/g, ' ').trim()
-      || (extra.type === 'date' ? new Date().toISOString().slice(0, 10) : extra.type === 'note' ? 'Note' : 'Text');
+      || (extra.type === 'date' ? todayText() : extra.type === 'note' ? L('Notitie', 'Note') : L('Tekst', 'Text'));
     el.removeEventListener('blur', finish);
     el.removeEventListener('keydown', onKey);
     // Rebuild the marker so delete/resize handles + geometry are consistent.
@@ -1247,6 +2030,7 @@ function commitExtraFromMarker(el, extra) {
 // Re-render every extra marker from state (used after a zoom re-render, which
 // wipes the overlay divs). PDF-point geometry is the source of truth.
 function reflowExtras() {
+  if (placeStepHidden()) return;
   document.querySelectorAll('.ds-anno').forEach(el => el.remove());
   if (placeState && placeState.isImage) return;
   for (const extra of state.extras) renderExtraMarker(extra);
@@ -1359,7 +2143,7 @@ function renderDrawMarker(extra) {
 
   const del = document.createElement('button');
   del.className = 'ds-anno-del'; del.type = 'button'; del.textContent = '×';
-  del.title = 'Remove'; del.setAttribute('aria-label', 'Remove this drawing');
+  del.title = L('Verwijderen', 'Remove'); del.setAttribute('aria-label', L('Deze tekening verwijderen', 'Remove this drawing'));
   del.addEventListener('pointerdown', e => { e.stopPropagation(); });
   del.addEventListener('click', e => { e.stopPropagation(); removeExtra(extra.id); });
   el.appendChild(del);
@@ -1378,6 +2162,15 @@ function renderDrawMarker(extra) {
 
 let _pageOpBusy = false;
 
+// The date a signer drops on a page: today on the signer's own clock (not UTC,
+// which gave yesterday between 00:00 and 02:00 in the Netherlands), written the
+// Dutch way on the Dutch page (4-10-2026) and unambiguous on the English one
+// (2026-10-04). Fase 1 SIGN-21.
+function todayText(d = new Date()) {
+  const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+  return EN ? y + '-' + String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0') : day + '-' + m + '-' + y;
+}
+
 function setPlaceHint(msg) {
   const h = $('ds-place-hint');
   if (h) h.textContent = msg;
@@ -1388,16 +2181,28 @@ async function runPageOp(fn) {
   _pageOpBusy = true;
   try {
     const PDFLib = await waitForPdfLib();
+    const hintEl = $('ds-place-hint');
+    const before = hintEl ? hintEl.textContent : '';
     const out = await fn(PDFLib, window.ParasignPdfOps);
+    // A hint the operation set ("the pages of x.pdf are now at the end") must
+    // survive the re-render, which writes the default hint back (fase 1 SIGN-18).
+    const opHint = hintEl && hintEl.textContent !== before ? hintEl.textContent : null;
     if (out) {
       state.doc.bytes = new Uint8Array(out);
       state.doc.size = state.doc.bytes.length;
       await renderPdfForPlacement();
+      if (opHint) setPlaceHint(opHint);
       // The seal gate: re-disable Continue when the op removed the stamp.
       $('ds-place-continue').disabled = hasInlineSeal() && !state.stamp;
     }
   } catch (err) {
-    setPlaceHint('Page operation failed: ' + err.message);
+    // Never the library's own English in the Dutch page: the reason in our
+    // words, the detail in the console for support.
+    try { console.error('[paramant] page operation', err); } catch (_) { /* no console */ }
+    const locked = /encrypt/i.test(String(err && err.message)) || (err && err.name === 'EncryptedPDFError');
+    setPlaceHint(locked
+      ? L('Deze pdf is beveiligd tegen wijzigen, dus pagina’s draaien, verplaatsen of verwijderen kan niet. Het document is niet veranderd.', 'This PDF is protected against changes, so pages cannot be rotated, moved or deleted. The document was not changed.')
+      : L('De paginabewerking is niet gelukt. Het document is niet veranderd; probeer het nog eens.', 'The page operation did not work. The document was not changed; please try again.'));
   } finally {
     _pageOpBusy = false;
   }
@@ -1410,14 +2215,14 @@ function clearObjectsOnPage(idx, why) {
   state.extras = state.extras.filter(e => e.pageIndex !== idx);
   if (hadStamp) state.stamp = null;
   if (hadExtras || hadStamp) {
-    setPlaceHint('Page ' + (idx + 1) + ' was ' + why + '; the objects placed on it were removed' +
-      (hadStamp ? ' (place the signature stamp again)' : '') + '.');
+    setPlaceHint(L('Pagina ', 'Page ') + (idx + 1) + L(' is ', ' was ') + why + L('; de objecten erop zijn verwijderd', '; the objects placed on it were removed') +
+      (hadStamp ? L(' (plaats de stempel opnieuw)', ' (place the signature stamp again)') : '') + '.');
   }
   return hadExtras || hadStamp;
 }
 
 function remapAfterDelete(idx) {
-  clearObjectsOnPage(idx, 'deleted');
+  clearObjectsOnPage(idx, L('verwijderd', 'deleted'));
   state.extras.forEach(e => { if (e.pageIndex > idx) e.pageIndex--; });
   if (state.stamp && !state.stamp.isImage && state.stamp.pageIndex > idx) state.stamp.pageIndex--;
 }
@@ -1434,7 +2239,7 @@ function remapAfterMove(from, to) {
 
 function pageOpDelete(idx) {
   runPageOp(async (PDFLib, Ops) => {
-    if (!confirm('Delete page ' + (idx + 1) + ' from the document?')) return null;
+    if (!confirm(L('Pagina ', 'Delete page ') + (idx + 1) + L(' uit het document verwijderen?', ' from the document?'))) return null;
     const out = await Ops.deletePage(PDFLib, state.doc.bytes, idx);
     remapAfterDelete(idx);
     return out;
@@ -1457,7 +2262,7 @@ function pageOpMove(idx, to) {
 function pageOpRotate(idx) {
   runPageOp(async (PDFLib, Ops) => {
     const out = await Ops.rotatePage(PDFLib, state.doc.bytes, idx, 90);
-    clearObjectsOnPage(idx, 'rotated');
+    clearObjectsOnPage(idx, L('gedraaid', 'rotated'));
     return out;
   });
 }
@@ -1474,10 +2279,10 @@ function buildPageBar(idx) {
     b.addEventListener('click', fn);
     bar.appendChild(b);
   };
-  mk('↑', 'Move page ' + (idx + 1) + ' up',   () => pageOpMove(idx, idx - 1));
-  mk('↓', 'Move page ' + (idx + 1) + ' down', () => pageOpMove(idx, idx + 1));
-  mk('⟳', 'Rotate page ' + (idx + 1) + ' 90°', () => pageOpRotate(idx));
-  mk('×', 'Delete page ' + (idx + 1),         () => pageOpDelete(idx));
+  mk('↑', L('Pagina ', 'Move page ') + (idx + 1) + L(' omhoog', ' up'),   () => pageOpMove(idx, idx - 1));
+  mk('↓', L('Pagina ', 'Move page ') + (idx + 1) + L(' omlaag', ' down'), () => pageOpMove(idx, idx + 1));
+  mk('⟳', L('Pagina ', 'Rotate page ') + (idx + 1) + L(' 90° draaien', ' 90°'), () => pageOpRotate(idx));
+  mk('×', L('Pagina ', 'Delete page ') + (idx + 1) + L(' verwijderen', ''),         () => pageOpDelete(idx));
   return bar;
 }
 
@@ -1492,7 +2297,7 @@ function wirePageTools() {
       const other = new Uint8Array(await f.arrayBuffer());
       runPageOp(async (PDFLib, Ops) => {
         const out = await Ops.appendPdf(PDFLib, state.doc.bytes, other);
-        setPlaceHint('Appended the pages of ' + f.name + ' to the end of the document.');
+        setPlaceHint(L("De pagina's van ", 'Appended the pages of ') + f.name + L(' staan nu achteraan in het document.', ' to the end of the document.'));
         return out;
       });
     });
@@ -1501,14 +2306,14 @@ function wirePageTools() {
     splitBtn.addEventListener('click', () => {
       runPageOp(async (PDFLib, Ops) => {
         const n = await Ops.pageCount(PDFLib, state.doc.bytes);
-        const raw = prompt('Export which pages as a new PDF? (e.g. 3 or 2-5, of ' + n + ' total)');
+        const raw = prompt(L("Welke pagina's wilt u als nieuwe pdf exporteren? (bijv. 3 of 2-5, van ", 'Export which pages as a new PDF? (e.g. 3 or 2-5, of ') + n + L(' in totaal)', ' total)'));
         if (raw === null) return null;
         const r = Ops.parsePageRange(raw, n);
-        if (!r) { setPlaceHint('Could not read that page range.'); return null; }
+        if (!r) { setPlaceHint(L('Dat paginabereik is niet te lezen.', 'Could not read that page range.')); return null; }
         const out = await Ops.extractRange(PDFLib, state.doc.bytes, r.from, r.to);
         const base = (state.doc.name || 'document.pdf').replace(/\.pdf$/i, '');
         downloadBytes(out, base + '-pages-' + (r.from + 1) + '-' + (r.to + 1) + '.pdf', 'application/pdf');
-        setPlaceHint('Exported pages ' + (r.from + 1) + ' to ' + (r.to + 1) + ' as a separate PDF. The document here is unchanged.');
+        setPlaceHint(L("Pagina's ", 'Exported pages ') + (r.from + 1) + L(' tot en met ', ' to ') + (r.to + 1) + L(' zijn als aparte pdf geëxporteerd. Het document hier is niet veranderd.', ' as a separate PDF. The document here is unchanged.'));
         return null;                                          // export only
       });
     });
@@ -1530,7 +2335,7 @@ function setupPageNav(container, total) {
   nav.hidden = false;
   const ratios = new Map(wraps.map(w => [w, 0]));
   let current = 0;
-  const render = () => { label.textContent = 'Page ' + (current + 1) + ' of ' + total; };
+  const render = () => { label.textContent = L('Pagina ', 'Page ') + (current + 1) + L(' van ', ' of ') + total; };
   _pageNavObserver = new IntersectionObserver((entries) => {
     for (const e of entries) ratios.set(e.target, e.intersectionRatio);
     let best = wraps[0], bestR = -1;
@@ -1562,9 +2367,28 @@ function setupPageNav(container, total) {
 // silently re-places the seal at the cursor (QA: stamp-resize, edit-object drag,
 // dblclick all corrupted the seal). Every interaction handler calls
 // swallowNextWrapClick(wrap) so exactly the next wrap click is eaten.
+//
+// Only the click of the gesture that just ended. A mouse fires that click right
+// after pointerup; a finger that dragged fires none at all. The old once-listener
+// then stayed armed and ate the NEXT real tap, so on a phone the first tap after
+// moving the seal did nothing (test report 2026-10-04). Every real click starts
+// with a pointerdown, so a new pointerdown disarms the guard; the timer is a
+// backstop for a click that never comes.
 function swallowNextWrapClick(wrap) {
   if (!wrap) return;
-  wrap.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+  if (wrap._swallowDisarm) wrap._swallowDisarm();
+  let timer = 0;
+  const eat = (ev) => { ev.stopPropagation(); ev.preventDefault(); disarm(); };
+  const disarm = () => {
+    wrap.removeEventListener('click', eat, true);
+    wrap.removeEventListener('pointerdown', disarm, true);
+    clearTimeout(timer);
+    if (wrap._swallowDisarm === disarm) wrap._swallowDisarm = null;
+  };
+  wrap.addEventListener('click', eat, true);
+  wrap.addEventListener('pointerdown', disarm, true);
+  timer = setTimeout(disarm, 1000);
+  wrap._swallowDisarm = disarm;
 }
 
 function onPlaceClick(e) {
@@ -1622,15 +2446,32 @@ function onPlaceClick(e) {
     // Nothing of the requester's is stamped into this document: this box is a
     // request the other party may move, so no ghosts and no saved template.
     $('ds-place-hint').textContent =
-      'You are asking for a signature on page ' + (wrap._pdfPage.index + 1) + '. Tap another spot to move the box.';
-    const btn = $('ds-invite-place'); if (btn) btn.textContent = 'Move the signature box';
+      L('U vraagt om een handtekening op pagina ', 'You are asking for a signature on page ') + (wrap._pdfPage.index + 1) + L('. Tik op een andere plek om het vak te verplaatsen.', '. Tap another spot to move the box.');
+    // On the text itself: say what will happen (/co-sign then uses a
+    // signature sheet after the last page rather than sign over the text).
+    const tb = textBoxesIfReady(state.doc.bytes);
+    const onPage = tb && tb[wrap._pdfPage.index];
+    if (Array.isArray(onPage)) {
+      const st = state.stamp;
+      let area = 0;
+      for (const t of onPage) {
+        const w = Math.min(st.x + st.w, t.x + t.w) - Math.max(st.x, t.x);
+        const h = Math.min(st.y + st.h, t.y + t.h) - Math.max(st.y, t.y);
+        if (w > 0 && h > 0) area += w * h;
+      }
+      if (area > 0.15 * st.w * st.h) {
+        $('ds-place-hint').textContent = L('Dit vak ligt op de tekst. Dan tekent iedereen op een apart handtekeningblad achter het document. Kies een lege plek als u wilt dat ze op deze pagina tekenen.', 'This box lies on the text. Everyone then signs on a separate signature sheet after the document. Pick an empty spot if you want them to sign on this page.');
+      }
+    }
+    const btn = $('ds-invite-place'); if (btn) btn.textContent = L('Verplaats het handtekeningvak', 'Move the signature box');
     return;
   }
   reflowGhostStamps();          // update the repeated-seal ghosts to the new spot
   savePlacementTemplate();      // remember this position/scale for next time
   $('ds-place-hint').textContent = isImage
-    ? 'Stamp placed on the image. Click another spot to move it.'
-    : 'Stamp on page ' + (wrap._pdfPage.index + 1) + '. Click another spot to move it.';
+    ? L('Stempel op de afbeelding geplaatst. Klik op een andere plek om hem te verplaatsen.', 'Stamp placed on the image. Click another spot to move it.')
+    : L('Stempel op pagina ', 'Stamp on page ') + (wrap._pdfPage.index + 1) + L('. Klik op een andere plek om hem te verplaatsen.', '. Click another spot to move it.');
+  if (!isImage) checkSoloStampCover().catch(() => {});
 }
 
 function renderStampMarker(wrap, left, top, w, h) {
@@ -1644,7 +2485,7 @@ function renderStampMarker(wrap, left, top, w, h) {
   // every placed object has a visible remove control (QA req 4).
   const del = document.createElement('button');
   del.className = 'ds-stamp-del'; del.type = 'button'; del.textContent = '×';
-  del.title = 'Remove signature'; del.setAttribute('aria-label', 'Remove the signature stamp');
+  del.title = L('Handtekening verwijderen', 'Remove signature'); del.setAttribute('aria-label', L('De stempel verwijderen', 'Remove the signature stamp'));
   del.addEventListener('pointerdown', e => { e.stopPropagation(); });
   del.addEventListener('click', e => { e.stopPropagation(); removeStamp(); });
   m.appendChild(del);
@@ -1666,6 +2507,139 @@ function commitStampFromMarker(marker, wrap) {
   }
   reflowGhostStamps();          // drag/resize moved the seal: follow with the ghosts
   savePlacementTemplate();      // and keep the reusable template in sync
+  scheduleSoloCoverCheck();
+}
+
+// ── Solo: the stamp over the text (acceptance r2, 1) ─────────────────────────
+// /co-sign never signs over text, but a solo signer could drop the stamp on
+// the last articles of a contract without a word. Now the hint says so and
+// offers the two ways out co-sign has: a free spot on this page, or a
+// separate signature sheet. It warns, it does not block: it is the signer's
+// own document.
+const SOLO_COVER_LIMIT = 0.15;
+function stampTextCover(st, boxes) {
+  if (!st || !Array.isArray(boxes)) return 0;
+  let area = 0;
+  for (const t of boxes) {
+    const w = Math.min(st.x + st.w, t.x + t.w) - Math.max(st.x, t.x);
+    const h = Math.min(st.y + st.h, t.y + t.h) - Math.max(st.y, t.y);
+    if (w > 0 && h > 0) area += w * h;
+  }
+  return area / (st.w * st.h);
+}
+// The free spot nearest to where the stamp is now, same size, nothing of the
+// text under it (3 pt room). PDF points, bottom-left origin. null if none.
+function nearestFreeStampSpot(st, boxes, page) {
+  if (!st || !page) return null;
+  const pad = 3, step = 6;
+  const padded = (boxes || []).map((t) => ({ x: t.x - pad, y: t.y - pad, w: t.w + 2 * pad, h: t.h + 2 * pad }));
+  const free = (x, y) => !padded.some((t) => x < t.x + t.w && t.x < x + st.w && y < t.y + t.h && t.y < y + st.h);
+  const cx = st.x + st.w / 2, cy = st.y + st.h / 2;
+  let best = null;
+  for (let y = 8; y + st.h <= page.height - 8; y += step) {
+    for (let x = 8; x + st.w <= page.width - 8; x += step) {
+      if (!free(x, y)) continue;
+      const d = Math.hypot(x + st.w / 2 - cx, y + st.h / 2 - cy);
+      if (!best || d < best.d) best = { x, y, d };
+    }
+  }
+  return best ? { x: best.x, y: best.y } : null;
+}
+// Pixels as well as text, for the one page the stamp is on: the same check
+// /co-sign makes for a signature box (co-sign.js boxesOfPdfjsPage, ink:true).
+// A page WITH a text layer used to be judged on its text alone, so articles
+// set as images, a scan with one stray character, a logo or a drawn table
+// under the stamp went unnoticed. Cached per document and page.
+let _stampInkCache = { bytes: null, pages: new Map() };
+function stampPageInkBoxes(bytes, pageIndex) {
+  if (_stampInkCache.bytes !== bytes) _stampInkCache = { bytes, pages: new Map() };
+  if (_stampInkCache.pages.has(pageIndex)) return _stampInkCache.pages.get(pageIndex);
+  const pr = (async () => {
+    try {
+      const pdfjs = await waitForPdfjs();
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
+      try { return await inkBoxesOfPage(await pdf.getPage(pageIndex + 1)); }
+      finally { try { pdf.destroy(); } catch (e) { /* best effort */ } }
+    } catch (e) { return null; }
+  })();
+  _stampInkCache.pages.set(pageIndex, pr);
+  return pr;
+}
+// Text and pixels under the stamp's page, view-space points. null: unknown.
+async function stampCoverBoxes(st) {
+  const all = await loadTextBoxes(state.doc.bytes);
+  const text = all && Array.isArray(all[st.pageIndex]) ? all[st.pageIndex] : null;
+  const ink = await stampPageInkBoxes(state.doc.bytes, st.pageIndex);
+  if (!text && !ink) return null;
+  return (text || []).concat(ink || []);
+}
+// The stamp lies over the text or the image of its page: said next to the
+// placement hint and again on the review step, like the paraaf
+// (showParaafOverTextNotice). page: 1-based, or 0 to take the notice away.
+function showStampOverTextNotice(page) {
+  for (const [anchorId, noticeId] of [['ds-place-hint', 'ds-stamp-over-text'], ['ds-review-doc-preview', 'ds-stamp-over-text-review']]) {
+    const anchor = $(anchorId);
+    let el = $(noticeId);
+    if (!page) { if (el) el.remove(); continue; }
+    if (!anchor) continue;
+    if (!el) {
+      el = document.createElement('p');
+      el.id = noticeId;
+      el.className = 'ds-banner err';
+      el.setAttribute('role', 'alert');
+      anchor.insertAdjacentElement('afterend', el);
+    }
+    el.textContent = L('Uw handtekening ligt op pagina ', 'Your signature lies on page ') + page
+      + L(' over tekst of een afbeelding. Kies bij Plaatsen een vrije plek of een apart handtekeningblad als die leesbaar moet blijven.',
+          ' over text or an image. At Place, pick a free spot or a separate signature sheet if that needs to stay readable.');
+  }
+}
+// The review step asks again, from the same boxes: the stamp may have been
+// moved, resized or the document changed since the placement check.
+async function refreshStampOverTextNotice() {
+  const st = state.stamp;
+  if (state.signingMode === 'invite' || state.mode !== 'pdf' || !st || st.isImage || !hasInlineSeal()) { showStampOverTextNotice(0); return; }
+  const boxes = await stampCoverBoxes(st);
+  if (state.stamp !== st) return;
+  showStampOverTextNotice(Array.isArray(boxes) && stampTextCover(st, boxes) > SOLO_COVER_LIMIT ? st.pageIndex + 1 : 0);
+}
+let _soloCoverTimer = 0;
+function scheduleSoloCoverCheck() {
+  clearTimeout(_soloCoverTimer);
+  _soloCoverTimer = setTimeout(() => { checkSoloStampCover().catch(() => {}); }, 250);
+}
+async function checkSoloStampCover() {
+  if (state.signingMode === 'invite' || state.mode !== 'pdf' || !state.stamp || state.stamp.isImage || !hasInlineSeal()) { showStampOverTextNotice(0); return; }
+  const st = state.stamp;
+  const boxes = await stampCoverBoxes(st);
+  if (state.stamp !== st) return;   // moved again in the meantime
+  if (!Array.isArray(boxes) || stampTextCover(st, boxes) <= SOLO_COVER_LIMIT) { showStampOverTextNotice(0); return; }
+  showStampOverTextNotice(st.pageIndex + 1);
+  const hint = $('ds-place-hint');
+  if (!hint) return;
+  hint.textContent = L('Deze handtekening staat op de tekst van pagina ', 'This signature sits on the text of page ') + (st.pageIndex + 1)
+    + L('. Kies een vrije plek of een apart handtekeningblad, zodat de tekst leesbaar blijft. ', '. Pick a free spot or a separate signature sheet, so the text stays readable. ');
+  hint.dataset.cover = '1';
+  const page = state.stampPage || null;
+  const spot = nearestFreeStampSpot(st, boxes, page);
+  if (spot) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn btn-secondary btn-small'; b.id = 'ds-cover-free';
+    b.textContent = L('Zet hem op een vrije plek', 'Move it to a free spot');
+    b.addEventListener('click', () => {
+      state.stamp = { ...state.stamp, x: spot.x, y: spot.y };
+      reflowStampMarker(); reflowGhostStamps(); savePlacementTemplate();
+      delete hint.dataset.cover;
+      showStampOverTextNotice(0);
+      setPlaceHint(L('Stempel op pagina ', 'Stamp on page ') + (state.stamp.pageIndex + 1) + L(', op een vrije plek. Klik op een andere plek om hem te verplaatsen.', ', on a free spot. Click another spot to move it.'));
+    });
+    hint.append(b, ' ');
+  }
+  const sheet = document.createElement('button');
+  sheet.type = 'button'; sheet.className = 'btn btn-secondary btn-small'; sheet.id = 'ds-cover-sheet';
+  sheet.textContent = L('Gebruik een handtekeningblad', 'Use a signature sheet');
+  sheet.addEventListener('click', () => { delete hint.dataset.cover; showStampOverTextNotice(0); setSealPlacement('sheet'); });
+  hint.append(sheet);
 }
 
 // A bottom-right corner grip that scales the seal uniformly (keeps its aspect
@@ -1675,8 +2649,8 @@ function addStampResizeHandle(marker, wrap) {
   const grip = document.createElement('button');
   grip.className = 'ds-stamp-resize';
   grip.type = 'button';
-  grip.title = 'Resize signature stamp';
-  grip.setAttribute('aria-label', 'Resize signature stamp. Use arrow keys to adjust.');
+  grip.title = L('Formaat van de stempel wijzigen', 'Resize signature stamp');
+  grip.setAttribute('aria-label', L('Formaat van de stempel wijzigen. Gebruik de pijltjestoetsen om aan te passen.', 'Resize signature stamp. Use arrow keys to adjust.'));
   marker.appendChild(grip);
   let rs = null;
   grip.addEventListener('pointerdown', (e) => {
@@ -1765,8 +2739,9 @@ function onStampPointerUp(e) {
     marker.style.transform = '';
     commitStampFromMarker(marker, wrap);
     // Swallow the click the browser fires after pointerup so onPlaceClick on the
-    // wrap does not ALSO re-place the stamp at the cursor.
-    wrap.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+    // wrap does not ALSO re-place the stamp at the cursor (and only that click:
+    // a touch drag fires none, see swallowNextWrapClick).
+    swallowNextWrapClick(wrap);
   }
   _drag = null;
 }
@@ -1820,7 +2795,7 @@ async function serverHasSigningKey() {
     const r = await fetch('/api/user/account/signing-key', { credentials: 'include' });
     if (!r.ok) return false;
     const body = await r.json().catch(() => ({}));
-    return Array.isArray(body.keys) && body.keys.some((k) => !k.revoked_at);
+    return Array.isArray(body.keys) && body.keys.some((k) => !k.revoked_at && !k.expired);
   } catch { return false; }
 }
 
@@ -1838,24 +2813,38 @@ async function showSigningIdentity() {
   // Claim nothing, and ask nothing.
   if (sessionState === 'out') {
     el.className = 'ds-hint';
-    el.textContent = 'Sign in to see which signing key will sign this document.';
+    el.textContent = L('Log in om te zien met welke ondertekensleutel dit document wordt ondertekend.', 'Sign in to see which signing key will sign this document.');
     return;
   }
   try {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
     el.className = 'ds-hint';
-    el.innerHTML = 'You\'ll sign with your signing key — unlocked with Face ID / Touch ID / a security key. ' +
-      'Key fingerprint <code>' + escapeHtml(k.fingerprint) + '</code>.';
+    el.innerHTML = L('U ondertekent met uw ondertekensleutel, die u ontgrendelt met Face ID, Touch ID of een beveiligingssleutel. ', 'You\'ll sign with your signing key, unlocked with Face ID / Touch ID / a security key. ') +
+      L('Vingerafdruk van de sleutel: <code>', 'Key fingerprint <code>') + escapeHtml(k.fingerprint) + '</code>.';
   } catch (e) {
     el.className = 'ds-hint';
     if (e && e.code === 'no_signing_passkey') {
+      // An account without a passkey, or a browser without WebAuthn, signs
+      // with the code: say that, not Face ID (same rule as /co-sign,
+      // acceptatie r3 A4).
+      let passkeys = null;
+      try {
+        if (window.PublicKeyCredential && navigator.credentials && typeof navigator.credentials.get === 'function') {
+          const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include', cache: 'no-store' });
+          if (r.ok) { const d = await r.json(); passkeys = d && Array.isArray(d.passkeys) ? d.passkeys.length : Number(d && d.total); }
+        } else passkeys = 0;
+      } catch { passkeys = null; }
+      if (passkeys === 0) {
+        el.textContent = L('U ondertekent met de code uit uw authenticator-app.', 'You\'ll sign with the code from your authenticator app.');
+        return;
+      }
       const elsewhere = await serverHasSigningKey();
       el.innerHTML = (elsewhere
-        ? 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign — one Face ID / Touch ID tap. No passkey here? You can sign with your authenticator code instead.'
-        : 'You\'ll sign with your sign-in passkey — this device sets up your signing key with one tap the first time you sign. No passkey here? You can sign with your authenticator code instead.');
+        ? L('U ondertekent met de passkey waarmee u inlogt. Een ondertekensleutel staat in de browser waarin u hem maakt, dus dit apparaat maakt er een aan de eerste keer dat u tekent: één tik met Face ID of Touch ID. Geen passkey hier? Dan kunt u tekenen met de code uit uw authenticator-app.', 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign, one Face ID / Touch ID tap. No passkey here? You can sign with your authenticator code instead.')
+        : L('U ondertekent met de passkey waarmee u inlogt. Dit apparaat maakt uw ondertekensleutel aan met één tik, de eerste keer dat u tekent. Geen passkey hier? Dan kunt u tekenen met de code uit uw authenticator-app.', 'You\'ll sign with your sign-in passkey, this device sets up your signing key with one tap the first time you sign. No passkey here? You can sign with your authenticator code instead.'));
     } else {
-      el.textContent = (e && e.message) ? e.message : 'Could not check your signing key.';
+      el.textContent = readableError(e, L('Uw ondertekensleutel kon niet worden gecontroleerd.', 'Could not check your signing key.'));
     }
   }
 }
@@ -1935,7 +2924,7 @@ function initDrawCanvas() {
   function start(ev) {
     ev.preventDefault();
     exportGeneration++;
-    if (drawStatus) drawStatus.textContent = 'Drawing. The line above follows your pointer.';
+    if (drawStatus) drawStatus.textContent = L('U tekent. De lijn hierboven volgt uw aanwijzer.', 'Drawing. The line above follows your pointer.');
     // Capture the pointer: a stroke that briefly leaves the canvas (normal at
     // writing speed) keeps drawing instead of being cut off mid-letter.
     try { cv.setPointerCapture(ev.pointerId); } catch {}
@@ -1970,7 +2959,7 @@ function initDrawCanvas() {
     if (!drawing) return;
     drawing = false;
     try { cv.releasePointerCapture(ev.pointerId); } catch {}
-    if (drawStatus) drawStatus.textContent = 'Preparing the signature preview.';
+    if (drawStatus) drawStatus.textContent = L('Het voorbeeld van de handtekening wordt klaargezet.', 'Preparing the signature preview.');
     const generation = ++exportGeneration;
     exportSignature(generation);
   }
@@ -1989,8 +2978,20 @@ function initDrawCanvas() {
     const out = document.createElement('canvas');
     out.width = w; out.height = h;
     const octx = out.getContext('2d');
-    octx.fillStyle = '#ffffff'; octx.fillRect(0, 0, w, h);
     octx.drawImage(cv, x0, y0, w, h, 0, 0, w, h);
+    // The paper of the drawing pad stays behind: white becomes see-through and
+    // the ink keeps its own colour, with its soft edge as transparency. A white
+    // block under the signature used to hide the text of the document (T1-10).
+    try {
+      const img = octx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const paper = Math.min(d[i], d[i + 1], d[i + 2]);
+        const a = Math.max(0, Math.min(255, Math.round((255 - paper) * 255 / 244)));
+        d[i] = 11; d[i + 1] = 58; d[i + 2] = 106; d[i + 3] = a;
+      }
+      octx.putImageData(img, 0, 0);
+    } catch { /* a tainted canvas cannot happen here; keep the plain copy */ }
     const blob = await new Promise((resolve) => out.toBlob(resolve, 'image/png'));
     if (!blob) return;
     const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -2002,7 +3003,7 @@ function initDrawCanvas() {
     state.signer.sigImageDataUrl = dataUrl;
     refreshIdentityValid();
     refreshVisibleSealPreviews();
-    if (drawStatus) drawStatus.textContent = 'Signature ready. Continue to review it in the seal.';
+    if (drawStatus) drawStatus.textContent = L('Handtekening klaar. Ga verder om hem in de stempel te bekijken.', 'Signature ready. Continue to review it in the seal.');
   }
 
   function clearSig() {
@@ -2027,7 +3028,7 @@ function initDrawCanvas() {
     exportGeneration++;
     paint(); ink = null; clearSig();
     refreshVisibleSealPreviews();
-    if (drawStatus) drawStatus.textContent = 'Cleared. Your line appears here while you draw.';
+    if (drawStatus) drawStatus.textContent = L('Gewist. Uw lijn verschijnt hier terwijl u tekent.', 'Cleared. Your line appears here while you draw.');
   });
 }
 
@@ -2040,14 +3041,22 @@ function initImageUpload() {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
     if (f.size > 1024 * 1024) {
-      alert('Image too large (max 1 MB).');
+      alert(L('Afbeelding te groot (max. 1 MB).', 'Image too large (max 1 MB).'));
       return;
     }
     const bytes = new Uint8Array(await f.arrayBuffer());
-    const type = (f.type === 'image/jpeg') ? 'jpg' : 'png';
+    // The bytes say what the image is, not its name: a PNG saved as .jpg was
+    // accepted here and then failed in the bake, after the code.
+    const mime = guessMimeFromMagic(bytes);
+    if (mime !== 'image/png' && mime !== 'image/jpeg') {
+      alert(L('Dit bestand is geen PNG- of JPG-afbeelding. Kies een PNG of JPG van uw handtekening.', 'This file is not a PNG or JPG image. Pick a PNG or JPG of your signature.'));
+      inp.value = '';
+      return;
+    }
+    const type = mime === 'image/jpeg' ? 'jpg' : 'png';
     state.signer.sigImageBytes = bytes;
     state.signer.sigImageType = type;
-    state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, f.type);
+    state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, mime);
     const img = $('ds-sig-image-preview');
     img.src = state.signer.sigImageDataUrl;
     img.style.display = 'block';
@@ -2097,26 +3106,26 @@ function fillReview() {
   $('ds-review-doc').textContent  = state.doc.name + ' (' + formatSize(state.doc.size) + ')';
   $('ds-review-mode').textContent =
     state.mode === 'pdf'   ? describePdfMode() :
-    state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
-                             'Hash-only (SHA3-256 attestation)';
+    state.mode === 'image' ? L('Afbeelding met ingebakken zichtbare stempel (', 'Image with visual stamp baked in (') + (state.imageType || '').toUpperCase() + ')' :
+                             L('Alleen een vingerafdruk (SHA3-256)', 'Fingerprint only (SHA3-256)');
   $('ds-review-name').textContent = state.signer.name;
   $('ds-review-sig').textContent =
-    state.signer.sigStyle === 'typed'  ? 'Typed name in the stamp' :
-    state.signer.sigStyle === 'drawn'  ? 'Drawn signature (' + formatSize(state.signer.sigImageBytes.length) + ' PNG)' :
-                                         'Uploaded image (' + formatSize(state.signer.sigImageBytes.length) + ' ' + state.signer.sigImageType.toUpperCase() + ')';
+    state.signer.sigStyle === 'typed'  ? L('Getypte naam in de stempel', 'Typed name in the stamp') :
+    state.signer.sigStyle === 'drawn'  ? L('Getekende handtekening (', 'Drawn signature (') + formatSize(state.signer.sigImageBytes.length) + ' PNG)' :
+                                         L('Geüploade afbeelding (', 'Uploaded image (') + formatSize(state.signer.sigImageBytes.length) + ' ' + state.signer.sigImageType.toUpperCase() + ')';
   // Signing key: always the account's passkey-protected ML-DSA-65 key. The
   // fingerprint is filled async (public vault metadata, no unlock) below.
-  $('ds-review-key-src').textContent = 'Your signing key (ML-DSA-65)';
+  $('ds-review-key-src').textContent = L('Uw ondertekensleutel (ML-DSA-65)', 'Your signing key (ML-DSA-65)');
 
   // Recipients summary. Multi-party envelopes are created same-origin via your
   // logged-in session (no manual API key); each recipient signs at /co-sign
   // with their own passkey.
   const recCell = $('ds-review-recipients');
   if (state.recipients.length === 0) {
-    recCell.textContent = 'None - personal signature only';
+    recCell.textContent = L('Geen, alleen uw eigen handtekening', 'None - personal signature only');
   } else {
     const list = state.recipients.map(r => r.label + (r.email ? ' (' + r.email + ')' : '')).join(', ');
-    recCell.innerHTML = state.recipients.length + ' co-signer' + (state.recipients.length === 1 ? '' : 's') + ': ' + escapeHtml(list);
+    recCell.innerHTML = state.recipients.length + (state.recipients.length === 1 ? L(' medeondertekenaar', ' co-signer') : L(' medeondertekenaars', ' co-signers')) + ': ' + escapeHtml(list);
   }
 
   // Cryptographic proof card: the mathematical evidence that backs the
@@ -2124,7 +3133,13 @@ function fillReview() {
   // the key source.
   const docHashHex = toHex(sha3_256(state.doc.bytes));
   $('ds-proof-doc-hash').textContent = docHashHex;
-  $('ds-proof-fp').textContent = '(your signing key fingerprint)';   // filled async below
+  // On the pdf route the signature goes on the version WITH the seal, whose
+  // hash only exists once it is baked; this is the original's (fase 1 SIGN-34).
+  const docHashLabel = $('ds-proof-doc-hash-label');
+  if (docHashLabel) docHashLabel.textContent = state.mode === 'pdf'
+    ? L('SHA3-256 van het origineel (de handtekening komt op de versie met de zegel)', 'SHA3-256 of the original (the signature goes on the version with the seal)')
+    : L('SHA3-256 van het document', 'Document SHA3-256');
+  $('ds-proof-fp').textContent = L('(vingerafdruk van uw ondertekensleutel)', '(your signing key fingerprint)');   // filled async below
   $('ds-proof-version').textContent = 'parasign-doc-3 (recipe_version 3)';
 
   // Envelope-structure preview — the v3 .psign receipt (parasign-doc-3). The
@@ -2188,17 +3203,17 @@ async function fillReviewKeyFingerprint() {
   // Same as showSigningIdentity: signed out there is no key to read, and
   // '(unavailable)' would read as a fault rather than as a missing session.
   if (sessionState === 'out') {
-    const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = '(after you sign in)';
+    const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = L('(nadat u bent ingelogd)', '(after you sign in)');
     return;
   }
   try {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
     const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = k.fingerprint;
-    const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = 'Your signing key (' + k.fingerprint + ')';
+    const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = L('Uw ondertekensleutel (', 'Your signing key (') + k.fingerprint + ')';
   } catch (e) {
     const fpEl = $('ds-proof-fp');
-    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? '(set up with one passkey tap when you sign)' : '(unavailable)';
+    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? L('(wordt aangemaakt met één tik op uw passkey als u tekent)', '(set up with one passkey tap when you sign)') : L('(niet beschikbaar)', '(unavailable)');
   }
 }
 
@@ -2261,6 +3276,8 @@ function renderReviewExtra(ex, wrap, ratio, pageH) {
 async function renderDocPreview() {
   const pane = $('ds-review-doc-preview');
   if (!pane) return;
+  const ticket = docPreviewGen.start();
+  const stale = () => !docPreviewGen.current(ticket);
   pane.innerHTML = '';
   pane.classList.remove('has-pdf');
   // Force block layout: the zoom bar must never sit in a flex ROW next to the
@@ -2276,9 +3293,9 @@ async function renderDocPreview() {
   const buildReviewZoom = (zoomwrap) => {
     const bar = document.createElement('div');
     bar.className = 'ds-zoom ds-rv-zoom';
-    bar.innerHTML = '<button type="button" aria-label="Zoom out" data-z="out">&minus;</button>' +
-      '<span class="ds-rv-pct">100%</span><button type="button" aria-label="Zoom in" data-z="in">+</button>' +
-      '<button type="button" data-z="fit">Fit</button>';
+    bar.innerHTML = L('<button type="button" aria-label="Uitzoomen" data-z="out">&minus;</button>', '<button type="button" aria-label="Zoom out" data-z="out">&minus;</button>') +
+      L('<span class="ds-rv-pct">100%</span><button type="button" aria-label="Inzoomen" data-z="in">+</button>', '<span class="ds-rv-pct">100%</span><button type="button" aria-label="Zoom in" data-z="in">+</button>') +
+      L('<button type="button" data-z="fit">Passend</button>', '<button type="button" data-z="fit">Fit</button>');
     const pct = bar.querySelector('.ds-rv-pct');
     const apply = () => { zoomwrap.style.transform = 'scale(' + _reviewZoom + ')'; pct.textContent = Math.round(_reviewZoom * 100) + '%'; };
     bar.addEventListener('click', (e) => {
@@ -2296,60 +3313,89 @@ async function renderDocPreview() {
     pane.classList.add('has-pdf');
     const pdfjs = await waitForPdfjs();
     const copy = new Uint8Array(state.doc.bytes);
-    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
+    // Let a pane that just became visible settle before it is measured.
+    await nextFrame();
+    if (stale()) return;
     const zoomwrap = document.createElement('div');
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
     pane.appendChild(zoomwrap);
-    if (state.sealPlacement === 'sheet') {
+    // Sheet only, without parafen: the pages are untouched, so the sheet is
+    // all there is to review. With "every page" the pages are shown too, with
+    // the paraaf on each, exactly as baked (acceptatie r4, Nieuw 2).
+    if (state.sealPlacement === 'sheet' && !state.stampAllPages) {
+      showStampOverTextNotice(0);
       zoomwrap.appendChild(buildSignatureSheetPreview());
       buildReviewZoom(zoomwrap);
       return;
     }
+    const reviewStamp = hasInlineSeal() && state.stamp ? state.stamp : null;
+    if (reviewStamp) refreshStampOverTextNotice().catch(() => {});
+    else showStampOverTextNotice(0);
     // Review shows EVERY page (capped), each with its own annotations, and the
     // seal on its page. Only the seal page gets the heavy supersample; other
     // pages render at screen resolution to keep memory sane on long documents.
     const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
-    const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
-    // Source page size for the "sign every page" relative-position math.
-    const srcVp = (await pdf.getPage(state.stamp.pageIndex + 1)).getViewport({ scale: 1 });
-    const frX = state.stamp.x / srcVp.width, frY = state.stamp.y / srcVp.height;
-    const frW = state.stamp.w / srcVp.width, frH = state.stamp.h / srcVp.height;
+    // Max 340 to fit the grid cell, min 280 so a mid-transition width of 1px
+    // can never produce a blank raster.
+    const targetW = previewTargetWidth(pane.clientWidth, 340, 280);
+    // Sign every page: the paraaf plan for the other pages, from the same text
+    // boxes and the same function buildStampedPdf uses.
+    let paraafByPage = new Map();
+    if (state.stampAllPages) {
+      const textBoxes = await loadTextBoxes(state.doc.bytes);
+      if (stale()) return;
+      const sizes = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const vp = (await pdf.getPage(i)).getViewport({ scale: 1 });
+        sizes.push({ width: vp.width, height: vp.height });
+      }
+      if (stale()) return;
+      const reviewPlan = paraafPlanFor(sizes, reviewStamp, textBoxes);
+      showParaafOverTextNotice(paraafOverTextPages(reviewPlan));
+      paraafByPage = new Map(reviewPlan.map((b) => [b.pageIndex, b]));
+    }
     for (let p = 1; p <= maxPages; p++) {
       const page = await pdf.getPage(p);
+      if (stale()) return;
       const baseViewport = page.getViewport({ scale: 1 });
-      const isSealPage = (p - 1 === state.stamp.pageIndex);
-      const showSeal = isSealPage || state.stampAllPages;   // every page when the toggle is on
+      const isSealPage = !!reviewStamp && (p - 1 === reviewStamp.pageIndex);
+      const paraaf = isSealPage ? null : paraafByPage.get(p - 1);
+      const showSeal = isSealPage || !!paraaf;   // seal page, or a paraaf page when the toggle is on
       const superSample = showSeal ? Math.max(2.5, hiDpiScale()) : Math.min(1.5, Math.max(1, hiDpiScale()));
-      const viewport = page.getViewport({ scale: (targetW / baseViewport.width) * superSample });
       const wrap = document.createElement('div');
       wrap.style.cssText = 'position:relative;width:100%;margin-bottom:6px';
       const canvas = document.createElement('canvas');
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
       // The missing line behind the white-review bug: without an explicit CSS
       // width the supersampled canvas rendered at raw pixel size and the pane
       // showed only its blank top-left corner.
-      canvas.style.cssText = 'display:block;width:100%;height:auto';
+      canvas.style.cssText = 'display:block;width:100%;height:auto;background:#fff';
       wrap.appendChild(canvas);
       zoomwrap.appendChild(wrap);
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      // The aspect ratio is set up front, so the CSS height is right even
+      // before (or without) a backing store.
+      canvas.width = Math.floor(baseViewport.width); canvas.height = Math.floor(baseViewport.height);
+      await renderPageCapped(page, canvas, (targetW / baseViewport.width) * superSample);
+      // A newer render cleared the pane while this page was drawing: stop here.
+      if (stale()) return;
       const ratio = baseViewport.width / (wrap.getBoundingClientRect().width || targetW);   // pdf pt per displayed px
-      if (showSeal) {
-        // Placed page uses exact coords; repeated pages use the same relative
-        // fraction against their own size (mirrors buildStampedPdf).
-        const sx = isSealPage ? state.stamp.x : frX * baseViewport.width;
-        const sy = isSealPage ? state.stamp.y : frY * baseViewport.height;
-        const sw = isSealPage ? state.stamp.w : frW * baseViewport.width;
-        const sh = isSealPage ? state.stamp.h : frH * baseViewport.height;
-        const left = sx / ratio;
-        const top  = (baseViewport.height - sy - sh) / ratio;
+      if (isSealPage) {
+        const left = state.stamp.x / ratio;
+        const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
         const mock = document.createElement('div');
-        mock.className = 'ds-mockup-stamp' + (isSealPage ? '' : ' ds-mockup-ghost');
-        mock.style.cssText = `left:${left}px;top:${top}px;width:${sw / ratio}px;height:${sh / ratio}px`;
+        mock.className = 'ds-mockup-stamp';
+        mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
         mock.innerHTML = stampInnerHtml();
         wrap.appendChild(mock);
-        // Only the placed page's seal is draggable; the repeated ghosts follow it.
-        if (isSealPage) makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+        // Only the placed page's seal is draggable; the paraafs are planned for it.
+        makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+      } else if (paraaf) {
+        // The paraaf exactly where buildStampedPdf bakes it.
+        const mock = document.createElement('div');
+        mock.className = 'ds-mockup-paraaf ds-paraaf';
+        mock.style.cssText = `left:${paraaf.x / ratio}px;top:${(baseViewport.height - paraaf.y - paraaf.h) / ratio}px;width:${paraaf.w / ratio}px;height:${paraaf.h / ratio}px;font-size:${paraaf.h / ratio}px`;
+        mock.innerHTML = paraafMockupHtml();
+        wrap.appendChild(mock);
       }
       for (const ex of state.extras) {
         if (ex.pageIndex !== p - 1) continue;
@@ -2360,7 +3406,7 @@ async function renderDocPreview() {
       const more = document.createElement('div');
       more.className = 'ds-ops-dim';
       more.style.cssText = 'font-size:11px;color:var(--ink-dim);padding:6px 0';
-      more.textContent = '+ ' + (pdf.numPages - maxPages) + ' more pages not previewed here; all pages are in the signed file.';
+      more.textContent = '+ ' + (pdf.numPages - maxPages) + L(" pagina's niet getoond; alle pagina's staan in het getekende bestand.", ' more pages not previewed here; all pages are in the signed file.');
       zoomwrap.appendChild(more);
     }
     if (hasSignatureSheet()) zoomwrap.appendChild(buildSignatureSheetPreview());
@@ -2407,8 +3453,8 @@ async function renderDocPreview() {
   meta.className = 'ds-pane-meta';
   const sha = toHex(sha3_256(state.doc.bytes));
   meta.innerHTML =
-    '<div><strong>File</strong> ' + escapeHtml(state.doc.name) + '</div>' +
-    '<div><strong>Size</strong> ' + formatSize(state.doc.size) + '</div>' +
+    L('<div><strong>Bestand</strong> ', '<div><strong>File</strong> ') + escapeHtml(state.doc.name) + '</div>' +
+    L('<div><strong>Grootte</strong> ', '<div><strong>Size</strong> ') + formatSize(state.doc.size) + '</div>' +
     '<div style="margin-top:8px"><strong>SHA3-256</strong></div>' +
     '<div style="font-size:10px">' + sha + '</div>';
   pane.appendChild(meta);
@@ -2450,7 +3496,7 @@ function makeReviewStampDraggable(mock, ratio, isImage, pageH, pageIndex) {
     if (isImage) state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
     else state.stamp = { pageIndex, x: natX, y: pageH - natYTop - h, w, h };
     refreshReviewProofCoords();   // QA #6: keep the proof card's coords in sync
-    // Sign-every-page: the repeated ghosts must follow the moved seal, so re-render.
+    // Sign-every-page: the paraafs are capped by the seal size, so re-render.
     if (!isImage && state.stampAllPages) renderDocPreview().catch(() => {});
   };
   mock.addEventListener('pointerup', up);
@@ -2465,7 +3511,7 @@ function renderSigPreview() {
   if (state.signer.sigStyle === 'typed') {
     const el = document.createElement('div');
     el.className = 'ds-typed-preview';
-    el.textContent = state.signer.name || '(no name)';
+    el.textContent = state.signer.name || L('(geen naam)', '(no name)');
     pane.appendChild(el);
     return;
   }
@@ -2473,12 +3519,12 @@ function renderSigPreview() {
   if (state.signer.sigImageDataUrl) {
     const img = document.createElement('img');
     img.src = state.signer.sigImageDataUrl;
-    img.alt = state.signer.sigStyle === 'drawn' ? 'Drawn signature' : 'Uploaded signature';
+    img.alt = state.signer.sigStyle === 'drawn' ? L('Getekende handtekening', 'Drawn signature') : L('Geüploade handtekening', 'Uploaded signature');
     pane.appendChild(img);
     return;
   }
 
-  pane.textContent = '(no signature data)';
+  pane.textContent = L('(geen handtekening)', '(no signature data)');
 }
 
 function stampInnerHtml() {
@@ -2496,14 +3542,14 @@ function stampMockupHtml() {
     return (
       '<div class="ds-sm-band">' +
         '<span class="ds-sm-logo">Para<span>MANT</span></span>' +
-        '<span class="ds-sm-badge">SIGNATURE REQUESTED</span>' +
+        L('<span class="ds-sm-badge">HANDTEKENING GEVRAAGD</span>', '<span class="ds-sm-badge">SIGNATURE REQUESTED</span>') +
       '</div>' +
-      '<div class="ds-sm-mid"><div class="ds-sm-sig-typed">Their signature</div></div>' +
-      '<div class="ds-sm-foot"><span class="ds-sm-name">Requested position</span></div>'
+      L('<div class="ds-sm-mid"><div class="ds-sm-sig-typed">Hun handtekening</div></div>', '<div class="ds-sm-mid"><div class="ds-sm-sig-typed">Their signature</div></div>') +
+      L('<div class="ds-sm-foot"><span class="ds-sm-name">Gevraagde plek</span></div>', '<div class="ds-sm-foot"><span class="ds-sm-name">Requested position</span></div>')
     );
   }
   const name = (state.signer.name || 'Signer').slice(0, 40);
-  const dateStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const dateStr = localStamp(null);
   const fp = state.signer.fingerprint ? state.signer.fingerprint.slice(0, 8) : 'pending';
   let mid = '';
   if (state.signer.sigStyle !== 'typed' && state.signer.sigImageDataUrl) {
@@ -2522,6 +3568,20 @@ function stampMockupHtml() {
       `<span class="ds-sm-date">${dateStr}</span>` +
     `</div>` +
     `<div class="ds-sm-crypto">ML-DSA-65 (FIPS 204) - PQ ${fp}</div>`
+  );
+}
+
+// The on-screen paraaf: initials, then one line with date and fingerprint. Sized
+// in em against the box height (set as font-size on the box), so it scales with
+// the zoom the same way the baked vectors do. Mirrors paintParaaf below.
+function paraafMockupHtml() {
+  // Before the identity step there is no name yet: say what goes here.
+  const initials = initialsFrom(state.signer.name) || L('Paraaf', 'Initials');
+  const dateStr = localStamp(null, false);
+  const fp = state.signer.fingerprint ? state.signer.fingerprint.slice(0, 8) : '';
+  return (
+    `<span class="ds-pf-initials">${escapeHtml(initials)}</span>` +
+    `<span class="ds-pf-foot">${escapeHtml(paraafFooter(dateStr, fp))}</span>`
   );
 }
 
@@ -2555,7 +3615,7 @@ async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerpr
     });
   }
 
-  drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg);
+  drawStampOnCanvas(ctx, stamp, signerName, localStamp(dateStr), fingerprint8, sigImg);
 
   return await new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {
@@ -2637,6 +3697,52 @@ function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg
   ctx.fillText('ML-DSA-65 (FIPS 204) - PQ ' + fingerprint8, x + padX, footY2);
 }
 
+// ── Text the standard PDF fonts cannot write ─────────────────────────────────
+// The 14 standard fonts (Helvetica, Times, Courier) only know WinAnsi. A name
+// like "Ayşe Yılmaz", "Łukasz Żółć" or "Ĳsbrand" made pdf-lib throw
+// `WinAnsi cannot encode "ş"` in the middle of the bake, and the signer was
+// told to try another browser (test report 2026-10-04). So:
+//   1. text the standard font can write stays in that font (the common case,
+//      byte for byte what this code always produced);
+//   2. anything else goes in Noto Sans (Latin, Latin Extended, Greek, Cyrillic,
+//      Vietnamese), embedded whole (211 KB); fontkit and the font are fetched
+//      only on the bake that needs them, same origin, so CSP and the first
+//      page load stay as they were;
+//   3. a script the bundled font does not cover either (Chinese, Arabic, ...)
+//      is drawn by the browser's own fonts into a sharp image of that text.
+// Every name can be signed; the bundle only grows for the document that needs it.
+
+// A PDF/A file must embed every font it uses. The seal, the paraaf and the
+// edit layer use the standard fonts (Helvetica, Times, Courier), which are not
+// embedded, so after signing the file is no longer PDF/A; it only kept saying
+// so in its XMP metadata (PDF sweep 2026-10-04, B6: pdfa1b/2b in, three
+// unembedded fonts out). The claim (pdfaid:part, conformance, amd, rev) is
+// taken out of the XMP; everything else in the metadata stays as it was.
+function dropPdfaClaim(PDFLib, pdfDoc) {
+  try {
+    const catalog = pdfDoc.catalog;
+    const ref = catalog.get(PDFLib.PDFName.of('Metadata'));
+    const stream = ref ? pdfDoc.context.lookup(ref) : null;
+    if (!stream || !(stream instanceof PDFLib.PDFStream)) return false;
+    let bytes;
+    if (stream instanceof PDFLib.PDFRawStream) bytes = PDFLib.decodePDFRawStream(stream).decode();
+    else if (typeof stream.getContents === 'function') bytes = stream.getContents();
+    else return false;
+    const xmp = new TextDecoder('utf-8').decode(bytes);
+    if (!/pdfaid:/.test(xmp)) return false;
+    const cleaned = xmp
+      .replace(/\s+pdfaid:(part|conformance|amd|rev)\s*=\s*("[^"]*"|'[^']*')/g, '')
+      .replace(/<pdfaid:(part|conformance|amd|rev)\b[^>]*\/>/g, '')
+      .replace(/<pdfaid:(part|conformance|amd|rev)\b[^>]*>[\s\S]*?<\/pdfaid:\1>/g, '');
+    if (/pdfaid:(part|conformance)/.test(cleaned)) return false;
+    const fresh = pdfDoc.context.stream(new TextEncoder().encode(cleaned), { Type: 'Metadata', Subtype: 'XML' });
+    catalog.set(PDFLib.PDFName.of('Metadata'), pdfDoc.context.register(fresh));
+    return true;
+  } catch (e) {
+    return false;   // metadata we cannot read: leave it, the signature is what counts
+  }
+}
+
 export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
   const PDFLib = await waitForPdfLib();
   const pdfDoc = await PDFLib.PDFDocument.load(origBytes);
@@ -2644,23 +3750,50 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
   const font     = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const fontItal = await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRomanItalic);
+  // Courier only when there is an edit layer to bake, as before.
+  const courier = (Array.isArray(state.extras) && state.extras.length) ? await pdfDoc.embedFont(PDFLib.StandardFonts.Courier) : null;
+  const kit = makeTextKit(PDFLib, pdfDoc, { regular: font, bold: fontBold, italic: fontItal, mono: courier || font });
+  const initials = initialsFrom(signerName) || '?';
+  const shownDate = localStamp(dateStr);
+  const footer = paraafFooter(localStamp(dateStr, false), fingerprint8);
+  const safeDocName = String(state.doc && state.doc.name || 'document').replace(/[\r\n\t]/g, ' ');
+  await kit.prepare([signerName, initials, footer, dateStr, shownDate, safeDocName,
+    ...((state.extras || []).map((ex) => ex && ex.text).filter(Boolean))]);
+  // Every position the signer made is in VIEW space (the page as pdf.js shows
+  // it). On a turned or cropped page, map that onto the PDF's own space with
+  // one matrix and draw upright in the view; elsewhere draw as always.
+  const geoms = await pageGeoms(origBytes, pages);
+  const inView = async (pageIndex, fn) => {
+    const pg = pages[pageIndex];
+    if (!pg) return;
+    const g = geoms[pageIndex];
+    if (!g || geomIsIdentity(g)) { await fn(pg); return; }
+    pg.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(...geomMatrix(g)));
+    try { await fn(pg); } finally { pg.pushOperators(PDFLib.popGraphicsState()); }
+  };
   const navy  = PDFLib.rgb(0.043, 0.227, 0.416);
   const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
-  const white = PDFLib.rgb(1, 1, 1);
 
   // Embed the signature image ONCE, reused on every stamped page.
   let sigEmbed = null;
   const hasImg = state.signer.sigStyle !== 'typed' && state.signer.sigImageBytes;
   if (hasImg) {
-    sigEmbed = state.signer.sigImageType === 'jpg'
-      ? await pdfDoc.embedJpg(state.signer.sigImageBytes)
-      : await pdfDoc.embedPng(state.signer.sigImageBytes);
+    // The bytes decide, not the name or the browser's guess at it: a PNG called
+    // .jpg used to fail here, after the code, as a passkey error.
+    const sigMime = guessMimeFromMagic(state.signer.sigImageBytes);
+    try {
+      sigEmbed = sigMime === 'image/jpeg'
+        ? await pdfDoc.embedJpg(state.signer.sigImageBytes)
+        : await pdfDoc.embedPng(state.signer.sigImageBytes);
+    } catch (e) {
+      throw Object.assign(new Error('signature image unreadable: ' + (e && e.message)), { code: 'sig_image_unreadable' });
+    }
   }
 
   // Paint the full Paramant seal into one box {x,y,w,h} (PDF points, bottom-left
   // origin) on the given page. Shared so the placed page and every repeated page
   // are byte-for-byte the same layout.
-  const paintSeal = (pg, box) => {
+  const paintSeal = async (pg, box) => {
     // The chrome SCALES with the box. The bands and type sizes used to be fixed
     // (16pt band, 22pt footer, 9/8/7/6pt text), which meant a small stamp had
     // no middle area left at all: wordmark, badge, signer name and the crypto
@@ -2671,12 +3804,14 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     const k = Math.max(0.5, Math.min(1, Math.min(box.h / 64, box.w / 190)));
     const bandH = 16 * k, footerH = 22 * k, padX = 8 * k;
     const sWord = 9 * k, sBadge = 4.6 * k, sName = 8 * k, sDate = 7 * k, sCrypto = 6 * k;
-    // Outer border + SOLID WHITE body (always legible: dark text on white).
-    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
-    // Branded cobalt top band: wordmark + PQ badge.
-    pg.drawRectangle({ x: box.x, y: box.y + box.h - bandH, width: box.w, height: bandH, color: navy });
+    // A thin outline and NO fill: the seal never hides what is printed under
+    // it. A solid white body with a solid navy band used to cover the text
+    // (retest 2026-10-04, T1-10).
+    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1 });
+    // Top band: wordmark + PQ badge in navy on the paper, a hairline under it.
+    pg.drawLine({ start: { x: box.x + 6 * k, y: box.y + box.h - bandH }, end: { x: box.x + box.w - 6 * k, y: box.y + box.h - bandH }, thickness: 0.5, color: navy, opacity: 0.35 });
     const wordW = fontBold.widthOfTextAtSize('ParaMANT', sWord);
-    pg.drawText('ParaMANT', { x: box.x + padX, y: box.y + box.h - bandH + (bandH - sWord) / 2 + 0.5, size: sWord, font: fontBold, color: white });
+    pg.drawText('ParaMANT', { x: box.x + padX, y: box.y + box.h - bandH + (bandH - sWord) / 2 + 0.5, size: sWord, font: fontBold, color: navy });
     // The badge is a QUALIFIER, not a second wordmark. At 6pt bold in full white it
     // competed with ParaMANT for the eye and made the band read as two headlines.
     // Smaller, regular weight, and held back in opacity so it supports the mark
@@ -2686,15 +3821,15 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     const badge = 'POST-QUANTUM SIGNED';
     const badgeW = font.widthOfTextAtSize(badge, sBadge);
     if (padX + wordW + 14 * k + badgeW + padX <= box.w) {
-      pg.drawText(badge, { x: box.x + box.w - badgeW - padX, y: box.y + box.h - bandH + (bandH - sBadge) / 2 + 0.5, size: sBadge, font, color: white, opacity: 0.72 });
+      pg.drawText(badge, { x: box.x + box.w - badgeW - padX, y: box.y + box.h - bandH + (bandH - sBadge) / 2 + 0.5, size: sBadge, font, color: dim });
     }
     // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2.
     const row1Y = box.y + footerH - sName - 1.5 * k;
-    const nameW = fontBold.widthOfTextAtSize(signerName, sName);
-    pg.drawText(signerName, { x: box.x + padX, y: row1Y, size: sName, font: fontBold, color: navy });
-    const dateW = font.widthOfTextAtSize(dateStr, sDate);
+    const nameW = kit.width(signerName, sName, 'bold');
+    await kit.draw(pg, signerName, { x: box.x + padX, y: row1Y, size: sName, role: 'bold', color: navy });
+    const dateW = kit.width(shownDate, sDate);
     if (padX + nameW + 6 * k + dateW + padX <= box.w) {
-      pg.drawText(dateStr, { x: box.x + box.w - dateW - padX, y: row1Y, size: sDate, font, color: dim });
+      await kit.draw(pg, shownDate, { x: box.x + box.w - dateW - padX, y: row1Y, size: sDate, color: dim });
     }
     const cryptoLine = 'ML-DSA-65 (FIPS 204)  -  PQ ' + fingerprint8;
     if (font.widthOfTextAtSize(cryptoLine, sCrypto) + padX * 2 <= box.w) {
@@ -2713,9 +3848,9 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
       // Cap on the middle area too, not just on width: a 22pt name in a 12pt
       // gap is what pushed the typed signature over the bands.
       let fontSize = Math.max(6, Math.min(22, midH - 4));
-      while (fontSize > 6 && fontItal.widthOfTextAtSize(signerName, fontSize) > maxW) fontSize -= 1;
-      const w = fontItal.widthOfTextAtSize(signerName, fontSize);
-      pg.drawText(signerName, { x: box.x + (box.w - w) / 2, y: midY + (midH - fontSize) / 2 + 2, size: fontSize, font: fontItal, color: navy });
+      while (fontSize > 6 && kit.width(signerName, fontSize, 'italic') > maxW) fontSize -= 1;
+      const w = kit.width(signerName, fontSize, 'italic');
+      await kit.draw(pg, signerName, { x: box.x + (box.w - w) / 2, y: midY + (midH - fontSize) / 2 + 2, size: fontSize, role: 'italic', color: navy });
     }
     // Subtle divider above the metadata band.
     pg.drawLine({ start: { x: box.x + 6, y: box.y + footerH - 1 }, end: { x: box.x + box.w - 6, y: box.y + footerH - 1 }, thickness: 0.5, color: navy, opacity: 0.25 });
@@ -2724,55 +3859,95 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
   if (hasSignatureSheet()) {
     const sheet = pdfDoc.addPage([595.28, 841.89]);
     const sourceHash = toHex(sha3_256(origBytes));
-    sheet.drawText('ParaSign signature sheet', { x: 54, y: 770, size: 22, font: fontBold, color: navy });
-    sheet.drawText('This final page identifies the signed source document and its visible signer.', { x: 54, y: 744, size: 10, font, color: dim });
-    sheet.drawLine({ start: { x: 54, y: 726 }, end: { x: 541, y: 726 }, thickness: 1, color: navy, opacity: 0.25 });
-    const safeName = String(state.doc && state.doc.name || 'document').replace(/[\r\n\t]/g, ' ');
+    // Bilingual on purpose: Dutch first, English underneath. The page travels
+    // with the signed PDF to readers who may not read Dutch, and nothing that
+    // verifies a signature reads this text: /verify and paramant-sign check the
+    // bytes against the .psign envelope, never the words on this page.
+    sheet.drawText('ParaSign-handtekeningblad', { x: 54, y: 776, size: 20, font: fontBold, color: navy });
+    sheet.drawText('ParaSign signature sheet', { x: 54, y: 758, size: 11, font, color: dim });
+    sheet.drawText('Deze laatste pagina benoemt het ondertekende brondocument en de zichtbare ondertekenaar.', { x: 54, y: 740, size: 9.5, font, color: dim });
+    sheet.drawText('This final page identifies the signed source document and its visible signer.', { x: 54, y: 728, size: 8.5, font, color: dim });
+    sheet.drawLine({ start: { x: 54, y: 716 }, end: { x: 541, y: 716 }, thickness: 1, color: navy, opacity: 0.25 });
     const fields = [
-      ['Source file', safeName],
-      ['Source pages', String(pages.length)],
-      ['Source SHA3-256', sourceHash],
-      ['Signed at', dateStr],
+      ['Bronbestand', 'Source file', safeDocName],
+      ["Pagina's bron", 'Source pages', String(pages.length)],
+      ['SHA3-256 bron', 'Source SHA3-256', sourceHash],
+      ['Ondertekend op', 'Signed at', shownDate],
     ];
     let y = 692;
-    for (const [label, value] of fields) {
+    for (const [label, labelEn, value] of fields) {
       sheet.drawText(label, { x: 54, y, size: 9, font: fontBold, color: navy });
-      const lines = wrapPdfText(font, value, 9, 380);
-      lines.forEach((line, i) => sheet.drawText(line, { x: 155, y: y - i * 12, size: 9, font, color: dim }));
+      sheet.drawText(labelEn, { x: 54, y: y - 11, size: 7.5, font, color: dim });
+      const lines = wrapPdfText((t, sz) => kit.width(t, sz), value, 9, 380);
+      for (let i = 0; i < lines.length; i++) await kit.draw(sheet, lines[i], { x: 155, y: y - i * 12, size: 9, color: dim });
       y -= Math.max(34, lines.length * 12 + 12);
     }
-    sheet.drawText('Visible signature', { x: 54, y: 520, size: 12, font: fontBold, color: navy });
-    paintSeal(sheet, { x: 54, y: 355, w: 390, h: 135 });
-    sheet.drawText('Verify the signed PDF together with its .psign file. Later co-signers are recorded in the envelope, not added to this PDF page.', { x: 54, y: 320, size: 9, font, color: dim, maxWidth: 487, lineHeight: 13 });
+    sheet.drawText('Zichtbare handtekening', { x: 54, y: 522, size: 12, font: fontBold, color: navy });
+    sheet.drawText('Visible signature', { x: 54, y: 508, size: 8.5, font, color: dim });
+    await paintSeal(sheet, { x: 54, y: 355, w: 390, h: 135 });
+    sheet.drawText('Controleer met de pdf zoals die uit deze ondertekening kwam, samen met het bijbehorende .psign-bestand. Zetten medeondertekenaars later hun handtekening, dan komt die in een leesbare kopie; die kopie zelf is niet het ondertekende bestand.', { x: 54, y: 320, size: 9, font, color: dim, maxWidth: 487, lineHeight: 13 });
+    sheet.drawText('Verify with the PDF as it came out of this signing, together with its .psign file. Signatures that co-signers add later go into a readable copy; that copy itself is not the signed file.', { x: 54, y: 276, size: 8.5, font, color: dim, maxWidth: 487, lineHeight: 12 });
   }
+  // The paraaf for "sign every page": initials and one line with date and short
+  // fingerprint, in the seal's navy, in a box planned by js/paraaf-place.js.
+  // No band, no badge: on a 38pt box those would only crowd the initials.
+  const paintParaaf = async (pg, box) => {
+    // Outline only, like the seal: nothing under the paraaf is hidden.
+    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1 });
+    // A thin navy bar on the left edge: the house style of the seal, in small.
+    const bar = Math.max(1.5, box.w * 0.03);
+    pg.drawRectangle({ x: box.x, y: box.y, width: bar, height: box.h, color: navy });
+    const padX = bar + Math.max(2.5, box.w * 0.05);
+    const maxW = box.w - padX - Math.max(2, box.w * 0.04);
+    let sFoot = Math.max(4, box.h * 0.18);
+    while (sFoot > 4 && kit.width(footer, sFoot) > maxW) sFoot -= 0.25;
+    const footFits = kit.width(footer, sFoot) <= maxW;
+    const footY = box.y + box.h * 0.12;
+    if (footFits) await kit.draw(pg, footer, { x: box.x + padX, y: footY, size: sFoot, color: dim });
+    const top = box.y + box.h - box.h * 0.1;
+    const bottom = footFits ? footY + sFoot + box.h * 0.06 : box.y + box.h * 0.12;
+    let sInit = Math.max(5, Math.min(18, (top - bottom) * 0.95));
+    while (sInit > 5 && kit.width(initials, sInit, 'italic') > maxW) sInit -= 0.5;
+    await kit.draw(pg, initials, { x: box.x + padX, y: bottom + ((top - bottom) - sInit) / 2 + sInit * 0.18, size: sInit, role: 'italic', color: navy });
+  };
+
+  state.lastParaafPlan = null;
   if (hasInlineSeal()) {
-    // Stamp the placed page exactly. With "sign every page" on, stamp every other
-    // page at the same RELATIVE position/scale (robust to differing page sizes).
-    const srcSz = pages[stamp.pageIndex].getSize();
-    const fx = stamp.x / srcSz.width, fy = stamp.y / srcSz.height, fw = stamp.w / srcSz.width, fh = stamp.h / srcSz.height;
-    const targets = state.stampAllPages ? pages.map((_, i) => i) : [stamp.pageIndex];
-    for (const pi of targets) {
-      const pg = pages[pi];
-      if (!pg) continue;
-      const box = (pi === stamp.pageIndex)
-        ? { x: stamp.x, y: stamp.y, w: stamp.w, h: stamp.h }
-        : (() => { const sz = pg.getSize(); return { x: fx * sz.width, y: fy * sz.height, w: fw * sz.width, h: fh * sz.height }; })();
-      paintSeal(pg, box);
+    // The placed page gets the seal exactly where the signer put it.
+    await inView(stamp.pageIndex, (pg) => paintSeal(pg, { x: stamp.x, y: stamp.y, w: stamp.w, h: stamp.h }));
+    // "Sign every page": every OTHER page gets a paraaf, never a copy of the seal.
+    // A copy at the same relative spot landed on running text (customer report
+    // 2026-10-04): the signing page has a free line there, the others do not.
+    if (state.stampAllPages && pages.length > 1) {
+      const textBoxes = await loadTextBoxes(origBytes);
+      // View sizes, the ones the preview planned with: a turned page is wide.
+      const sizes = geoms.map(geomViewSize);
+      const plan = paraafPlanFor(sizes, stamp, textBoxes);
+      for (const box of plan) await inView(box.pageIndex, (pg) => paintParaaf(pg, box));
+      state.lastParaafPlan = plan;
     }
+  } else if (state.stampAllPages && pages.length) {
+    // Signature sheet only, with "every page": the signature goes on the sheet,
+    // the paraaf on every page of the document (acceptatie r4, Nieuw 2: the
+    // pdf came out without a single paraaf, and nothing said so). pages is the
+    // list from before the sheet was added, so the sheet itself gets none.
+    const textBoxes = await loadTextBoxes(origBytes);
+    const sizes = geoms.map(geomViewSize);
+    const plan = paraafPlanFor(sizes, null, textBoxes);
+    for (const box of plan) await inView(box.pageIndex, (pg) => paintParaaf(pg, box));
+    state.lastParaafPlan = plan;
   }
 
   // Bake the edit layer (text, date, highlight, note, pen strokes) as real
   // vectors on their pages. Additive to the seal; sharp at any zoom.
   if (Array.isArray(state.extras) && state.extras.length) {
-    const courier = await pdfDoc.embedFont(PDFLib.StandardFonts.Courier);
     const ink = PDFLib.rgb(0.1, 0.1, 0.1);
     const penInk = PDFLib.rgb(0.043, 0.227, 0.416);                    // same navy as the seal
     const hlYellow = PDFLib.rgb(1, 0.84, 0.24);
     const noteBg = PDFLib.rgb(1, 0.968, 0.788), noteEdge = PDFLib.rgb(0.83, 0.7, 0.2);
-    const pages = pdfDoc.getPages();
     for (const ex of state.extras) {
-      const pg = pages[ex.pageIndex];
-      if (!pg) continue;
+      if (!pages[ex.pageIndex]) continue;
+      await inView(ex.pageIndex, async (pg) => {
       if (ex.type === 'highlight') {
         pg.drawRectangle({ x: ex.x, y: ex.y, width: ex.w, height: ex.h, color: hlYellow, opacity: 0.35 });
       } else if (ex.type === 'note') {
@@ -2780,14 +3955,14 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
         // edge (ex.yTop), matching the on-screen behaviour while typing.
         const pad = ex.size * 0.5;
         const lineH = ex.size * TEXT_LINE_H;
-        const lines = wrapPdfText(font, ex.text, ex.size, Math.max(ex.size, ex.w - pad * 2));
+        const lines = wrapPdfText((t, sz) => kit.width(t, sz), ex.text, ex.size, Math.max(ex.size, ex.w - pad * 2));
         const boxH = lines.length * lineH + pad * 2;
         pg.drawRectangle({ x: ex.x, y: ex.yTop - boxH, width: ex.w, height: boxH, color: noteBg, borderColor: noteEdge, borderWidth: 0.8 });
-        lines.forEach((ln, i) => pg.drawText(ln, {
+        for (let i = 0; i < lines.length; i++) await kit.draw(pg, lines[i], {
           x: ex.x + pad,
           y: ex.yTop - pad - (i + 1) * lineH + ex.size * 0.32,         // line-bottom -> baseline
-          size: ex.size, font, color: ink,
-        }));
+          size: ex.size, color: ink,
+        });
       } else if (ex.type === 'draw') {
         for (let i = 1; i < ex.points.length; i++) {
           pg.drawLine({
@@ -2796,32 +3971,101 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
           });
         }
       } else {
-        const f = ex.type === 'date' ? courier : font;
-        pg.drawText(String(ex.text || ''), {
+        await kit.draw(pg, String(ex.text || ''), {
           x: ex.x + ex.size * 0.1,
           y: ex.y + ex.size * 0.35,        // box-bottom -> text baseline (matches the on-screen box)
-          size: ex.size, font: f, color: ink,
+          size: ex.size, role: ex.type === 'date' ? 'mono' : 'regular', color: ink,
         });
       }
+      });
     }
   }
 
+  dropPdfaClaim(PDFLib, pdfDoc);
   return await pdfDoc.save();
 }
 
 // Greedy word wrap against real font metrics; a word longer than the box gets
 // its own (overflowing) line rather than an infinite loop.
-function wrapPdfText(font, text, size, maxW) {
+function wrapPdfText(measure, text, size, maxW) {
   const words = String(text || '').split(/\s+/).filter(Boolean);
   const lines = [];
   let cur = '';
   for (const w of words) {
     const candidate = cur ? cur + ' ' + w : w;
-    if (!cur || font.widthOfTextAtSize(candidate, size) <= maxW) cur = candidate;
+    if (!cur || measure(candidate, size) <= maxW) cur = candidate;
     else { lines.push(cur); cur = w; }
   }
   if (cur) lines.push(cur);
   return lines.length ? lines : [''];
+}
+
+// The paraaf boxes of the last buildStampedPdf, in PDF points. Read by
+// tests/paraaf-margin.test.mjs to hold the preview and the baked PDF to the
+// same spot; the receipt reads it through paraafCoords below.
+export function lastParaafPlan() {
+  return Array.isArray(state.lastParaafPlan) ? state.lastParaafPlan.map((b) => ({ ...b })) : null;
+}
+
+// Receipt metadata for "sign every page". all_pages stays what it was (there is
+// a mark on every page), and says WHAT is on the other pages: a paraaf, with the
+// box each one got. Absent when nothing was repeated, so a receipt without the
+// toggle keeps exactly its old shape. Display only: the .psign signature covers
+// stamped_hash, never these coords.
+function paraafCoords() {
+  if (!state.stampAllPages || !Array.isArray(state.lastParaafPlan) || !state.lastParaafPlan.length) return {};
+  const r = (n) => Math.round(n * 100) / 100;
+  return {
+    other_pages: 'paraaf',
+    paraaf: state.lastParaafPlan.map((b) => ({ pageIndex: b.pageIndex, x: r(b.x), y: r(b.y), w: r(b.w), h: r(b.h) })),
+  };
+}
+
+// The bake failed: what kind of failure, for an honest message.
+function bakeError(be) {
+  const msg = String(be && be.message || '');
+  let kind = 'other';
+  if ((be && be.name === 'EncryptedPDFError') || /encrypted/i.test(msg)) kind = 'encrypted';
+  else if (be && be.code === 'sig_image_unreadable') kind = 'image';
+  try { console.error('[paramant] bake failed', be); } catch (_) { /* no console */ }
+  return Object.assign(new Error('bake failed: ' + msg), { code: 'bake_failed', bakeKind: kind, cause: be });
+}
+
+// A real WebAuthn/passkey failure, as the browser or a passkey manager reports
+// it: a DOMException from navigator.credentials, or a provider error that says
+// so. Only those get the "your passkey could not finish" advice; everything
+// else that reaches the end of doSign is OUR fault and is said to be.
+const WEBAUTHN_ERROR_NAMES = ['NotAllowedError', 'InvalidStateError', 'NotSupportedError', 'SecurityError', 'AbortError', 'UnknownError', 'ConstraintError', 'NotReadableError', 'OperationError'];
+function isWebAuthnError(e) {
+  if (!e) return false;
+  if (WEBAUTHN_ERROR_NAMES.includes(e.name)) return true;
+  if (typeof DOMException !== 'undefined' && e instanceof DOMException) return true;
+  return /authenticator|webauthn|passkey|credential|\bprf\b/i.test(String(e.message || '')) || /Authenticator/.test(String(e.name || ''));
+}
+
+// Every reason one-tap passkey signing is not available on this device, and
+// for each the authenticator code is the way to sign (retest: a browser
+// without WebAuthn had no way to sign at all).
+const TOTP_FALLBACK_CODES = ['prf_unsupported', 'no_passkey', 'no_webauthn', 'vault_unavailable'];
+
+function isSignerNotEnrolled(e) {
+  return !!e && e.status === 403 && ((e.data && e.data.error) === 'signer_not_enrolled' || e.message === 'signer_not_enrolled');
+}
+
+// The vault row of the key the last doSign used, so "link the key again" can
+// retire exactly that one (and nothing else in this browser's vault).
+let _lastSignVaultId = null;
+
+async function relinkSigningKey() {
+  const btn = $('ds-relink-key'); if (btn) btn.disabled = true;
+  try {
+    if (_lastSignVaultId) await vaultDelete(_lastSignVaultId);
+  } catch (e) {
+    try { console.error('[paramant] vault delete', e); } catch (_) { /* no console */ }
+  }
+  _lastSignVaultId = null;
+  // The next run finds no key here and sets up a new one, linked to THIS account.
+  doSign();
 }
 
 async function doSign() {
@@ -2841,42 +4085,55 @@ async function doSign() {
     // The signing key is the account's PASSKEY-protected ML-DSA-65 key. Read ONLY
     // its public half from vault metadata here (for the stamp fingerprint); the
     // secret is unlocked solely by the per-document PRF activation below.
-    status('Locating your signing key...');
+    status(L('Uw ondertekensleutel wordt gezocht...', 'Locating your signing key...'));
     // Resolve the account's signing key, or set one up inline. Happy path is one
     // passkey tap (PRF). If one-tap passkey signing isn't available — the provider
     // can't do PRF (e.g. Proton Pass), or there's no passkey at all — we fall back
     // to a TOTP-gated ephemeral signing key: a 6-digit authenticator code authorises
     // a fresh key bound to the account, used for this one signing session only.
     let signKey;
+    _lastSignVaultId = null;
     try {
       signKey = await ensureSigningKey({ rpId: location.hostname, label: state.signer.name || 'Signing key', onStatus: status });
     } catch (e) {
-      if (!e || (e.code !== 'prf_unsupported' && e.code !== 'no_passkey')) throw e;
+      // No one-tap passkey here, for whatever reason (no passkey, a provider
+      // without PRF, a browser without WebAuthn or without key storage): sign
+      // with the authenticator code. That key is never stored, so it needs
+      // neither WebAuthn nor IndexedDB.
+      if (!e || !TOTP_FALLBACK_CODES.includes(e.code)) throw e;
       const code = await promptTotp('ds-pass');
       if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
-      status('Setting up your signing key…');
+      status(L('Uw ondertekensleutel wordt aangemaakt…', 'Setting up your signing key…'));
       const _enrol = await enrolEphemeralSigningKeyWithTotp({ label: state.signer.name || 'Signing key', totp: code, onStatus: status });
       signKey = _enrol.signKey;
       ephemeralSigner = _enrol.signer;
       if (_enrol.totpAlgorithm === 'sha1') state.totpSha1 = true;
     }
     const fingerprint = signKey.fingerprint;
+    if (signKey.vaultId) _lastSignVaultId = signKey.vaultId;
     const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
 
     // 1) STAMP (PDF/image) + HASH — unchanged. The stamp shows the PUBLIC fingerprint.
     let stampedBytes = null, origHashHex = null, stampedHashHex = null, coords = null, docHashForEnvelope;
     if (state.mode === 'pdf' || state.mode === 'image') {
-      status(state.mode === 'pdf' ? 'Stamping PDF...' : 'Stamping image...');
-      stampedBytes = state.mode === 'pdf'
-        ? await buildStampedPdf(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint)
-        : await buildStampedImage(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint, state.imageType);
+      status(state.mode === 'pdf' ? L('De stempel wordt op de pdf gezet...', 'Stamping PDF...') : L('De stempel wordt op de afbeelding gezet...', 'Stamping image...'));
+      try {
+        stampedBytes = state.mode === 'pdf'
+          ? await buildStampedPdf(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint)
+          : await buildStampedImage(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint, state.imageType);
+      } catch (be) {
+        // A failure while drawing the seal into the file is not a passkey
+        // problem and must not read as one (test report 2026-10-04): mark it,
+        // so the catch below can say what went wrong and what to do.
+        throw bakeError(be);
+      }
       origHashHex = toHex(sha3_256(state.doc.bytes));
       stampedHashHex = toHex(sha3_256(stampedBytes));
       coords = state.mode === 'pdf' && state.sealPlacement === 'sheet'
-        ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, name: state.signer.name, date: dateStr }
+        ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, name: state.signer.name, date: dateStr, ...(state.stampAllPages ? { all_pages: true, ...paraafCoords() } : {}) }
         : state.mode === 'pdf' && state.sealPlacement === 'both'
-          ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, inline_seal: { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, all_pages: !!state.stampAllPages }, name: state.signer.name, date: dateStr }
-          : { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages) };
+          ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, inline_seal: { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, all_pages: !!state.stampAllPages, ...paraafCoords() }, name: state.signer.name, date: dateStr }
+          : { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages), ...(state.mode === 'pdf' ? paraafCoords() : {}) };
       docHashForEnvelope = stampedHashHex;
     } else {
       docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
@@ -2886,10 +4143,22 @@ async function doSign() {
     //    recipe_version 3. A self-sign (no recipients) STILL gets an envelope, so
     //    every signature goes through the per-document activation gate (R018) —
     //    no separate weaker self-sign route.
-    status('Preparing this document for signing...');
+    status(L('Dit document wordt klaargezet om te ondertekenen...', 'Preparing this document for signing...'));
+    // "Samen ondertekenen": every co-signer gets a spot of their own beside the
+    // sender's box, and the paraaf on every page when the sender put one on
+    // every page, read against the document they will actually open (the one
+    // with the sender's seal on it).
+    const cosignWithOthers = state.signingMode === 'cosign' && state.recipients.length > 0;
+    // Too large to send along: stop before anything is created or signed.
+    if (cosignWithOthers) { const big = tooLargeToShare(stampedBytes || state.doc.bytes); if (big) throw big; }
+    const coBase = cosignWithOthers && state.mode === 'pdf' && (state.sealPlacement || 'inline') === 'inline'
+      ? requestedAppearanceFromStamp(state.stamp, state.stampPage) : null;
+    const coRequests = cosignWithOthers && state.mode === 'pdf'
+      ? await partyRequests(coBase, { bytes: stampedBytes, count: state.recipients.length, skipFirst: true })
+      : null;
     const created = await createSigningEnvelope({
       docHash: docHashForEnvelope,
-      recipients: state.recipients,
+      recipients: coRequests ? state.recipients.map((r, i) => ({ ...r, requested_appearance: coRequests[i] })) : state.recipients,
       originalFilename: state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name,
       signerLabel: state.signer.name,
       creatorPublicKey: signKey.pk_b64,
@@ -2901,10 +4170,10 @@ async function doSign() {
     // 3) Per-document activation (authorize -> one-shot token), THEN the passkey-PRF
     //    unlock + sign of the v3 domain-prefixed message, THEN submit. The secret
     //    key lives ONLY inside the ActivatedSigner and is zeroized by dispose().
-    status('Requesting signing authorization...');
+    status(L('Toestemming om te ondertekenen wordt gevraagd...', 'Requesting signing authorization...'));
     const act = await requestSignActivation({ envelopeId: env.id, partyIndex: 0, docHash: docHashForEnvelope, inviteToken: myLink.invite_token });
 
-    status('Confirm to sign (Face ID / Touch ID / security key)...');
+    status(L('Bevestig om te ondertekenen (Face ID, Touch ID of beveiligingssleutel)...', 'Confirm to sign (Face ID / Touch ID / security key)...'));
     // PRF key: unlock with one passkey tap. TOTP fallback: the signer was already
     // produced (in memory) when the code was entered, so just use it.
     const signer = ephemeralSigner || await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname });
@@ -2926,7 +4195,7 @@ async function doSign() {
       signer.dispose();   // zeroize — the secret never outlives this block
     }
 
-    status('Recording your signature...');
+    status(L('Uw handtekening wordt vastgelegd...', 'Recording your signature...'));
     const submitted = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance });
 
     // 4) v3 .psign receipt. The authoritative, CT-logged signature record is the
@@ -2967,6 +4236,12 @@ async function doSign() {
     }
 
     state.result = { stampedBytes, envelope, fingerprint, quota: submitted.quota };
+    // "Samen ondertekenen": the others open the document the sender just
+    // signed, the same way "Handtekeningen vragen" delivers it (encrypted
+    // capsule, split key, one invitation each). It used to stop here: no
+    // capsule and no mail, while the end screen said the key was in the link
+    // (matrix COSIGN-02). The signature above stands whatever happens next.
+    if (cosignWithOthers) await shareCosignDocument(env, mp, stampedBytes || state.doc.bytes, docHashForEnvelope);
     showDone();
   } catch (e) {
     // Zeroize any unconsumed ephemeral secret (error before it was handed to the signer).
@@ -2976,8 +4251,19 @@ async function doSign() {
     $('ds-sign-status').setAttribute('aria-live', 'assertive');
     // Free monthly signing limit (relay 402, dimension/plan/limit passed
     // through by the admin proxy): a purchase moment, not an error dump.
+    // Rate limit or the SENDER's allowance: a plain sentence, no upgrade pitch
+    // (it is not this signer's plan that ran out).
+    // The purchase card first: since "sender pays" the free plan's third
+    // signature is refused at creation (sign_quota_insufficient, room 0), and
+    // the plain sentence below swallowed the card (fase-1 PLAN-33-A).
     if (e && e.status === 402 && window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(e.status, e.data)) {
       $('ds-sign-status').innerHTML = window.paQuotaUpgrade.html(e.data);
+      $('ds-sign-now').disabled = false;
+      return;
+    }
+    const lim = limitMessage(e);
+    if (lim) {
+      $('ds-sign-status').textContent = lim;
       $('ds-sign-now').disabled = false;
       return;
     }
@@ -2985,22 +4271,49 @@ async function doSign() {
     // opaque "AuthenticatorError" from a PRF assertion) has no e.status/e.code,
     // so it lands in the final else with a recovery path — never the raw engine
     // string, which leaked before and read as a crash to the user.
+    if (e && e.status === 401) { showSessionLost($('ds-sign-status')); $('ds-sign-now').disabled = false; return; }
     let msg;
-    if (e && e.status === 401) msg = 'Please sign in to sign documents. Open /auth/login, then return here.';
-    else if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then sign — your sign-in passkey becomes your signing key.';
+    if (e && e.status === 401) msg = L('Log in om documenten te ondertekenen. Kom daarna hier terug.', 'Sign in to sign documents, then come back here.');
+    else if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, inloggen met passkey) en onderteken daarna. De passkey waarmee u inlogt wordt uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then sign, your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
-    else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.';
-    else if (e && e.code === 'cancelled') msg = 'Signing cancelled. Tap Sign now when you’re ready.';
-    else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = 'That authenticator code didn’t match. Tap Sign now and enter the current 6-digit code.';
-    else if (e && e.code === 'totp_unavailable') msg = 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.';
+    else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of verlopen. Tik nogmaals op Dit document ondertekenen.', 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.');
+    else if (e && e.code === 'cancelled') msg = L('Ondertekenen geannuleerd. Tik op Dit document ondertekenen als u klaar bent.', 'Signing cancelled. Tap Sign now when you’re ready.');
+    else if (e && e.code === 'totp_locked') msg = e.message;
+    else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = L('Die code uit de authenticator-app klopte niet. Tik op Dit document ondertekenen en voer de huidige code van 6 cijfers in.', 'That authenticator code didn’t match. Tap Sign now and enter the current 6-digit code.');
+    else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op uw account (Account, tweestapsverificatie) en onderteken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
     // Already translated by the signer (js/error-message.js): the message on
     // this error is our own vetted sentence with a next step, never the wire's
     // "http_502" or a browser's TypeError text. The detail is in the console.
-    else if (e && e.code === 'service_error') msg = e.message;
-    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = 'Your passkey can’t do one-tap signing here. Tap Sign now to sign with your authenticator code instead.';
-    else if (e && (e.status === 403 || e.status === 409 || e.status === 410)) msg = 'That signing authorization was already used or has expired. Tap Sign now to start a fresh one.';
-    else if (e && e.status) msg = 'Signing could not be completed right now (server error ' + e.status + '). Please try again in a moment.';
-    else msg = 'Your passkey could not complete signing on this browser. Tap Sign now to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';
+    else if (e && (e.code === 'service_error' || e.code === 'document_too_large')) msg = e.message;
+    else if (e && e.code === 'bake_failed') msg = e.bakeKind === 'encrypted'
+      ? L('Deze pdf is beveiligd tegen wijzigen, dus er kan geen zichtbare handtekening op. Er is niets ondertekend. Kies het bestand opnieuw. U ondertekent dan een vingerafdruk van het bestand, zonder zichtbare stempel.', 'This PDF is protected against changes, so it cannot carry a visible signature. Nothing was signed. Pick the file again. You then sign a fingerprint of the file, without a visible stamp.')
+      : e.bakeKind === 'image'
+        ? L('Uw handtekeningafbeelding kon niet in de pdf worden gezet: het is geen geldige PNG of JPG. Er is niets ondertekend. Ga terug, kies de afbeelding opnieuw of teken uw handtekening, en onderteken daarna.', 'Your signature image could not be placed in the PDF: it is not a valid PNG or JPG. Nothing was signed. Go back, pick the image again or draw your signature, then sign.')
+        : L('De zichtbare handtekening kon niet in deze pdf worden gezet. Er is niets ondertekend, en aan uw passkey ligt het niet. Kies bij Plaatsen voor een apart handtekeningblad, of sla de pdf opnieuw op met Afdrukken naar pdf en probeer het nog eens.', 'The visible signature could not be placed in this PDF. Nothing was signed, and your passkey is not the problem. At Place, choose a separate signature sheet, or save the PDF again with Print to PDF and try once more.');
+    else if (isSignerNotEnrolled(e)) msg = 'relink';
+    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = L('Met uw passkey kunt u hier niet met één tik ondertekenen. Tik op Dit document ondertekenen om met de code uit uw authenticator-app te tekenen.', 'Your passkey can’t do one-tap signing here. Tap Sign now to sign with your authenticator code instead.');
+    else if (e && (e.status === 403 || e.status === 409 || e.status === 410)) msg = L('Die toestemming om te ondertekenen is al gebruikt of verlopen. Tik op Dit document ondertekenen om opnieuw te beginnen.', 'That signing authorization was already used or has expired. Tap Sign now to start a fresh one.');
+    else if (e && e.status) msg = L('Ondertekenen lukt nu niet (serverfout ', 'Signing could not be completed right now (server error ') + e.status + L('). Probeer het zo nog eens.', '). Please try again in a moment.');
+    else if (isWebAuthnError(e)) msg = L('Uw passkey kon het ondertekenen in deze browser niet afronden. Tik nogmaals op Dit document ondertekenen. Blijft het mislukken, probeer dan een andere browser of de passkey op uw telefoon.', 'Your passkey could not complete signing on this browser. Tap Sign now to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');
+    else {
+      try { console.error('[paramant] sign failed', e); } catch (_) { /* no console */ }
+      msg = L('Ondertekenen is niet gelukt door een onverwachte fout op deze pagina. Er is niets ondertekend. Laad de pagina opnieuw en probeer het nog eens; blijft het misgaan, mail dan info@paramant.app met het tijdstip.', 'Signing did not work because of an unexpected error on this page. Nothing was signed. Reload the page and try again; if it keeps failing, email info@paramant.app with the time it happened.');
+    }
+    if (msg === 'relink') {
+      // 403 signer_not_enrolled: the key this browser holds is not linked to
+      // this account (a link that stopped halfway, or a second account in the
+      // same browser). Starting over picks the same key again, forever, so the
+      // way out is a new key, linked now (test-3 report, point 4).
+      const st = $('ds-sign-status');
+      st.textContent = L('De ondertekensleutel in deze browser is niet aan uw account gekoppeld, bijvoorbeeld omdat het koppelen eerder halverwege stopte of omdat hier ook een ander account tekent. Koppel opnieuw: deze browser maakt een nieuwe sleutel en koppelt die met één bevestiging aan uw account. Er is nog niets ondertekend, en wat u eerder ondertekende blijft geldig. ', 'The signing key in this browser is not linked to your account, for example because linking stopped halfway earlier or because another account also signs here. Link again: this browser makes a new key and links it to your account with one confirmation. Nothing has been signed yet, and what you signed before stays valid. ');
+      const b = document.createElement('button');
+      b.type = 'button'; b.id = 'ds-relink-key'; b.className = 'btn btn-primary';
+      b.textContent = L('Sleutel opnieuw koppelen', 'Link the key again');
+      b.addEventListener('click', relinkSigningKey);
+      st.appendChild(b);
+      $('ds-sign-now').disabled = false;
+      return;
+    }
     $('ds-sign-status').textContent = msg;
     $('ds-sign-now').disabled = false;
   }
@@ -3033,7 +4346,7 @@ async function addQualifiedSignature(pdfBytes) {
   note.className = 'ds-note';
   note.setAttribute('role', 'note');
   const line = document.createElement('p');
-  line.textContent = 'Requesting a qualified signature...';
+  line.textContent = L('Een gekwalificeerde handtekening wordt aangevraagd...', 'Requesting a qualified signature...');
   note.appendChild(line);
   const dl = $('ds-dl-pdf');
   if (dl && dl.parentNode) dl.parentNode.insertBefore(note, dl.nextSibling);
@@ -3060,37 +4373,37 @@ async function addQualifiedSignature(pdfBytes) {
       }),
     });
   } catch {
-    line.textContent = 'The qualified signature could not be requested. Your ParaSign signature is unaffected.';
+    line.textContent = L('De gekwalificeerde handtekening kon niet worden aangevraagd. Uw ParaSign-handtekening blijft geldig.', 'The qualified signature could not be requested. Your ParaSign signature is unaffected.');
     return;
   }
   let body = null;
   try { body = await res.json(); } catch { /* handled by the status below */ }
 
   if (res.status === 409 && body) {
-    line.textContent = 'A qualified signature needs the signer to authorise it in the provider app first. '
+    line.textContent = L('Voor een gekwalificeerde handtekening moet de ondertekenaar eerst toestemming geven in de app van de aanbieder. ', 'A qualified signature needs the signer to authorise it in the provider app first. ')
       + (body.reason || '');
     if (body.authorize_url) {
       const a = document.createElement('a');
       a.href = body.authorize_url;
-      a.textContent = 'Open the provider authorisation';
+      a.textContent = L('Toestemming geven bij de aanbieder', 'Open the provider authorisation');
       a.rel = 'noopener';
       note.appendChild(a);
     }
     return;
   }
   if (!res.ok || !body || !body.document) {
-    line.textContent = 'The provider did not return a qualified signature. Your ParaSign signature is unaffected.';
+    line.textContent = L('De aanbieder gaf geen gekwalificeerde handtekening terug. Uw ParaSign-handtekening blijft geldig.', 'The provider did not return a qualified signature. Your ParaSign signature is unaffected.');
     return;
   }
 
   const raw = atob(body.document);
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  line.textContent = 'Qualified signature added (' + (body.level || 'PAdES') + ').';
+  line.textContent = L('Gekwalificeerde handtekening toegevoegd (', 'Qualified signature added (') + (body.level || 'PAdES') + ').';
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn btn-secondary';
-  btn.textContent = 'Download the qualified PDF';
+  btn.textContent = L('Gekwalificeerde pdf downloaden', 'Download the qualified PDF');
   btn.addEventListener('click', () => downloadBytes(out, 'qualified-' + signedDocName(), 'application/pdf'));
   note.appendChild(btn);
 }
@@ -3135,11 +4448,11 @@ function renderTotpSha1Note(afterEl) {
   note.className = 'ds-note';
   note.setAttribute('role', 'note');
   const p = document.createElement('p');
-  p.innerHTML = 'Signed. Your authenticator app uses SHA-1. For the strongest setup, switch to a SHA-256 app such as Raivo (iOS) or Aegis (Android). <a href="/help/authenticator-apps">See the app list</a>.';
+  p.innerHTML = L('Ondertekend. Uw authenticator-app gebruikt SHA-1. Het sterkst is een app met SHA-256, zoals Raivo (iOS) of Aegis (Android). <a href="/help/authenticator-apps">Bekijk de lijst met apps</a>.', 'Signed. Your authenticator app uses SHA-1. For the strongest setup, switch to a SHA-256 app such as Raivo (iOS) or Aegis (Android). <a href="/help/authenticator-apps">See the app list</a>.');
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'ds-note-dismiss';
-  btn.textContent = 'Dismiss';
+  btn.textContent = L('Sluiten', 'Dismiss');
   btn.addEventListener('click', () => note.remove());
   note.appendChild(p);
   note.appendChild(btn);
@@ -3148,6 +4461,7 @@ function renderTotpSha1Note(afterEl) {
 
 function showDone() {
   setActive('step-done');
+  clearDraft();   // sent or signed: the kept draft has done its job
   const r = state.result;
   // Say what the proof covers before the reader draws his own conclusion from
   // a green checkmark. Only ever from what the server actually reported: the
@@ -3167,14 +4481,27 @@ function showDone() {
   const inviteDetails = $('ds-invite-details'); if (inviteDetails) inviteDetails.hidden = true;
 
   const signedName = r.stampedBytes ? signedDocName() : state.doc.name;
+  // "Samen ondertekenen": everyone signs the version with the sender's seal,
+  // so that file, not the one the sender started from, is what the final
+  // proof checks against (acceptatie r3, A1). Said by name, with the button.
+  const togetherNote = (state.signingMode === 'cosign' && state.recipients.length > 0 && r.stampedBytes)
+    ? L('De medeondertekenaars tekenen precies dit bestand. Controleer het eindbewijs later op /verify met ', 'Your co-signers sign exactly this file. Later, check the final proof on /verify with ') + signedName +
+      L(', niet met ', ', not with ') + state.doc.name + L(' en niet met de leesbare kopie met alle handtekeningen. ', ' and not with the readable copy that shows every signature. ')
+    : '';
+  // Alone: the same, by name. The stamped file is what turns /verify green, not
+  // the file the signer started from (acceptatie r4, punt 3).
+  const soloNote = togetherNote ? ''
+    : r.stampedBytes
+      ? L('Controleer later op /verify met ', 'Later, check on /verify with ') + signedName + L(' en het bewijsbestand, niet met ', ' and the proof file, not with ') + state.doc.name + '. '
+      : L('Controleer later op /verify met ', 'Later, check on /verify with ') + signedName + L(' en het bewijsbestand. ', ' and the proof file. ');
   paDone().fill('step-done', {
-    title: 'Signed.',
+    title: L('Ondertekend.', 'Signed.'),
     line: r.stampedBytes
-      ? 'Your signature is on ' + signedName + '. Save both files now and keep them together, ' +
-        'because we do not hold a copy you could come back for.'
-      : 'Your signature covers ' + signedName + ', which is left exactly as it was. ' +
-        'Save the proof file now and keep it with the document, because we do not hold a copy ' +
-        'you could come back for.',
+      ? L('Uw handtekening staat op ', 'Your signature is on ') + signedName + '. ' + togetherNote + soloNote + L('Bewaar nu beide bestanden en houd ze bij elkaar, ', 'Save both files now and keep them together, ') +
+        L('want wij bewaren geen kopie die u later kunt ophalen.', 'because we do not hold a copy you could come back for.')
+      : L('Uw handtekening geldt voor ', 'Your signature covers ') + signedName + L(', dat precies blijft zoals het was. ', ', which is left exactly as it was. ') + soloNote +
+        L('Bewaar nu het bewijsbestand bij het document, want wij bewaren geen kopie ', 'Save the proof file now and keep it with the document, because we do not hold a copy ') +
+        L('die u later kunt ophalen.', 'you could come back for.'),
   });
 
   if (state.totpSha1) renderTotpSha1Note($('ds-done-line'));
@@ -3183,16 +4510,16 @@ function showDone() {
   $('ds-done-name').textContent = state.doc.name;
   $('ds-done-mode').textContent =
     state.mode === 'pdf'   ? describePdfMode() :
-    state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
-                             'Hash-only attestation (SHA3-256)';
+    state.mode === 'image' ? L('Afbeelding met ingebakken zichtbare stempel (', 'Image with visual stamp baked in (') + (state.imageType || '').toUpperCase() + ')' :
+                             L('Alleen een vingerafdruk (SHA3-256)', 'Fingerprint only (SHA3-256)');
 
   // v3: the signature was submitted to the relay (same-origin, via the
   // per-document activation) which recorded it on the envelope and wrote it to
   // the public CT log. There is no optional "notary" step any more.
-  if ($('ds-done-notary')) $('ds-done-notary').textContent = 'Yes - recorded on the relay and the public CT log';
+  if ($('ds-done-notary')) $('ds-done-notary').textContent = L('Ja, vastgelegd op onze server en in het openbare CT-logboek', 'Yes, recorded on our server and in the public CT log');
 
   const psignName = (state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
-  $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(r.envelope, null, 2)), psignName, 'application/json');
+  $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(psignForFile(r.envelope), null, 2)), psignName, 'application/json');
   // One loud button per end screen. When there is a stamped document it is the
   // one people came for and the proof file is the quiet line beside it; in
   // hash-only mode the proof file IS the document's only companion, so it takes
@@ -3200,7 +4527,7 @@ function showDone() {
   setDonePrimary(r.stampedBytes ? 'ds-dl-pdf' : 'ds-dl-psign');
   if (r.stampedBytes) {
     $('ds-dl-pdf').hidden = false;
-    $('ds-dl-pdf').textContent = state.mode === 'pdf' ? 'Download signed PDF' : 'Download signed image';
+    $('ds-dl-pdf').textContent = state.mode === 'pdf' ? L('Getekende pdf downloaden', 'Download signed PDF') : L('Getekende afbeelding downloaden', 'Download signed image');
     $('ds-dl-pdf').onclick = () => downloadBytes(r.stampedBytes, signedDocName(), signedDocMime());
     const optIn = $('ds-qes-optin');
     if (state.mode === 'pdf' && optIn && optIn.checked) {
@@ -3217,21 +4544,21 @@ function showDone() {
     filesList.innerHTML = '';
     if (r.stampedBytes) {
       const li1 = document.createElement('li');
-      const what = state.mode === 'pdf' ? 'signed PDF' : 'signed image';
-      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(signedDocName())}</span><span class="ds-usage-files-note">the ${what} with your visible Paramant seal baked in</span>`;
+      const what = state.mode === 'pdf' ? L('getekende pdf', 'signed PDF') : L('getekende afbeelding', 'signed image');
+      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(signedDocName())}</span><span class="ds-usage-files-note">${L(`de ${what} met uw zichtbare Paramant-stempel erin`, `the ${what} with your visible Paramant seal baked in`)}</span>`;
       filesList.appendChild(li1);
     } else {
       const li1 = document.createElement('li');
-      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(state.doc.name)}</span><span class="ds-usage-files-note">the original file (unchanged - hash-only mode does not modify it)</span>`;
+      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(state.doc.name)}</span><span class="ds-usage-files-note">${L('het oorspronkelijke bestand (ongewijzigd, want bij alleen een vingerafdruk blijft het zoals het was)', 'the original file (unchanged: signing only a fingerprint leaves it as it was)')}</span>`;
       filesList.appendChild(li1);
     }
     const li2 = document.createElement('li');
-    li2.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(psignName)}</span><span class="ds-usage-files-note">the proof: the signature, your public key and what was signed</span>`;
+    li2.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(psignName)}</span><span class="ds-usage-files-note">${L('het bewijs: de handtekening, uw publieke sleutel en wat er ondertekend is', 'the proof: the signature, your public key and what was signed')}</span>`;
     filesList.appendChild(li2);
   }
   const notaryLine = $('ds-usage-notary-line');
   if (notaryLine) {
-    notaryLine.textContent = 'it was recorded on our relay and written to the public CT log, which gives the reader an independent witness of when this happened.';
+    notaryLine.textContent = L('hij is vastgelegd op onze server en in het openbare CT-logboek, zodat de lezer een onafhankelijke getuige heeft van wanneer het gebeurde.', 'it was recorded on our server and written to the public CT log, which gives the reader an independent witness of when this happened.');
   }
 
   // Multi-party: render share-links for the recipients (party 1..N).
@@ -3279,18 +4606,18 @@ function showDoneInvite(r) {
     sb.hidden = !emailPartial;
     sb.className = 'ds-banner err';
     sb.innerHTML = emailPartial
-      ? '<strong>Request created, but not every notice was delivered.</strong> Use Retry, or send the failed personal links below yourself.'
+      ? L('<strong>Verzoek aangemaakt, maar niet elk bericht is bezorgd.</strong> Probeer het opnieuw, of stuur de persoonlijke links hieronder zelf.', '<strong>Request created, but not every notice was delivered.</strong> Use Retry, or send the failed personal links below yourself.')
       : '';
   }
   paDone().fill('step-done', {
-    title: emailPartial ? 'Not every notice went out.'
-         : emailOk      ? 'Notified. Now send them the links.'
-         :                'Ready for signature.',
+    title: emailPartial ? L('Niet elk bericht is verstuurd.', 'Not every notice went out.')
+         : emailOk      ? L('Uitnodigingen verstuurd.', 'Invitations sent.')
+         :                L('Klaar om te ondertekenen.', 'Ready for signature.'),
     line: emailPartial
-      ? 'Some notices were not delivered. Retry below. Either way each signer still needs their link from you.'
+      ? L('Sommige uitnodigingen zijn niet bezorgd. Probeer het hieronder opnieuw, of stuur wie geen mail kreeg zelf de link hieronder.', 'Some invitations were not delivered. Retry below, or send anyone who got no mail their link below yourself.')
       : emailOk
-        ? 'The email is a notice and carries no key. Send each person their link below.'
-        : 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.',
+        ? L('Iedereen heeft een eigen link gekregen. U hoeft niets meer te sturen. U krijgt bericht bij elke handtekening, en aan het eind het complete document.', 'Everyone has their own link now. There is nothing more to send. You hear about every signature, and get the complete document at the end.')
+        : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
   ['ds-dl-pdf', 'ds-dl-psign'].forEach(id => { const el = $(id); if (el) el.hidden = true; });
@@ -3298,7 +4625,7 @@ function showDoneInvite(r) {
   // per-recipient copy buttons stay quiet: they sit inside a card that
   // already draws the eye, and there is one of them per signer.
   const restart = $('ds-restart');
-  if (restart) restart.textContent = 'Send another document';
+  if (restart) restart.textContent = L('Nog een document versturen', 'Send another document');
   setDonePrimary('ds-restart');
   const info = document.querySelector('#step-done .ds-info-card'); if (info) info.hidden = true;
   document.querySelectorAll('#step-done .ds-usage-card').forEach(c => { if (c.id !== 'ds-party-links-card') c.hidden = true; });
@@ -3322,6 +4649,18 @@ function setDonePrimary(id) {
   });
 }
 
+// The .psign as it leaves the browser. The personal invitation links (with
+// each co-signer's invite token) are for this screen only: in the file they
+// handed every reader of the proof the means to open the others' invitations
+// (retest T3-11). Nothing that verifies reads them; every other byte of the
+// proof stays exactly as before.
+export function psignForFile(envelope) {
+  if (!envelope || !envelope.multiparty || !('party_links' in envelope.multiparty)) return envelope;
+  const multiparty = { ...envelope.multiparty };
+  delete multiparty.party_links;
+  return { ...envelope, multiparty };
+}
+
 function renderPartyLinks(mp) {
   const card = $('ds-party-links-card');
   const list = $('ds-party-links');
@@ -3337,17 +4676,42 @@ function renderPartyLinks(mp) {
   const result = $('ds-invite-delivery-result');
   const retry = $('ds-invite-retry');
   const deliveryByParty = new Map((state.inviteDelivery?.results || []).map((item) => [item.party_index, item]));
+  // What these links do, in the words of what actually happened. It used to
+  // say "the key is in the link" on every screen, also when no document had
+  // been sent along at all (matrix COSIGN-02).
+  const copyLine = $('ds-party-links-copy');
+  if (copyLine) {
+    copyLine.textContent = state.cosignShareError
+      ? L('Deze links openen het verzoek, maar niet het document: dat kon niet worden meegestuurd. Stuur iedereen zelf de getekende pdf (Getekende pdf downloaden). Op de eigen pagina kiest ieder dat bestand en tekent dan.', 'These links open the request, but not the document: it could not be sent along. Send everyone the signed PDF yourself (Download signed PDF). On their own page each person chooses that file and then signs.')
+      : (state.inviteDelivery?.ok
+        ? L('Wilt u iemand de link toch zelf sturen? Elke link opent het document na inloggen, en is alleen voor die ene persoon.', 'Want to send someone the link yourself after all? Each link opens the document after sign-in, and is for that one person only.')
+        : L('Elke link opent het document na inloggen, en is alleen voor die ene persoon.', 'Each link opens the document after sign-in, and is for that one person only.'));
+  }
+  const covered = paraafCoveredNotice();
+  let coveredEl = $('ds-paraaf-covered');
+  if (covered && !coveredEl && copyLine) {
+    coveredEl = document.createElement('div');
+    coveredEl.id = 'ds-paraaf-covered';
+    coveredEl.className = 'ds-banner err';
+    coveredEl.setAttribute('role', 'status');
+    copyLine.parentNode.insertBefore(coveredEl, copyLine.nextSibling);
+  }
+  if (coveredEl) { coveredEl.hidden = !covered; coveredEl.textContent = covered; }
   if (result) {
-    if (state.deliveryMode === 'copy') {
+    if (state.cosignShareError) {
+      result.hidden = false; result.className = 'ds-banner err';
+      result.textContent = L('Uw handtekening staat. Alleen het document kon niet versleuteld worden meegestuurd: ', 'Your signature stands. Only the document could not be sent along encrypted: ') + state.cosignShareError + L(' Er is daarom geen e-mail verstuurd.', ' No email was sent for that reason.');
+    } else if (state.deliveryMode === 'copy') {
       result.hidden = false; result.className = 'ds-banner';
-      result.textContent = 'No email was sent. Send each person their link yourself.';
+      result.textContent = L('Er is geen e-mail verstuurd. Stuur iedereen zelf de eigen link.', 'No email was sent. Send each person their link yourself.');
     } else if (state.inviteDelivery?.ok) {
-      result.hidden = false; result.className = 'ds-banner ok';
-      result.textContent = 'All notices were delivered. Now send each person their link.';
+      // The heading already says the invitations went out; a second green
+      // banner and a tick per person said it twice more (acceptance 3.1.1, 13).
+      result.hidden = true;
     } else if (state.inviteDelivery) {
       const failedCount = state.inviteDelivery.failed_party_indexes?.length || 0;
       result.hidden = false; result.className = 'ds-banner err';
-      result.textContent = failedCount + ' notice' + (failedCount === 1 ? '' : 's') + ' could not be delivered. Retry, or just send that person the link below.';
+      result.textContent = failedCount + (failedCount === 1 ? L(' bericht kon', ' notice') : L(' berichten konden', ' notices')) + L(' niet worden bezorgd. Probeer het opnieuw, of stuur de link hieronder gewoon zelf.', ' could not be delivered. Retry, or just send that person the link below.');
     } else {
       result.hidden = true;
     }
@@ -3358,27 +4722,32 @@ function renderPartyLinks(mp) {
     const recipientIndex = inviteOnly ? p.party_index : p.party_index - 1;
     const recipient = state.recipients[recipientIndex] || { label: 'Recipient ' + (recipientIndex + 1) };
     const fullUrl = location.origin + p.sign_path;
-    const deliveryStatus = deliveryByParty.get(p.party_index);
+    // A status per person only when not every mail arrived: then it says who.
+    const deliveryStatus = state.inviteDelivery?.ok ? null : deliveryByParty.get(p.party_index);
     const row = document.createElement('div');
     row.className = 'ds-party-link-row';
     row.innerHTML =
-      `<div class="ds-pl-label">${escapeHtml(recipient.label)}${recipient.email ? '<div style="font-size:10px;color:var(--ink-dim);font-weight:400">' + escapeHtml(recipient.email) + '</div>' : ''}${deliveryStatus ? '<div class="ds-invite-status ' + (deliveryStatus.ok ? 'ok' : 'err') + '">' + (deliveryStatus.ok ? 'Email sent' : 'Email failed') + '</div>' : ''}</div>` +
-      `<div class="ds-pl-url" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>` +
-      `<button class="ds-pl-copy" type="button">Copy link</button>`;
+      `<div class="ds-pl-label">${escapeHtml(recipient.label)}${recipient.email ? '<div style="font-size:10px;color:var(--ink-dim);font-weight:400">' + escapeHtml(recipient.email) + '</div>' : ''}${deliveryStatus ? '<div class="ds-invite-status ' + (deliveryStatus.ok ? 'ok' : 'err') + '">' + (deliveryStatus.ok ? L('E-mail verstuurd', 'Email sent') : L('E-mail mislukt', 'Email failed')) + '</div>' : ''}</div>` +
+      // The raw link stays out of sight: the copy button is how it travels.
+      // It is still in the row, so the select-all fallback below can show it.
+      `<div class="ds-pl-url" title="${escapeHtml(fullUrl)}" hidden>${escapeHtml(fullUrl)}</div>` +
+      L(`<button class="ds-pl-copy" type="button">Link kopiëren</button>`, `<button class="ds-pl-copy" type="button">Copy link</button>`);
     const btn = row.querySelector('.ds-pl-copy');
     btn.onclick = async () => {
       try {
         await navigator.clipboard.writeText(fullUrl);
-        btn.textContent = 'Copied!';
+        btn.textContent = L('Gekopieerd', 'Copied!');
         btn.classList.add('copied');
-        setTimeout(() => { btn.textContent = 'Copy link'; btn.classList.remove('copied'); }, 1500);
+        setTimeout(() => { btn.textContent = L('Link kopiëren', 'Copy link'); btn.classList.remove('copied'); }, 1500);
       } catch {
         // Fallback: select the URL element for manual copy
+        const urlEl = row.querySelector('.ds-pl-url');
+        urlEl.hidden = false;
         const range = document.createRange();
-        range.selectNode(row.querySelector('.ds-pl-url'));
+        range.selectNode(urlEl);
         getSelection().removeAllRanges();
         getSelection().addRange(range);
-        btn.textContent = 'Select all (Ctrl+C)';
+        btn.textContent = L('Alles selecteren (Ctrl+C)', 'Select all (Ctrl+C)');
       }
     };
     list.appendChild(row);
@@ -3390,11 +4759,13 @@ function renderPartyLinks(mp) {
   // (/api/user/sign/*). The relay GET /v2/envelopes/:id is public.
   const statusLink = $('ds-envelope-status-link');
   if (statusLink) {
-    statusLink.href = RELAY_PUBLIC + '/v2/envelopes/' + mp.envelope_id;
+    // The owner's result page, not the relay's raw JSON (acceptance test
+    // 2026-10-04): who signed, and the complete PDF once everyone has.
+    statusLink.href = '/co-sign?owner=' + encodeURIComponent(mp.envelope_id);
     // The id and the machine it sits on are in the href, where a person who
     // wants them can get at them. On the face of an end screen they were two
     // pieces of plumbing in the middle of a sentence.
-    statusLink.textContent = 'the status page for this request';
+    statusLink.textContent = L('de statuspagina van dit verzoek', 'the status page for this request');
   }
 }
 
@@ -3402,14 +4773,14 @@ async function retryFailedInviteEmails() {
   const retry = $('ds-invite-retry');
   const failed = state.inviteDelivery?.failed_party_indexes || [];
   if (!failed.length) return;
-  if (retry) { retry.disabled = true; retry.textContent = 'Retrying…'; }
+  if (retry) { retry.disabled = true; retry.textContent = L('Opnieuw bezig…', 'Retrying…'); }
   const retried = await deliverInviteEmails(failed);
   const previous = new Map((state.inviteDelivery?.results || []).map((item) => [item.party_index, item]));
   for (const item of retried.results || []) previous.set(item.party_index, item);
   const results = Array.from(previous.values()).sort((a, b) => a.party_index - b.party_index);
   const failed_party_indexes = results.filter((item) => !item.ok).map((item) => item.party_index);
   state.inviteDelivery = { ok: failed_party_indexes.length === 0, partial_failure: failed_party_indexes.length > 0, failed_party_indexes, results };
-  if (retry) { retry.disabled = false; retry.textContent = 'Retry failed emails'; }
+  if (retry) { retry.disabled = false; retry.textContent = L('Mislukte e-mails opnieuw sturen', 'Retry failed emails'); }
   renderPartyLinks(state.result.envelope.multiparty);
   showDoneInvite(state.result);
 }
@@ -3417,6 +4788,8 @@ async function retryFailedInviteEmails() {
 async function renderSignedPreview() {
   const container = $('ds-signed-preview');
   if (!container) return;
+  const ticket = signedPreviewGen.start();
+  const stale = () => !signedPreviewGen.current(ticket);
   container.innerHTML = '';
   const r = state.result;
 
@@ -3424,8 +4797,8 @@ async function renderSignedPreview() {
   if (state.mode === 'hash' || !r.stampedBytes) {
     container.innerHTML =
       '<div class="ds-info-card"><dl>' +
-      '<dt>Signed bytes (SHA3-256)</dt><dd>' + escapeHtml(r.envelope.document_hash || '-') + '</dd>' +
-      '<dt>Signature (b64, first 32)</dt><dd>' + escapeHtml((r.envelope.signature || '').slice(0, 32)) + '...</dd>' +
+      L('<dt>Ondertekende bytes (SHA3-256)</dt><dd>', '<dt>Signed bytes (SHA3-256)</dt><dd>') + escapeHtml(r.envelope.document_hash || '-') + '</dd>' +
+      L('<dt>Handtekening (b64, eerste 32)</dt><dd>', '<dt>Signature (b64, first 32)</dt><dd>') + escapeHtml((r.envelope.signature || '').slice(0, 32)) + '...</dd>' +
       '</dl></div>';
     return;
   }
@@ -3434,6 +4807,7 @@ async function renderSignedPreview() {
   if (state.mode === 'image') {
     const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
     const dataUrl = await bytesToDataUrl(r.stampedBytes, mime);
+    if (stale()) return;
     const img = document.createElement('img');
     img.src = dataUrl;
     img.alt = signedDocName();
@@ -3446,26 +4820,31 @@ async function renderSignedPreview() {
   // signer sees their stamp in context without scrolling long documents.
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(r.stampedBytes);
-  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true, maxImageSize: 1 << 26 }).promise;
+  await nextFrame();
+  if (stale()) return;
   const firstPreviewPage = state.sealPlacement === 'sheet' ? pdf.numPages - 1 : state.stamp.pageIndex;
   const idxs = [firstPreviewPage];
   if (state.sealPlacement === 'both') idxs.push(pdf.numPages - 1);
   else if (state.sealPlacement === 'inline' && firstPreviewPage + 1 < pdf.numPages) idxs.push(firstPreviewPage + 1);
   for (const idx of idxs) {
     const page = await pdf.getPage(idx + 1);
+    if (stale()) return;
     const baseViewport = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    const targetWidth = viewportTargetWidth(window.innerWidth);
     const dpr = hiDpiScale();
     const cssScale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale: cssScale * dpr });
     const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);        // backing store = cssW * dpr
-    canvas.height = Math.floor(viewport.height);
     canvas.style.width = targetWidth + 'px';          // shown at CSS width -> crisp
     canvas.style.height = Math.floor(baseViewport.height * cssScale) + 'px';
     canvas.style.display = 'block';
-    container.appendChild(canvas);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    canvas.style.background = '#fff';   // a dark or transparent PDF stays legible
+    const holder = document.createElement('div');   // room for the blank-page note
+    holder.style.position = 'relative';
+    holder.appendChild(canvas);
+    container.appendChild(holder);
+    await renderPageCapped(page, canvas, cssScale * dpr);   // backing store = cssW * dpr, capped
+    if (stale()) return;
   }
 }
 
@@ -3488,8 +4867,16 @@ function wireNav() {
     // Signed out: this button is the sign-in, and nothing below it should run.
     // Whatever was typed here is lost by the navigation; applySessionToSendButton
     // has already said so on screen, above the button.
+    // Check what was typed first (test with a stranger, 13-10-2026): an empty
+    // name or address went straight to the sign-in, and came back as a
+    // request that could not be sent.
     if ($('ds-recipients-continue').dataset.signInFirst === '1') {
-      location.href = '/auth/login?next=/sign';
+      commitRecipientsFromDom();
+      commitInviteDeliveryFromDom();
+      const sErr = validateRecipients();
+      if (sErr) { showRecipientsHint(sErr, true); return; }
+      if (state.signingMode === 'invite' && state.recipients.length === 0) { showRecipientsHint(L('Voeg minstens één persoon toe om dit naar te sturen.', 'Add at least one person to send this to.'), true); return; }
+      signInKeepingWork();
       return;
     }
     commitRecipientsFromDom();
@@ -3499,8 +4886,8 @@ function wireNav() {
     const rErr = validateRecipients();
     if (rErr) { showRecipientsHint(rErr, true); return; }
     if (state.signingMode === 'invite') {
-      if (state.recipients.length === 0) { showRecipientsHint('Add at least one person to send this to.', true); return; }
-      sendForSignature();
+      if (state.recipients.length === 0) { showRecipientsHint(L('Voeg minstens één persoon toe om dit naar te sturen.', 'Add at least one person to send this to.'), true); return; }
+      sendAfterAllowanceCheck();
     } else {
       setActive('step-identity');
     }
@@ -3527,12 +4914,12 @@ function wireNav() {
     // first call is the step-up options, which is the 401 this gate exists to
     // stop; applySessionToSignButton has already said so above the button.
     if ($('ds-sign-now').dataset.signInFirst === '1') {
-      location.href = '/auth/login?next=/sign';
+      signInKeepingWork();
       return;
     }
     doSign();
   });
-  $('ds-restart').addEventListener('click', () => location.reload());
+  $('ds-restart').addEventListener('click', () => { clearDraft().finally(() => location.reload()); });
 }
 
 // ====================================================================
@@ -3546,8 +4933,11 @@ function renderRecipients() {
     const empty = document.createElement('div');
     empty.className = 'ds-recipient-empty';
     empty.innerHTML = (state.signingMode === 'invite')
-      ? 'Add the people who need to sign this document. Each one gets their own link to sign.'
-      : 'No co-signers yet. Click <strong>+ Add recipient</strong> to invite someone, or <strong>Continue</strong> to sign just for yourself.';
+      // One sentence says who to add: the line above the list (.ds-sub). This
+      // spot only says the list is empty and how to fill it; it used to repeat
+      // that line in other words (test with a stranger, 13-10-2026).
+      ? L('Nog niemand toegevoegd. Klik op <strong>+ Ontvanger toevoegen</strong>.', 'Nobody added yet. Click <strong>+ Add recipient</strong>.')
+      : L('Nog geen medeondertekenaars. Klik op <strong>+ Ontvanger toevoegen</strong> om iemand uit te nodigen, of op <strong>Verder</strong> om alleen zelf te tekenen.', 'No co-signers yet. Click <strong>+ Add recipient</strong> to invite someone, or <strong>Continue</strong> to sign just for yourself.');
     list.appendChild(empty);
     return;
   }
@@ -3560,9 +4950,9 @@ function buildRecipientRow(idx, data) {
   row.dataset.idx = String(idx);
   const n = idx + 1;
   row.innerHTML =
-    `<input class="ds-input" type="text" data-field="label" maxlength="80" placeholder="Recipient name (required)" aria-label="Recipient ${n} name (required)" value="${escapeHtml(data.label || '')}">` +
-    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="Email (required)" aria-label="Recipient ${n} email (required, invite is bound to it)" value="${escapeHtml(data.email || '')}">` +
-    `<button class="ds-rm" type="button" data-action="remove" aria-label="Remove recipient ${n}">Remove</button>`;
+    `<input class="ds-input" type="text" data-field="label" maxlength="80" placeholder="${L('Naam ontvanger (verplicht)', 'Recipient name (required)')}" aria-label="${L(`Naam ontvanger ${n} (verplicht)`, `Recipient ${n} name (required)`)}" value="${escapeHtml(data.label || '')}">` +
+    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="${L('E-mailadres (verplicht)', 'Email (required)')}" aria-label="${L(`E-mailadres ontvanger ${n} (verplicht, de uitnodiging werkt alleen voor dit adres)`, `Recipient ${n} email (required, the invitation works only for this address)`)}" value="${escapeHtml(data.email || '')}">` +
+    `<button class="ds-rm" type="button" data-action="remove" aria-label="${L(`Ontvanger ${n} verwijderen`, `Remove recipient ${n}`)}">${L('Verwijderen', 'Remove')}</button>`;
   row.querySelector('[data-action="remove"]').addEventListener('click', () => removeRecipientRow(idx));
   return row;
 }
@@ -3592,9 +4982,9 @@ function validateRecipients() {
   for (let i = 0; i < state.recipients.length; i++) {
     const r = state.recipients[i] || {};
     const n = i + 1;
-    if (!r.label) return `Recipient ${n} needs a name.`;
-    if (!r.email) return `Recipient ${n} needs an email address. The invite is cryptographically bound to it.`;
-    if (!RECIPIENT_EMAIL_RE.test(r.email)) return `Recipient ${n}: \u201c${r.email}\u201d is not a valid email address.`;
+    if (!r.label) return L(`Ontvanger ${n} heeft een naam nodig.`, `Recipient ${n} needs a name.`);
+    if (!r.email) return L(`Ontvanger ${n} heeft een e-mailadres nodig. De uitnodiging werkt alleen voor dat adres.`, `Recipient ${n} needs an email address. The invitation works only for that address.`);
+    if (!RECIPIENT_EMAIL_RE.test(r.email)) return L(`Ontvanger ${n}: \u201c${r.email}\u201d is geen geldig e-mailadres.`, `Recipient ${n}: \u201c${r.email}\u201d is not a valid email address.`);
   }
   return null;
 }
@@ -3618,6 +5008,130 @@ function wireLiveStampUpdates() {
   });
 }
 
+// ── Keeping the work across a sign-in (T5-6) ───────────────────────────────
+// Everything the customer prepared, as js/sign-draft.js keeps it.
+function draftMeta() {
+  if (!$('step-recipients').hidden) { try { commitRecipientsFromDom(); commitInviteDeliveryFromDom(); } catch { /* not rendered */ } }
+  const active = document.querySelector('.ds-step:not([hidden])');
+  return {
+    mode: state.signingMode,
+    step: active ? active.id : '',
+    docName: state.doc ? state.doc.name : '',
+    docHash: state.doc && state.doc.bytes ? toHex(sha3_256(state.doc.bytes)) : '',
+    stamp: state.stamp && !state.stamp.isImage ? { ...state.stamp } : null,
+    stampPage: state.stampPage ? { ...state.stampPage } : null,
+    stampAllPages: !!state.stampAllPages,
+    sealPlacement: state.sealPlacement || 'inline',
+    recipients: (state.recipients || []).map((r) => ({ label: r.label || '', email: r.email || '' })),
+    inviteSubject: state.inviteSubject || '',
+    inviteMessage: state.inviteMessage || '',
+    deliveryMode: state.deliveryMode || 'email',
+    signerName: ($('ds-signer-name') && $('ds-signer-name').value) || '',
+  };
+}
+
+async function signInKeepingWork() {
+  try {
+    if (state.doc && state.doc.bytes && state.doc.bytes.length) await saveDraft(draftMeta(), state.doc.bytes);
+  } catch (e) {
+    try { console.warn('[paramant] draft not kept', e); } catch { /* no console */ }
+  }
+  location.href = '/auth/login?next=' + encodeURIComponent((EN ? '/en/sign' : '/sign') + '?herstel=1');
+}
+
+// The session ran out halfway: one sentence and one button, and the work
+// stays (it used to be "open /auth/login and come back", and everything was
+// gone on return).
+function showSessionLost(el) {
+  if (!el) return;
+  el.hidden = false;
+  el.className = 'ds-banner err';
+  el.textContent = L('U bent uitgelogd. Log opnieuw in. Uw document, de plek en de ontvangers blijven in deze browser en staan daarna weer klaar. ', 'You were signed out. Sign in again. Your document, the spot and the recipients stay in this browser and are ready again afterwards. ');
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn btn-primary'; b.id = 'ds-signin-keep';
+  b.textContent = L('Inloggen en verdergaan', 'Sign in and continue');
+  b.addEventListener('click', signInKeepingWork);
+  el.appendChild(b);
+}
+
+function waitFor(cond, ms = 15000) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const tick = () => { if (cond()) return resolve(true); if (Date.now() - t0 > ms) return resolve(false); setTimeout(tick, 50); };
+    tick();
+  });
+}
+
+// Back from the sign-in: put the draft back where the customer left it.
+async function restoreDraft(draft) {
+  const m = draft.meta || {};
+  if (!draft.bytes || !m.mode || toHex(sha3_256(draft.bytes)) !== m.docHash) { await clearDraft(); return false; }
+  state.signingMode = m.mode;
+  setStepperForMode(m.mode);
+  setActive('step-doc');
+  await onDocChosen(new File([draft.bytes], m.docName || 'document.pdf', { type: 'application/pdf' }));
+  if (state.mode === 'pdf' && m.stamp) {
+    await waitFor(() => placeState && Array.isArray(placeState.pages) && placeState.pages.length
+      && placeState.pages.every((p) => p.wrap && p.wrap.querySelector('canvas') && p.wrap.querySelector('canvas').getBoundingClientRect().width > 0));
+    state.stamp = { ...m.stamp };
+    state.stampPage = m.stampPage ? { ...m.stampPage } : state.stampPage;
+    if (m.sealPlacement) state.sealPlacement = m.sealPlacement;
+    reflowStampMarker();
+    $('ds-place-continue').disabled = false;
+  }
+  // The paraaf choice comes back too, also without a box (an invite may ask
+  // for the paraaf without pointing at a spot).
+  if (state.mode === 'pdf') setStampAllPages(!!m.stampAllPages, false);
+  state.recipients = Array.isArray(m.recipients) ? m.recipients.map((r) => ({ label: r.label || '', email: r.email || '' })) : [];
+  state.inviteSubject = m.inviteSubject || '';
+  state.inviteMessage = m.inviteMessage || '';
+  state.deliveryMode = m.deliveryMode || 'email';
+  { const el = $('ds-invite-subject'); if (el) el.value = state.inviteSubject; }
+  { const el = $('ds-invite-message'); if (el) el.value = state.inviteMessage; }
+  { const el = document.querySelector('input[name="ds-delivery-mode"][value="' + state.deliveryMode + '"]'); if (el) el.checked = true; }
+  if (m.signerName && $('ds-signer-name')) { $('ds-signer-name').value = m.signerName; $('ds-signer-name').dispatchEvent(new Event('input', { bubbles: true })); }
+  const back = L('Welkom terug. Uw document, de plek en de ontvangers staan er nog.', 'Welcome back. Your document, the spot and the recipients are still here.');
+  const wasLater = ['step-recipients', 'step-identity', 'step-sign'].includes(m.step);
+  if (wasLater && m.mode !== 'alone') {
+    enterRecipients();
+    showRecipientsHint(back, false);
+  } else if (wasLater && m.mode === 'alone') {
+    setActive('step-identity');
+  } else {
+    setPlaceHint(back);
+  }
+  await clearDraft();
+  return true;
+}
+
+async function offerDraftAfterSignIn() {
+  await sessionKnown;
+  if (sessionState !== 'in') return;
+  // The account's draft key, held in memory for a later save as well: a draft
+  // made by another account in this browser does not open with it and is wiped.
+  await loadAccountKey();
+  const draft = await loadDraft();
+  if (!draft) return;
+  const q = new URLSearchParams(location.search);
+  if (q.get('herstel') === '1') { await restoreDraft(draft); return; }
+  // Made before the sign-in: only the road back puts it back (sign-draft.js).
+  if (draft.anon) return;
+  // Not straight back from the sign-in: ask, once, on the first screen.
+  const host = $('step-mode');
+  if (!host || host.hidden) return;
+  const box = document.createElement('div');
+  box.className = 'ds-banner'; box.id = 'ds-draft-offer';
+  box.textContent = L('U was bezig met ', 'You were working on ') + '"' + (draft.meta.docName || 'document') + '". ';
+  const go = document.createElement('button');
+  go.type = 'button'; go.className = 'btn btn-primary'; go.textContent = L('Verdergaan', 'Continue');
+  go.addEventListener('click', () => { box.remove(); restoreDraft(draft); });
+  const drop = document.createElement('button');
+  drop.type = 'button'; drop.className = 'btn btn-tertiary'; drop.textContent = L('Weggooien', 'Discard');
+  drop.addEventListener('click', () => { box.remove(); clearDraft(); });
+  box.append(go, ' ', drop);
+  host.insertBefore(box, host.firstChild.nextSibling);
+}
+
 function init() {
   // First, before anything that might want to ask the API a question only a
   // session can answer: initStepIdentity() below is one such caller.
@@ -3629,10 +5143,10 @@ function init() {
   wireNav();
   wireLiveStampUpdates();
   wireEditTools();
-  // Restore the saved sign-every-page preference (position/scale is applied on
-  // demand via "Use saved position"; the toggle default comes along here).
-  const tpl = loadPlacementTemplate();
-  if (tpl && typeof tpl.allPages === 'boolean') state.stampAllPages = tpl.allPages;
+  // The saved sign-every-page choice is NOT switched on here. It used to be,
+  // silently, for every next document (test report 2026-10-04): a paraaf on
+  // every page of a contract the signer never asked it for. It comes back only
+  // with "Use saved position", which says so in the hint.
   const requestedMode = new URLSearchParams(location.search).get('mode');
   if (['alone', 'cosign', 'invite'].includes(requestedMode)) {
     state.signingMode = requestedMode;
@@ -3641,6 +5155,7 @@ function init() {
   } else {
     setActive('step-mode');
   }
+  offerDraftAfterSignIn().catch(() => { /* no draft, nothing to offer */ });
 }
 
 // What the probe answered, kept so every later step can ask the same question
@@ -3681,22 +5196,50 @@ function applySignedOut() {
 // button whose only possible answer is 401, three steps after the moment we
 // already knew. So it becomes the sign-in.
 //
-// The prepared state does NOT survive it, and the button says so rather than
-// pretending. The document lives in this page as raw bytes; a scanned contract
-// or a phone photo is megabytes and sessionStorage is about 5MB per origin, so
-// stashing it would fail on exactly the files people bring. The recipients and
-// the message are small enough to keep, but keeping half a flow and silently
-// dropping the other half is worse than one honest sentence.
+// The prepared state survives it (retest T5-6): signInKeepingWork keeps the
+// document, the spot and the recipients as a draft in IndexedDB
+// (js/sign-draft.js, the bytes encrypted, wiped after two hours or once sent),
+// and /sign?herstel=1 puts it all back after the sign-in. sessionStorage could
+// not: a scanned contract is megabytes and it holds about 5MB per origin.
+// Every signature on an invitation counts on the SENDER's month. A sender
+// with too little left could send, and the signer stranded on "the sender's
+// allowance is used up" (acceptance r2, 6). The relay now refuses such a
+// request at creation (sign_quota_insufficient), so the page says so first and
+// offers no "click again to send anyway" that the server would refuse anyway
+// (acceptatie r3, A4). Unknown (no answer, unlimited): send.
+async function senderSignsLeft() {
+  try {
+    const r = await fetch('/api/user/dashboard/overview', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const cap = d && d.quota && d.quota.caps ? d.quota.caps.signs : null;
+    const used = Number(d && d.quota && d.quota.signs) || 0;
+    return typeof cap === 'number' && Number.isFinite(cap) ? Math.max(0, cap - used) : null;
+  } catch { return null; }
+}
+async function sendAfterAllowanceCheck() {
+  const need = state.recipients.length;
+  const left = await senderSignsLeft();
+  if (left !== null && left < need) {
+    showRecipientsHint(L('U heeft deze maand nog ', 'You have ') + left
+      + L(left === 1 ? ' handtekening over' : ' handtekeningen over', left === 1 ? ' signature left this month' : ' signatures left this month')
+      + L(', en dit verzoek vraagt er ', ', and this request needs ') + need
+      + L('. Elke handtekening telt mee, dus zo kan dit verzoek niet weg. Verhoog uw plan op /pricing, nodig minder mensen uit, of verstuur het na het begin van de volgende maand.', '. Every signature counts, so this request cannot go out like this. Upgrade your plan on /pricing, invite fewer people, or send it after the start of next month.'), true);
+    return;
+  }
+  sendForSignature();
+}
+
 function applySessionToSendButton() {
   const cont = $('ds-recipients-continue');
   if (!cont) return;
   const gate = sessionState === 'out' && state.signingMode === 'invite';
   cont.dataset.signInFirst = gate ? '1' : '';
   if (!gate) return;
-  cont.textContent = 'Sign in to send';
+  cont.textContent = L('Inloggen om te versturen', 'Sign in to send');
   cont.disabled = false;
   if (!$('step-recipients').hidden) {
-    showRecipientsHint('Your document has not been uploaded and stays in this browser. Signing in reloads this page, so you pick the file and the recipients again afterwards.', false);
+    showRecipientsHint(L('Uw document is niet geüpload en blijft in deze browser. Na het inloggen staan het document, de plek en de ontvangers weer klaar.', 'Your document has not been uploaded and stays in this browser. After you sign in, the document, the spot and the recipients are ready again.'), false);
   }
 }
 
@@ -3716,7 +5259,7 @@ function applySessionToSignButton() {
   const gate = sessionState === 'out';
   btn.dataset.signInFirst = gate ? '1' : '';
   if (!gate) return;
-  btn.textContent = 'Sign in to sign';
+  btn.textContent = L('Inloggen om te ondertekenen', 'Sign in to sign');
   btn.disabled = false;
   const hint = $('ds-sign-signin-hint');
   if (hint) hint.hidden = false;
@@ -3776,6 +5319,35 @@ async function showSessionRequirement() {
   if (!data || typeof data.authenticated !== 'boolean') return;
   sessionState = data.authenticated ? 'in' : 'out';
   if (sessionState === 'out') applySignedOut();
+  else showOwnPlan().catch(() => { /* the free line simply stays */ });
+}
+
+// A paying customer read "Free forever · 2 signatures a month" at the top of
+// /sign and wondered whether his plan was active (test-5 report, point 8).
+// Signed in: show HIS plan. Same tier rule and the same names as the account
+// page (admin/server.js effectivePaidTier, PLAN_NAMES): a stored tier counts
+// only while its paid period runs. No answer, or no paid tier: the line stays.
+const PLAN_NAMES = { pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
+function paidTierOf(me) {
+  const live = (plan, until) => (plan && plan !== 'free' && plan !== 'community'
+    && (!until || Date.parse(until) > Date.now())) ? plan : null;
+  const held = [live(me.plan_parasign, me.paid_until_parasign), live(me.plan_parasend, me.paid_until_parasend)].filter(Boolean);
+  for (const tier of ['enterprise', 'business', 'pro']) if (held.includes(tier)) return tier;
+  return null;
+}
+async function showOwnPlan() {
+  const li = $('ds-plan-fact');
+  if (!li) return;
+  const res = await fetch('/api/user/me', { credentials: 'include', cache: 'no-store' });
+  if (!res.ok) return;
+  const me = await res.json();
+  const tier = me && paidTierOf(me);
+  if (!tier) return;
+  const b = document.createElement('b');
+  b.textContent = L('Uw plan: ', 'Your plan: ') + (PLAN_NAMES[tier] || tier);
+  li.textContent = '';
+  li.appendChild(b);
+  li.appendChild(document.createTextNode(L(' · uw handtekeningen vallen onder dit plan', ' · your signatures are covered by this plan')));
 }
 
 // What the finished proof does and does not say. An open-mode envelope has no

@@ -77,6 +77,45 @@ const OUTAGE_CODES = new Set([
   'ENOTFOUND', 'ETIMEDOUT', 'EAI_AGAIN',
 ]);
 
+// The store answers, and refuses. Redis replies to a command with an error
+// whose message starts with one of these words; node-redis raises that as a
+// plain Error, so neither the constructor set nor the socket codes above see
+// it. Every one of them means the same thing to a caller as an unreachable
+// store: the request failed for a reason that is not the caller's fault and
+// that a retry may fix. They are NOT command mistakes -- WRONGTYPE, a bad Lua
+// script and a wrong arity stay 500, because those are bugs in this code.
+//
+// Found on 07-09-2026: /api/captcha/challenge answered 500 internal_error in
+// production while signup and password reset were dead. The route's own catch
+// could not have produced that body, and the 503 branch in the error handler
+// did not fire, because the store was not unreachable -- it was refusing
+// writes. A safeguard that exists and cannot fire for the failure that is
+// actually happening.
+const REFUSAL_PREFIXES = [
+  'READONLY',   // write sent to a read-only replica
+  'MISCONF',    // RDB snapshot failing, so writes are refused (usually a full disk)
+  'OOM',        // maxmemory reached
+  'NOPERM',     // the ACL user may read but not write
+  'NOAUTH',     // the connection never authenticated
+  'WRONGPASS',  // it tried and the password is wrong
+  'LOADING',    // still reading the dataset from disk
+  'BUSY',       // a script is blocking the server
+  'CLUSTERDOWN',
+  'TRYAGAIN',
+  'MASTERDOWN',
+];
+
+// The refusal word Redis put at the front of its reply, or null. Kept separate
+// from the boolean so a caller can log WHICH refusal it was; without that the
+// operator sees "redis_unavailable" and still has to guess between a full disk
+// and a wrong ACL.
+function redisRefusal(err) {
+  const msg = err && typeof err.message === 'string' ? err.message : '';
+  if (!msg) return null;
+  const first = msg.split(/[\s:]/, 1)[0].toUpperCase();
+  return REFUSAL_PREFIXES.includes(first) ? first : null;
+}
+
 // One failure type for "the store could not answer", whatever the reason. A
 // route that catches this knows the request failed for a reason that is not the
 // caller's fault, which is exactly the 503 case.
@@ -94,16 +133,18 @@ class RedisUnavailableError extends Error {
   }
 }
 
-// Is this error the store being unreachable, rather than the command being
-// wrong? A WRONGTYPE or a bad Lua script is a 500 and must not be laundered
-// into a 503, so the match is on connection failures only.
+// Is this error the store failing us, rather than the command being wrong? A
+// WRONGTYPE or a bad Lua script is a 500 and must not be laundered into a 503,
+// so the match stays on connection failures plus the refusals above -- never on
+// a command this code got wrong.
 function isRedisOutage(err) {
   if (!err || typeof err !== 'object') return false;
   if (err.isRedisOutage === true) return true;
   if (err.code && OUTAGE_CODES.has(err.code)) return true;
   const ctor = err.constructor && err.constructor.name;
   if (ctor && OUTAGE_CONSTRUCTORS.has(ctor)) return true;
-  return OUTAGE_CONSTRUCTORS.has(err.name);
+  if (OUTAGE_CONSTRUCTORS.has(err.name)) return true;
+  return redisRefusal(err) !== null;
 }
 
 // The configured bound, in milliseconds. One name for the whole estate:
@@ -287,6 +328,8 @@ module.exports = {
   DEFAULT_DEADLINE_MS,
   RESET_AFTER_BREACHES,
   RedisUnavailableError,
+  REFUSAL_PREFIXES,
+  redisRefusal,
   isRedisOutage,
   redisDeadlineMs,
   withRedisDeadline,

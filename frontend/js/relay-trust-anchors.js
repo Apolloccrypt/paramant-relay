@@ -38,6 +38,7 @@ export const PUBKEY_URL = 'https://relay.paramant.app/v2/pubkey';
 export const RELAY_TRUST_ANCHORS = [
   {
     name: 'the Paramant relay',
+    name_nl: 'de Paramant-relay',
     host: 'relay.paramant.app',
     sector: 'relay',
     alg: 'ML-DSA-65',
@@ -46,6 +47,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant health relay',
+    name_nl: 'de zorgrelay van Paramant',
     host: 'health.paramant.app',
     sector: 'health',
     alg: 'ML-DSA-65',
@@ -54,6 +56,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant legal relay',
+    name_nl: 'de juridische relay van Paramant',
     host: 'legal.paramant.app',
     sector: 'legal',
     alg: 'ML-DSA-65',
@@ -62,6 +65,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant finance relay',
+    name_nl: 'de financiële relay van Paramant',
     host: 'finance.paramant.app',
     sector: 'finance',
     alg: 'ML-DSA-65',
@@ -70,6 +74,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant IoT relay',
+    name_nl: 'de IoT-relay van Paramant',
     host: 'iot.paramant.app',
     sector: 'iot',
     alg: 'ML-DSA-65',
@@ -78,12 +83,27 @@ export const RELAY_TRUST_ANCHORS = [
   },
 ];
 
+// RETIRED RELAY KEYS. A ParaSign receipt (.psign, type parasign-envelope-
+// receipt) is counter-signed once, at completion, by whichever relay held the
+// envelope, and it stays evidence for years. When a relay rotates its identity
+// key, move the old entry here instead of deleting it: the receipts it signed
+// before the rotation must keep verifying, and /verify must keep refusing keys
+// that were never ours. Same shape as above, plus retired_at (ISO date). Empty
+// today: no relay has rotated since the pins were taken on 2026-09-05.
+export const RETIRED_RELAY_ANCHORS = [];
+
 export function defaultAnchor() {
   return RELAY_TRUST_ANCHORS[0] || null;
 }
 
+// Current pins first, then retired ones. A retired key still proves that a
+// receipt came from Paramant; it only stops being used for new signatures.
 export function anchorByFingerprint(fingerprint) {
-  return RELAY_TRUST_ANCHORS.find((a) => a.fingerprint === fingerprint) || null;
+  const fp = String(fingerprint || '').toLowerCase();
+  if (!fp) return null;
+  return RELAY_TRUST_ANCHORS.find((a) => a.fingerprint === fp)
+    || RETIRED_RELAY_ANCHORS.find((a) => a.fingerprint === fp)
+    || null;
 }
 
 // A receipt names its issuer in `relay_id`, which relay.js writes as either a

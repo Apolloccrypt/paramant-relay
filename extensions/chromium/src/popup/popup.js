@@ -13,7 +13,6 @@ const elLoading  = document.getElementById('state-loading');
 const elLogin    = document.getElementById('state-login');
 const elLoggedIn = document.getElementById('state-logged-in');
 
-const bannerRollingOut = document.getElementById('banner-rolling-out');
 const formApikey       = document.getElementById('form-apikey');
 const formTotp         = document.getElementById('form-totp');
 const showTotpLink     = document.getElementById('show-totp');
@@ -37,7 +36,6 @@ async function init() {
   const caps = await chrome.runtime.sendMessage({ type: 'GET_CAPABILITIES' });
   const totpOn = !!caps?.user_totp;
   showTotpLink.classList.toggle('hidden', !totpOn);
-  bannerRollingOut.classList.toggle('hidden', totpOn);
   showState('login');
 }
 

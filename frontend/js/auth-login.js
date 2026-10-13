@@ -1,13 +1,61 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 (function() {
   const form = document.getElementById('login-form');
   const errorDiv = document.getElementById('error');
   const submitBtn = document.getElementById('submit-btn');
 
   const params = new URLSearchParams(window.location.search);
+  // The first sign-in after making an account (test with a stranger,
+  // 13-10-2026). /signup?next= keeps the way back in this browser
+  // (js/signup-next.js); a sign-in without a ?next= of its own takes it, once,
+  // and puts it in the address so passkey.js reads the same thing.
+  const NEXT_KEY = 'paramant:signup-next';
+  if (!params.get('next') && !params.get('return')) {
+    let rec = null;
+    try { rec = JSON.parse(localStorage.getItem(NEXT_KEY) || 'null'); localStorage.removeItem(NEXT_KEY); } catch (e) { rec = null; }
+    const now = Date.now();
+    if (rec && typeof rec.path === 'string' && /^\/(?![\/\\])[^\s\\]*$/.test(rec.path) && rec.path.length <= 512
+        && Number(rec.exp) > now && Number(rec.exp) <= now + 864e5) {
+      params.set('next', rec.path);
+      try { history.replaceState(history.state, '', location.pathname + '?' + params.toString() + location.hash); } catch (e) { /* the default route then */ }
+    }
+  }
   // Honour both the nginx gate's ?next= and legacy ?return= links. Local paths
   // only (leading single slash, no // or /\) so it can't become an open redirect.
-  const _rv = params.get('next') || params.get('return') || '/dashboard';
-  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
+  // No whitespace, control character or backslash anywhere either: the URL
+  // parser drops a tab or newline, so ?next=/%09/evil.example became
+  // //evil.example after the sign-in (review PR 586, 13-10-2026).
+  const _rv = params.get('next') || params.get('return') || nlEn('/dashboard', '/en/dashboard');
+  const returnUrl = /^\/(?![\/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
+  const hasNext = returnUrl === _rv && !!(params.get('next') || params.get('return'));
+
+  // No account yet: "Account maken" on this page keeps the way back
+  // (login.html linked a bare /signup, so a visitor sent here from /pricing or
+  // /sign lost his place the moment he chose to make an account).
+  if (hasNext) {
+    const signup = nlEn('/signup', '/en/signup') + '?next=' + encodeURIComponent(returnUrl);
+    const keepWayBack = function () {
+      document.querySelectorAll('a[href="/signup"], a[href="/en/signup"], a[href^="/signup?next="], a[href^="/en/signup?next="]').forEach(function (a) {
+        if (a.getAttribute('href') !== signup) a.setAttribute('href', signup);
+      });
+    };
+    keepWayBack();
+    // nav-auth.js draws the bar again once it knows the session; its
+    // "Account maken" keeps the way back too.
+    const bar = document.getElementById('nav-auth');
+    if (bar && window.MutationObserver) new MutationObserver(keepWayBack).observe(bar, { childList: true, subtree: true });
+  }
+
+  // Sent here by the nginx gate in front of the send page (the landing's "Probeer
+  // het zelf" under Versturen does exactly that when nobody is signed in). A bare
+  // "Welkom terug" told a first-time visitor nothing; this says why he is here and
+  // offers the free account. Prod check 06-10-2026, kanttekening 2.
+  if (/^\/(en\/)?(parashare|send)(\?|$)/.test(returnUrl)) {
+    const ctx = document.getElementById('login-context');
+    if (ctx) ctx.hidden = false;
+  }
 
   // Non-blocking, dismissible note shown after a successful login when the account's
   // authenticator app produced a SHA-1 code (accepted via dual-verify). Login already
@@ -16,14 +64,30 @@
   function showSha1Notice(dest) {
     const notice = document.getElementById('sha1-notice');
     if (!notice) { window.location = dest; return; }
+    // The session is there now: the bar should say so, not "Account maken".
+    try { window.dispatchEvent(new Event('paramant:session-changed')); } catch (e) { /* old browser */ }
     if (form) form.hidden = true;
     if (errorDiv) errorDiv.classList.remove('visible');
     notice.hidden = false;
     const cont = document.getElementById('sha1-continue');
+    // Where the button goes, in words: back to the document the customer came
+    // from, not "to your account" (retest T5-5).
+    const toDoc = /^\/(en\/)?(co-sign|sign)\b/.test(dest);
     if (cont) {
       cont.setAttribute('href', dest);
+      cont.textContent = toDoc ? nlEn('Verder naar het document', 'Continue to the document') : nlEn('Verder naar uw account', 'Continue to your account');
       cont.addEventListener('click', function(ev) { ev.preventDefault(); window.location = dest; });
     }
+    // And on its own after a few seconds: the tip must never be a stop.
+    const auto = document.getElementById('sha1-auto');
+    let left = 8;
+    const say = function () { if (auto) auto.textContent = nlEn('U gaat over ' + left + ' seconden vanzelf verder.', 'Continuing on its own in ' + left + ' seconds.'); };
+    say();
+    const timer = setInterval(function () {
+      left -= 1;
+      if (left <= 0) { clearInterval(timer); window.location = dest; return; }
+      say();
+    }, 1000);
   }
 
   // One sign-in POST. `proof`, when present, is a solved proof-of-work; the
@@ -43,7 +107,7 @@
     e.preventDefault();
     errorDiv.classList.remove('visible');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Signing in...';
+    submitBtn.textContent = nlEn('Bezig met inloggen...', 'Signing in...');
 
     const email = document.getElementById('email').value.trim();
     const totp = document.getElementById('totp').value.trim();
@@ -56,7 +120,7 @@
       // pay it here and post again. Nobody is locked out by it; the only cost
       // is the second or two the challenge takes.
       if (res.status === 428) {
-        submitBtn.textContent = 'Verifying...';
+        submitBtn.textContent = nlEn('Bezig met controleren...', 'Verifying...');
         let proof = null;
         try { proof = await ParamantCaptcha.getCaptchaProof(); } catch (_) { proof = null; }
         if (proof) res = await postLogin(email, totp, proof);
@@ -67,36 +131,41 @@
         // soft, dismissible note before continuing; otherwise redirect as before.
         let body = null;
         try { body = await res.json(); } catch (_) { /* non-JSON, ignore */ }
-        if (body && body.totp_algorithm === 'sha1') { showSha1Notice(returnUrl); return; }
+        // The tip about an older authenticator app at most once per browser:
+        // Google Authenticator works this way and that is normal, so it is
+        // not something to read at every sign-in (acceptance test 2026-10-04).
+        let seen = false;
+        try { seen = localStorage.getItem('paramant.sha1tip.v1') === '1'; localStorage.setItem('paramant.sha1tip.v1', '1'); } catch (_) { seen = false; }
+        if (body && body.totp_algorithm === 'sha1' && !seen) { showSha1Notice(returnUrl); return; }
         window.location = returnUrl;
       } else if (res.status === 401) {
-        errorDiv.textContent = 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.';
+        errorDiv.textContent = nlEn('Dit e-mailadres en deze code horen niet bij elkaar. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.');
         errorDiv.classList.add('visible');
         document.getElementById('totp').value = '';
         document.getElementById('totp').focus();
       } else if (res.status === 403) {
-        errorDiv.innerHTML = 'This account has no authenticator app linked to it yet. <a href="/auth/request-reset">Email me a setup link</a>, or <a href="/signup">create an account</a>.';
+        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. Heeft u een back-upcode? <a href="/auth/request-reset">Koppel dan een nieuwe app</a>. Geen back-upcode? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf uw accountadres.', 'This account has no authenticator app linked to it yet. Have a backup code? <a href="/en/auth/request-reset">Link a new app</a>. No backup code? Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.');
         errorDiv.classList.add('visible');
       } else if (res.status === 428) {
-        errorDiv.textContent = 'We could not run the extra verification this sign-in needs. Refresh the page and try again.';
+        errorDiv.textContent = nlEn('De extra controle voor deze inlogpoging lukte niet. Vernieuw de pagina en probeer het opnieuw.', 'We could not run the extra verification this sign-in needs. Refresh the page and try again.');
         errorDiv.classList.add('visible');
       } else if (res.status === 429) {
-        errorDiv.textContent = 'Too many sign-in attempts from this internet connection. Sign-in from here is paused for up to 15 minutes. The limit counts the connection, not your account, so someone else on your network can set it off, and nobody can trigger it by guessing at your email address.';
+        errorDiv.textContent = nlEn('Te veel inlogpogingen vanaf deze internetverbinding. Inloggen vanaf hier is maximaal 15 minuten geblokkeerd. De grens telt de verbinding, niet uw account. Iemand anders op uw netwerk kan hem dus ook bereiken. Maar niemand kan hem veroorzaken door uw e-mailadres te raden.', 'Too many sign-in attempts from this internet connection. Sign-in from here is paused for up to 15 minutes. The limit counts the connection, not your account. So someone else on your network can set it off too. But nobody can trigger it by guessing at your email address.');
         errorDiv.classList.add('visible');
       } else if (res.status === 503) {
-        errorDiv.textContent = 'Sign-in is temporarily unavailable. Nothing is wrong with your account or your code. Try again in a few minutes.';
+        errorDiv.textContent = nlEn('Inloggen kan even niet. Er is niets mis met uw account of uw code. Probeer het over een paar minuten opnieuw.', 'Sign-in is temporarily unavailable. Nothing is wrong with your account or your code. Try again in a few minutes.');
         errorDiv.classList.add('visible');
       } else {
-        errorDiv.textContent = 'Sign-in did not go through. Nothing changed on your account. Try again in a moment.';
+        errorDiv.textContent = nlEn('Inloggen lukte niet. Er is niets aan uw account veranderd. Probeer het zo opnieuw.', 'Sign-in did not go through. Nothing changed on your account. Try again in a moment.');
         errorDiv.classList.add('visible');
       }
     } catch (err) {
-      errorDiv.textContent = 'We could not reach Paramant. Check your connection and try again.';
+      errorDiv.textContent = nlEn('Paramant is niet bereikbaar. Controleer uw verbinding en probeer het opnieuw.', 'We could not reach Paramant. Check your connection and try again.');
       errorDiv.classList.add('visible');
     }
 
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Sign in';
+    submitBtn.textContent = nlEn('Inloggen', 'Sign in');
   });
 
   // Progressive disclosure: the 6-digit code field stays hidden until the user

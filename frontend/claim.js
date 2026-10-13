@@ -1,4 +1,7 @@
 'use strict';
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 // Claim page: reads the one-time token from the URL fragment (never sent to the
 // server on load, never logged), and only on an explicit click POSTs it to burn
 // on reveal. Requiring a click prevents mail-scanner prefetch from spending the
@@ -19,13 +22,13 @@
 
   if (!/^[a-f0-9]{64}$/.test(token)) {
     revealBtn.disabled = true;
-    showError('This claim link is missing or malformed. Use the exact link from your email.');
+    showError(nlEn('Deze link is onvolledig of klopt niet. Gebruik precies de link uit uw mail.', 'This claim link is missing or malformed. Use the exact link from your email.'));
     return;
   }
 
   revealBtn.addEventListener('click', function () {
     revealBtn.disabled = true;
-    revealBtn.textContent = 'Revealing…';
+    revealBtn.textContent = nlEn('Bezig met tonen…', 'Revealing…');
     errorEl.hidden = true;
     fetch('/v2/claim/reveal', {
       method: 'POST',
@@ -37,9 +40,9 @@
       if (!res.ok || !res.body || !res.body.key) {
         var code = res.body && res.body.error;
         showError(code === 'claim_not_found_or_used'
-          ? 'This key has already been claimed or the link has expired.'
-          : 'Could not reveal the key. Please try again or contact support via paramant.app.');
-        revealBtn.textContent = 'Reveal my API key';
+          ? nlEn('Deze sleutel is al opgehaald, of de link is verlopen.', 'This key has already been claimed or the link has expired.')
+          : nlEn('De sleutel kon niet worden getoond. Probeer het opnieuw, of mail hello@paramant.app.', 'Could not reveal the key. Please try again or contact support via paramant.app.'));
+        revealBtn.textContent = nlEn('Mijn API-sleutel tonen', 'Reveal my API key');
         revealBtn.disabled = false;
         return;
       }
@@ -49,8 +52,8 @@
       startEl.hidden = true;
       resultEl.hidden = false;
     }).catch(function () {
-      showError('Network error. Please try again.');
-      revealBtn.textContent = 'Reveal my API key';
+      showError(nlEn('Geen verbinding. Probeer het opnieuw.', 'Network error. Please try again.'));
+      revealBtn.textContent = nlEn('Mijn API-sleutel tonen', 'Reveal my API key');
       revealBtn.disabled = false;
     });
   });
@@ -59,8 +62,8 @@
     var txt = keyOut.textContent || '';
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(txt).then(function () {
-        copyBtn.textContent = 'Copied';
-        setTimeout(function () { copyBtn.textContent = 'Copy key'; }, 1500);
+        copyBtn.textContent = nlEn('Gekopieerd', 'Copied');
+        setTimeout(function () { copyBtn.textContent = nlEn('Sleutel kopiëren', 'Copy key'); }, 1500);
       });
     }
   });

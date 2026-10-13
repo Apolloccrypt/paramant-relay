@@ -55,7 +55,33 @@ const BUNDLES = Object.freeze({
       Object.freeze({ product: 'parasend', tier: 'pro' }),
     ]),
   }),
+  // Business is more than Firm (besluit 05-10-2026). It is sold under its old
+  // key, product 'parasign' plan 'business', because that is what every button,
+  // payment link and Mollie metadata already carries. Until 05-10 it granted
+  // ParaSign alone: a Business customer kept ParaSend Community (one recipient,
+  // one hour, 50 a month), /parashare then told him "with Firm you send to 30",
+  // and buying Firm was refused because Business was running (betaaltest 05-10,
+  // row 1). Now it also carries the ParaSend half of Firm. That half is
+  // `included`: it is not what the price is for, so it never moves the anchor
+  // of the term (lib/billing.processPayment), it rides on it.
+  business: Object.freeze({
+    plan: 'business',
+    sold_as: 'parasign',
+    label: 'Business',
+    grants: Object.freeze([
+      Object.freeze({ product: 'parasign', tier: 'business' }),
+      Object.freeze({ product: 'parasend', tier: 'pro', included: true }),
+    ]),
+  }),
 });
+
+// The bundle a sold (product, plan) is, or null. Firm is sold under its own
+// key; Business under the ParaSign key it has always had.
+function bundleKeyOf(product, plan) {
+  if (product === 'firm' && plan === 'firm') return 'firm';
+  if (product === 'parasign' && plan === 'business') return 'business';
+  return null;
+}
 
 // The name a customer sees for what he bought: on the Mollie statement, on the
 // invoice line and in his billing history. One function, so those three can
@@ -84,8 +110,57 @@ function orderLabel(order) {
   return planLabel(order.product, order.tier || order.plan);
 }
 
-// What /pricing actually sells today. The two `pro` rows are NOT here and are
-// still in CATALOG on purpose: an existing ParaSign Pro or ParaSend Pro customer
+// The Dutch name for what was bought, on the Mollie statement and the invoice
+// of a buyer who bought in Dutch: "Firm (versturen en ondertekenen)". The
+// English orderLabel above stays the name of the record (acceptatie 3.1.1,
+// betalen punt 5; taal #4: no "ParaSign Pro and ParaSend Pro" for a Dutch
+// buyer). A single-product term names the product by what it does.
+const PRODUCT_LABEL_NL = Object.freeze({ parasend: 'versturen', parasign: 'ondertekenen' });
+const TIER_LABEL_NL = Object.freeze({ pro: 'Firm', business: 'Business', enterprise: 'Enterprise' });
+function orderLabelNl(order) {
+  if (!order) return '';
+  const bundle = BUNDLES[order.bundle || order.product];
+  if (bundle) {
+    const what = [...new Set(bundle.grants.map((g) => PRODUCT_LABEL_NL[g.product]))];
+    const list = what.length > 1 ? 'versturen en ondertekenen' : what[0];
+    return `${bundle.label} (${list})`;
+  }
+  const tier = order.tier || order.plan;
+  return `${TIER_LABEL_NL[tier] || tier} voor ${PRODUCT_LABEL_NL[order.product] || order.product}`;
+}
+
+// The English name on the Mollie statement of a buyer who bought in English:
+// the bundle and what it is for, "Firm (sending and signing)", the words the
+// site uses.
+const PRODUCT_LABEL_MAIL = Object.freeze({ parasend: 'sending', parasign: 'signing' });
+function orderLabelEn(order) {
+  if (!order) return '';
+  const bundle = BUNDLES[order.bundle || order.product];
+  if (bundle) {
+    const what = [...new Set(bundle.grants.map((g) => PRODUCT_LABEL_MAIL[g.product]))];
+    return `${bundle.label} (${what.length > 1 ? 'sending and signing' : what[0]})`;
+  }
+  const tier = order.tier || order.plan;
+  return `${TIER_LABEL_NL[tier] || tier} for ${PRODUCT_LABEL_MAIL[order.product] || order.product}`;
+}
+
+// What a bundle supplies, by product: "ParaSign Pro and ParaSend Pro". Empty
+// for a single plan, whose name already is the supply. The English invoice of
+// a buyer who bought in English names the plan the way Mollie and the site do
+// ("Firm (sending and signing)") and carries this as the description of the
+// supply (Wet OB art. 35a) on the line below (acceptatie 3.1.1 ronde 2, P5).
+function orderSupply(order) {
+  if (!order) return '';
+  const bundle = BUNDLES[order.bundle || order.product];
+  if (!bundle) return '';
+  const parts = bundle.grants.map((g) => planLabel(g.product, g.tier));
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : (parts[0] || '');
+}
+
+// What the site sells today (the buttons on /pricing and /en/pricing, pinned
+// to this list by relay/test/pricing-page.test.js), and therefore the only
+// thing the checkout sells (resolveSale). The two `pro` rows are NOT here and
+// are still in CATALOG on purpose: an existing ParaSign Pro or ParaSend Pro customer
 // keeps his entitlement and his paid_until, an outstanding renewal link still
 // resolves, and a Mollie subscription created before Firm carries
 // {product:'parasign', plan:'pro'} in its metadata and must still grant when it
@@ -100,8 +175,22 @@ function isOnSale(product, plan) {
   return ON_SALE.some((o) => o.product === product && o.plan === plan);
 }
 
+// What the CHECKOUT may sell: a resolvable order that is also on sale. Until
+// 2026-09-25 the checkout asked resolveOrder alone, so anyone calling the API,
+// or editing a button attribute in the browser, could still buy ParaSign Pro
+// or ParaSend Pro on its own: plans no page sells, that the docs say are no
+// longer sold, and that every screen then called Firm while the other product
+// stayed free (betaaltest 25-09, R8). The webhook keeps asking resolveOrder:
+// money that has already moved for a legacy plan must still grant.
+function resolveSale(req) {
+  const order = resolveOrder(req);
+  if (order.error) return order;
+  if (!isOnSale(order.product, order.plan)) return { error: 'not_on_sale' };
+  return order;
+}
+
 function isBundle(product) {
-  return Object.prototype.hasOwnProperty.call(BUNDLES, product);
+  return product === 'firm';
 }
 
 // The entitlement tier a (product, plan) grants. Here the sold plan name equals
@@ -117,8 +206,9 @@ function grantedTier(product, plan) {
 // One entry for a product plan, two for the Firm bundle. null when the plan is
 // not sold.
 function grantsOf(product, plan) {
-  const bundle = BUNDLES[product];
-  if (bundle) return bundle.plan === plan ? bundle.grants : null;
+  const key = bundleKeyOf(product, plan);
+  if (key) return BUNDLES[key].grants;
+  if (BUNDLES[product]) return null;
   const tier = grantedTier(product, plan);
   return tier ? Object.freeze([Object.freeze({ product, tier })]) : null;
 }
@@ -148,16 +238,18 @@ function resolveOrder({ product, plan, interval } = {}) {
   if (!amount || !grants) return { error: 'unknown_plan' };
   return {
     amount, currency: 'EUR', tier: grants[0].tier, grants,
-    bundle: isBundle(product) ? product : null,
+    bundle: bundleKeyOf(product, plan),
     product, plan, interval,
   };
 }
 
 // Amount equality by integer cents, so '18.15' == '18.150' and formatting noise
 // never lets a mismatched amount through. NaN (unparseable) is never equal.
+// Digits past the cents are accepted only when they are zeros: '35.091' is not
+// 35.09, and reading it as such would grant a plan for an amount nobody set.
 function amountsEqual(a, b) {
   const cents = (s) => {
-    const m = /^(\d+)\.(\d{2})\d*$/.exec(String(s).trim());
+    const m = /^(\d+)\.(\d{2})0*$/.exec(String(s).trim());
     return m ? (parseInt(m[1], 10) * 100 + parseInt(m[2], 10)) : NaN;
   };
   const ca = cents(a), cb = cents(b);
@@ -165,7 +257,7 @@ function amountsEqual(a, b) {
 }
 
 module.exports = {
-  CATALOG, PRODUCTS, SELLABLE, INTERVALS, BUNDLES, ON_SALE, isOnSale,
-  PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel,
-  isBundle, grantedTier, grantsOf, floorTier, priceOf, resolveOrder, amountsEqual,
+  CATALOG, PRODUCTS, SELLABLE, INTERVALS, BUNDLES, ON_SALE, isOnSale, resolveSale,
+  PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel, orderLabelNl, orderLabelEn, orderSupply,
+  isBundle, bundleKeyOf, grantedTier, grantsOf, floorTier, priceOf, resolveOrder, amountsEqual,
 };

@@ -66,7 +66,8 @@ function payment(id, value = '603.79', extra = {}) {
   return Object.assign({
     id, status: 'paid', method: 'ideal',
     amount: { value, currency: 'EUR' },
-    metadata: { accountId: 'acct_demo', product: 'parasign', plan: 'pro', interval: 'yearly' },
+    // An English buyer: the document assertions below read the English words.
+    metadata: { accountId: 'acct_demo', product: 'parasign', plan: 'pro', interval: 'yearly', lang: 'en' },
   }, extra);
 }
 

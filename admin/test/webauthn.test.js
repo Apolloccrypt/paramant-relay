@@ -36,9 +36,9 @@ async function main() {
   ok('counterIsAcceptable exact rule');
 
   // limits are concrete (enforced on options AND verify)
-  assert.strictEqual(wa.LIMITS.loginVerify.ip, 10, 'verify per-IP limit');
+  assert.strictEqual(wa.LIMITS.loginVerify.ip, 60, 'verify per-IP limit (an office behind one NAT address)');
   assert.strictEqual(wa.LIMITS.loginVerify.account, 5, 'verify per-account limit');
-  assert.strictEqual(wa.LIMITS.loginOptions.ip, 30, 'options per-IP limit');
+  assert.strictEqual(wa.LIMITS.loginOptions.ip, 120, 'options per-IP limit (an office behind one NAT address)');
   assert.strictEqual(wa.LIMITS.loginOptions.account, 15, 'options per-account limit');
   ok('rate limits are concrete values');
 

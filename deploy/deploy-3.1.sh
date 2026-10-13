@@ -15,10 +15,41 @@
 #                                              that is already deployed
 #   bash deploy/deploy-3.1.sh --dry-run        print every remote and gated
 #                                              command instead of running it
+#   bash deploy/deploy-3.1.sh --seller-vat     also write BILLING_SELLER_VAT
+#                                              in step 1e: from this deploy on
+#                                              VAT invoices and reverse charge
+#   bash deploy/deploy-3.1.sh --host-strict    make step 6l (auditd, AIDE,
+#                                              AppArmor) a STOP instead of a
+#                                              warning; combines with a full run
+#                                              and --verify-only
+#   bash deploy/deploy-3.1.sh --nginx-sync     phase 5e only: put the whole repo
+#                                              site conf on the server (backup,
+#                                              nginx -t, reload, checks, and
+#                                              back to the old conf on any fault)
+#   bash deploy/deploy-3.1.sh --dry-run --nginx-sync
+#                                              show the diff 5e would write,
+#                                              write nothing (set
+#                                              PARAMANT_NGINX_LIVE_COPY to a copy
+#                                              of the server conf to diff against)
 #
 # Flags combine with --dry-run: --dry-run --preflight-only, --dry-run
-# --rollback <TS>, --dry-run --verify-only. The three run modes are mutually
-# exclusive.
+# --rollback <TS>, --dry-run --verify-only, --dry-run --nginx-sync. The four run
+# modes are mutually exclusive. --seller-vat combines with a full run, --preflight-only and
+# --verify-only, never with --rollback.
+#
+# --seller-vat is a decision, not a default. Without it step 1e writes the
+# seller's name, address and KvK number and leaves the btw-id alone, so every
+# document stays a payment receipt and nothing is reverse charged. With it 1e
+# also writes the btw-id, and from the recreate in phase 4 on every new
+# document is a VAT invoice and a business in another EU country can pay
+# without VAT (#517). Tell the bookkeeper before, not after.
+#
+# Step 6l measures the host promises on /dpa (auditd, AIDE, AppArmor). Until the
+# host state has been measured once and found right, a miss there is a WARN, not
+# a STOP: 6l runs after the containers and the frontend are live, and a stop
+# there skipped phase 7 and its deployed-head marker, so the next run stopped in
+# phase 1a over a host fact the deploy did not change (review-574 N1). The miss
+# is printed in the log and again in the summary. --host-strict makes it a STOP.
 #
 # --verify-only exists for a deploy that did its work and then died in the
 # checks. It gates on the server already being deployed (checkout on
@@ -34,8 +65,11 @@
 #
 # Secrets: this script never prints a key value. Environment variables are
 # reported as "empty" or "set, prefix <first 5 chars>", which is the shape the
-# runbook's own step 1 uses. No remote block runs under set -x, and no read of
-# .env is ever written to stdout.
+# runbook's own step 1 uses. The four seller variables are not even given a
+# prefix: they are reported as empty, match or differs against the public
+# details. No remote block runs under set -x, and no read of .env is ever
+# written to stdout. --dry-run is the exception by design: it prints the remote
+# blocks themselves, and the 1e block holds the four public seller details.
 #
 # Everything the script prints also lands in deploy/logs/deploy-3.1-<TS>.log.
 
@@ -58,6 +92,35 @@ NGINX_SITES=/etc/nginx/sites-enabled
 # nginx -T that the file it wrote is really loaded, and puts the previous file
 # back when it is not.
 LIMIT_REQ_DEST="${PARAMANT_LIMIT_REQ_DEST:-/etc/nginx/conf.d/paramant-limit-req.conf}"
+
+# Phase 5e: the whole site conf, not seven edits.
+#
+# 5c edits the live confs by anchor and never copied deploy/nginx-paramant-live.conf
+# over them, so every change to that file that 5c did not name stayed in git.
+# The prodtest of 2026-10-05 measured what that cost: the server conf differed
+# from the repo by about 600 lines, /api/user/ still sat on relay_auth (one
+# /account load gave 429) and /parashare?t= lost its token on the way to the
+# login page. 5e renders the repo conf (deploy/nginx-render.sh) and places it
+# whole on the live slot, together with the security-headers snippet it
+# includes. The public conf (slot 1) is not touched by 5e.
+#
+# The slot uses the same candidate syntax as NGINX_CONF_SLOTS.
+NGINX_LIVE_SLOT="${PARAMANT_NGINX_LIVE_SLOT:-paramant-live.conf|paramant.conf}"
+NGINX_SNIPPET_DIR="${PARAMANT_NGINX_SNIPPET_DIR:-/etc/nginx/snippets}"
+# The commit the conf is rendered from. Empty: the commit phase 3 left the
+# server checkout on, or DEPLOY_REF when 5e runs on its own (--nginx-sync).
+NGINX_REF="${PARAMANT_NGINX_REF:-}"
+# A local copy of the server conf, for --dry-run: the diff is shown against it.
+# Without one a dry run cannot know what is on the server (it never connects);
+# scripts/check-prod-drift.sh is the read-only way to get the live diff.
+NGINX_LIVE_COPY="${PARAMANT_NGINX_LIVE_COPY:-}"
+# 5e stops when another enabled conf (paramant-public.conf) proxies to
+# 127.0.0.1:808[1-6]: the limits of those blocks would then meet real uploads.
+# 1 lets it go ahead after someone compared them (review PR #569, B3).
+NGINX_PUBLIC_808X_OK="${PARAMANT_NGINX_PUBLIC_808X_OK:-0}"
+case "$NGINX_PUBLIC_808X_OK" in 0|1) ;; *) echo "PARAMANT_NGINX_PUBLIC_808X_OK must be 0 or 1" >&2; exit 2 ;; esac
+# Where 5e checks the result from outside, through Caddy, as a visitor would.
+PUBLIC_SITE="${PARAMANT_PUBLIC_SITE:-https://paramant.app}"
 
 # The two server confs the runbook names. Phase 5 edits these and nothing else:
 # a wildcard loop over sites-enabled would silently rewrite a conf nobody
@@ -118,7 +181,7 @@ EXPECTED_HEAD="${PARAMANT_EXPECTED_HEAD:-}"           # explicit override, wins
 # replaces, here the mainline-ancestor test in phase Va.
 VERIFY_HEAD="${PARAMANT_VERIFY_HEAD:-}"
 DEPLOYED_HEAD_FILE="${PARAMANT_DEPLOYED_HEAD_FILE:-$BACKUP_DIR/deployed-head}"
-EXPECT_VERSION="3.1.0"
+EXPECT_VERSION="3.1.3"
 SERVICES="relay-main relay-health relay-finance relay-legal relay-iot admin"
 HOSTS="paramant.app health.paramant.app legal.paramant.app finance.paramant.app iot.paramant.app relay.paramant.app"
 
@@ -178,6 +241,13 @@ REQUIRED_WORKFLOWS="${PARAMANT_REQUIRED_WORKFLOWS:-test.yml csp-inline-check.yml
 # them instead, then judge what they became.
 CI_WAIT_SECONDS="${PARAMANT_CI_WAIT_SECONDS:-900}"   # 15 minutes
 
+# Step 6l. /dpa promises three things about the host, and this is what holds
+# the page to them: auditd active, AIDE installed with a check that ran within
+# this many days (the check is daily, so 2 leaves room for one missed night),
+# AppArmor enabled with at least one profile in enforce mode. The page names
+# this number, and tests/site-claims.test.mjs keeps the two equal.
+HOST_AIDE_MAX_AGE_DAYS="${PARAMANT_AIDE_MAX_AGE_DAYS:-2}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -188,6 +258,11 @@ SSH_SHOWN="ssh -i <prod-key> -o BatchMode=yes -o IdentitiesOnly=yes $PROD_HOST"
 DRY_RUN=0
 PREFLIGHT_ONLY=0
 VERIFY_ONLY=0
+NGINX_SYNC_ONLY=0
+NGINX_PAYLOAD=""
+SELLER_VAT_GO=0
+HOST_STRICT=0
+HOST_UNPROVEN=""
 ROLLBACK_TS=""
 REMOTE_OUT=""
 REMOTE_RC=0
@@ -394,7 +469,82 @@ RESOLVER
 remote_nginx() {
   local body
   body="$(cat)"
-  remote "$@" < <(printf '%s\n%s\n' "$NGINX_RESOLVE_SNIPPET" "$body")
+  remote "$@" < <(printf '%s\n%s%s\n' "$NGINX_RESOLVE_SNIPPET" "${NGINX_PAYLOAD:-}" "$body")
+}
+
+# ------------------------------------------------------- the seller (#517) --
+#
+# One definition of the seller's public details and of how a value is compared,
+# shared by steps 1b, 1e and 6j. remote_seller prepends it to a block, the way
+# remote_nginx prepends resolve_conf_slots, so the server runs exactly this text
+# and tests/deploy-3.1-dryrun.test.sh runs it too.
+#
+# A value is compared on its letters and digits only, in lower case, and the
+# address without a closing country line: "Paramantis Solutions BV" and
+# "Meerkoetmeen 47, 3844XM Harderwijk" match, a different value never does. The
+# output of every function here is empty, match or differs, or a count. Never a
+# value.
+seller_snippet() {
+  cat <<'SELLER'
+SELLER_VARS="BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT"
+# The public details of Paramantis Solutions B.V., as the .env line each
+# variable gets. VIES holds the same name and address for this btw-id (checked
+# 2026-09-25). The address is in double quotes: docker compose turns \n inside
+# double quotes into a line break.
+seller_line() {
+  case "$1" in
+    BILLING_SELLER_NAME)    printf '%s' 'BILLING_SELLER_NAME="Paramantis Solutions B.V."' ;;
+    BILLING_SELLER_ADDRESS) printf '%s' 'BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"' ;;
+    BILLING_SELLER_KVK)     printf '%s' 'BILLING_SELLER_KVK=42115132' ;;
+    BILLING_SELLER_VAT)     printf '%s' 'BILLING_SELLER_VAT=NL869798017B01' ;;
+  esac
+}
+seller_canon() {  # variable, value -> letters and digits, lower case
+  local s
+  s="$(printf '%s' "$2" | sed 's/\\n/ /g' | tr '[:upper:]' '[:lower:]')"
+  if [ "$1" = BILLING_SELLER_ADDRESS ]; then
+    s="$(printf '%s' "$s" | sed -E 's/[[:space:],]*(the[[:space:]]+)?(netherlands|nederland)[[:space:]"]*$//')"
+  fi
+  printf '%s' "$s" | LC_ALL=C tr -cd 'a-z0-9'
+}
+seller_expected() {  # variable -> the canonical form of the public value
+  seller_canon "$1" "$(seller_line "$1" | sed 's/^[A-Z_]*=//')"
+}
+# Lines that hold a value, as docker compose reads .env: an optional "export ",
+# blanks and quotes around the value allowed. X= and X="" hold none.
+seller_isset() {  # variable -> a count
+  grep -cE "^(export[[:space:]]+)?$1=[[:space:]]*[\"']?[[:space:]]*[^\"'[:space:]]" .env || true
+}
+# empty, match or differs, for the LAST line of a variable, which is the one
+# docker compose uses.
+seller_state() {  # variable
+  local canon_env
+  if [ "$(seller_isset "$1")" -eq 0 ]; then echo empty; return 0; fi
+  canon_env="$(seller_canon "$1" "$(sed -nE "s/^(export[[:space:]]+)?$1=//p" .env | tail -1)")"
+  if [ "$canon_env" = "$(seller_expected "$1")" ]; then echo match; else echo differs; fi
+}
+# The same comparison inside a relay, on its own environment and through its
+# own lib/invoice.js: the state of each variable, the kind of document it would
+# issue and the number of lines in the address. The expected forms travel in
+# as SELLER_EXPECT_*, so this snippet is still the only place they come from.
+SELLER_JS='const {env:e}=process;const canon=(k,v)=>{let s=String(v||"").replace(/\\n/g," ").toLowerCase();if(k==="BILLING_SELLER_ADDRESS")s=s.replace(/[\s,]*(the\s+)?(netherlands|nederland)[\s"]*$/,"");return s.replace(/[^a-z0-9]/g,"");};const st=(k)=>{const v=String(e[k]||"").trim();if(!v)return "empty";return canon(k,v)===String(e["SELLER_EXPECT_"+k]||"")?"match":"differs";};let kind="unknown",lines=0;try{const i=require("./lib/invoice");const s=i.sellerFromEnv(e);kind=i.documentKind(s);lines=String(s.address||"").split("\n").filter((l)=>l.trim()).length;}catch(x){kind="unreadable";}console.log("name="+st("BILLING_SELLER_NAME")+" address="+st("BILLING_SELLER_ADDRESS")+" kvk="+st("BILLING_SELLER_KVK")+" vat="+st("BILLING_SELLER_VAT")+" kind="+kind+" address_lines="+lines);'
+seller_probe() {  # service -> one line, from inside that relay
+  docker compose exec -T \
+    -e SELLER_EXPECT_BILLING_SELLER_NAME="$(seller_expected BILLING_SELLER_NAME)" \
+    -e SELLER_EXPECT_BILLING_SELLER_ADDRESS="$(seller_expected BILLING_SELLER_ADDRESS)" \
+    -e SELLER_EXPECT_BILLING_SELLER_KVK="$(seller_expected BILLING_SELLER_KVK)" \
+    -e SELLER_EXPECT_BILLING_SELLER_VAT="$(seller_expected BILLING_SELLER_VAT)" \
+    "$1" node -e "$SELLER_JS" </dev/null 2>/dev/null || echo unreadable
+}
+SELLER
+}
+
+# remote_seller: remote(), with the seller snippet above already defined in the
+# body. Same shape as remote_nginx, and for the same reason not a pipeline.
+remote_seller() {
+  local body
+  body="$(cat)"
+  remote "$@" < <(printf '%s\n%s\n' "$(seller_snippet)" "$body")
 }
 
 # expect: assert against the output of the last remote call. Skipped, loudly,
@@ -505,6 +655,119 @@ expect_min() {
   printf '%s' "$got" | grep -qE '^[0-9]+$' || die "$what -- $field is '$got', not a number"
   [ "$got" -ge "$min" ] || die "$what -- $field is $got, expected at least $min"
   ok "$what ($field = $got)"
+}
+
+# expect_lines: exactly <count> lines of the last remote output match. A
+# positive count, so a line in a shape nobody expected cannot pass by not
+# matching a forbidden pattern.
+expect_lines() {
+  local pattern="$1" want="$2" what="$3" got
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): %s   [%s lines match /%s/]\n' "$what" "$want" "$pattern"
+    return 0
+  fi
+  got="$(printf '%s\n' "$REMOTE_OUT" | grep -cE -- "$pattern" || true)"
+  [ "$got" = "$want" ] || die "$what -- $got line(s) match /$pattern/, expected $want"
+  ok "$what ($got of $want)"
+}
+
+# -------------------------------------------------- the seller, judged --
+#
+# The two judgements of the seller steps, on REMOTE_OUT. Functions of their own
+# so tests/deploy-3.1-dryrun.test.sh can hand them a made-up server answer and
+# see them stop.
+
+# Step 1e. A line that differs from the public details, or a btw-id already in
+# .env without --seller-vat, stops a real run before anything else happens; the
+# block itself wrote nothing in both cases.
+judge_seller_details() {
+  local refused
+  refused="$(printf '%s\n' "$REMOTE_OUT" | sed -n 's/^refuse differs://p' | head -1)"
+  if [ -n "$refused" ]; then
+    if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+      warn "a seller line in .env differs from the public details:${refused}. A full run stops here."
+    else
+      die "a seller line in .env differs from the public details:${refused}. Nothing was written. Correct or remove the line by hand (DEPLOY-3.1.md, 'Invoices: the four seller variables'), then run again."
+    fi
+    return 0
+  fi
+  if printf '%s\n' "$REMOTE_OUT" | grep -q '^refuse vat without --seller-vat'; then
+    if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+      warn "BILLING_SELLER_VAT is already in .env: a full run without --seller-vat stops here"
+    else
+      die "BILLING_SELLER_VAT is already in .env, so this deploy would issue VAT invoices and reverse charge. Run again with --seller-vat to confirm that, or take the line out. Nothing was written."
+    fi
+    return 0
+  fi
+  if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+    if [ "$DRY_RUN" -eq 0 ] && printf '%s\n' "$REMOTE_OUT" | grep -q 'action REPORT ONLY'; then
+      warn "a seller variable is missing; a full run will write it. Preflight wrote nothing."
+    else
+      ok "seller details state reported, nothing written"
+    fi
+    return 0
+  fi
+  local sv
+  for sv in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK; do
+    expect_count "after $sv" match "$sv in .env matches the public details"
+    expect_count "after $sv lines" 1 "$sv is in .env exactly once"
+  done
+  if [ "$SELLER_VAT_GO" -eq 1 ]; then
+    expect_count "after BILLING_SELLER_VAT" match "BILLING_SELLER_VAT in .env matches the public btw-id"
+    expect_count "after BILLING_SELLER_VAT lines" 1 "BILLING_SELLER_VAT is in .env exactly once"
+    warn "--seller-vat: from the recreate in phase 4 on every new document is a VAT invoice, and a business in another EU country with a valid VAT number pays without VAT (reverse charge). Tell the bookkeeper."
+  else
+    expect_count "after BILLING_SELLER_VAT" empty "BILLING_SELLER_VAT stays empty without --seller-vat"
+    expect_count "after BILLING_SELLER_VAT lines" 0 "no BILLING_SELLER_VAT line in .env"
+    note "no --seller-vat: the btw-id stays out of .env, every document stays a payment receipt, nothing is reverse charged"
+  fi
+}
+
+# Step 6j. Five relays, each answering in exactly the expected shape: a positive
+# count, not the absence of a bad word.
+judge_seller_known() {
+  expect_min "compose seller vars declared" 5 "the rendered compose passes BILLING_SELLER_* to the five relays"
+  expect_not '^seller relay-[a-z]+ +unreadable' "every relay answered the seller question"
+  expect_not '^seller relay-[a-z]+ .*=differs' "no relay holds a seller value that differs from the public details"
+  if [ "$SELLER_VAT_GO" -eq 1 ]; then
+    expect_lines '^seller relay-[a-z]+ +name=match address=match kvk=match vat=match kind=invoice address_lines=[2-9]$' 5 \
+      "all five relays know the seller and issue VAT invoices (--seller-vat)"
+  else
+    expect_lines '^seller relay-[a-z]+ +name=match address=match kvk=match vat=empty kind=receipt address_lines=[2-9]$' 5 \
+      "all five relays know the seller, hold no btw-id and issue payment receipts (no --seller-vat)"
+  fi
+}
+
+# Step 6l. One line per promise on /dpa, in the log, before any verdict: a
+# deploy that stops on auditd still says what AIDE and AppArmor answered.
+# Returns the number of promises that did not hold. Phase 6 warns on any, and
+# stops only under --host-strict (review-574 N1).
+judge_host_hardening() {   # max age in days
+  local max="$1" fails=0 v age n
+  v="$(remote_field 'host auditd')"
+  if [ "$v" = active ]; then ok "host: auditd is active"
+  else printf '  FAIL  host: auditd is %s, not active\n' "${v:-not reported}"; fails=$((fails + 1)); fi
+
+  v="$(remote_field 'host aide binary')"
+  age="$(remote_field 'host aide last run age days')"
+  if [ "$v" != yes ]; then
+    printf '  FAIL  host: AIDE is not installed (no aide binary)\n'; fails=$((fails + 1))
+  elif [ "$(remote_field 'host aide db')" != yes ]; then
+    printf '  FAIL  host: AIDE is installed but has no database to check against\n'; fails=$((fails + 1))
+  elif ! printf '%s' "$age" | grep -qE '^[0-9]+$'; then
+    printf '  FAIL  host: AIDE is installed but no check run was found (no log, no timer run)\n'; fails=$((fails + 1))
+  elif [ "$age" -gt "$max" ]; then
+    printf '  FAIL  host: the last AIDE check ran %s days ago, more than %s\n' "$age" "$max"; fails=$((fails + 1))
+  else ok "host: AIDE is installed and its last check ran $age day(s) ago (at most $max)"; fi
+
+  v="$(remote_field 'host apparmor enabled')"
+  n="$(remote_field 'host apparmor enforce profiles')"
+  if [ "$v" != yes ]; then
+    printf '  FAIL  host: AppArmor is not enabled\n'; fails=$((fails + 1))
+  elif ! printf '%s' "$n" | grep -qE '^[0-9]+$' || [ "$n" -lt 1 ]; then
+    printf '  FAIL  host: AppArmor is enabled but no profile is in enforce mode (%s)\n' "${n:-not reported}"; fails=$((fails + 1))
+  else ok "host: AppArmor is enabled with $n profile(s) in enforce mode"; fi
+  return "$fails"
 }
 
 # ------------------------------------------------ the starting commit gate --
@@ -618,7 +881,7 @@ sanity_verdict() {
 # --------------------------------------------------------- argument handling --
 
 usage() {
-  sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -626,7 +889,10 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
     --verify-only)    VERIFY_ONLY=1; shift ;;
+    --nginx-sync)     NGINX_SYNC_ONLY=1; shift ;;
     --dry-run)        DRY_RUN=1; shift ;;
+    --seller-vat)     SELLER_VAT_GO=1; shift ;;
+    --host-strict)    HOST_STRICT=1; shift ;;
     --rollback)       [ $# -ge 2 ] || { echo "--rollback needs a <TS>" >&2; exit 2; }
                       ROLLBACK_TS="$2"; shift 2 ;;
     -h|--help)        usage 0 ;;
@@ -640,6 +906,18 @@ if [ -n "$ROLLBACK_TS" ] && [ "$PREFLIGHT_ONLY" -eq 1 ]; then
 fi
 if [ "$VERIFY_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ]; }; then
   echo "--verify-only is its own run; do not combine it with --rollback or --preflight-only" >&2
+  exit 2
+fi
+if [ "$NGINX_SYNC_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ] || [ "$VERIFY_ONLY" -eq 1 ] || [ "$SELLER_VAT_GO" -eq 1 ]; }; then
+  echo "--nginx-sync is its own run (phase 5e only); combine it with --dry-run and nothing else" >&2
+  exit 2
+fi
+if [ "$HOST_STRICT" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ] || [ "$NGINX_SYNC_ONLY" -eq 1 ]; }; then
+  echo "--host-strict only changes step 6l, which runs in a full deploy and in --verify-only" >&2
+  exit 2
+fi
+if [ -n "$ROLLBACK_TS" ] && [ "$SELLER_VAT_GO" -eq 1 ]; then
+  echo "--seller-vat decides what a deploy writes; a rollback writes nothing new. Leave it out" >&2
   exit 2
 fi
 if [ -n "$ROLLBACK_TS" ] && ! printf '%s' "$ROLLBACK_TS" | grep -qE '^[0-9]{8}-[0-9]{4}$'; then
@@ -662,10 +940,11 @@ MODE="full deploy"
 [ "$PREFLIGHT_ONLY" -eq 1 ] && MODE="preflight only (phases 0 and 1, read-only)"
 [ "$VERIFY_ONLY" -eq 1 ] && MODE="verify only (phases 6 and 7 on an already deployed server)"
 [ -n "$ROLLBACK_TS" ] && MODE="rollback to $ROLLBACK_TS (phase 8)"
+[ "$NGINX_SYNC_ONLY" -eq 1 ] && MODE="nginx sync only (phase 5e: the whole repo site conf on the live slot)"
 [ "$DRY_RUN" -eq 1 ] && MODE="$MODE, DRY RUN (nothing is executed on the server)"
 
 hr
-echo "PARAMANT deploy 3.1.0 - deploy/DEPLOY-3.1.md as one command"
+echo "PARAMANT deploy $EXPECT_VERSION - deploy/DEPLOY-3.1.md as one command"
 hr
 printf '  run started   %s\n' "$(date -Is)"
 printf '  mode          %s\n' "$MODE"
@@ -675,6 +954,7 @@ printf '  compose dir   %s\n' "$COMPOSE_DIR"
 printf '  docroot       %s\n' "$DOCROOT"
 printf '  nginx confs   %s\n' "$NGINX_CONF_SLOTS"
 printf '  limit_req     %s\n' "$LIMIT_REQ_DEST"
+printf '  live conf     %s (phase 5e places the whole repo conf here)\n' "$NGINX_LIVE_SLOT"
 printf '                %s slot(s); the first candidate present on the server wins\n' "$NGINX_SLOT_COUNT"
 printf '  deploy ref    %s\n' "$DEPLOY_REF"
 if [ -n "$EXPECTED_HEAD" ]; then
@@ -769,9 +1049,9 @@ phase_0() {
 phase_1() {
   if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
     phase 1 "Layout and environment (server, read-only)" "Step 1, without the writes"
-    note "--preflight-only: steps 1c and 1d only report. Nothing is written."
+    note "--preflight-only: steps 1c, 1d and 1e only report. Nothing is written."
   else
-    phase 1 "Layout and environment (server, read-only plus two env writes)" "Step 1"
+    phase 1 "Layout and environment (server, read-only plus the env writes of 1c, 1d and 1e)" "Step 1"
   fi
 
   step "1a. checkout, compose project and container health"
@@ -856,6 +1136,8 @@ EOF
   expect_not 'container [a-z-]+ MISSING' "no service is missing a container"
   expect_not 'unhealthy' "no container reports unhealthy"
 
+  check_relay_node_env "1a2"
+
   step "1b. environment presence (never values)"
   remote "env presence" "$COMPOSE_DIR" <<'EOF'
 set -euo pipefail
@@ -875,6 +1157,17 @@ EOF
     "BILLING_MODE is empty in the running relay, so the recurring layer stays off"
   expect 'env MOLLIE_API_KEY +set, prefix live_' \
     "MOLLIE_API_KEY is set with a live_ prefix, unchanged since 08-08"
+
+  # The seller (#517): empty, match or differs against the public details, in
+  # .env and in relay-main. No value and no prefix.
+  remote_seller "seller presence" "$COMPOSE_DIR" <<'EOF'
+set -euo pipefail
+cd "$1"
+for v in $SELLER_VARS; do
+  printf 'seller env %-24s %s\n' "$v" "$(seller_state "$v")"
+done
+printf 'seller relay-main %s\n' "$(seller_probe relay-main)"
+EOF
 
   local envmode="write"
   [ "$PREFLIGHT_ONLY" -eq 1 ] && envmode="report"
@@ -957,6 +1250,68 @@ EOF
       warn "the deprecated inline receipt header was switched on; remove it once paramant-sdk 3.3.0 reaches PyPI (one line in .env plus a recreate)"
     fi
   fi
+
+  local vatmode="nogo"
+  [ "$SELLER_VAT_GO" -eq 1 ] && vatmode="go"
+  step "1e. BILLING_SELLER_* (${envmode}, btw-id: ${vatmode}): the seller on every invoice"
+  note "the public details of Paramantis Solutions B.V., the same ones VIES holds for its"
+  note "btw-id (checked 2026-09-25). A line that already matches is left alone; a line"
+  note "that differs stops the run before anything is written. The btw-id is written"
+  note "only with --seller-vat. Output: the variable and its state, never the value."
+  remote_seller "seller details" "$COMPOSE_DIR" "$envmode" "$vatmode" "$TS" "$BACKUP_DIR" <<'EOF'
+set -euo pipefail
+cd "$1"
+MODE="$2"; VATMODE="$3"; TS="$4"; BK="$5"
+# Look first, decide, then write: a refusal writes nothing at all.
+refuse=""
+for v in $SELLER_VARS; do
+  st="$(seller_state "$v")"
+  echo "before $v = $st"
+  [ "$st" = differs ] && refuse="$refuse $v"
+done
+if [ -n "$refuse" ]; then
+  echo "refuse differs:$refuse"
+  exit 0
+fi
+if [ "$VATMODE" != go ] && [ "$(seller_state BILLING_SELLER_VAT)" = match ]; then
+  echo "refuse vat without --seller-vat: BILLING_SELLER_VAT is already in .env"
+  exit 0
+fi
+todo=""
+for v in $SELLER_VARS; do
+  [ "$v" = BILLING_SELLER_VAT ] && [ "$VATMODE" != go ] && continue
+  [ "$(seller_state "$v")" = empty ] && todo="$todo $v"
+done
+if [ -n "$todo" ] && [ "$MODE" != report ]; then
+  # The .env as it was before 1e, under this run's TS: --rollback <TS> puts
+  # this one back, so a rollback takes the seller lines out again.
+  cp -a .env "$BK/.env-pre-seller-$TS"
+  chmod 600 "$BK/.env-pre-seller-$TS"
+  echo "backup .env-pre-seller-$TS bytes = $(stat -c%s "$BK/.env-pre-seller-$TS")"
+fi
+for v in $todo; do
+  if [ "$MODE" = report ]; then
+    echo "action REPORT ONLY: $v is not set and a full run would write it"
+    continue
+  fi
+  sed -i -E "/^(export[[:space:]]+)?$v=/d" .env
+  # A .env whose last line has no newline would swallow the new line.
+  [ -z "$(tail -c1 .env)" ] || printf '\n' >> .env
+  printf '%s\n' "$(seller_line "$v")" >> .env
+  chmod 600 .env
+  echo "action SET $v"
+done
+if [ "$VATMODE" != go ]; then
+  echo "action none, BILLING_SELLER_VAT left empty: payment receipts, no reverse charge (no --seller-vat)"
+elif [ "$MODE" != report ] && printf '%s\n' "$todo" | grep -q BILLING_SELLER_VAT; then
+  echo "action SET BILLING_SELLER_VAT: from the recreate on, VAT invoices and reverse charge"
+fi
+for v in $SELLER_VARS; do
+  echo "after $v = $(seller_state "$v")"
+  echo "after $v lines = $(seller_isset "$v")"
+done
+EOF
+  judge_seller_details
 }
 
 # =============================================================== PHASE 2 =====
@@ -1057,6 +1412,49 @@ EOF
     "every nginx conf slot resolved to a name on the server and was backed up"
   expect_not 'nginxconf [a-z.-]+ ABSENT' \
     "every nginx conf slot has a candidate on the server (set PARAMANT_NGINX_CONFS if they are named differently)"
+
+  # 2c. The mirror of the other relays' tree heads (#576). From 3.1.2 every
+  # relay moves heads that are not from a pinned key to peer-sths/purged/ at
+  # its first start, in phase 4. It only moves, never deletes, and the nightly
+  # backup-full-state.sh copies all of /data, but above it runs as best effort
+  # and nothing asserts it. This copy is asserted: one tar per relay, taken
+  # from the running container, before phase 4 recreates it.
+  step "2c. back up the peer STH mirror (/data/peer-sths) of every relay"
+  remote "peer sths backup" "$COMPOSE_DIR" "$TS" "$BACKUP_DIR" "$SERVICES" <<'EOF'
+set -euo pipefail
+cd "$1"
+TS="$2"; BK="$3"; SVCS="$4"
+mkdir -p "$BK"
+n=0; relays=0
+for svc in $SVCS; do
+  case "$svc" in relay-*) ;; *) continue ;; esac
+  relays=$((relays + 1))
+  cid="$(docker compose ps -q "$svc" 2>/dev/null || true)"
+  if [ -z "$cid" ]; then echo "peersths $svc MISSING container"; continue; fi
+  dir="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cid" | sed -n 's/^PEER_STH_DIR=//p' | head -1)"
+  dir="${dir:-/data/peer-sths}"
+  out="$BK/peer-sths-$svc-pre-3.1-$TS.tar"
+  if docker cp "$cid:$dir" - > "$out" 2>/dev/null </dev/null; then
+    chmod 600 "$out"
+    echo "peersths $svc $dir $(stat -c%s "$out") bytes, $(tar tf "$out" | grep -c '\.jsonl$' || true) mirror files"
+    n=$((n + 1))
+  else
+    rm -f "$out"
+    # A relay that never mirrored anything has no directory: nothing to lose.
+    if docker exec "$cid" test -e "$dir" </dev/null 2>/dev/null; then
+      echo "peersths $svc FAILED to copy $dir"
+    else
+      echo "peersths $svc $dir absent, nothing to back up"
+      n=$((n + 1))
+    fi
+  fi
+done
+echo "relay services = $relays"
+echo "after peer sths backups = $n"
+EOF
+  expect_not 'peersths [a-z-]+ (FAILED|MISSING)' "every relay's /data/peer-sths was copied (or is absent)"
+  expect_count "after peer sths backups" 5 \
+    "one peer-sths backup per relay (five), before phase 4 lets 3.1.2 move polluted mirrors to purged/"
 }
 
 # =============================================================== PHASE 3 =====
@@ -1158,7 +1556,18 @@ cd "$1"
 echo "before images:"
 docker compose images 2>/dev/null | sed 's/^/  img /' || true
 rc=0
-docker compose build > /tmp/paramant-build.$$ 2>&1 || rc=$?
+# EEN VOOR EEN, EN DAT IS SNELLER DAN TEGELIJK. De vijf relays hebben alle vijf
+# `build: ./relay`, dus het is vijf keer dezelfde build. Parallel starten ze
+# tegelijk, kan geen van hen de laag-cache van de ander gebruiken, en compileert
+# paramant-core vijf keer naast elkaar: vijf Rust-toolchains plus liboqs die
+# tegelijk op de schijf staan. Dat liep twee keer vol op 22 en 23 september,
+# beide keren met 16 GB vrij vooraf, en beide keren was de melding "no space
+# left on device" terwijl de eindresultaten samen geen 2 GB zijn.
+#
+# Serieel bouwt de eerste alles en halen de andere vier het uit de cache. De
+# piek is een vijfde, en de vier die volgen kosten seconden in plaats van vier
+# en een halve minuut elk.
+COMPOSE_PARALLEL_LIMIT=1 docker compose build > /tmp/paramant-build.$$ 2>&1 || rc=$?
 tail -40 /tmp/paramant-build.$$
 rm -f /tmp/paramant-build.$$
 echo "build exit = $rc"
@@ -1304,6 +1713,140 @@ EOF
   expect_not 'NOTHEALTHY|UNHEALTHY|FATAL' "every recreated container reached healthy"
   expect_not 'stance .*"recurring":true' "no relay reports recurring:true after the recreate"
   expect_not 'version .*no relay_started line' "every relay logged relay_started"
+}
+
+# ------------------------------------------------ relay NODE_ENV gate (#576) --
+#
+# A relay only gossips its tree heads to the fleet when it is a pinned Paramant
+# relay AND its NODE_ENV is not test, development or dev (relay/lib/
+# fleet-pins.js, mayTalkToParamantFleet, since 3.1.2). Compose sets no NODE_ENV
+# and relay/Dockerfile neither, so on production it should be empty, but nobody
+# had looked (review-576, uitrolaandachtspunt 1). If it is test or dev there,
+# health stops gossiping the moment 3.1.2 starts. PARAMANT_FLEET_GOSSIP=0 does
+# the same on purpose. Read-only.
+#
+# node_env_verdict: reads "nodeenv <svc> <value>" and "fleetgossip <svc>
+# <value>" lines (value "unset" when absent) on stdin. Prints OK or STOP with
+# the reason; returns 1 on STOP.
+node_env_verdict() {
+  local line svc val bad="" seen=0
+  while IFS= read -r line; do
+    case "$line" in
+      "nodeenv "*)
+        svc="$(printf '%s' "$line" | awk '{print $2}')"; val="$(printf '%s' "$line" | awk '{print $3}')"
+        if [ "$val" = "MISSING" ]; then bad="$bad $svc=no-container"; continue; fi
+        seen=$((seen + 1))
+        if printf '%s' "$val" | grep -qiE '^(test|development|dev)$'; then bad="$bad $svc=NODE_ENV:$val"; fi ;;
+      "fleetgossip "*)
+        svc="$(printf '%s' "$line" | awk '{print $2}')"; val="$(printf '%s' "$line" | awk '{print $3}')"
+        if [ "$val" = "0" ]; then bad="$bad $svc=PARAMANT_FLEET_GOSSIP:0"; fi ;;
+    esac
+  done
+  if [ -n "$bad" ]; then
+    printf 'STOP%s: from 3.1.2 a relay with NODE_ENV test/development/dev (or PARAMANT_FLEET_GOSSIP=0) sends no tree heads to the fleet and does not register with it, so the gossip of health.paramant.app goes silent. Remove NODE_ENV (or set it to production) for these relays, recreate them, and run again\n' "$bad"
+    return 1
+  fi
+  if [ "$seen" -eq 0 ]; then
+    printf 'STOP no relay container reported its NODE_ENV, so it is not known whether the fleet keeps gossiping\n'
+    return 1
+  fi
+  printf 'OK NODE_ENV of %s relay container(s) is empty or production, and none has PARAMANT_FLEET_GOSSIP=0\n' "$seen"
+}
+
+check_relay_node_env() {   # step label
+  step "$1. NODE_ENV of the relay containers (read-only; test or dev silences the gossip from 3.1.2)"
+  remote "relay node env" "$COMPOSE_DIR" "$SERVICES" <<'EOF'
+set -euo pipefail
+cd "$1"
+for svc in $2; do
+  case "$svc" in relay-*) ;; *) continue ;; esac
+  cid="$(docker compose ps -q "$svc" 2>/dev/null || true)"
+  if [ -z "$cid" ]; then echo "nodeenv $svc MISSING"; continue; fi
+  envs="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cid")"
+  v="$(printf '%s\n' "$envs" | sed -n 's/^NODE_ENV=//p' | head -1)"
+  g="$(printf '%s\n' "$envs" | sed -n 's/^PARAMANT_FLEET_GOSSIP=//p' | head -1)"
+  echo "nodeenv $svc ${v:-unset}"
+  echo "fleetgossip $svc ${g:-unset}"
+done
+# .env itself, as a count only (compose passes nothing from it that it does
+# not list, but it is the first place someone would put NODE_ENV).
+echo "dotenv NODE_ENV lines = $(grep -c '^NODE_ENV=' .env || true)"
+EOF
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): every relay container has NODE_ENV empty or production, and no PARAMANT_FLEET_GOSSIP=0\n'
+    return 0
+  fi
+  local verdict
+  verdict="$(printf '%s\n' "$REMOTE_OUT" | node_env_verdict)" || die "${verdict#STOP }"
+  ok "${verdict#OK }"
+}
+
+# ---------------------------------------------------- release tag gate (N2) --
+
+# release_tag_verdict: does the tag the installers pin exist on origin, and does
+# it name the commit we deploy? Pure, so the dry-run test can feed it cases.
+#   $1 tag        what install.sh, frontend/install.sh and install-pi.sh pin
+#   $2 tag sha    the commit origin's tag points at (peeled), empty if absent
+#   $3 deploy sha the commit this run deploys
+release_tag_verdict() {
+  local tag="$1" tagsha="$2" sha="$3"
+  if [ -z "$tag" ]; then
+    printf 'STOP the installers do not agree on one pinned tag (RELAY_VERSION default), so there is no tag to check\n'
+    return 1
+  fi
+  if [ -z "$tagsha" ]; then
+    printf 'STOP tag %s does not exist on origin. Phase 5 puts frontend/install.sh with that pin live, and every curl | bash install and every paramant upgrade would fail. Set it first: git tag -a %s %s -m "Release %s" && git push origin %s\n' \
+      "$tag" "$tag" "$sha" "${tag#v}" "$tag"
+    return 1
+  fi
+  if ! sha_eq "$tagsha" "$sha"; then
+    printf 'STOP tag %s on origin points at %s, not at %s, the commit this run deploys. Move it on purpose: git tag -f -a %s %s -m "Release %s" && git push -f origin %s\n' \
+      "$tag" "${tagsha:0:12}" "${sha:0:12}" "$tag" "$sha" "${tag#v}" "$tag"
+    return 1
+  fi
+  printf 'OK tag %s on origin points at %s, the commit this run deploys\n' "$tag" "${sha:0:12}"
+}
+
+release_tag_gate() {   # step label
+  step "$1. the tag the installers pin exists on origin and names the deploy commit"
+  local sha tag="" t f tagsha=""
+  if [ -n "$DEPLOYED_HEAD" ]; then
+    sha="$DEPLOYED_HEAD"
+  elif sha="$(git rev-parse -q --verify "$DEPLOY_REF^{commit}" 2>/dev/null)"; then
+    :
+  elif [ "$DRY_RUN" -eq 1 ]; then
+    # A shallow CI checkout has no $DEPLOY_REF. Same rule as nginx_sync_prepare:
+    # the dry run reads HEAD and says so; a real run still stops.
+    note "$DEPLOY_REF does not resolve here; this dry run reads the installer pins from HEAD"
+    sha="$(git rev-parse HEAD)"
+  else
+    die "$DEPLOY_REF does not resolve here, so there is no deploy commit to check the tag against. git fetch origin"
+  fi
+  for f in install.sh frontend/install.sh frontend/install-pi.sh; do
+    t="$(git show "$sha:$f" 2>/dev/null | sed -n 's/^RELAY_VERSION="${PARAMANT_VERSION:-\(v[0-9][0-9.]*\)}".*/\1/p' | head -1)"
+    if [ -z "$tag" ]; then tag="$t"; elif [ "$t" != "$tag" ]; then tag=""; break; fi
+    [ -n "$t" ] || { tag=""; break; }
+  done
+  if [ -n "$tag" ] && [ "$tag" != "v$EXPECT_VERSION" ]; then
+    local mism="the installers in ${sha:0:7} pin $tag but this deploy expects v$EXPECT_VERSION; make them agree first"
+    [ "$DRY_RUN" -eq 1 ] || die "$mism"
+    note "$mism (dry run, not a stop)"
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '\n  $ git ls-remote --tags origin %s\n  [dry-run] not executed\n' "${tag:-<tag>}"
+    printf '  SKIP  assert (dry-run): tag %s exists on origin and points at %s\n' "${tag:-<none>}" "${sha:0:7}"
+    return 0
+  fi
+  if [ -n "$tag" ]; then
+    local ls
+    ls="$(git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}" 2>&1)" \
+      || die "git ls-remote --tags origin $tag failed: $ls"
+    tagsha="$(printf '%s\n' "$ls" | awk -v r="refs/tags/$tag^{}" '$2==r{print $1}')"
+    [ -n "$tagsha" ] || tagsha="$(printf '%s\n' "$ls" | awk -v r="refs/tags/$tag" '$2==r{print $1}')"
+  fi
+  local verdict
+  verdict="$(release_tag_verdict "$tag" "$tagsha" "$sha")" || die "${verdict#STOP }"
+  ok "${verdict#OK }"
 }
 
 # =============================================================== PHASE 5 =====
@@ -1867,6 +2410,46 @@ for f in $TARGETS; do
   awk "$ADMIN_AWK" "$f" "$f" > "/tmp/nginx-admin.$$"
   cat "/tmp/nginx-admin.$$" > "$f"
   rm -f "/tmp/nginx-admin.$$"
+  # 8. the document capsule may be 5 MB, and nginx allowed 64k.
+  #
+  #    location /api/user/ carries client_max_body_size 64k, which is right for
+  #    every JSON call under it. The one route that is not JSON is the capsule
+  #    upload, POST /api/user/envelopes/<id>/document, where express.raw accepts
+  #    6mb and the app tells the customer the limit is 5 MB.
+  #
+  #    So anything over 64k died at nginx with a 413 HTML page before node saw
+  #    it. Nothing was logged in any container, and the browser could not parse
+  #    that body, so sign-flow.js fell back to its generic sentence: "Could not
+  #    store the encrypted document." Measured against production on 08-09-2026:
+  #    30000 bytes answers 401 (the app, no session), 100000 bytes answers 413
+  #    (nginx, never reached the app). Every real document is over 64k, so
+  #    co-sign delivery was dead for anything but a toy file.
+  #
+  #    A regex location is matched before any prefix location, so this one wins
+  #    over /api/user/ without moving it. The capture is what lets proxy_pass
+  #    keep a URI here; a regex location may not carry a static one.
+  if ! grep -q 'envelopes/\[\^/\]+/document' "$f"; then
+    awk '
+      /^[[:space:]]*location \/api\/user\/ \{/ && !done {
+        print "    # the capsule upload is not JSON: 6m, matching express.raw in admin/server.js."
+        print "    location ~ ^/api/user/(envelopes/[^/]+/document)$ {"
+        print "        limit_req        zone=relay_auth burst=5 nodelay;"
+        print "        limit_req_status 429;"
+        print "        proxy_pass http://127.0.0.1:4200/admin/api/user/$1;"
+        print "        proxy_set_header Host $host;"
+        print "        proxy_set_header X-Real-IP $remote_addr;"
+        print "        proxy_set_header X-Forwarded-For $remote_addr;"
+        print "        proxy_set_header Cookie $http_cookie;"
+        print "        proxy_pass_header Set-Cookie;"
+        print "        client_max_body_size 6m;"
+        print "    }"
+        done = 1
+      }
+      { print }
+    ' "$f" > "/tmp/nginx-capsule.$$"
+    cat "/tmp/nginx-capsule.$$" > "$f"
+    rm -f "/tmp/nginx-capsule.$$"
+  fi
   if ! cmp -s "$f" "/tmp/nginx-pre-3.1-$(basename "$f").$TS"; then
     echo "edited $(basename "$f")"
     edited=$((edited + 1))
@@ -2265,6 +2848,436 @@ EOF
       ok "limit_req: $wz zone(s) written, $lz left to the config that already binds them ($(remote_field 'before duplicate zone names'))"
     fi
   fi
+
+  # After 5d on purpose: the repo conf rate limits on user_session, and 5d is
+  # what guarantees that zone is loaded.
+  phase_5e
+}
+
+# ============================================================== PHASE 5e =====
+#
+# The whole site conf from the repo, on the live slot. See NGINX_LIVE_SLOT at
+# the top for why 5c's seven edits were not enough.
+#
+# Order of trust, each step only if the one before it held:
+#   local   render the conf from the commit being deployed, and refuse it when
+#           a login door would leave its strict zone, /api/user/ would not be on
+#           user_session, or the /parashare ?t= redirect is missing
+#   server  back up the conf and the snippet, show the diff, write, nginx -t,
+#           reload; on any fault the backups go back and nginx is reloaded on them
+#   server  loopback on 127.0.0.1:8080: the home page answers 200 and
+#           /parashare?t= answers 302 to /get; on a fault, back again
+#   outside through Caddy: /parashare?t= and /en/parashare?t= keep the token,
+#           12 parallel /api/user/me get no 429; on a fault, back again
+#
+# --dry-run does the local half and prints the server half: no ssh.
+
+NGX_TMP=""
+NGINX_REF_USED=""
+
+# Each location of a conf with the limit_req zone it sets, one "path zone" per
+# line ("-" for none). Good enough for the flat blocks of this conf; the
+# docker test (tests/nginx-volledig-docker.test.mjs) proves the same thing
+# against a real nginx.
+nginx_zone_map() {
+  awk '
+    /^[[:space:]]*location[[:space:]]/ {
+      if (inloc) print loc " -"
+      loc = $0
+      sub(/^[[:space:]]*location[[:space:]]+(=|\^~|~\*?)?[[:space:]]*/, "", loc)
+      sub(/[[:space:]]*\{.*/, "", loc)
+      inloc = 1
+    }
+    inloc && /limit_req[[:space:]]+zone=/ {
+      z = $0; sub(/.*zone=/, "", z); sub(/[[:space:];].*/, "", z)
+      print loc " " z; inloc = 0
+    }
+    inloc && /^[[:space:]]*\}/ { print loc " -"; inloc = 0 }
+  ' "$1"
+}
+
+# The doors where a password, a code or a new account is tried, and the zone
+# each must stay on, plus the one zone every other /api/user/ call must be on.
+NGINX_ZONE_WANT="/api/user/login=relay_login
+/api/user/auth/webauthn/login/=relay_login
+/api/user/auth/=relay_auth
+/api/user/setup/=relay_auth
+/api/user/signup=relay_auth
+/api/user/account/totp/=relay_auth
+/api/user/account/backup-codes/=relay_auth
+/api/user/=user_session"
+
+# nginx_sync_gate <rendered conf>: dies before anything reaches the server.
+nginx_sync_gate() {
+  local f="$1" map line path zone got bad=0
+  map="$(nginx_zone_map "$f")"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path="${line%%=*}"; zone="${line#*=}"
+    got="$(printf '%s\n' "$map" | awk -v p="$path" '$1 == p { print $2; exit }')"
+    if [ "$got" = "$zone" ]; then
+      printf '  zone  %-34s %s\n' "$path" "$got"
+    else
+      printf '  ZONE  %-34s %s, expected %s\n' "$path" "${got:-no such location}" "$zone"
+      bad=$((bad + 1))
+    fi
+  done <<< "$NGINX_ZONE_WANT"
+  [ "$bad" -eq 0 ] \
+    || die "$bad /api/user/ location(s) in the rendered conf are on the wrong limit_req zone; nothing was sent to the server"
+  ok "rendered conf: login, signup, setup and TOTP doors stay on their strict zones, the rest of /api/user/ is on user_session"
+  grep -qE 'location = /parashare +\{ *if \(\$arg_t\) \{ return 302 https://\$host/get\?\$args; \}' "$f" \
+    && grep -qE 'location = /en/parashare +\{ *if \(\$arg_t\) \{ return 302 https://\$host/en/get\?\$args; \}' "$f" \
+    || die "the rendered conf has no \$arg_t redirect on /parashare and /en/parashare; nothing was sent to the server"
+  ok "rendered conf: /parashare?t= and /en/parashare?t= redirect to /get and /en/get with the token"
+}
+
+# nginx_sync_prepare: render the conf and take the snippet from the commit that
+# is being deployed, into $NGX_TMP/conf and $NGX_TMP/snip.
+nginx_sync_prepare() {
+  local ref="${NGINX_REF:-${DEPLOYED_HEAD:-$DEPLOY_REF}}"
+  NGX_TMP="$(mktemp -d "${TMPDIR:-/tmp}/paramant-5e.XXXXXX")"
+  if git -C "$ROOT" rev-parse -q --verify "$ref^{commit}" >/dev/null 2>&1 \
+     && git -C "$ROOT" cat-file -e "$ref:deploy/nginx-render.sh" 2>/dev/null; then
+    git -C "$ROOT" show "$ref:deploy/nginx-paramant-live.conf" > "$NGX_TMP/src.conf"
+    git -C "$ROOT" show "$ref:deploy/nginx-render.sh" > "$NGX_TMP/render.sh"
+    git -C "$ROOT" show "$ref:deploy/nginx/snippets/paramant-security-headers.conf" > "$NGX_TMP/snip"
+    NGINX_REF_USED="$(git -C "$ROOT" rev-parse --short "$ref^{commit}") ($ref)"
+  elif [ "$DRY_RUN" -eq 1 ]; then
+    note "$ref does not resolve here, or predates deploy/nginx-render.sh; this dry run renders the working tree"
+    cp "$ROOT/deploy/nginx-paramant-live.conf" "$NGX_TMP/src.conf"
+    cp "$ROOT/deploy/nginx-render.sh" "$NGX_TMP/render.sh"
+    cp "$ROOT/deploy/nginx/snippets/paramant-security-headers.conf" "$NGX_TMP/snip"
+    NGINX_REF_USED="the working tree"
+  else
+    die "cannot render the site conf from $ref: it does not resolve here, or predates deploy/nginx-render.sh. git fetch, or set PARAMANT_NGINX_REF"
+  fi
+  PARAMANT_DOCROOT="$DOCROOT" bash "$NGX_TMP/render.sh" "$NGX_TMP/src.conf" > "$NGX_TMP/conf" \
+    || die "deploy/nginx-render.sh refused to render the conf (see above)"
+  NGX_CONF_SHA="$(sha256sum "$NGX_TMP/conf" | cut -d' ' -f1)"
+  NGX_SNIP_SHA="$(sha256sum "$NGX_TMP/snip" | cut -d' ' -f1)"
+  printf '  rendered      %s, %s bytes, sha256 %s\n' "$NGINX_REF_USED" "$(stat -c%s "$NGX_TMP/conf")" "$(printf '%s' "$NGX_CONF_SHA" | cut -c1-16)"
+  printf '  snippet       paramant-security-headers.conf, %s bytes, sha256 %s\n' "$(stat -c%s "$NGX_TMP/snip")" "$(printf '%s' "$NGX_SNIP_SHA" | cut -c1-16)"
+}
+
+# nginx_sync_public_check: from outside, through Caddy. Prints one line per
+# check and returns non-zero when any of them fails.
+nginx_sync_public_check() {
+  local bad=0 got codes n429 pair
+  for pair in "/parashare?t=deploycheck5e /get?t=deploycheck5e" "/en/parashare?t=deploycheck5e /en/get?t=deploycheck5e"; do
+    got="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 15 "$PUBLIC_SITE${pair% *}" || echo 000)"
+    if [ "$got" = "302 $PUBLIC_SITE${pair#* }" ]; then
+      printf '  public  %-30s %s\n' "${pair% *}" "$got"
+    else
+      printf '  PUBLIC  %-30s %s, expected 302 %s\n' "${pair% *}" "$got" "$PUBLIC_SITE${pair#* }"
+      bad=$((bad + 1))
+    fi
+  done
+  codes="$(for _ in $(seq 1 12); do
+             curl -s -o /dev/null -w '%{http_code}\n' --max-time 15 "$PUBLIC_SITE/api/user/me" &
+           done; wait)"
+  n429="$(printf '%s\n' "$codes" | grep -c '^429$' || true)"
+  printf '  public  12 x /api/user/me in parallel: %s\n' "$(printf '%s\n' "$codes" | sort | uniq -c | awk '{printf "%s x %s  ", $1, $2}')"
+  if [ "$n429" -ne 0 ]; then
+    printf '  PUBLIC  %s of 12 parallel /api/user/me answered 429; /api/user/ is still on a login brake\n' "$n429"
+    bad=$((bad + 1))
+  fi
+  return "$bad"
+}
+
+# nginx_sync_restore: put back the conf and snippet 5e backed up under this TS.
+# For a fault 5e can only see from outside, after the server half finished.
+nginx_sync_restore() {
+  remote_nginx "nginx full conf restore" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_LIVE_SLOT" "$NGINX_SNIPPET_DIR" <<'EOF'
+set -euo pipefail
+TS="$1"; SITES="$2"; NGBK="$3"; SLOT="$4"; SNIPDIR="$5"
+resolve_conf_slots "$SITES" "$SLOT"
+name="$(printf '%s' "$RESOLVED_CONFS" | awk '{print $1}')"
+CONF="$(readlink -f "$SITES/$name")"
+SNIP="$SNIPDIR/paramant-security-headers.conf"
+[ -f "$NGBK/$name.pre-nginx-sync-$TS" ] || { echo "FATAL no backup $NGBK/$name.pre-nginx-sync-$TS"; exit 1; }
+cat "$NGBK/$name.pre-nginx-sync-$TS" > "$CONF"
+if [ -f "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" ]; then
+  cat "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" > "$SNIP"
+else
+  rm -f "$SNIP"
+fi
+nginx -t 2>&1 | sed 's/^/  nginxt /'
+systemctl reload nginx
+echo "restored and reloaded the previous nginx conf"
+EOF
+  expect 'restored and reloaded the previous nginx conf' "the previous nginx conf and snippet are back and reloaded"
+}
+
+phase_5e() {
+  step "5e. the whole site conf from the repo on the live slot, with the snippet it includes"
+  nginx_sync_prepare
+  nginx_sync_gate "$NGX_TMP/conf"
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    if [ -n "$NGINX_LIVE_COPY" ]; then
+      [ -r "$NGINX_LIVE_COPY" ] || die "PARAMANT_NGINX_LIVE_COPY is not readable: $NGINX_LIVE_COPY"
+      local dl
+      dl="$(diff -u --label "server copy $(basename "$NGINX_LIVE_COPY")" --label "repo, rendered" \
+              "$NGINX_LIVE_COPY" "$NGX_TMP/conf" || true)"
+      printf '%s\n' "$dl" | sed 's/^/  confdiff /'
+      printf '  [dry-run] %s line(s) would change against %s; nothing was written\n' \
+        "$(printf '%s\n' "$dl" | grep -cE '^[-+][^-+]|^[-+]$' || true)" "$NGINX_LIVE_COPY"
+    else
+      note "no PARAMANT_NGINX_LIVE_COPY: a dry run never connects, so it cannot diff against the"
+      note "server. The real run prints the diff on the server before it writes, and"
+      note "scripts/check-prod-drift.sh shows the live diff read-only."
+    fi
+    NGINX_PAYLOAD="CONF_B64='<the rendered conf, $(stat -c%s "$NGX_TMP/conf") bytes, base64>'
+SNIP_B64='<the snippet, $(stat -c%s "$NGX_TMP/snip") bytes, base64>'
+WANT_CONF='<sha256 of the rendered conf>'
+WANT_SNIP='<sha256 of the snippet>'
+PUBLIC_808X_OK='$NGINX_PUBLIC_808X_OK'
+"
+  else
+    # The checksums travel in the payload, not as arguments: an argument is
+    # printed in the ssh line, and no 32+ hex run is ever printed.
+    NGINX_PAYLOAD="CONF_B64='$(base64 -w0 < "$NGX_TMP/conf")'
+SNIP_B64='$(base64 -w0 < "$NGX_TMP/snip")'
+WANT_CONF='$NGX_CONF_SHA'
+WANT_SNIP='$NGX_SNIP_SHA'
+PUBLIC_808X_OK='$NGINX_PUBLIC_808X_OK'
+"
+  fi
+
+  remote_nginx "nginx full conf" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_LIVE_SLOT" "$NGINX_SNIPPET_DIR" <<'EOF'
+set -euo pipefail
+TS="$1"; SITES="$2"; NGBK="$3"; SLOT="$4"; SNIPDIR="$5"
+: "${WANT_CONF:?}" "${WANT_SNIP:?}"
+
+resolve_conf_slots "$SITES" "$SLOT"
+if [ "$RESOLVED_MISSING" -ne 0 ]; then
+  echo "FATAL the live conf slot has no candidate in $SITES: $SLOT"
+  exit 1
+fi
+name="$(printf '%s' "$RESOLVED_CONFS" | awk '{print $1}')"
+CONF="$(readlink -f "$SITES/$name")"
+SNIP="$SNIPDIR/paramant-security-headers.conf"
+WORK="$(mktemp -d /tmp/paramant-5e.XXXXXX)"
+trap 'rm -rf "$WORK"' EXIT
+
+printf '%s' "${CONF_B64:?}" | base64 -d > "$WORK/conf"
+printf '%s' "${SNIP_B64:?}" | base64 -d > "$WORK/snip"
+if [ "$(sha256sum "$WORK/conf" | cut -d' ' -f1)" != "$WANT_CONF" ] \
+   || [ "$(sha256sum "$WORK/snip" | cut -d' ' -f1)" != "$WANT_SNIP" ]; then
+  echo "FATAL the conf or the snippet arrived with a different checksum than was sent; nothing was written"
+  exit 1
+fi
+echo "target $name -> $CONF"
+
+# Every zone the new conf limits on must already be bound in the config nginx
+# loads. In a full deploy 5d has just made sure of that; under --nginx-sync it
+# has not run, and a missing zone is a conf nginx refuses. Asked before the
+# first write, so the answer costs nothing.
+used="$( { grep -oE 'limit_req[[:space:]]+zone=[A-Za-z0-9_]+' "$WORK/conf" || true; } | sed 's/.*zone=//' | sort -u)"
+defined="$( { nginx -T 2>/dev/null || true; } | { grep -oE '^[[:space:]]*limit_req_zone[^;]*zone=[A-Za-z0-9_]+' || true; } | sed 's/.*zone=//' | sort -u)"
+missing="$(comm -23 <(printf '%s\n' "$used") <(printf '%s\n' "$defined") | tr '\n' ' ')"
+echo "before zones used = $(printf '%s' "$used" | wc -w | tr -d ' ')"
+echo "before zones missing = $(printf '%s' "$missing" | wc -w | tr -d ' ')"
+if [ -n "${missing// /}" ]; then
+  echo "FATAL the repo conf limits on zone(s) the loaded config does not bind: $missing"
+  echo "FATAL nothing was written. Run the full deploy (step 5d places the tracked zones) first."
+  exit 1
+fi
+
+# Read-only: does another enabled conf (paramant-public.conf) proxy to one of
+# the loopback ports this conf serves? The repo public conf goes straight to
+# :3000-:3004, so the limits on :8081-:8086 never meet a visitor. If the server's
+# public conf does point there, the body limits of those blocks would apply to
+# real uploads, and nobody has weighed that yet. Stop before the first write.
+hits=""
+for f in "$SITES"/*; do
+  [ -e "$f" ] || continue
+  [ "$(readlink -f "$f")" = "$CONF" ] && continue
+  h="$( { grep -nE '^[^#]*(127\.0\.0\.1|localhost):808[1-6]' "$f" || true; } | sed "s|^|$(basename "$f"):|")"
+  [ -n "$h" ] && hits="${hits:+$hits
+}$h"
+done
+echo "before public 808x hits = $(printf '%s' "$hits" | grep -c . || true)"
+if [ -n "$hits" ]; then
+  printf '%s\n' "$hits" | sed 's/^/  public808x /'
+  if [ "${PUBLIC_808X_OK:-0}" = 1 ]; then
+    echo "after public 808x = accepted by PARAMANT_NGINX_PUBLIC_808X_OK=1"
+  else
+    echo "FATAL another enabled conf proxies to 127.0.0.1:808[1-6] (lines above). The repo conf sets"
+    echo "FATAL client_max_body_size on those ports (12M on :8081/:8083-:8085, 35M on :8086 /v2/), and"
+    echo "FATAL production runs them without; uploads through that vhost could get 413. Nothing was written."
+    echo "FATAL Compare those limits with what the vhost needs, then run again with PARAMANT_NGINX_PUBLIC_808X_OK=1."
+    exit 1
+  fi
+fi
+
+# The backups first, before a single byte changes. The snippet may not exist
+# yet; then a marker says so, and a restore removes it again.
+mkdir -p "$NGBK"
+BK_CONF="$NGBK/$name.pre-nginx-sync-$TS"
+BK_SNIP="$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS"
+BK_NOSNIP="$NGBK/paramant-security-headers.conf.absent-nginx-sync-$TS"
+cp -a "$CONF" "$BK_CONF"
+echo "after conf backup = $BK_CONF ($(stat -c%s "$BK_CONF") bytes)"
+if [ -f "$SNIP" ]; then
+  cp -a "$SNIP" "$BK_SNIP"
+  echo "after snippet backup = $BK_SNIP ($(stat -c%s "$BK_SNIP") bytes)"
+else
+  : > "$BK_NOSNIP"
+  echo "after snippet backup = none, $SNIP did not exist ($BK_NOSNIP)"
+fi
+
+# restore: conf and snippet go back together, never one of the two. It tries
+# both writes even when the first fails (set +e), and only reloads when both
+# landed: a half restored pair is not handed to nginx. Runs once.
+ARMED=0
+RESTORED=0
+restore() {
+  [ "$RESTORED" = 1 ] && return 0
+  RESTORED=1
+  set +e
+  cat "$BK_CONF" > "$CONF"
+  if [ -f "$BK_SNIP" ]; then cat "$BK_SNIP" > "$SNIP"; else rm -f "$SNIP"; fi
+  # Judged on what is on disk, not on the exit codes: a conf that could not be
+  # written because it was never changed is back all the same.
+  if ! cmp -s "$BK_CONF" "$CONF" \
+     || { [ -f "$BK_SNIP" ] && ! cmp -s "$BK_SNIP" "$SNIP"; } || { [ ! -f "$BK_SNIP" ] && [ -e "$SNIP" ]; }; then
+    echo "FATAL could not put the backups back on disk; nothing reloaded, nginx keeps its running workers."
+    echo "FATAL by hand: cp $BK_CONF $CONF and $([ -f "$BK_SNIP" ] && echo "cp $BK_SNIP $SNIP" || echo "rm $SNIP")"
+    set -e
+    return 0
+  fi
+  echo "restored $CONF and $SNIP from the pre-nginx-sync-$TS backups"
+  if nginx -t > /dev/null 2>&1 && systemctl reload nginx; then
+    echo "restored and reloaded the previous nginx conf"
+  else
+    echo "FATAL the restored conf did not test clean or did not reload; nginx keeps its running workers"
+  fi
+  set -e
+}
+# Any command that fails after the backups (a write on a full or read-only disk
+# under set -e) ends the block. These traps make sure that end puts conf and
+# snippet back together, instead of leaving the new snippet next to the old
+# conf, or a half written conf for the next restart to choke on.
+on_fault() {
+  echo "FATAL a command failed at line $1 after the backups (exit $2), restoring the conf and snippet"
+  restore
+}
+on_exit() {
+  local rc=$?
+  if [ "$ARMED" = 1 ] && [ "$RESTORED" = 0 ]; then
+    echo "FATAL the 5e block ended unfinished (exit $rc) after the backups, restoring the conf and snippet"
+    restore
+    [ "$rc" -eq 0 ] && rc=1
+  fi
+  rm -rf "$WORK"
+  exit "$rc"
+}
+trap 'on_fault "$LINENO" "$?"' ERR
+trap on_exit EXIT
+ARMED=1
+
+# What will change, before anything does.
+diff -u --label "server $name" --label "repo, rendered" "$CONF" "$WORK/conf" > "$WORK/conf.diff" || true
+diff -u --label "server snippet" --label "repo snippet" "$([ -f "$SNIP" ] && echo "$SNIP" || echo /dev/null)" "$WORK/snip" > "$WORK/snip.diff" || true
+echo "before conf diff lines = $(grep -cE '^[-+][^-+]|^[-+]$' "$WORK/conf.diff" || true)"
+echo "before snippet diff lines = $(grep -cE '^[-+][^-+]|^[-+]$' "$WORK/snip.diff" || true)"
+sed 's/^/  confdiff /' "$WORK/conf.diff"
+sed 's/^/  snipdiff /' "$WORK/snip.diff"
+
+conf_changed=yes; cmp -s "$CONF" "$WORK/conf" && conf_changed=no
+snip_changed=yes; [ -f "$SNIP" ] && cmp -s "$SNIP" "$WORK/snip" && snip_changed=no
+echo "after conf changed = $conf_changed"
+echo "after snippet changed = $snip_changed"
+
+if [ "$conf_changed" = yes ] || [ "$snip_changed" = yes ]; then
+  # cat into the file, not mv over it: the conf may be a symlink target, and
+  # its owner and mode stay as they were.
+  [ "$snip_changed" = yes ] && { mkdir -p "$SNIPDIR"; cat "$WORK/snip" > "$SNIP"; chmod 0644 "$SNIP"; }
+  [ "$conf_changed" = yes ] && cat "$WORK/conf" > "$CONF"
+  if [ "$(sha256sum "$CONF" | cut -d' ' -f1)" != "$WANT_CONF" ] \
+     || [ "$(sha256sum "$SNIP" | cut -d' ' -f1)" != "$WANT_SNIP" ]; then
+    echo "FATAL what is on disk after the write is not what was sent"
+    restore
+    exit 1
+  fi
+  rc=0
+  nginx -t > "$WORK/nginxt" 2>&1 || rc=$?
+  sed 's/^/  nginxt /' "$WORK/nginxt"
+  if [ "$rc" -ne 0 ]; then
+    echo "FATAL nginx -t failed on the repo conf, restoring the backed up conf and snippet"
+    restore
+    exit 1
+  fi
+  if ! systemctl reload nginx; then
+    echo "FATAL systemctl reload nginx failed, restoring the backed up conf and snippet"
+    restore
+    exit 1
+  fi
+  echo "reloaded nginx for the full conf"
+else
+  echo "the server already runs the repo conf and snippet; nothing written, nothing reloaded"
+fi
+echo "after conf sha256 prefix = $(sha256sum "$CONF" | cut -c1-16)"
+
+# Loopback, straight at the vhost: no DNS, no Caddy, so a fault here is this
+# conf and nothing else. The home page proves the site still answers.
+lb() { curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 10 -H 'Host: paramant.app' "http://127.0.0.1:8080$1" || echo 000; }
+# systemctl reload only signals the master: for a moment the old workers still
+# answer, with the old conf (measured: 27 of 100 checks right after a reload got
+# the old /parashare answer). So wait up to 10 s, every 0.5 s, for the new conf
+# to answer, and judge only then.
+WANT_SHARE="302 https://paramant.app/get?t=deploycheck5e"
+tries="${LB_TRIES:-20}"
+n=0
+while :; do
+  n=$((n + 1))
+  home="$(lb /)"
+  share="$(lb '/parashare?t=deploycheck5e')"
+  case "$home" in 200*) [ "$share" = "$WANT_SHARE" ] && break ;; esac
+  [ "$n" -ge "$tries" ] && break
+  sleep 0.5
+done
+echo "after loopback tries = $n"
+echo "after loopback home = $home"
+echo "after loopback parashare = $share"
+case "$home" in 200*) ;; *)
+  echo "FATAL the home page answers '$home' on 127.0.0.1:8080 after the reload, restoring"
+  restore
+  exit 1 ;;
+esac
+if [ "$share" != "$WANT_SHARE" ]; then
+  echo "FATAL /parashare?t= answers '$share' on 127.0.0.1:8080, expected a 302 to /get with the token, restoring"
+  restore
+  exit 1
+fi
+ARMED=0
+EOF
+  NGINX_PAYLOAD=""
+
+  # Anchored: the diff above prints conf lines, and only the block's own verdicts
+  # start a line with FATAL.
+  expect_not '^FATAL' "the repo site conf is in place, tested clean and reloaded, and the old one is backed up"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): /parashare?t= and /en/parashare?t= answer 302 to /get with the token, through Caddy\n'
+    printf '  SKIP  assert (dry-run): 12 parallel /api/user/me answer no 429, through Caddy\n'
+    return 0
+  fi
+  [ "$(remote_field 'after conf sha256 prefix')" = "$(printf '%s' "$NGX_CONF_SHA" | cut -c1-16)" ] \
+    || die "the live conf on the server is not the rendered repo conf after 5e"
+  ok "the live conf on the server is the repo conf, byte for byte ($NGINX_REF_USED)"
+  expect 'after loopback home = 200' "the home page answers 200 on the vhost after the reload"
+  expect 'after loopback parashare = 302 https://paramant.app/get\?t=deploycheck5e' \
+    "/parashare?t= answers 302 to /get on the vhost itself"
+
+  if nginx_sync_public_check; then
+    ok "through Caddy: /parashare?t= keeps its token, and 12 parallel /api/user/me get no 429"
+  else
+    warn "the outside checks failed after 5e; putting the previous conf and snippet back"
+    nginx_sync_restore
+    die "5e was rolled back: the repo conf passed nginx -t but failed the outside checks above"
+  fi
+  rm -rf "$NGX_TMP"
 }
 
 # =============================================================== PHASE 6 =====
@@ -2517,6 +3530,114 @@ for svc in relay-main relay-health relay-finance relay-legal relay-iot; do
 done
 EOF
   expect_not '"recurring":true' "every relay still reports recurring:false"
+
+  step "6j. the relays know the seller (BILLING_SELLER_*), values never printed"
+  remote_seller "seller known" "$COMPOSE_DIR" <<'EOF'
+set -euo pipefail
+cd "$1"
+# A compose that cannot render is a stop, not a zero: the checks below would
+# have nothing to stand on.
+rendered="$(docker compose config 2>/dev/null)" || { echo "FATAL docker compose config failed"; exit 1; }
+echo "compose seller vars declared = $(printf '%s\n' "$rendered" | grep -c 'BILLING_SELLER_VAT:' || true)"
+unset rendered
+for svc in relay-main relay-health relay-finance relay-legal relay-iot; do
+  printf 'seller %-14s %s\n' "$svc" "$(seller_probe "$svc")"
+done
+EOF
+  judge_seller_known
+
+  # 6k. A relay that signs with a key /verify does not pin turns every new
+  # multi-party proof red, and nothing above would notice (hertest
+  # 2026-10-04). Read from here, over TLS, like 6b. RUNBOOK.md, "Relay
+  # identity key rotation", is what to do when this is red.
+  check_relay_node_env "6k0"
+
+  step "6k. every relay signs with the key /verify pins (frontend/js/relay-trust-anchors.js)"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '\n  $ node deploy/check-relay-anchors.mjs   # GET https://<host>/v2/pubkey, five relays\n'
+    printf '  [dry-run] not executed\n'
+    printf '  SKIP  assert (dry-run): every relay serves its pinned key\n'
+  elif ! command -v node >/dev/null 2>&1; then
+    warn "node is not installed here: NOT proven that the relays still sign with the pinned keys. Run node deploy/check-relay-anchors.mjs from a checkout that has node."
+  else
+    local rc=0
+    node deploy/check-relay-anchors.mjs 2>/dev/null || rc=$?
+    case "$rc" in
+      0) ok "every relay serves the key /verify pins" ;;
+      2) warn "relay anchors NOT PROVEN: a relay did not answer /v2/pubkey" ;;
+      *) die "a relay signs with a key /verify does not pin as current; follow RUNBOOK.md, Relay identity key rotation" ;;
+    esac
+  fi
+
+  # 6l. /dpa says auditd, AIDE and AppArmor. Nothing else in the deploy looked
+  # at the host, so the page stated a server state nobody re-measured (telling
+  # SITE-48-A). Read-only: it starts, stops, writes and updates nothing; the
+  # AIDE database is only stat'ed, never checked or rebuilt here.
+  step "6l. host hardening that /dpa promises: auditd, AIDE, AppArmor (read-only)"
+  remote_soft "host hardening" /var/lib/aide /var/log/aide /sys/module/apparmor/parameters/enabled <<'EOF'
+set -euo pipefail
+aide_db_dir="$1"; aide_log_dir="$2"; aa_param="$3"
+echo "host auditd = $(systemctl is-active auditd 2>/dev/null || true)"
+if command -v aide >/dev/null 2>&1; then
+  echo "host aide binary = yes"
+else
+  echo "host aide binary = no"
+fi
+if [ -e "$aide_db_dir/aide.db" ] || [ -e "$aide_db_dir/aide.db.gz" ]; then
+  echo "host aide db = yes"
+else
+  echo "host aide db = no"
+fi
+# The last check run: the newest of the daily check's log and its systemd run.
+now="$(date +%s)"
+newest=0
+for f in "$aide_log_dir"/*.log "$aide_log_dir"/*.log.0; do
+  [ -f "$f" ] || continue
+  t="$(stat -c %Y "$f" 2>/dev/null || echo 0)"
+  if [ "$t" -gt "$newest" ]; then newest="$t"; fi
+done
+for unit in dailyaidecheck.service aidecheck.service; do
+  ts="$(systemctl show "$unit" -p ExecMainExitTimestamp --value 2>/dev/null || true)"
+  [ -n "$ts" ] || continue
+  t="$(date -d "$ts" +%s 2>/dev/null || echo 0)"
+  if [ "$t" -gt "$newest" ]; then newest="$t"; fi
+done
+if [ "$newest" -gt 0 ]; then
+  echo "host aide last run age days = $(( (now - newest) / 86400 ))"
+else
+  echo "host aide last run age days = none"
+fi
+if aa-status --enabled >/dev/null 2>&1 \
+   || [ "$(cat "$aa_param" 2>/dev/null || true)" = Y ]; then
+  echo "host apparmor enabled = yes"
+else
+  echo "host apparmor enabled = no"
+fi
+n="$(aa-status 2>/dev/null | sed -n 's/^\([0-9][0-9]*\) profiles are in enforce mode.*/\1/p' | head -1 || true)"
+echo "host apparmor enforce profiles = ${n:-unknown}"
+exit 0
+EOF
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): auditd active, AIDE ran within %s days, AppArmor enforcing\n' "$HOST_AIDE_MAX_AGE_DAYS"
+  else
+    local host_fails=0 host_msg=""
+    if [ "$REMOTE_RC" -ne 0 ]; then
+      host_msg="remote step 'host hardening' exited $REMOTE_RC; the host state was not read"
+    else
+      judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS" || host_fails=$?
+      [ "$host_fails" -eq 0 ] \
+        || host_msg="$host_fails of the three host promises on /dpa do not hold (auditd, AIDE, AppArmor); the FAIL lines above say which"
+    fi
+    if [ -n "$host_msg" ]; then
+      [ "$HOST_STRICT" -eq 1 ] && die "$host_msg (--host-strict)"
+      HOST_UNPROVEN="$host_msg"
+      warn "6l host NOT PROVEN: $host_msg"
+      note "this is a warning, not a stop: the release is live and the host state is"
+      note "not something this deploy changed. /dpa says 'we check at every deploy"
+      note "whether auditd, AIDE and AppArmor are active', and this run's answer is no."
+      note "Fix the host (or the page), then confirm with --verify-only --host-strict."
+    fi
+  fi
 }
 
 # =============================================================== PHASE V =====
@@ -2666,13 +3787,21 @@ EOF
   printf '  run TS        %s\n' "$TS"
   printf '  rollback with bash deploy/deploy-3.1.sh --rollback %s\n' "$TS"
   printf '  log           %s\n' "$LOG"
+  if [ -n "$HOST_UNPROVEN" ]; then
+    echo
+    echo "HOST NOT PROVEN (step 6l, a warning, not a stop):"
+    printf '  %s\n' "$HOST_UNPROVEN"
+    echo "  The deploy itself is done and the marker is written. The promise on /dpa"
+    echo "  is that we CHECK auditd, AIDE and AppArmor at every deploy; this check"
+    echo "  said no. Put the host right, then run --verify-only --host-strict."
+  fi
   echo
   echo "Still by hand, on purpose (runbook step 7):"
   echo "  1. watch thirty minutes: docker compose logs -f --tail=200 relay-main"
   echo "  2. mint the ParaSign canary key and set PARASIGN_CANARY_KEY as an"
   echo "     Actions secret, then dispatch product-heartbeat.yml once"
   echo "  3. scripts/check-prod-drift.sh origin/main must print OK"
-  echo "  4. git tag v$EXPECT_VERSION <commit> and push it, put the live date in CHANGELOG.md"
+  echo "  4. put the live date in CHANGELOG.md (tag v$EXPECT_VERSION was checked before phase 5)"
   echo "  5. write the deploy down in the vault, with the billing_config line as logged"
   echo
   echo "BILLING_MODE stays empty. Turning the recurring layer on is a separate"
@@ -2748,7 +3877,15 @@ M="$BK/rollback-images-$TS.txt"
 
 echo "before .env bytes = $(stat -c%s .env)"
 cp -a .env ".env.bak-rollback-$TS"
-cp "$BK/.env-pre-3.1-$TS" .env
+# The .env from before step 1e, when 1e wrote anything in that run: phase 2b
+# saved .env after phase 1, with the seller lines already in it.
+if [ -f "$BK/.env-pre-seller-$TS" ]; then
+  echo "env source = pre-seller"
+  cp "$BK/.env-pre-seller-$TS" .env
+else
+  echo "env source = pre-3.1"
+  cp "$BK/.env-pre-3.1-$TS" .env
+fi
 chmod 600 .env
 echo "after .env bytes = $(stat -c%s .env)"
 
@@ -2804,6 +3941,17 @@ for name in $RESOLVED_CONFS; do
   n=$((n + 1))
 done
 echo "restored nginx confs = $n"
+
+# Phase 5e also placed the security-headers snippet. Its backup carries this
+# same TS; a marker instead of a backup means there was no snippet before.
+SNIP=/etc/nginx/snippets/paramant-security-headers.conf
+if [ -f "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" ]; then
+  cp -a "$NGBK/paramant-security-headers.conf.pre-nginx-sync-$TS" "$SNIP"
+  echo "restored the security-headers snippet from the 5e backup"
+elif [ -f "$NGBK/paramant-security-headers.conf.absent-nginx-sync-$TS" ]; then
+  rm -f "$SNIP"
+  echo "removed the security-headers snippet again; 5e found none before it"
+fi
 
 # Test before reload. A reload on a broken conf keeps the old workers alive and
 # hides the breakage until the next restart.
@@ -2931,6 +4079,23 @@ if [ "$VERIFY_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+if [ "$NGINX_SYNC_ONLY" -eq 1 ]; then
+  phase 5e "The whole site conf from the repo (server, WRITE)" "Step 5e"
+  phase_5e
+  echo
+  hr
+  echo "NGINX SYNC FINISHED, warnings: $WARNINGS"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "Dry run: nothing was written. The diff above is what 5e would change."
+  else
+    echo "Phase 5e only. The live site conf and the security-headers snippet are"
+    echo "the repo's, rendered from $NGINX_REF_USED. Nothing else was touched."
+    echo "The previous files are in $NGINX_BACKUP_DIR under *.pre-nginx-sync-$TS."
+  fi
+  hr
+  exit 0
+fi
+
 phase_0
 phase_1
 
@@ -2947,9 +4112,13 @@ if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+# Checked once before anything is written, so a missing tag stops a clean run,
+# and again right before phase 5 puts the installers live.
+release_tag_gate "1z"
 phase_2
 phase_3
 phase_4
+release_tag_gate "5-pre"
 phase_5
 phase_6
 phase_7

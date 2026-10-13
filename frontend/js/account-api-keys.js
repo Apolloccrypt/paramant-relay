@@ -1,3 +1,6 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 // The ParaSign API keys block on /account.
 //
 // /pricing sells Firm with "a developer API with its own documentation and
@@ -29,7 +32,7 @@
     if (!list) return;
     list.textContent = '';
     if (!keys || !keys.length) {
-      list.textContent = 'No API keys yet.';
+      list.textContent = nlEn('Nog geen API-sleutels.', 'No API keys yet.');
       return;
     }
     var ul = document.createElement('ul');
@@ -45,19 +48,41 @@
       var code = document.createElement('code');
       code.textContent = k.key_masked || k.masked || k.kid || '';
       var mode = document.createElement('span');
-      mode.textContent = (k.mode === 'test' ? 'test' : 'live');
+      // ACCT-34: a revoked key stays in the list (active:false from
+      // relay.js GET /v2/user/parasign-keys) and must not read "live".
+      var revoked = k.active === false;
+      mode.textContent = revoked ? nlEn('ingetrokken', 'revoked') : (k.mode === 'test' ? 'test' : 'live');
+      if (revoked) {
+        li.style.opacity = '0.7';
+        code.style.textDecoration = 'line-through';
+        li.appendChild(code); li.appendChild(mode);
+        ul.appendChild(li);
+        return;
+      }
       var revoke = document.createElement('button');
       revoke.type = 'button';
       revoke.className = 'btn btn-secondary btn-small';
-      revoke.textContent = 'Revoke';
+      revoke.textContent = nlEn('Intrekken', 'Revoke');
       revoke.addEventListener('click', function () {
-        if (!window.confirm('Revoke this key? Anything using it stops working immediately.')) return;
-        say('Revoking…');
+        if (!window.confirm(nlEn('Deze sleutel intrekken? Alles wat hem gebruikt, stopt direct.', 'Revoke this key? Anything using it stops working immediately.'))) return;
+        say(nlEn('Intrekken…', 'Revoking…'));
         fetch('/api/user/parasign-keys', {
           method: 'DELETE', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kid: k.kid }),
-        }).then(function () { say('Key revoked.'); load(); })
-          .catch(function () { say('Could not revoke that key.'); });
+        }).then(function (r) {
+          // Only a 2xx revoked anything. A 404/503 left the key working, and
+          // "Sleutel ingetrokken" then was a false all-clear (ACCT-34).
+          if (!r.ok) {
+            say(r.status === 503
+              ? nlEn('Door een storing bij ons lukte intrekken niet. De sleutel werkt nog. Probeer het zo opnieuw.', 'Revoking did not work right now because of a fault on our side. The key still works. Please try again shortly.')
+              : nlEn('Intrekken lukte niet. De sleutel werkt nog.', 'Could not revoke that key. It still works.'));
+            load();
+            return;
+          }
+          say(nlEn('Sleutel ingetrokken.', 'Key revoked.'));
+          load();
+        })
+          .catch(function () { say(nlEn('Intrekken lukte niet. De sleutel werkt nog.', 'Could not revoke that key. It still works.')); });
       });
       li.appendChild(code); li.appendChild(mode); li.appendChild(revoke);
       ul.appendChild(li);
@@ -84,24 +109,24 @@
 
   if (btn) {
     btn.addEventListener('click', function () {
-      say('Creating…');
+      say(nlEn('Maken…', 'Creating…'));
       fetch('/api/user/parasign-keys', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: 'account' }),
       }).then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
         .then(function (out) {
           if (out.status !== 201 && out.status !== 200) {
-            say((out.body && out.body.message) || 'Could not create a key.');
+            say((out.body && out.body.message) || nlEn('Het maken van de sleutel lukte niet.', 'Could not create a key.'));
             return;
           }
           say('');
           if (fresh) {
-            fresh.textContent = out.body.key + '  ·  copy it now; it is shown once and cannot be read again.';
+            fresh.textContent = out.body.key + nlEn('  ·  kopieer hem nu. U ziet hem maar één keer.', '  ·  copy it now. You only see it once.');
             fresh.hidden = false;
           }
           load();
         })
-        .catch(function () { say('Could not create a key.'); });
+        .catch(function () { say(nlEn('Het maken van de sleutel lukte niet.', 'Could not create a key.')); });
     });
   }
 

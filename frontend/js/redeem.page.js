@@ -116,7 +116,7 @@
       if (signedOutNote) signedOutNote.hidden = false;
       if (signinLine) signinLine.hidden = false;
       updateSigninLink();
-      submit.textContent = 'Create a free account';
+      submit.textContent = 'Maak een gratis account';
     }
     submit.disabled = false;
   }
@@ -178,7 +178,7 @@
 
   document.addEventListener('paramant:plan-changed', function (ev) {
     forget();
-    showDone(ev && ev.detail ? ev.detail.message : '');
+    showDone(ev && ev.detail ? (ev.detail.message_nl || ev.detail.message) : '');
   });
 
   /* ---- wiring ----------------------------------------------------------- */

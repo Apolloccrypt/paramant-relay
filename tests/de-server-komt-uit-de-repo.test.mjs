@@ -21,8 +21,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   ROOT, PUBLIEKE_CONF, leesPubliekeConf, naarBytes, leesAfspraak, leesAnkers,
-  verwachting, meet, vergelijk,
+  verwachting, meet, vergelijk, kopProbe,
 } from '../scripts/meet-de-server.mjs';
+import net from 'node:net';
 
 const verw = verwachting();
 
@@ -108,6 +109,21 @@ test('geen enkele workflow zet de live helft uit', () => {
     const bron = fs.readFileSync(path.join(map, naam), 'utf8');
     assert.doesNotMatch(bron, /DE_SERVER_OFFLINE/,
       naam + ' zet DE_SERVER_OFFLINE; dan meet niemand productie meer en is deze poort een decor');
+  }
+});
+
+// Stilte na de kop betekent "onder de grens". Stilte tijdens de TLS-handdruk
+// betekent niets, en mocht dat ook niet gaan betekenen: op 2026-10-01 las CI
+// een trage verbinding naar finance.paramant.app als een grens van 12M.
+test('een handdruk die niet lukt is een fout, geen grens', async () => {
+  const stil = net.createServer(() => {}); // neemt aan, zegt nooit iets terug
+  await new Promise((r) => stil.listen(0, '127.0.0.1', r));
+  try {
+    const uit = await kopProbe('127.0.0.1', 12582912, { port: stil.address().port, handdruk: 300 });
+    assert.notEqual(uit, 'wacht', 'een hangende handdruk telt als "onder de grens"');
+    assert.match(String(uit), /^fout: /);
+  } finally {
+    stil.close();
   }
 });
 

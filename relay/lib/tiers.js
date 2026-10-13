@@ -70,6 +70,11 @@ const TIER_LIMITS = Object.freeze({
     devices: 5,            // mirrors legacy _pubkeyMax.free
     view_ttl_ms: 3_600_000, // mirrors legacy _planMaxTtl.dev (1 h)
     max_views: 1,          // mirrors legacy _planMaxViews.free (burn-on-read)
+    max_recipients: 1,     // named recipients per send; one is the free story
+    // Signers on one document. Twenty is what every account could already do,
+    // so it stays the floor: a paid ceiling must never be a quiet takeaway from
+    // people who have been using twenty since before it was a plan field.
+    max_parties: 20,
     concurrent_blobs: 8, // one live hand-over at a time, plus slack for its window
     outbound_per_hour: 50,  // mirrors legacy OUTBOUND_RATE.free
   }),
@@ -80,6 +85,24 @@ const TIER_LIMITS = Object.freeze({
     devices: 50,           // mirrors legacy _pubkeyMax.pro; brief says 10 once policy bump
     view_ttl_ms: 86_400_000, // 24 h
     max_views: 10,
+    // Thirty, and it is the number the product is sold on.
+    //
+    // A care provider in Utrecht wrote in on 22-09 asking whether the paid
+    // bundles could send one file to about twenty people; their current tool
+    // stops at five. At ten this row answered "no" to the one question a buyer
+    // had actually asked, and `business` -- the row that does carry thirty --
+    // is not a tier anyone can buy: validateProductPlan('parasend','business')
+    // returns invalid_tier and the catalogue only ever grants 'pro'. So ten was
+    // not a ceiling somebody chose for Firm, it was a gap nobody had walked.
+    //
+    // The cost is bounded and was worked out: thirty recipients is sixty mails
+    // (invitation plus code), and 500 transfers a month puts the worst case at
+    // 30,000 -- 37 euro of Mailjet against 29 excl. btw of revenue, and that
+    // worst case is a customer sending twenty-five times every working day.
+    // What keeps it honest is the per-hour brake on invitations in relay.js,
+    // which did not exist when this number was ten.
+    max_recipients: 30,
+    max_parties: 20,
     concurrent_blobs: 24, // about three at a time
     outbound_per_hour: 500,  // mirrors legacy OUTBOUND_RATE.pro
   }),
@@ -90,6 +113,8 @@ const TIER_LIMITS = Object.freeze({
     devices: 100,
     view_ttl_ms: 604_800_000, // 7 d
     max_views: 25,
+    max_recipients: 30,
+    max_parties: 30,
     concurrent_blobs: 80, // about ten at a time
     outbound_per_hour: 2000, // its transfers_month; never below pro, which is
                              // what the old table did by leaving it out
@@ -101,6 +126,11 @@ const TIER_LIMITS = Object.freeze({
     devices: UNLIMITED,
     view_ttl_ms: 604_800_000, // 7 d  (legacy enterprise ceiling)
     max_views: 100,
+    // Deliberately not UNLIMITED. Above thirty named people a send stops being
+    // a send and becomes a distribution list, which needs list ownership and a
+    // different conversation. Thirty is the product ceiling, not a price step.
+    max_recipients: 30,
+    max_parties: 30,
     concurrent_blobs: UNLIMITED,
     outbound_per_hour: UNLIMITED, // mirrors legacy OUTBOUND_RATE.enterprise
   }),
@@ -139,6 +169,129 @@ function tierLimitNum(plan, dim) {
   return isUnlimited(v) ? Infinity : v;
 }
 
+// Check a list of named recipients against the plan's ceiling.
+//
+// This is the ONLY place that decides who may address more than one person.
+// The browser may show the field to anyone; the answer is made here, server
+// side, from the plan on the key. A front end that forgets to hide the field
+// therefore cannot hand a community account a paid capability.
+//
+// Rejects rather than silently truncating. Quietly dropping addresses from a
+// send of a confidential document is the worst possible failure: the sender
+// believes twenty people were reached and nineteen never hear about it.
+//
+// Returns { ok, plan, limit, recipients, count, reason, rejected }.
+//   recipients  validated, NFC-normalised, lowercased and de-duplicated
+//   reason      'empty' | 'over_limit' | 'invalid_address' when ok is false
+//   rejected    the first address that failed validation, for the error message
+
+// One address, or null when it is not one.
+//
+// WHY THIS IS STRICT. The old version did String(raw).trim().toLowerCase() and
+// called it a day, which let three things through that an adversarial pass
+// demonstrated on 22-09:
+//
+//   ['a@x.org','b@x.org'] as ONE entry became the single string
+//   "a@x.org,b@x.org". One recipient by the count, two mailboxes on the wire,
+//   sharing one pickup token. A community account with a ceiling of one reached
+//   two people.
+//
+//   "a@x.org\nBcc: someone@else" survived trim() whole, because trim only takes
+//   the ends. That line feeds the invitation mail: a blind copy of a pickup link
+//   to a third party.
+//
+//   Combining characters meant one mailbox could appear as two recipients with
+//   two live tokens, so revoking one revoked nothing.
+//
+// Hence: normalise first, then reject anything that is not a single ordinary
+// address. Better a sender who has to fix a typo than a leak nobody sees.
+const CONTROL_OR_SEPARATOR = /[\x00-\x1f\x7f,;<>"\\\s]/;
+
+function normaliseAddress(raw) {
+  if (typeof raw !== 'string') return null;         // arrays, numbers, objects: no
+  let email;
+  try {
+    // Fold twice: some capitals do not come back to their plain form in one
+    // pass (the Turkish dotted capital I becomes i plus a combining dot).
+    email = raw.normalize('NFC').trim().toLowerCase().normalize('NFC');
+  } catch (_) {
+    return null;
+  }
+  if (!email) return null;
+  if (email.length > 254) return null;               // RFC 5321 ceiling
+  if (CONTROL_OR_SEPARATOR.test(email)) return null; // CR, LF, comma, angle brackets
+  // ASCII only. Internationalised addresses (EAI) are rare in this market and
+  // they carry a whole class of trouble: the Turkish dotted capital I folds to
+  // an i with a separate combining dot, so one mailbox can enter the list twice
+  // as two recipients with two live tokens, and revoking one revokes nothing.
+  // Refusing them is a product choice, and a sender gets a clear error rather
+  // than a silent duplicate.
+  if (!/^[\x20-\x7e]+$/.test(email)) return null;
+  const at = email.indexOf('@');
+  if (at < 1 || at !== email.lastIndexOf('@')) return null;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!local || local.length > 64) return null;
+  if (!domain || domain.length > 253) return null;
+  if (!domain.includes('.')) return null;
+  if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..')) return null;
+  if (domain.startsWith('-') || domain.endsWith('-')) return null;
+  return email;
+}
+
+// How far past the plan we keep counting, so a refusal can name the real
+// number, and how many items we look at at all before we stop reading.
+const TEL_MARGE = 64;
+const SCAN_MAX = 2000;
+
+function checkRecipients(plan, list) {
+  const named = normalisePlan(plan);
+  const limit = tierLimitNum(named, 'max_recipients');
+  const seen = new Set();
+  const recipients = [];
+  const items = Array.isArray(list) ? list : [];
+  let bekeken = 0;
+  for (const raw of items) {
+    // TWO ceilings, because they stop two different things.
+    //
+    // The first is on unique addresses, and it deliberately runs a little past
+    // the plan: a sender who pastes twenty names on a plan that allows one has
+    // to be told she listed TWENTY. The old rule stopped at limit+1 and the
+    // page said "your plan allows 1, you listed 2", which is wrong twice in
+    // one sentence.
+    //
+    // The second is on items SEEN, and that one is the real brake. Counting
+    // only what survived deduplication meant fifty thousand copies of one
+    // address kept the counter at one, so the whole list was normalised before
+    // anything was refused: free work for whoever asked for it.
+    if (recipients.length > limit + TEL_MARGE) break;
+    if (bekeken > SCAN_MAX) break;
+    if (raw == null || (typeof raw === 'string' && raw.trim() === '')) continue;
+    bekeken += 1;
+    const email = normaliseAddress(raw);
+    if (!email) {
+      return { ok: false, plan: named, limit, recipients: [], count: 0,
+               reason: 'invalid_address',
+               rejected: typeof raw === 'string' ? raw.slice(0, 80) : typeof raw };
+    }
+    if (seen.has(email)) continue;
+    seen.add(email);
+    recipients.push(email);
+  }
+  if (recipients.length === 0) {
+    return { ok: false, plan: named, limit, recipients, count: 0, reason: 'empty',
+             rejected: null };
+  }
+  if (recipients.length > limit) {
+    // Report the ceiling and how far over it went, without handing back the
+    // whole list: the caller only needs to tell the sender to trim it.
+    return { ok: false, plan: named, limit, recipients: [], count: recipients.length,
+             reason: 'over_limit', rejected: null };
+  }
+  return { ok: true, plan: named, limit, recipients, count: recipients.length,
+           reason: null, rejected: null };
+}
+
 module.exports = {
   TIER_LIMITS,
   UNLIMITED,
@@ -146,4 +299,6 @@ module.exports = {
   tierLimit,
   tierLimitNum,
   isUnlimited,
+  checkRecipients,
+  normaliseAddress,
 };

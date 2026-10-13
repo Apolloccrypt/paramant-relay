@@ -1,0 +1,41 @@
+{
+	# I serve the :80 ACME webroot myself for certbot renewals, so disable Caddy's auto redirects.
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+# Plain HTTP: keep certbot webroot renewals working, redirect everything else to HTTPS.
+http://paramant.app, http://health.paramant.app, http://legal.paramant.app,
+http://finance.paramant.app, http://iot.paramant.app, http://relay.paramant.app,
+http://addin.paramant.app {
+	handle /.well-known/acme-challenge/* {
+		root * /var/www/html
+		file_server
+	}
+	handle {
+		redir https://{host}{uri} 308
+	}
+}
+
+# TLS edge: terminates TLS 1.3 incl. post-quantum X25519MLKEM768, proxies to existing nginx on :8443.
+paramant.app, health.paramant.app, legal.paramant.app,
+finance.paramant.app, iot.paramant.app, relay.paramant.app,
+addin.paramant.app {
+	tls /etc/letsencrypt/live/paramant.app/fullchain.pem /etc/letsencrypt/live/paramant.app/privkey.pem
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	encode zstd gzip {
+		match {
+			header Content-Type text/*
+			header Content-Type application/javascript*
+			header Content-Type application/wasm*
+			header Content-Type image/svg+xml*
+		}
+	}
+	reverse_proxy 127.0.0.1:8443 {
+		header_up Host {host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto https
+	}
+}

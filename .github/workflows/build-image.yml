@@ -58,3 +58,74 @@ jobs:
           load: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # THE ADMIN IMAGE WAS BUILT NOWHERE UNTIL THE DEPLOY TRIED IT.
+  #
+  # On 22-09 the deploy stopped in phase 4b: the admin crash-looped on
+  # MODULE_NOT_FOUND because admin/lib/email-templates.js reaches for
+  # ../../relay/lib/mail and the build context was admin/ alone. Nothing in CI
+  # had ever built that Dockerfile, so the first thing to try it was production,
+  # with five relays already replaced and half a fleet on the new version.
+  #
+  # Building is not enough either: the image built fine before, it just could
+  # not start. So this job also RUNS it and asks whether the server comes up.
+  build-admin-dockerfile:
+    name: Build admin/Dockerfile, and start it
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    services:
+      redis:
+        image: redis:7.4.8-alpine
+        ports: ['6399:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      # Context is the repository root, matching docker-compose.yml: the admin
+      # shares relay/lib/mail.js so one MAIL_PROVIDER decides for the whole
+      # product. load: true because the next step runs what was built.
+      - name: Build admin image (no push)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./admin/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: paramant-admin:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: It has to start, not just build
+        run: |
+          set -o pipefail
+          docker run -d --name admin-ci --network host \
+            -e PORT=14200 -e REDIS_URL=redis://127.0.0.1:6399 \
+            -e ADMIN_TOKEN="$(head -c 30 /dev/zero | tr '\0' 'x')" \
+            -e PARAMANT_TOTP_MASTER_KEY="$(head -c 32 /dev/urandom | base64)" \
+            paramant-admin:ci
+          op=""
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:14200/api/auth/check || true)
+            # 401 is the right answer without a session; anything that answers
+            # at all means the process is up and listening.
+            if [ "$code" != "000" ]; then op="$code"; break; fi
+            sleep 2
+          done
+          if [ -z "$op" ]; then
+            echo "::error::the admin image built but never started listening."
+            echo "That is the 22-09 failure: a require that only resolves when"
+            echo "the build context is the repository root."
+            docker logs admin-ci 2>&1 | tail -30
+            exit 1
+          fi
+          echo "admin answered $op on /api/auth/check"
+          docker rm -f admin-ci >/dev/null 2>&1 || true

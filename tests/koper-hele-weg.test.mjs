@@ -150,19 +150,40 @@ test('1. de kassa rekent het bedrag af dat op de knop staat', async () => {
 test('2. de vier schermen zeggen na de betaling hetzelfde', async () => {
   // Deze vier spraken elkaar tegen: dat is de reden dat poort 6 bestaat.
   const thuis = await schermtekst(S.pageK, '/');
+  const thuisEn = await schermtekst(S.pageK, '/en/');
   const account = await schermtekst(S.pageK, '/account');
   const dashboard = await schermtekst(S.pageK, '/dashboard');
 
-  assert.match(thuis, new RegExp(`${FIRM_SIGNS} of ${FIRM_SIGNS} signatures left`),
+  // / is Nederlands, /en de Engelse homepage; beide moeten het zeggen.
+  assert.match(thuis, new RegExp(`${FIRM_SIGNS} van ${FIRM_SIGNS} handtekeningen over deze maand`),
     'de ingelogde homepage toont de gekochte limiet niet');
-  assert.doesNotMatch(thuis, /Community, free for good/,
+  assert.doesNotMatch(thuis, /Community, gratis, voor altijd/,
     'de homepage noemt een betalend account nog Community');
+  assert.match(thuisEn, new RegExp(`${FIRM_SIGNS} of ${FIRM_SIGNS} signatures left`),
+    'de Engelse ingelogde homepage toont de gekochte limiet niet');
+  assert.doesNotMatch(thuisEn, /Community, free for good/,
+    'de Engelse homepage noemt een betalend account nog Community');
   assert.match(account, /FIRM PLAN/, '/account noemt het plan niet Firm');
   assert.match(dashboard, /FIRM PLAN/, '/dashboard noemt het plan niet Firm');
   // De termijn staat op beide schermen, met dezelfde zin.
+  // /account en /dashboard zijn Nederlands sinds 23 september 2026; de Engelse
+  // kopieën onder /en houden de Engelse zin.
+  // Deze stapel draait met BILLING_MODE=test: er staat een abonnement achter
+  // (auto_renews true, zie test 6). Tot acceptatie 3.1.1 (taal 31) zei het
+  // scherm juist dan "er wordt niets automatisch verlengd", en deze test pinde
+  // die omgekeerde zin vast. Nu zegt het scherm wat er gebeurt.
   for (const [naam, tekst] of [['account', account], ['dashboard', dashboard]]) {
-    assert.match(tekst, /nothing renews automatically/,
+    assert.match(tekst, /automatisch verlengd/,
       `${naam} zegt niet wat er aan het einde van de termijn gebeurt`);
+    assert.doesNotMatch(tekst, /[Ee]r wordt niets automatisch verlengd/,
+      `${naam} zegt dat er niets verlengd wordt terwijl er een abonnement loopt`);
+  }
+  for (const pad of ['/en/account', '/en/dashboard']) {
+    const t = await schermtekst(S.pageK, pad);
+    assert.match(t, /[Rr]enews automatically/,
+      `${pad} zegt niet wat er aan het einde van de termijn gebeurt`);
+    assert.doesNotMatch(t, /[Nn]othing renews automatically/,
+      `${pad} zegt dat er niets verlengd wordt terwijl er een abonnement loopt`);
   }
 
   // En de API zegt hetzelfde als de schermen. current_plan zei 'community'
@@ -213,7 +234,9 @@ test('4. wat het plan verkoopt kan de koper ook echt gebruiken', async () => {
 
   // En de sleutel staat op zijn eigen accountpagina, niet alleen in een JSON.
   const account = await schermtekst(S.pageK, '/account');
-  assert.match(account, /ParaSign API keys/i, '/account laat de API-sleutels van het plan niet zien');
+  assert.match(account, /API-sleutels voor ParaSign/i, '/account laat de API-sleutels van het plan niet zien');
+  assert.match(await schermtekst(S.pageK, '/en/account'), /ParaSign API keys/i,
+    '/en/account laat de API-sleutels van het plan niet zien');
 });
 
 test('5. de factuur klopt, en het nummer loopt door', async () => {
@@ -245,7 +268,9 @@ test('5. de factuur klopt, en het nummer loopt door', async () => {
   }, doc.number);
   assert.equal(pdf.status, 200);
   assert.ok(pdf.txt.includes(doc.number), 'de PDF noemt zijn eigen nummer niet');
-  assert.ok(pdf.txt.includes(FIRM_GROSS), 'de PDF noemt het betaalde bedrag niet');
+  // De koper kocht via de Nederlandse pagina, dus de PDF is Nederlands en
+  // schrijft het bedrag met een komma (acceptatie 3.1.1, betalen punt 5).
+  assert.ok(pdf.txt.includes(FIRM_GROSS.replace('.', ',')), 'de PDF noemt het betaalde bedrag niet');
 
   // Tweede aankoop: opvolgend nummer, en de termijn wordt verlengd, niet vervangen.
   const voor = (await api(S.pageK, '/api/user/billing/status')).body.access_until;
@@ -275,7 +300,7 @@ test('6. opzeggen stopt de incasso echt', async () => {
     'na "Cancellation scheduled" liep de incasso gewoon door');
 
   // De mail noemt het plan zoals de schermen het noemen.
-  const mail = S.resend.mails.find((m) => /cancellation/i.test(String(m.subject)));
+  const mail = S.resend.mails.find((m) => /cancel/i.test(String(m.subject))); // onderwerp: 'is cancelled as of <datum>'
   assert.ok(mail, 'er ging geen bevestiging van de opzegging uit');
   assert.match(String(mail.text), /Firm/, 'de opzegmail noemt een ander plan dan de accountpagina');
 
@@ -313,14 +338,23 @@ test('7. geld terug levert een creditnota op die bij de factuur past', async () 
   // toekenningstak en alleen de idempotentiemarkering hield een verse maand
   // tegen. De vloer per product staat in relay/lib/billing-catalog.js.
   const vloer = { parasign: 'free', parasend: 'community' };
+  // Deze koper betaalde twee keer (twee maanden). Geld terug voor de EERSTE
+  // neemt sinds 2026-10-04 alleen die maand terug, niet de maand die de
+  // tweede betaling kocht (sweep-acct bevinding 8): het recht blijft dan staan,
+  // een maand korter. Stap 8 boekt de andere terug en ziet de vloer.
+  const overige = betalingen.filter((p) => p.status === 'paid' && p.id !== eerste.id);
   const gekocht = eerste.metadata && eerste.metadata.product;
   assert.ok(gekocht, 'de betaling draagt geen product in zijn metadata');
   const producten = gekocht === 'firm' ? ['parasign', 'parasend'] : [gekocht];
   for (const [naam, port] of [['main', S.relayPort], ['health', S.healthPort]]) {
     const e = await rechtenOp(port, S.koper.key);
     for (const prod of producten) {
-      assert.equal(e[prod].tier, vloer[prod],
-        `${naam} geeft na een volledige terugbetaling nog ${prod} op ${e[prod].tier}`);
+      if (overige.length) {
+        assert.equal(e[prod].tier, 'pro', `${naam}: geld terug voor een maand nam ook de andere betaalde maand van ${prod} af`);
+      } else {
+        assert.equal(e[prod].tier, vloer[prod],
+          `${naam} geeft na een volledige terugbetaling nog ${prod} op ${e[prod].tier}`);
+      }
     }
   }
 });
@@ -374,10 +408,30 @@ test('9. de termijn loopt af zoals de site het aankondigt', async () => {
     await new Promise((r) => setTimeout(r, 5000));
   };
 
+  // Deze stapel draait met BILLING_MODE=test, dus de aankoop opende een
+  // abonnement. Zeven dagen voor het einde zegt de waarschuwing dan wat er
+  // gebeurt: verlengen, voor welk bedrag, en waar je opzegt. Tot 25-09 pinde
+  // deze test hier "nothing is charged automatically", terwijl het abonnement
+  // zes dagen later zou incasseren.
+  await opnieuw(new Date(Date.now() + 6 * 86400000).toISOString());
+  const verlenging = S.resend.mails.filter((m) => / renews on /.test(String(m.subject)));
+  assert.ok(verlenging.length >= 1, 'er kwam geen waarschuwing voor een termijn die zichzelf verlengt');
+  for (const m of verlenging) {
+    assert.match(String(m.text), /renews automatically/, 'de waarschuwing zegt niet dat er verlengd wordt');
+    assert.doesNotMatch(String(m.text), /nothing is charged automatically/,
+      'de waarschuwing belooft dat er niets wordt afgeschreven terwijl het abonnement loopt');
+  }
+
+  // Wie opzegt, heeft daarna een termijn die gewoon afloopt.
+  const opzeg = await api(page2, '/api/user/billing/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(opzeg.status, 200, JSON.stringify(opzeg));
+  await page2.waitForTimeout(1500);
+
   // Zeven dagen voor het einde: de aangekondigde waarschuwing.
   await opnieuw(new Date(Date.now() + 6 * 86400000).toISOString());
   const waarschuwing = S.resend.mails.filter((m) => / ends on /.test(String(m.subject)));
-  assert.ok(waarschuwing.length >= 1, 'er kwam geen waarschuwing voor het einde van de termijn');
+  assert.ok(waarschuwing.length >= 1,
+    `er kwam geen waarschuwing voor het einde van de termijn (wel: ${JSON.stringify(S.resend.mails.map((m) => m.subject))})`);
   assert.match(String(waarschuwing[0].text), /nothing is charged automatically/,
     'de waarschuwing zegt iets anders dan /pricing en /terms');
   assert.equal((await rechtenOp(S.healthPort, koper2.key)).parasign.tier, 'pro',

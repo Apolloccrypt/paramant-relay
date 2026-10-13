@@ -66,6 +66,10 @@ Live production volumes (host paths, from `docker volume inspect`):
 
 ### Install on prod (not yet done — gated as a production action)
 
+Superseded: install the systemd timer from `deploy/systemd/` as described in
+`deploy/DEPLOY-3.1.md`, section "Daily backup (systemd timer)". The cron line
+below is kept for history; do not run both.
+
 ```
 # copy the script into place
 scp deploy/ops/backup-full-state.sh root@<prod>:/home/paramant/scripts/
@@ -98,8 +102,13 @@ ssh root@<prod> '
   also requires typing `restore` at the prompt.
 
 ```
-# Safe: decrypt, verify every manifest hash, list contents, touch nothing live
+# Safe: decrypt, verify every manifest hash, list contents, touch nothing live.
+# The decrypted copy is removed again when the script exits.
 ./restore-full-state.sh --from /path/to/paramant-full-<ts>.tar.gz.age --inspect
+
+# Same, but keep the decrypted bundle in a directory you name (created 0700,
+# must be empty). It holds private keys in the clear: remove it when done.
+./restore-full-state.sh --from ... --inspect --extract-to /root/restore-work
 
 # Destructive: overwrite live volumes + restart containers (run as root on prod)
 ./restore-full-state.sh --from /path/to/paramant-full-<ts>.tar.gz.age --confirm

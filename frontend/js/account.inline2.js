@@ -1,3 +1,6 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 
 import { vaultAvailable, vaultList } from '/vendor/vault.js?v=5';
 
@@ -11,36 +14,49 @@ function fmtTs(iso) {
   return paramantDate.moment(iso, '-');
 }
 
+// A failed load in words, never "(HTTP 429)" (retest T5-1): what happened
+// and what the reader can do, by status.
+function loadFailText(status, nlWhat, enWhat) {
+  if (status === 429) return nlEn(nlWhat + ' laden even niet: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
+  if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
+  if (status >= 500) return nlEn(nlWhat + ' laden nu niet door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  return nlEn(nlWhat + ' laden nu niet. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
+}
+
 async function loadEnrolledKeys() {
   const listEl = document.getElementById('signing-list');
   const emptyEl = document.getElementById('signing-empty');
   try {
     const res = await fetch('/api/user/account/signing-key', { credentials: 'include' });
     if (!res.ok) {
-      emptyEl.textContent = 'Could not load enrolled keys (HTTP ' + res.status + ').';
+      emptyEl.textContent = loadFailText(res.status, 'Uw ondertekensleutels', 'your signing keys');
       return;
     }
     const data = await res.json();
     const keys = (data.keys || []);
     if (!keys.length) {
-      emptyEl.textContent = 'No signing keys enrolled yet. Use "Set up your signing key" below to create one.';
+      emptyEl.textContent = nlEn('U heeft geen vaste ondertekensleutel, en dat hoeft ook niet: u tekent met de code uit uw authenticator-app. Liever tekenen met uw passkey? Stel het hieronder in.', 'You have no stored signing key, and you do not need one: you sign with the code from your authenticator app. Rather sign with your passkey? Set it up below.');
       listEl.innerHTML = '';
       return;
     }
     emptyEl.hidden = true;
     listEl.innerHTML = keys.map(k => {
       const fp = escHtml((k.pk_hash_sha3 || '').slice(0, 16));
-      const lbl = k.label ? escHtml(k.label) : '<em>no label</em>';
+      const lbl = k.label ? escHtml(k.label) : nlEn('<em>geen label</em>', '<em>no label</em>');
       const enrolled = escHtml(fmtTs(k.enrolled_at));
-      const revoked = k.revoked_at ? ' &middot; revoked ' + escHtml(fmtTs(k.revoked_at)) : '';
+      // A key bound with a 6-digit code was made for one signature and lapses
+      // by itself (relay user-signing.js, expires_at): history, like a revoked one.
+      const revoked = k.revoked_at ? nlEn(' &middot; ingetrokken ', ' &middot; revoked ') + escHtml(fmtTs(k.revoked_at))
+        : k.expired ? nlEn(' &middot; verlopen ', ' &middot; expired ') + escHtml(fmtTs(k.expires_at))
+        : k.expires_at ? nlEn(' &middot; vervalt ', ' &middot; lapses ') + escHtml(fmtTs(k.expires_at)) : '';
       const alg = escHtml(k.alg || '?');
-      const btn = k.revoked_at
+      const btn = (k.revoked_at || k.expired)
         ? ''
-        : '<button type="button" class="btn btn-secondary btn-small" data-revoke="' + escHtml(k.pk_hash_sha3) + '">Revoke</button>';
+        : '<button type="button" class="btn btn-secondary btn-small" data-revoke="' + escHtml(k.pk_hash_sha3) + nlEn('">Intrekken</button>', '">Revoke</button>');
       return '<li style="padding:12px 0;border-bottom:1px solid var(--border-soft, #e5e7eb)">' +
         '<div style="font-weight:600">' + lbl + '</div>' +
         '<div class="mono small" style="margin:4px 0">' + fp + '...</div>' +
-        '<div class="small">' + alg + ' &middot; enrolled ' + enrolled + revoked + '</div>' +
+        '<div class="small">' + alg + nlEn(' &middot; geregistreerd ', ' &middot; enrolled ') + enrolled + revoked + '</div>' +
         (btn ? '<div style="margin-top:8px">' + btn + '</div>' : '') +
         '</li>';
     }).join('');
@@ -48,7 +64,7 @@ async function loadEnrolledKeys() {
       b.addEventListener('click', () => revokeKey(b.getAttribute('data-revoke')));
     });
   } catch (e) {
-    emptyEl.textContent = 'Could not load enrolled keys: ' + e.message;
+    emptyEl.textContent = nlEn('We konden uw sleutels niet laden: ', 'Could not load your keys: ') + e.message;
   }
 }
 
@@ -58,7 +74,7 @@ function askRevokeTotp() {
     const input = document.getElementById('revoke-totp');
     const ok = document.getElementById('revoke-totp-confirm');
     const cancel = document.getElementById('revoke-totp-cancel');
-    if (!wrap || !input || !ok || !cancel) { resolve((window.prompt('Enter your 6-digit authenticator code to revoke this signing key.') || '').trim()); return; }
+    if (!wrap || !input || !ok || !cancel) { resolve((window.prompt(nlEn('Vul de code van 6 cijfers uit uw authenticator-app in. Daarmee trekt u deze sleutel in.', 'Enter the 6-digit code from your authenticator app. That revokes this key.')) || '').trim()); return; }
     input.value = ''; wrap.hidden = false; input.focus();
     const done = (v) => { ok.removeEventListener('click', onOk); cancel.removeEventListener('click', onCancel); input.removeEventListener('keydown', onKey); wrap.hidden = true; resolve(v); };
     const onOk = () => { const t = (input.value || '').trim(); if (!/^\d{6}$/.test(t)) { input.focus(); return; } done(t); };
@@ -78,30 +94,39 @@ async function revokeKey(pkHash) {
       body: JSON.stringify({ pk_hash_sha3: pkHash, totp }),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) { alert('Revoke failed: ' + (body.error || ('HTTP ' + res.status))); return; }
+    if (!res.ok) {
+      alert(body && body.error === 'totp_locked'
+        ? nlEn('Te veel foute codes achter elkaar. Probeer het over ' + Math.max(1, Math.ceil((body.retry_after || 60) / 60)) + ' minuten opnieuw.', 'Too many wrong codes in a row. Try again in ' + Math.max(1, Math.ceil((body.retry_after || 60) / 60)) + ' minutes.')
+        : body && body.error === 'invalid_totp'
+        ? nlEn('Die code klopt niet. Er is niets veranderd.', 'That code did not match. Nothing changed.')
+        : res.status === 429
+        ? nlEn('Intrekken lukte even niet: te veel verzoeken tegelijk. Probeer het over een minuut opnieuw.', 'Revoking did not work just now: too many requests at once. Try again in a minute.')
+        : nlEn('Intrekken is niet gelukt. Er is niets veranderd; probeer het zo opnieuw.', 'Revoking did not work. Nothing changed; please try again shortly.'));
+      return;
+    }
     await loadEnrolledKeys();
-  } catch (e) { alert('Revoke failed: ' + e.message); }
+  } catch (e) { alert(nlEn('Intrekken lukte niet: ', 'Could not revoke: ') + e.message); }
 }
 
 async function loadVaultStatus() {
   const el = document.getElementById('vault-status');
   if (!(await vaultAvailable())) {
-    el.textContent = 'IndexedDB or WebCrypto is unavailable in this browser (private/incognito mode can cause this), so a signing key cannot be stored here.';
+    el.textContent = nlEn('Deze browser kan hier geen ondertekensleutel bewaren (IndexedDB of WebCrypto ontbreekt). Een privévenster kan de oorzaak zijn.', 'This browser cannot store a signing key here (IndexedDB or WebCrypto is missing). A private window can cause this.');
     return;
   }
   try {
     const list = await vaultList();
     if (!list.length) {
-      el.textContent = 'No signing key in this browser yet. Use "Set up your signing key" below.';
+      el.textContent = nlEn('Geen ondertekensleutel in deze browser. Niet nodig om te tekenen; wilt u er een, gebruik dan "Uw ondertekensleutel instellen" hieronder.', 'No signing key in this browser. You do not need one to sign; if you want one, use "Set up your signing key" below.');
       return;
     }
-    const fmt = e => (e.label ? e.label : '(no label)') + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';
+    const fmt = e => (e.label ? e.label : nlEn('(geen label)', '(no label)')) + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';
     const last = list.reduce((acc, e) => (e.last_used_at && (!acc || e.last_used_at > acc) ? e.last_used_at : acc), null);
-    el.textContent = list.length + ' key' + (list.length === 1 ? '' : 's') + ' saved in this browser'
-      + (last ? '. Last used ' + fmtTs(last) : '. Never unlocked yet')
-      + '. Keys: ' + list.map(fmt).join(', ');
+    el.textContent = list.length + nlEn(list.length === 1 ? ' sleutel' : ' sleutels', ' key' + (list.length === 1 ? '' : 's')) + nlEn(' bewaard in deze browser', ' saved in this browser')
+      + (last ? nlEn('. Laatst gebruikt ', '. Last used ') + fmtTs(last) : nlEn('. Nog nooit geopend', '. Never unlocked yet'))
+      + nlEn('. Sleutels: ', '. Keys: ') + list.map(fmt).join(', ');
   } catch (e) {
-    el.textContent = 'Could not read browser vault: ' + e.message;
+    el.textContent = nlEn('We konden de sleutel in deze browser niet lezen: ', 'Could not read the key in this browser: ') + e.message;
   }
 }
 

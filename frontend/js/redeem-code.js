@@ -44,10 +44,21 @@
   var forms = document.querySelectorAll('[data-redeem-form]');
   if (!forms.length) return;
 
-  var BUSY = 'Checking your code...';
-  var NO_HELPER = 'This page could not start. Reload and try again.';
-  var OFFLINE = 'We could not reach the server. Please try again in a minute.';
-  var EMPTY = 'Enter your code first.';
+  // The page's own language: Dutch on every page that declares <html lang="nl">,
+  // English on the pages that still declare "en" (the copies under /en).
+  var EN = document.documentElement.lang === 'en';
+  var BUSY = EN ? 'Checking your code...' : 'We controleren uw code...';
+  var NO_HELPER = EN ? 'This page did not load properly. Reload it and try again.' : 'Deze pagina laadde niet goed. Laad hem opnieuw en probeer het nog eens.';
+  var OFFLINE = EN ? 'We could not reach the server. Please try again in a minute.' : 'We konden de server niet bereiken. Probeer het over een minuut opnieuw.';
+  var EMPTY = EN ? 'Enter your code first.' : 'Vul eerst uw code in.';
+
+  /* The relay answers in both languages: `message` in English, `message_nl`
+   * in Dutch. A Dutch page printed the English one word for word (fase 1,
+   * PLAN-28/29/31). A relay that predates message_nl still gives `message`. */
+  function pick(data) {
+    if (!data) return '';
+    return (!EN && data.message_nl) || data.message || '';
+  }
 
   function say(form, text, kind) {
     var el = form.querySelector('[data-redeem-message]');
@@ -114,7 +125,7 @@
       if (!out) return;
       busy(form, false);
       if (out.status === 200 && out.data.ok) {
-        say(form, out.data.message || 'Your code is redeemed.', 'info');
+        say(form, pick(out.data) || (EN ? 'Your code is redeemed.' : 'Uw code is ingewisseld.'), 'info');
         if (input) input.value = '';
         /* The plan on this page is now out of date. Let whichever page we are
          * on refresh the block that shows it, without this file knowing which
@@ -124,7 +135,7 @@
         } catch (e) { /* an old browser simply keeps the stale block */ }
         return;
       }
-      say(form, out.data.message || OFFLINE, 'error');
+      say(form, pick(out.data) || OFFLINE, 'error');
     }).catch(function () {
       busy(form, false);
       say(form, OFFLINE, 'error');
