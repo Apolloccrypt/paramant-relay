@@ -129,6 +129,10 @@ function spawnRelay(port, extraEnv, opts = {}) {
     exitCode: null,
     exitSignal: null,
     exited: false,
+    // True once THIS child logged relay_started for THIS port. Only the process
+    // that owns the socket logs that, so it is proof of ownership; see
+    // waitRelayHealthy for why a 200 on /health is not.
+    started: false,
     stdoutTail: '',
     stderrTail: '',
     // Both tails, labelled, for an error message. Says so when a stream stayed
@@ -144,9 +148,17 @@ function spawnRelay(port, extraEnv, opts = {}) {
   };
 
   let pending = '';
+  let startScan = '';
+  const startedRe = new RegExp(`"msg":"relay_started"[^\\n]*"port":${port}\\b`);
   child.stdout.on('data', (d) => {
     const text = d.toString();
     handle.stdoutTail = (handle.stdoutTail + text).slice(-BOOT_TAIL_BYTES);
+    if (!handle.started) {
+      // The previous chunk's end rides along, so a line split across two
+      // chunks is still seen whole.
+      startScan = (startScan + text).slice(-(text.length + 512));
+      if (startedRe.test(startScan)) { handle.started = true; startScan = ''; }
+    }
     if (!opts.onLine) return;
     pending += text;
     const lines = pending.split('\n');
@@ -187,11 +199,15 @@ async function waitRelayHealthy(handle, timeoutMs = BOOT_TIMEOUT_MS) {
     }
     try {
       const r = await fetch(`${handle.base}/health`);
-      // A healthy answer is only OUR relay's answer while our child is alive.
-      // On a port collision the other process answers too, and a suite that
-      // takes that for its own boot goes green having asserted against someone
-      // else's relay. That is the quiet half of the same bug.
-      if (r.ok && !handle.exited) return handle;
+      // A healthy answer is only OUR relay's answer once our child has said it
+      // owns the port. On a collision the other process answers /health while
+      // our child is still loading, and "the child has not exited yet" was all
+      // this checked: the suite then ran against a stranger and our child died
+      // of EADDRINUSE a second later. _relay-server.js closed the same hole
+      // the same way (relay_started for this port). Seen here on 07-10 when 64
+      // copies of sends-aanval ran side by side with identical keys: uploads
+      // answered 200 by a sibling's relay, and our own log never saw them.
+      if (r.ok && !handle.exited && handle.started) return handle;
     } catch (_) { /* not listening yet */ }
     if (Date.now() > deadline) {
       throw new Error(
@@ -203,10 +219,25 @@ async function waitRelayHealthy(handle, timeoutMs = BOOT_TIMEOUT_MS) {
 }
 
 // freeRelayPort + spawnRelay + waitRelayHealthy, for the common case.
+//
+// A lost port race is retried on a fresh port, at most three boots. The gap
+// between freeRelayPort's close and the child's listen is real: a CI step
+// starts well over a hundred relays side by side. Only EADDRINUSE before our
+// child owned the port counts as a lost race; any other failure is the
+// suite's own and is thrown as it is.
 async function bootHealthyRelay(extraEnv, opts = {}) {
-  const handle = spawnRelay(await freeRelayPort(), extraEnv, opts);
-  await waitRelayHealthy(handle, opts.timeoutMs);
-  return handle;
+  for (let poging = 1; ; poging++) {
+    const handle = spawnRelay(await freeRelayPort(), extraEnv, opts);
+    try {
+      await waitRelayHealthy(handle, opts.timeoutMs);
+      return handle;
+    } catch (e) {
+      const bezet = handle.exited && !handle.started
+        && /EADDRINUSE/.test(handle.stdoutTail + handle.stderrTail);
+      if (!bezet || poging >= 3) throw e;
+      handle.kill();
+    }
+  }
 }
 
 // Call from a suite's after() hook. SIGKILL, which is what these three suites
