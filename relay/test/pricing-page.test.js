@@ -67,14 +67,18 @@ ok('6 checkout buttons with data-billing-*');
 for (const b of buttons) {
   assert(!/payment-links\.mollie\.com/.test(b.href),
     'checkout button falls back to a static Mollie link (no metadata, unattributable): ' + b.href);
-  assert(b.href.startsWith('/auth/login') || b.href.startsWith('/en/auth/login'),
-    'no-JS fallback must be sign-in, got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
+  // Since 13-10-2026 (test with a stranger) the fallback is the free account,
+  // /signup?next=..., because a visitor without a session nearly always has
+  // no account yet; the signup page links on to the sign-in. Either way the
+  // payment is made by an account, which is the point of this check.
+  assert(/^\/(en\/)?(auth\/login|signup)\?next=\/(en\/)?pricing$/.test(b.href),
+    'no-JS fallback must be the account (signup or sign-in, back to pricing), got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
   // Every button, not only the variants below: a button the checkout refuses
   // is a price the site shows and nobody can pay.
   assert(!catalog.resolveSale(b).error,
     'the checkout refuses a button on the page: ' + b.product + '/' + b.plan + '/' + b.interval);
 }
-ok('no-JS fallback on every button is sign-in, never a metadata-less payment link');
+ok('no-JS fallback on every button is the account (signup or sign-in), never a metadata-less payment link');
 
 for (const v of VARIANTS) {
   const btn = buttons.find(b => b.product === v.product && b.plan === v.plan && b.interval === v.interval);
@@ -979,7 +983,7 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert.deepStrictEqual(buys.map((b) => `${b.product}/${b.plan}/${b.interval}`), ['firm/firm/monthly', 'firm/firm/yearly'],
     'the Dutch /pricing sells Firm, monthly and yearly, and nothing else');
   for (const b of buys) {
-    assert(b.href.startsWith('/auth/login'), 'no-JS fallback on the Dutch page must be sign-in, got ' + b.href);
+    assert(b.href === '/signup?next=/pricing', 'no-JS fallback on the Dutch page must be the free account, back to pricing, got ' + b.href);
     assert(!catalog.resolveSale(b).error, 'the checkout refuses ' + b.product + '/' + b.plan + '/' + b.interval);
   }
   assert(/class="btn btn-primary/.test(buys[0].rest), 'the monthly Firm button is the primary action');
