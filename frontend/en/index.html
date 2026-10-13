@@ -27,7 +27,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/werkplek.css?v=2">
+<link rel="stylesheet" href="/werkplek.css?v=3">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FFFFFF, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -338,7 +338,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 :root[data-theme="dark"] .panel-night .letter-sign{border-top-color:rgba(244,247,250,.45)}
 :root[data-theme="dark"] .panel-night .letter-sign .by-mark{border-color:rgba(244,247,250,.55)}
 .panel-paper{background:var(--card);border:1px solid var(--card-line)}
-.panel-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px}
+.panel-kicker{font-size:15px;font-weight:600;margin:0 0 6px}
 .panel p.panel-amt{margin:0 0 18px;font-family:var(--hp-mono);font-size:clamp(1.9rem,3.2vw,2.6rem);font-weight:700;letter-spacing:-.02em;line-height:1;white-space:nowrap}
 .panel p.panel-amt small{font-size:.45em;font-weight:500;letter-spacing:0;color:inherit;opacity:.7;font-family:var(--hp-sans)}
 .panel-night p.panel-amt{color:var(--paper-ink)}
@@ -545,66 +545,60 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
   <div class="hp-wrap">
     <div class="home-state" data-home="out">
       <!-- Mick, 5 October 2026: the visitor lands in the dashboard itself, not
-           under a hero. Same head, same rows as /dashboard, in a demo state
-           marked "Example" on the frame and on every row. See the Dutch page. -->
+           under a hero, with the same rows and state words as /dashboard.
+           Mick, 13 October 2026: no caption per row, "Example" said once. See
+           the Dutch page. -->
       <div class="wp-demo wp-demo-top" role="region" aria-labelledby="home-h1" data-wp-demo>
         <div class="wp-demo-bar">
-          <span class="wp-sign" aria-hidden="true">Example</span>
-          <p class="wp-demo-h" id="wp-demo-h">This is what your overview looks like. <span>Pick a document and see how it works.</span></p>
           <ul class="wp-appnav" aria-hidden="true">
             <li class="on">Documents</li><li>Send</li><li>Sign</li><li>Verify</li>
           </ul>
         </div>
         <header class="wp-demo-hero">
           <div class="wp-demo-title">
-            <h1 id="home-h1">Send files safely and get documents signed, for small professional firms.</h1>
-            <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;29 a month. You can prepare without an account; sending needs a free one.</p>
+            <h1 id="home-h1">For what shouldn't just go by email.</h1>
+            <p class="hero-line">Your file leaves encrypted and is deleted once it has been collected. With a contract, you see who still has to sign.</p>
           </div>
           <div class="home-actions">
             <a class="hp-btn hp-btn-fill" href="/en/signup">Create account</a>
             <a class="hp-btn hp-btn-line" href="/en/sign?mode=invite">Try it yourself</a>
           </div>
+          <p class="hero-note">Sending needs a free account. For your firm: 29 euros a month, excl. VAT.</p>
         </header>
         <div class="wp-demo-head">
-          <p class="wp-demo-hi">Your documents <span class="wp-demo-tag">example</span></p>
-          <span class="dh-plan wp-plan"><strong>Community</strong><span>plan</span></span>
+          <p class="wp-demo-hi">Your documents</p>
+          <span class="wp-demo-tag">Example</span>
         </div>
         <div class="wp-tiles">
           <a class="wp-tile dh-workspace" href="/en/sign?mode=invite" data-wp-open="sign" aria-haspopup="dialog">
-            <span class="wp-tile-k">Sign</span>
-            <span class="wp-tile-t">A contract two people sign</span>
             <span class="dh-document wp-row">
               <span class="dh-document-open">
-                <span class="dh-document-name"><strong>Office lease.pdf</strong><span>Example &middot; 4 pages</span></span>
+                <span class="dh-document-name"><strong>Practice premises lease.pdf</strong><span>Created yesterday 16:42</span></span>
                 <span class="dh-document-progress"><span>1 of 2 signed</span><span class="dh-progress"><i style="width:50%"></i></span></span>
-                <span class="dh-status in_progress">Waiting for 1 signature</span>
+                <span class="dh-status in_progress">In progress</span>
               </span>
+              <span class="wp-row-next">Waiting for M. de Vries.</span>
             </span>
-            <span class="wp-tile-go">How it works</span>
           </a>
           <a class="wp-tile dh-workspace" href="/en/parashare" data-wp-open="send" aria-haspopup="dialog">
-            <span class="wp-tile-k">Send</span>
-            <span class="wp-tile-t">A case file, sent safely</span>
             <span class="dh-send-row wp-row">
               <span class="dh-send-open">
-                <span class="dh-send-name"><strong>Referral and case file.pdf</strong><span>Example &middot; to 1 recipient</span></span>
+                <span class="dh-send-name"><strong>Physiotherapy referral.pdf</strong><span>Sent today 09:12</span></span>
                 <span class="dh-send-progress"><span>1 of 1 collected</span><span class="dh-progress"><i style="width:100%"></i></span></span>
-                <span class="dh-status completed">Collected and deleted</span>
+                <span class="dh-status completed">Complete</span>
               </span>
+              <span class="wp-row-next">Everyone has collected it.</span>
             </span>
-            <span class="wp-tile-go">How it works</span>
           </a>
           <a class="wp-tile dh-workspace" href="/en/verify" data-wp-open="verify" aria-haspopup="dialog">
-            <span class="wp-tile-k">Verify</span>
-            <span class="wp-tile-t">A proof, checked by yourself</span>
             <span class="dh-document wp-row">
               <span class="dh-document-open">
-                <span class="dh-document-name"><strong>Employment contract.pdf</strong><span>Example &middot; with its proof file</span></span>
-                <span class="dh-document-progress"><span>3 of 3 checks</span><span class="dh-progress"><i style="width:100%"></i></span></span>
-                <span class="dh-status completed">Genuine</span>
+                <span class="dh-document-name"><strong>Employment contract S. Jansen.pdf</strong><span>Created Monday 11:05</span></span>
+                <span class="dh-document-progress"><span>2 of 2 signed</span><span class="dh-progress"><i style="width:100%"></i></span></span>
+                <span class="dh-status completed">Completed</span>
               </span>
+              <span class="wp-row-next">Signed by everyone. The proof is yours to download.</span>
             </span>
-            <span class="wp-tile-go">How it works</span>
           </a>
         </div>
       </div>
@@ -789,17 +783,15 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 
 <section class="hp-sec why-nl-sec" aria-labelledby="why-nl-h">
   <div class="hp-wrap">
-    <p class="wp-more-kicker">Before you start</p>
     <details class="wp-more">
-      <summary><span class="wp-more-k">Why Dutch matters</span><h2 id="why-nl-h" class="hp-h2">Dutch is a fact here, not a flag.</h2></summary>
+      <summary><h2 id="why-nl-h" class="hp-h2">Who owns Paramant, and where are my files?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Where a supplier's owner is based decides which law reaches your client files, and who can be ordered to hand them over. That makes it a purchasing question. Here are the three answers.</p>
+    <p class="hp-lede">Where a supplier's owner is based decides which law reaches your client files, and who can be ordered to hand them over.</p>
     <ul class="check-grid why-grid">
-      <li data-partner-context="digicert geen-partij"><span class="ck-fact">The Dutch names were sold</span><p class="ck-how">The parent of WeTransfer has been Bending Spoons in Milan since July 2024. Zivver has been part of Kiteworks in California since June 2025. Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands. The names stayed Dutch. The owners did not.</p></li>
-      <li><span class="ck-fact">This one was not</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132. Its parent is Paramantis Digital B.V., also Dutch, KvK 42114664. There is no parent company abroad. Dutch law governs the terms you agree to, and a Dutch court hears the dispute.</p><a href="/en/terms#law">Governing law &rarr;</a></li>
-      <li><span class="ck-fact">And neither is the data path</span><p class="ck-how" data-partners-rollen>Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. The encrypted files sit only there. Email still goes through Resend in the United States for now. For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file. An invitation to sign carries half of the document key; the relay hands the other half only to the signed-in recipient. Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider. Every party with its status: <a href="/en/partners">/en/partners</a>.</p><a href="/en/privacy">The sub-processors &rarr;</a></li>
+      <li data-partner-context="digicert geen-partij"><span class="ck-fact">Well-known Dutch names were sold</span><p class="ck-how">The parent of WeTransfer has been Bending Spoons in Milan since July 2024. Zivver has been part of Kiteworks in California since June 2025. Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands.</p></li>
+      <li><span class="ck-fact">Paramant is owned by a Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132. Its parent is Paramantis Digital B.V., also Dutch, KvK 42114664. There is no parent company abroad. Dutch law governs the terms you agree to, and a Dutch court hears the dispute.</p><a href="/en/terms#law">Governing law &rarr;</a></li>
+      <li><span class="ck-fact">Where your files are</span><p class="ck-how" data-partners-rollen>Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. The encrypted files sit only there. Email still goes through Resend in the United States for now. For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file. An invitation to sign carries half of the document key; the relay hands the other half only to the signed-in recipient. Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider. Every party with its status: <a href="/en/partners">/en/partners</a>.</p><a href="/en/privacy">The sub-processors &rarr;</a></li>
     </ul>
-    <p class="why-proud">We are Dutch, and we would rather say so than hide behind a Delaware address.</p>
     <p class="why-src" data-partner-context="digicert geen-partij">Ownership sources: the Kiteworks announcement of the Zivver acquisition (17 June 2025); the Bending Spoons announcement of the WeTransfer acquisition (31 July 2024); Entrust on Signhost (2022); Box on SignRequest (2021); the RDI trust service status list, which carries QuoVadis as DigiCert Europe Netherlands B.V. Checked 3 September 2026. The parent of Paramant is named on paramantis.nl, checked 23 September 2026.</p>
       </div>
     </details>
@@ -809,14 +801,14 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <section class="hp-sec home-split-sec" aria-labelledby="split-h">
   <div class="hp-wrap">
     <details class="wp-more">
-      <summary><span class="wp-more-k">What it costs</span><h2 id="split-h" class="hp-h2">For your firm: 29 euros a month.</h2></summary>
+      <summary><h2 id="split-h" class="hp-h2">What does it cost?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Excluding VAT, so &euro;35.09 a month with 21% VAT. One payment for sending and signing together. You pay per month or per year, and nothing renews by itself.</p>
+    <p class="hp-lede">For your firm: 29 euros a month. Excluding VAT, so &euro;35.09 a month with 21% VAT. One payment for sending and signing together. You pay per month or per year, and nothing renews by itself.</p>
     <div class="gift-grid">
       <article class="panel panel-paper">
         <p class="panel-kicker">For your firm</p>
         <p class="panel-amt">&euro;29 <small>a month, excl. VAT</small></p>
-        <h3>What you get.</h3>
+        <h3>What you get</h3>
         <ul class="split-adds">
           <li>100 signatures a month.</li>
           <li>500 transfers a month, up to 30 recipients per send, and links that stay valid for 24 hours.</li>
@@ -828,7 +820,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
       <article class="panel panel-night">
         <p class="panel-kicker">Community</p>
         <p class="panel-amt">&euro;0 <small>for good</small></p>
-        <h3>Why half of this is free.</h3>
+        <h3>Why Community is free</h3>
         <div class="letter">
           <p>I research how personal data leaks from the apps and clouds people trust. Paramant is what I would want a small firm to have: a way to get a document signed and send a file, with client files that stay in Europe and proof you can check without us.</p>
           <p>The <strong>Community</strong> plan is free, and stays free: 2 signatures a month, 50 transfers a month, one recipient per send, and files up to 500 MB when you hand them over live. No card, and no trial that runs out. That is my contribution to society.</p>
@@ -847,14 +839,14 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <section class="hp-sec check-sec" aria-labelledby="check-h">
   <div class="hp-wrap">
     <details class="wp-more">
-      <summary><span class="wp-more-k">Do not take our word for it</span><h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2></summary>
+      <summary><h2 id="check-h" class="hp-h2">How can I check this myself?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Trust is not something a website can claim. These five facts are on public record outside this page, and each one comes with a link to where you can look it up.</p>
+    <p class="hp-lede">Each point says where you can look it up.</p>
     <ul class="check-grid">
       <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register (the Dutch Chamber of Commerce) lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
       <li><span class="ck-fact">Servers in Germany</span><p class="ck-how">Hetzner in Nuremberg. Which company holds what, and the one exception for email, is written out line by line on the security page.</p><a href="/en/security">Jurisdiction, line by line &rarr;</a></li>
-      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read. Not a claim about transparency: the log itself.</p><a href="/en/ct-log">Open the log &rarr;</a></li>
-      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/en/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
+      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read.</p><a href="/en/ct-log">Open the log &rarr;</a></li>
+      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement. Your signature receipts verify without us, so they stay valid proof if we are gone.</p><a href="/en/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
       <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/en/rules">The nine rules &rarr;</a></li>
     </ul>
       </div>
@@ -865,17 +857,16 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <section class="hp-sec" id="products" aria-labelledby="products-h">
   <div class="hp-wrap">
     <details class="wp-more">
-      <summary><span class="wp-more-k">Two things</span><h2 id="products-h" class="hp-h2">Sending and signing.</h2></summary>
+      <summary><h2 id="products-h" class="hp-h2">What can I do with it?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Both in a plain browser. Nothing to install, for you or for the other side.</p>
+    <p class="hp-lede">Send a file and get a document signed, both in a plain browser. Neither you nor the other side has to install anything.</p>
     <ul class="prod-grid">
       <li>
-        <span class="prod-name">Send &middot; ParaSend</span>
-        <h3>A file that disappears.</h3>
+        <h3>Send a file</h3>
         <ul class="prod-lines">
           <li>The file is encrypted in your browser before it leaves your device.</li>
           <li>Our server only holds the encrypted file, in memory and never on a disk.</li>
-          <li>After the last read it is wiped. Nothing is left to leak later.</li>
+          <li>After the last read it is wiped.</li>
           <li>That holds for the web app and the SDKs. The browser extensions still encrypt on our server. We are changing that.</li>
           <!-- The handshake, on the card rather than on /parashare step 1. A
                reviewer on 3 September 2026 bought ParaSign and refused ParaSend
@@ -886,13 +877,12 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
         <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/en/parasend">More about sending</a></div>
       </li>
       <li>
-        <span class="prod-name">Sign &middot; ParaSign</span>
-        <h3>Get a document signed.</h3>
+        <h3>Get a document signed</h3>
         <ul class="prod-lines">
           <li>Upload the PDF, place the fields and email it to whoever has to sign.</li>
           <li>They sign with the link from that email, after signing in to the account the invitation went to.</li>
           <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
-          <li>A simple electronic signature under eIDAS. Not a qualified one, and we say so.</li>
+          <li>A simple electronic signature under eIDAS, not a qualified one.</li>
         </ul>
         <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/en/parasign">More about signing</a></div>
       </li>

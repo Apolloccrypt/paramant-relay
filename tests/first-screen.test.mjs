@@ -171,26 +171,31 @@ const PAGES = [
     // retired with it; the price and the free plan stay on the first screen).
     slug: '/',
     claims: [
-      { name: 'the demo bar, marked as an example', css: '[data-home="out"] .wp-demo-top #wp-demo-h', text: 'Zo ziet uw overzicht eruit' },
-      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Veilig versturen en laten tekenen, voor praktijken en kantoren' },
-      { name: 'the Community plan and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'Community-plan', also: ['Voor uw kantoor: 29 euro per maand'] },
+      // 13 October 2026 (Mick: "te letterlijk, typisch ai"): the yellow badge
+      // and the sentence explaining the demo are gone; the title is one plain
+      // line with one line under it, and the price and the account sit small.
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Voor wat niet zomaar per mail kan' },
+      { name: 'what the code does, in one line', css: '[data-home="out"] .wp-demo-top p.hero-line', text: 'versleuteld' },
+      { name: 'the account and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'gratis account', also: ['Voor uw kantoor: 29 euro per maand'] },
       { name: 'the primary action, Account maken', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/signup', text: 'Account maken' },
       { name: 'the second action, Probeer het zelf', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/sign?mode=invite', text: 'Probeer het zelf' },
       { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Uw documenten' },
+      { name: 'the one mark that this is an example', css: '[data-home="out"] .wp-demo-top .wp-demo-tag', text: 'Voorbeeld' },
     ],
   },
   {
     slug: '/en',
     claims: [
-      { name: 'the demo bar, marked as an example', css: '[data-home="out"] .wp-demo-top #wp-demo-h', text: 'This is what your overview looks like' },
-      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Send files safely and get documents signed, for small professional firms' },
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: "For what shouldn't just go by email" },
+      { name: 'what the code does, in one line', css: '[data-home="out"] .wp-demo-top p.hero-line', text: 'encrypted' },
       // The split the whole homepage argues from. It has to be readable as a
       // split, so both halves are checked in one line: free tier named, paid
       // tier named, on the first screen.
-      { name: 'the Community and business plans split', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'Community plan', also: ['business plans from'] },
+      { name: 'the account and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'free account', also: ['For your firm: 29 euros a month'] },
       { name: 'the primary action, Create account', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/en/signup', text: 'Create account' },
       { name: 'the second action, Try it yourself', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/en/sign?mode=invite', text: 'Try it yourself' },
       { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Your documents' },
+      { name: 'the one mark that this is an example', css: '[data-home="out"] .wp-demo-top .wp-demo-tag', text: 'Example' },
     ],
   },
   {

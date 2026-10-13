@@ -221,8 +221,9 @@ test('VREEMDE-09: de stap Ontvangers zegt maar een keer wie u toevoegt', () => {
 // dialoog zei "voor het tekenen", terwijl een uitnodiging verstuurd wordt.
 test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versturen een gratis account vraagt', () => {
   const cases = [
-    ['index', '/sign?mode=invite', /versturen doet u met een gratis account/, /Voor het versturen maakt u een gratis account/],
-    ['en/index', '/en/sign?mode=invite', /sending needs a free one/, /To send it, you create a free one/],
+    // 13-10-2026: de kop zegt het nu in een korte zin onder de knoppen, met hoofdletter.
+    ['index', '/sign?mode=invite', /versturen doet u met een gratis account/i, /Voor het versturen maakt u een gratis account/],
+    ['en/index', '/en/sign?mode=invite', /sending needs a free account/i, /To send it, you create a free one/],
   ];
   for (const [slug, href, hero, stage] of cases) {
     const html = pg(slug);

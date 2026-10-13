@@ -27,7 +27,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/werkplek.css?v=2">
+<link rel="stylesheet" href="/werkplek.css?v=3">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FFFFFF, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -338,7 +338,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 :root[data-theme="dark"] .panel-night .letter-sign{border-top-color:rgba(244,247,250,.45)}
 :root[data-theme="dark"] .panel-night .letter-sign .by-mark{border-color:rgba(244,247,250,.55)}
 .panel-paper{background:var(--card);border:1px solid var(--card-line)}
-.panel-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px}
+.panel-kicker{font-size:15px;font-weight:600;margin:0 0 6px}
 .panel p.panel-amt{margin:0 0 18px;font-family:var(--hp-mono);font-size:clamp(1.9rem,3.2vw,2.6rem);font-weight:700;letter-spacing:-.02em;line-height:1;white-space:nowrap}
 .panel p.panel-amt small{font-size:.45em;font-weight:500;letter-spacing:0;color:inherit;opacity:.7;font-family:var(--hp-sans)}
 .panel-night p.panel-amt{color:var(--paper-ink)}
@@ -570,72 +570,68 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
     <div class="home-state" data-home="out">
       <!-- Mick, 5 October 2026: "Moet meteen die dashboard zijn voor users maar
            dan niet ingelogd." So there is no hero above it: the visitor lands
-           in the dashboard a signed-in customer gets, in a demo state. The same
-           head (title, plan) and the same register rows /dashboard renders
-           (dh-document, dh-send, dh-status, dh-progress), filled with example
-           data that is marked as such on the frame and on every row. The title
-           says what it is for, one line gives the price, and the two actions
-           sit in the head of the dashboard itself. Each tile opens a short
-           explanation with one button into the real tool; js/home-demo.js
-           drives it, and without script every tile is a plain link. -->
+           in the dashboard a signed-in customer gets, in a demo state, with the
+           same rows /dashboard renders (dh-document, dh-send, dh-status,
+           dh-progress) and the same words for their states.
+           Mick, 13 October 2026: "Text en voorbeeld is te letterlijk, typisch
+           ai". So the rows no longer carry a caption that explains them, and
+           "Voorbeeld" is said once, beside "Uw documenten", not on every row.
+           The title is one plain line, one line under it says what the code
+           does, and the price and the account sit small under the buttons.
+           Each row opens a short explanation with one button into the real
+           tool; js/home-demo.js drives it, and without script every row is a
+           plain link. -->
       <div class="wp-demo wp-demo-top" role="region" aria-labelledby="home-h1" data-wp-demo>
         <div class="wp-demo-bar">
-          <span class="wp-sign" aria-hidden="true">Voorbeeld</span>
-          <p class="wp-demo-h" id="wp-demo-h">Zo ziet uw overzicht eruit. <span>Kies een document en zie hoe het werkt.</span></p>
           <ul class="wp-appnav" aria-hidden="true">
             <li class="on">Documenten</li><li>Versturen</li><li>Ondertekenen</li><li>Controleren</li>
           </ul>
         </div>
         <header class="wp-demo-hero">
           <div class="wp-demo-title">
-            <h1 id="home-h1">Veilig versturen en laten tekenen, voor praktijken en kantoren.</h1>
-            <p class="hero-note">Gratis met het <b>Community-plan</b>. Voor uw kantoor: 29 euro per maand, excl. btw. Klaarzetten kan zonder account, versturen doet u met een gratis account.</p>
+            <h1 id="home-h1">Voor wat niet zomaar per mail kan.</h1>
+            <p class="hero-line">Uw dossier gaat versleuteld weg en is gewist zodra het is opgehaald. Bij een contract ziet u wie nog moet tekenen.</p>
           </div>
           <div class="home-actions">
             <a class="hp-btn hp-btn-fill" href="/signup">Account maken</a>
             <a class="hp-btn hp-btn-line" href="/sign?mode=invite">Probeer het zelf</a>
           </div>
+          <p class="hero-note">Versturen doet u met een gratis account. Voor uw kantoor: 29 euro per maand, excl. btw.</p>
         </header>
         <div class="wp-demo-head">
-          <p class="wp-demo-hi">Uw documenten <span class="wp-demo-tag">voorbeeld</span></p>
-          <span class="dh-plan wp-plan"><strong>Community</strong><span>plan</span></span>
+          <p class="wp-demo-hi">Uw documenten</p>
+          <span class="wp-demo-tag">Voorbeeld</span>
         </div>
         <div class="wp-tiles">
           <a class="wp-tile dh-workspace" href="/sign?mode=invite" data-wp-open="sign" aria-haspopup="dialog">
-            <span class="wp-tile-k">Ondertekenen</span>
-            <span class="wp-tile-t">Een contract dat twee mensen tekenen</span>
             <span class="dh-document wp-row">
               <span class="dh-document-open">
-                <span class="dh-document-name"><strong>Huurovereenkomst praktijkruimte.pdf</strong><span>Voorbeeld &middot; 4 pagina's</span></span>
+                <span class="dh-document-name"><strong>Huurovereenkomst praktijkruimte.pdf</strong><span>Gemaakt gisteren 16:42</span></span>
                 <span class="dh-document-progress"><span>1 van 2 getekend</span><span class="dh-progress"><i style="width:50%"></i></span></span>
-                <span class="dh-status in_progress">Wacht op 1 handtekening</span>
+                <span class="dh-status in_progress">Bezig</span>
               </span>
+              <span class="wp-row-next">Wacht op M. de Vries.</span>
             </span>
-            <span class="wp-tile-go">Hoe het werkt</span>
           </a>
           <a class="wp-tile dh-workspace" href="/parashare" data-wp-open="send" aria-haspopup="dialog">
-            <span class="wp-tile-k">Versturen</span>
-            <span class="wp-tile-t">Een dossier, veilig verstuurd</span>
             <span class="dh-send-row wp-row">
               <span class="dh-send-open">
-                <span class="dh-send-name"><strong>Verwijzing en dossier.pdf</strong><span>Voorbeeld &middot; aan 1 ontvanger</span></span>
+                <span class="dh-send-name"><strong>Verwijsbrief fysiotherapie.pdf</strong><span>Verstuurd vandaag 09:12</span></span>
                 <span class="dh-send-progress"><span>1 van 1 opgehaald</span><span class="dh-progress"><i style="width:100%"></i></span></span>
-                <span class="dh-status completed">Opgehaald en gewist</span>
+                <span class="dh-status completed">Compleet</span>
               </span>
+              <span class="wp-row-next">Iedereen heeft het opgehaald.</span>
             </span>
-            <span class="wp-tile-go">Hoe het werkt</span>
           </a>
           <a class="wp-tile dh-workspace" href="/verify" data-wp-open="verify" aria-haspopup="dialog">
-            <span class="wp-tile-k">Controleren</span>
-            <span class="wp-tile-t">Een bewijs, zelf nagekeken</span>
             <span class="dh-document wp-row">
               <span class="dh-document-open">
-                <span class="dh-document-name"><strong>Arbeidsovereenkomst.pdf</strong><span>Voorbeeld &middot; met het bewijsbestand</span></span>
-                <span class="dh-document-progress"><span>3 van 3 controles</span><span class="dh-progress"><i style="width:100%"></i></span></span>
-                <span class="dh-status completed">Echt</span>
+                <span class="dh-document-name"><strong>Arbeidsovereenkomst S. Jansen.pdf</strong><span>Gemaakt maandag 11:05</span></span>
+                <span class="dh-document-progress"><span>2 van 2 getekend</span><span class="dh-progress"><i style="width:100%"></i></span></span>
+                <span class="dh-status completed">Afgerond</span>
               </span>
+              <span class="wp-row-next">Door iedereen getekend. U kunt het bewijs downloaden.</span>
             </span>
-            <span class="wp-tile-go">Hoe het werkt</span>
           </a>
         </div>
       </div>
@@ -821,17 +817,15 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 </section>
 <section class="hp-sec why-nl-sec" aria-labelledby="why-nl-h">
   <div class="hp-wrap">
-    <p class="wp-more-kicker">Meer weten voordat u begint</p>
     <details class="wp-more">
-      <summary><span class="wp-more-k">Waarom Nederlands telt</span><h2 id="why-nl-h" class="hp-h2">Nederlands is hier een feit, geen vlag.</h2></summary>
+      <summary><h2 id="why-nl-h" class="hp-h2">Van wie is Paramant, en waar staan mijn bestanden?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Wie de eigenaar is van uw leverancier, bepaalt onder welk recht uw dossiers vallen en wie gedwongen kan worden ze af te geven. Dat hoort dus bij de inkoop. Hieronder de drie antwoorden.</p>
+    <p class="hp-lede">Wie de eigenaar is van uw leverancier, bepaalt onder welk recht uw dossiers vallen en wie gedwongen kan worden ze af te geven.</p>
     <ul class="check-grid why-grid">
-      <li data-partner-context="digicert geen-partij"><span class="ck-fact">De Nederlandse namen zijn verkocht</span><p class="ck-how">Zivver is sinds juni 2025 onderdeel van Kiteworks in Californi&euml;. WeTransfer valt sinds juli 2024 onder Bending Spoons in Milaan. Signhost ging in 2022 naar Entrust, SignRequest in 2021 naar Box, en QuoVadis staat op de Nederlandse vertrouwenslijst als DigiCert Europe Netherlands. De namen bleven Nederlands. De eigenaren niet.</p></li>
-      <li><span class="ck-fact">Deze niet</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132. Het moederbedrijf is Paramantis Digital B.V., ook Nederlands, KvK 42114664. Er is geen moederbedrijf in het buitenland. Op de voorwaarden is Nederlands recht van toepassing, en bij een geschil beslist een Nederlandse rechter.</p><a href="/terms#law">Toepasselijk recht &rarr;</a></li>
-      <li><span class="ck-fact">En de weg van uw bestanden ook niet</span><p class="ck-how" data-partners-rollen>Servers bij Hetzner in Neurenberg, Duitsland. DNS bij Bunny in Sloveni&euml;. De versleutelde bestanden staan alleen daar. E-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen naar ontvangers op naam bevat die mail de link met het token, en de ophaalcode gaat ook per mail: wie beide mails leest, kan het bestand openen. Een uitnodiging om te ondertekenen bevat de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. Resend, onze e-mailprovider, is de enige Amerikaanse partij; we stappen over naar een Nederlandse aanbieder. Alle partijen en hun status staan op <a href="/partners">de partnerpagina</a>.</p><a href="/privacy">De subverwerkers &rarr;</a></li>
+      <li data-partner-context="digicert geen-partij"><span class="ck-fact">Bekende Nederlandse namen zijn verkocht</span><p class="ck-how">Zivver is sinds juni 2025 onderdeel van Kiteworks in Californi&euml;. WeTransfer valt sinds juli 2024 onder Bending Spoons in Milaan. Signhost ging in 2022 naar Entrust, SignRequest in 2021 naar Box, en QuoVadis staat op de Nederlandse vertrouwenslijst als DigiCert Europe Netherlands.</p></li>
+      <li><span class="ck-fact">Paramant is van een Nederlands bedrijf</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132. Het moederbedrijf is Paramantis Digital B.V., ook Nederlands, KvK 42114664. Er is geen moederbedrijf in het buitenland. Op de voorwaarden is Nederlands recht van toepassing, en bij een geschil beslist een Nederlandse rechter.</p><a href="/terms#law">Toepasselijk recht &rarr;</a></li>
+      <li><span class="ck-fact">Waar uw bestanden staan</span><p class="ck-how" data-partners-rollen>Servers bij Hetzner in Neurenberg, Duitsland. DNS bij Bunny in Sloveni&euml;. De versleutelde bestanden staan alleen daar. E-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen naar ontvangers op naam bevat die mail de link met het token, en de ophaalcode gaat ook per mail: wie beide mails leest, kan het bestand openen. Een uitnodiging om te ondertekenen bevat de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. Resend, onze e-mailprovider, is de enige Amerikaanse partij; we stappen over naar een Nederlandse aanbieder. Alle partijen en hun status staan op <a href="/partners">de partnerpagina</a>.</p><a href="/privacy">De subverwerkers &rarr;</a></li>
     </ul>
-    <p class="why-proud">Wij zijn Nederlands, en dat zeggen we liever dan dat we ons achter een adres in Delaware verschuilen.</p>
     <p class="why-src" data-partner-context="digicert geen-partij">Bronnen eigendom: de aankondiging van Kiteworks over de overname van Zivver (17 juni 2025); de aankondiging van Bending Spoons over de overname van WeTransfer (31 juli 2024); Entrust over Signhost (2022); Box over SignRequest (2021); de vertrouwenslijst van de RDI, met QuoVadis als DigiCert Europe Netherlands B.V. Gecontroleerd op 3 september 2026. Het moederbedrijf van Paramant staat op paramantis.nl, gecontroleerd op 23 september 2026.</p>
       </div>
     </details>
@@ -840,14 +834,14 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <section class="hp-sec home-split-sec" aria-labelledby="split-h">
   <div class="hp-wrap">
     <details class="wp-more">
-      <summary><span class="wp-more-k">Wat het kost</span><h2 id="split-h" class="hp-h2">Voor uw kantoor: 29 euro per maand.</h2></summary>
+      <summary><h2 id="split-h" class="hp-h2">Wat kost het?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Excl. btw, dus 35,09 euro per maand met 21% btw. E&eacute;n betaling voor versturen en ondertekenen samen. U betaalt per maand of per jaar, en er loopt geen abonnement vanzelf door.</p>
+    <p class="hp-lede">Voor uw kantoor: 29 euro per maand. Excl. btw, dus 35,09 euro per maand met 21% btw. E&eacute;n betaling voor versturen en ondertekenen samen. U betaalt per maand of per jaar, en er loopt geen abonnement vanzelf door.</p>
     <div class="gift-grid">
       <article class="panel panel-paper">
         <p class="panel-kicker">Voor uw kantoor</p>
         <p class="panel-amt">&euro;29 <small>per maand, excl. btw</small></p>
-        <h3>Wat u krijgt.</h3>
+        <h3>Wat u krijgt</h3>
         <ul class="split-adds">
           <li>100 handtekeningen per maand.</li>
           <li>500 verzendingen per maand, tot 30 ontvangers per verzending, en links die 24 uur geldig blijven.</li>
@@ -859,7 +853,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
       <article class="panel panel-night">
         <p class="panel-kicker">Community</p>
         <p class="panel-amt">&euro;0 <small>voor altijd</small></p>
-        <h3>Waarom de helft gratis is.</h3>
+        <h3>Waarom Community gratis is</h3>
         <div class="letter">
           <p>Ik onderzoek hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen. Paramant is wat ik een klein kantoor gun: een document laten tekenen en een bestand versturen, met dossiers die in Europa blijven en bewijs dat u zonder ons kunt controleren.</p>
           <p>Het <strong>Community</strong>-plan is gratis en blijft gratis: 2 handtekeningen per maand, 50 verzendingen per maand, &eacute;&eacute;n ontvanger per verzending, en bestanden tot 500 MB als u ze direct overdraagt. Geen betaalkaart en geen proefperiode die afloopt. Dat is mijn bijdrage aan de samenleving.</p>
@@ -878,14 +872,14 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <section class="hp-sec check-sec" aria-labelledby="check-h">
   <div class="hp-wrap">
     <details class="wp-more">
-      <summary><span class="wp-more-k">Neem het niet van ons aan</span><h2 id="check-h" class="hp-h2">Vijf dingen die u vandaag zelf kunt nakijken.</h2></summary>
+      <summary><h2 id="check-h" class="hp-h2">Hoe kan ik dit zelf nakijken?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Een website kan niet zelf beweren dat ze te vertrouwen is. Deze vijf feiten liggen elders vast, en bij elk staat waar u het nakijkt.</p>
+    <p class="hp-lede">Bij elk punt staat waar u het nakijkt.</p>
     <ul class="check-grid">
       <li><span class="ck-fact">Een ingeschreven Nederlands bedrijf</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. Het KvK-register noemt het bedrijf achter elke belofte op deze pagina.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
       <li><span class="ck-fact">Servers in Duitsland</span><p class="ck-how">Hetzner in Neurenberg. Welk bedrijf wat bewaart, en de ene uitzondering voor e-mail, staat regel voor regel op de beveiligingspagina.</p><a href="/security">Beveiliging &rarr;</a></li>
       <li><span class="ck-fact">Een openbaar logboek</span><p class="ck-how">Elke geregistreerde sleutel en elke overdracht laat een regel achter in een logboek dat iedereen kan lezen en dat niet ongemerkt te wijzigen is.</p><a href="/ct-log">Open het logboek &rarr;</a></li>
-      <li><span class="ck-fact">Als er iets misgaat</span><p class="ck-how">Een datalek met persoonsgegevens melden we binnen 48 uur aan u. Dat staat in de verwerkersovereenkomst, niet in een blog. Uw ondertekeningsbewijzen zijn zonder ons te controleren, dus ze blijven geldig bewijs als wij er niet meer zijn.</p><a href="/dpa#incidents">Meldplicht, artikel 8 &rarr;</a></li>
+      <li><span class="ck-fact">Als er iets misgaat</span><p class="ck-how">Een datalek met persoonsgegevens melden we binnen 48 uur aan u. Dat staat in de verwerkersovereenkomst. Uw ondertekeningsbewijzen zijn zonder ons te controleren, dus ze blijven geldig bewijs als wij er niet meer zijn.</p><a href="/dpa#incidents">Meldplicht, artikel 8 &rarr;</a></li>
       <li><span class="ck-fact">Code die u kunt lezen</span><p class="ck-how">De kern en de server zijn gepubliceerd. Negen regels, elk met een link naar het bewijs, staan op &eacute;&eacute;n plek.</p><a href="/rules">De negen regels &rarr;</a></li>
     </ul>
       </div>
@@ -895,17 +889,16 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <section class="hp-sec" id="products" aria-labelledby="products-h">
   <div class="hp-wrap">
     <details class="wp-more">
-      <summary><span class="wp-more-k">Twee dingen</span><h2 id="products-h" class="hp-h2">Versturen en ondertekenen.</h2></summary>
+      <summary><h2 id="products-h" class="hp-h2">Wat kan ik ermee?</h2></summary>
       <div class="wp-more-body">
-    <p class="hp-lede">Allebei in een gewone browser. Niets te installeren, voor u niet en voor de ander niet.</p>
+    <p class="hp-lede">Een bestand versturen en een document laten tekenen, allebei in een gewone browser. U en de ander hoeven niets te installeren.</p>
     <ul class="prod-grid">
       <li>
-        <span class="prod-name">Versturen &middot; ParaSend</span>
-        <h3>Een bestand dat verdwijnt.</h3>
+        <h3>Een bestand versturen</h3>
         <ul class="prod-lines">
           <li>Het bestand wordt in uw browser versleuteld voordat het uw apparaat verlaat.</li>
           <li>Onze server bewaart alleen het versleutelde bestand, in het werkgeheugen en nooit op een schijf.</li>
-          <li>Na de laatste keer lezen is het gewist. Er blijft niets over om later te lekken.</li>
+          <li>Na de laatste keer lezen is het gewist.</li>
           <li>Dat geldt voor de webapp en de SDK's. De browserextensies versleutelen nog op onze server. Dat gaan we aanpassen.</li>
           <li>In de webapp stuurt u een link die de ontvanger opent wanneer het uitkomt, naar één persoon of, met Firm, naar meerdere mensen tegelijk. Met ‘Extra veilig’ zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. U kunt ook versturen met de API of SDK.</li>
           <li>&Eacute;&eacute;n ontvanger per verzending op Community, tot 30 ontvangers per verzending op Firm.</li>
@@ -913,13 +906,12 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
         <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">Meer over versturen</a></div>
       </li>
       <li>
-        <span class="prod-name">Ondertekenen &middot; ParaSign</span>
-        <h3>Een document laten tekenen.</h3>
+        <h3>Een document laten tekenen</h3>
         <ul class="prod-lines">
           <li>Upload de pdf, plaats de velden en mail hem naar wie moet tekenen.</li>
           <li>De ondertekenaar tekent via de link in die mail, na inloggen op het account waar de uitnodiging naartoe ging.</li>
           <li>U houdt een bewijs dat iedereen offline kan controleren, plus een regel in het openbare logboek.</li>
-          <li>Een gewone elektronische handtekening onder eIDAS. Geen gekwalificeerde, en dat zeggen we erbij.</li>
+          <li>Een gewone elektronische handtekening onder eIDAS, geen gekwalificeerde.</li>
         </ul>
         <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasign">Meer over ondertekenen</a></div>
       </li>
