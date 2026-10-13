@@ -1353,7 +1353,7 @@ assert.ok(parasend.includes('Het Community-plan is gratis en blijft gratis. De z
 // The limits, stated in the same voice as the promises. Both already shipped
 // before the product pages existed and neither may be softened or moved into
 // small print.
-const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).';
+const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a qualified signature (QES) under eIDAS.';
 // /about says it without the product name (13 October 2026), with the same
 // two levels in the same words.
 // A qualified signature is not a notarial deed, so /about names the level
@@ -1361,7 +1361,7 @@ const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-
 assert.ok(aboutVisible.includes('a signature made with Paramant is a Simple Electronic Signature (SES). It is not a qualified signature (QES) under eIDAS.'),
   'about.html lost the SES scope note');
 // /parasign says it in Dutch, with the same two levels named in the same words.
-const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).';
+const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen gekwalificeerde elektronische handtekening (QES) onder eIDAS.';
 assert.ok(parasign.includes(SES_NL), 'parasign.html must carry the SES scope note, not a softer version');
 assert.ok(parasignEn.includes(SES), 'en/parasign.html must carry the SES scope note, not a softer version');
 // Where it sits is part of the claim. The note has to land in the hero section,
