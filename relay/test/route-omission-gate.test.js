@@ -102,7 +102,18 @@ after(async () => {
 
 const docHash = () => crypto.createHash('sha3-256').update(crypto.randomBytes(32)).digest('hex');
 
-async function createEnvelope(parties = [{ label: 'Alice' }], extra = {}) {
+// Envelopes this suite opened. The create route now checks that the sender's
+// month has room for every signature still open on his requests, so a test
+// that needs room withdraws what earlier tests left open, as a sender would.
+const _opened = [];
+async function withdrawOpen() {
+  while (_opened.length) {
+    const id = _opened.pop();
+    await srv.post(`/v2/envelopes/${id}/cancel`, { headers: asParty({ 'X-Api-Key': OWNER }), body: {} });
+  }
+}
+async function createEnvelope(parties = [{ label: 'Alice' }], extra = {}, { keepOpen = false } = {}) {
+  if (!keepOpen) await withdrawOpen();
   const dh = docHash();
   const r = await srv.post('/v2/envelopes', {
     headers: asParty({ 'X-Api-Key': OWNER }),
@@ -110,6 +121,7 @@ async function createEnvelope(parties = [{ label: 'Alice' }], extra = {}) {
   });
   assert.strictEqual(r.status, 200, `create failed: ${r.status} ${r.text}`);
   const env = r.json.envelope;
+  _opened.push(env.id);
   return { id: env.id, docHash: dh, tokens: env.party_links.map((p) => p.invite_token) };
 }
 
@@ -225,6 +237,7 @@ test('DOOR 1: knowing the envelope id does not let a stranger sign in a party na
 test('DOOR 1: the public status never publishes the tokens it now depends on', async () => {
   if (!ready()) return;
   IP = nextIp();
+  await resetSigns();
   const { id, tokens } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
 
   const pub = await srv.get(`/v2/envelopes/${id}`, { headers: asParty() });
@@ -269,11 +282,23 @@ test('DOOR 2: the plan cap bites even when every request omits account_id', asyn
   if (!ready()) return;
   IP = nextIp();
   await resetSigns();
-  // community includes 2 signatures a month. Three envelopes, three anonymous
-  // sign requests: the third must be refused, or the cap is decorative.
+  // community includes 2 signatures a month. Three anonymous sign requests:
+  // the third must be refused, or the cap is decorative. Since the create
+  // route refuses a request the month cannot pay for, the third envelope is
+  // made while there is room, and the month fills before it is signed (two
+  // signatures placed elsewhere): exactly the case the sign gate is for.
+  const made = [];
+  for (let i = 0; i < 2; i++) made.push(await createEnvelope(undefined, {}, { keepOpen: i > 0 }));
   const statuses = [];
   for (let i = 0; i < 3; i++) {
-    const { id, docHash: dh, tokens } = await createEnvelope();
+    if (i === 2) {
+      const ctr = `paramant:quota:signs:${OWNER_ACCT}:${quota.ymKey()}`;
+      const before = await rc.get(ctr);
+      await rc.set(ctr, '0');
+      made.push(await createEnvelope(undefined, {}, { keepOpen: true }));
+      await rc.set(ctr, before || '2');
+    }
+    const { id, docHash: dh, tokens } = made[i];
     const { pubB64, sigB64 } = signForParty(id, dh, 0);
     const r = await srv.post(`/v2/envelopes/${id}/sign`, {
       headers: asParty(),
@@ -281,8 +306,10 @@ test('DOOR 2: the plan cap bites even when every request omits account_id', asyn
     });
     statuses.push(r.status);
     if (r.status === 402) {
-      assert.strictEqual(r.json.error, 'monthly_sign_quota_reached');
-      assert.strictEqual(r.json.dimension, 'signs_month');
+      // A signer without an account is not the sender: the refusal says it is
+      // the sender's month, without the sender's numbers.
+      assert.strictEqual(r.json.error, 'sender_sign_quota_reached');
+      assert.strictEqual(r.json.billed_to, 'sender');
     }
   }
   assert.deepStrictEqual(statuses, [200, 200, 402],

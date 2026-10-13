@@ -39,6 +39,7 @@ function telling(store) {
     if (kind === 'blob') uit.blob.push(id);
     else if (id.startsWith('tok-')) uit.tok.push(id);
     else if (id.startsWith('acct-')) uit.acct.push(id);
+    else if (id.startsWith('send-budget:')) continue; // the open-sends ledger, not a send
     else uit.send.push(id);
   }
   return uit;

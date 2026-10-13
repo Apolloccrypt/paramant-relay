@@ -9,8 +9,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Receive a file · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/design-system.css?v=32">
-<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/done-state.css?v=1">
 <!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
@@ -18,9 +18,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="live">
-<meta name="description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download.">
+<meta name="description" content="A secure file is waiting for you. It opens in your browser and disappears after one download.">
 <meta property="og:title" content="A secure file is waiting · Paramant">
-<meta property="og:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta property="og:description" content="A secure file is waiting for you. It opens in your browser and disappears after one download. Nothing is stored on the server.">
 <meta property="og:url" content="https://paramant.app/en/ontvang">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -28,7 +28,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="A secure file is waiting · Paramant">
-<meta name="twitter:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta name="twitter:description" content="A secure file is waiting for you. It opens in your browser and disappears after one download. Nothing is stored on the server.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/en/ontvang">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/ontvang">
@@ -137,15 +137,15 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -158,15 +158,15 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ontvang" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ontvang" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content">
@@ -176,18 +176,18 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <div class="step" id="step-empty">
   <h1>Nothing to pick up yet</h1>
   <p class="sub">This page opens by itself from the link you were sent.</p>
-  <a href="/parasend" class="btn">Send something yourself</a>
+  <a href="/en/parasend" class="btn">Send something yourself</a>
 </div>
 
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
   <h1>Receive a file securely</h1>
-  <p class="sub">Your browser is generating a post-quantum keypair. The private key never leaves your device. Share your fingerprint with the sender to verify the connection.</p>
+  <p class="sub">Your browser is now making your own keys. The secret key never leaves your device. Then you read the check code out to the sender. That way you both know the connection is right.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Generating keypair...</div></div>
+    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Making your keys...</div></div>
     <div class="card-body">
-      <div class="status-line" id="keygen-status">Generating ML-KEM-768 + ECDH P-256 keypair in your browser...</div>
+      <div class="status-line" id="keygen-status">Your browser is making the keys (ML-KEM-768 and ECDH P-256)...</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="keygen-progress" style="width:30%"></div></div>
     </div>
   </div>
@@ -195,15 +195,15 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <!-- STEP 2: Show fingerprint, wait for sender -->
 <div class="step" id="step-fingerprint">
-  <h1>Your fingerprint</h1>
-  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This stops the relay from intercepting the file.</p>
+  <h1>Your check code</h1>
+  <p class="sub">Read this code out to the sender. They check that it matches the code on their screen. Only then is the file sealed. That way nobody can get in between.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for the sender to confirm...</div></div>
     <div class="card-body">
       <p class="fingerprint-label">Read this to the sender:</p>
       <div class="fingerprint" id="fp-display">-</div>
-      <div class="status-line" id="fp-status">Connected. The sender is checking your fingerprint.</div>
+      <div class="status-line" id="fp-status">Connected. The sender is checking your code.</div>
     </div>
   </div>
 </div>
@@ -211,7 +211,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- STEP 3: Receiving & decrypting -->
 <div class="step" id="step-receiving">
   <h1>Receiving file...</h1>
-  <p class="sub">Downloading and decrypting with your private key. The relay never had access to the decryption key.</p>
+  <p class="sub">The file is downloading and opens with your own key. Paramant never had that key.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Decrypting</div></div>
@@ -236,7 +236,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
     <div class="done-actions">
       <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain" hidden>Save it again</button>
-      <a class="done-quiet" id="done-dashboard" href="/dashboard">Open your dashboard</a>
+      <a class="done-quiet" id="done-dashboard" href="/en">Go to paramant.app</a>
     </div>
 
     <details class="done-details">
@@ -244,7 +244,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <div class="done-details-body">
         <p>Your browser made its own pair of keys when this page opened and kept the private half here, where it still is. The sender locked the file for the public half before it left their device, so what travelled was sealed for you and for nobody else (<code>ML-KEM-768</code> with <code>ECDH P-256</code> for the key exchange, <code>AES-256-GCM</code> for the file).</p>
         <p>The short code you both read out was worked out on this side too, from your own keys. Two screens showing the same code is what tells you nobody swapped a key in between.</p>
-        <p>A transfer through this web app is read once. Each block was wiped on our side as your browser took it, and our copy is destroyed on its own clock as well if nobody ever comes for it. What our relay reported on the way is written below.</p>
+        <p>A transfer through this web app is read once. Each block was wiped on our side as soon as your browser fetched it. If nobody fetches it, our copy is destroyed when the time runs out. What our server reported on the way is shown below.</p>
         <pre id="burn-receipt" hidden></pre>
       </div>
     </details>
@@ -263,7 +263,6 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </div>
 
 </main>
-<p class="lang-switch" style="max-width:580px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/ontvang" hreflang="nl" lang="nl" style="color:var(--ink)">Deze pagina in het Nederlands</a></p>
 
 <footer>
   <div class="container-lg">
@@ -272,6 +271,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p class="lang-switch"><a id="lang-switch-link" href="/ontvang" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
       </div>
       <div>
         <div class="footer-col-label">Company</div>
@@ -298,10 +298,10 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/noble-mlkem-loader.js?v=5"></script>
 <script type="module" src="/js/ontvang.inline1.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
-<script src="/js/ontvang.page.js?v=7" defer></script>
-<script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/ontvang.page.js?v=11" defer></script>
+<script src="/nav.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

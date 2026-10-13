@@ -142,7 +142,13 @@ function parse(line) {
   else return { unknown: tokens[0] };
   const spec = COMMANDS[name];
   const args = {};
-  spec.args.forEach((a, i) => { if (rest[i] !== undefined) args[a.name] = rest[i]; });
+  // "logs relay -f": a flag, wherever it stands, sets the follow argument.
+  const hasFollow = spec.args.some((a) => a.name === 'follow');
+  if (hasFollow && rest.some((t) => t === '-f' || t === '--follow')) {
+    rest = rest.filter((t) => t !== '-f' && t !== '--follow');
+    args.follow = 'follow';
+  }
+  spec.args.forEach((a, i) => { if (rest[i] !== undefined && args[a.name] === undefined) args[a.name] = rest[i]; });
   return { name, spec, args };
 }
 

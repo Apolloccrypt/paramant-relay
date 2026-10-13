@@ -59,8 +59,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=32">
-<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/parapear.css?v=4">
 <style>
@@ -244,7 +244,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
     <div class="buyer-qa-item">
       <div class="buyer-qa-q">Kan ik ondertekenen zonder account?</div>
-      <p class="buyer-qa-a">Nee. Voor het ondertekenen van een document heeft u een account nodig. Zonder account kunt u een verzoek tot ondertekenen wel openen.</p>
+      <p class="buyer-qa-a">Nee. Om te ondertekenen heeft u een account nodig. Kreeg u een verzoek om te ondertekenen? Dat opent u ook zonder account.</p>
       <a class="buyer-qa-link" href="/sign">Naar ondertekenen &rarr;</a>
     </div>
 
@@ -256,7 +256,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
     <div class="buyer-qa-item">
       <div class="buyer-qa-q">Waar staan mijn gegevens?</div>
-      <p class="buyer-qa-a">Uw documenten staan versleuteld op servers van Hetzner in Neurenberg, Duitsland. De relay ziet nooit leesbare tekst en bewaart nooit een privésleutel, behalve bij het gehoste ondertekenen op <code>/v1</code>. Alleen e-mail (adres en link, nooit het document of een sleutel) gaat nog via Resend Inc. in de VS, zie <a class="buyer-qa-inline" href="/privacy">/privacy</a>.</p>
+      <p class="buyer-qa-a">Uw documenten staan versleuteld op servers van Hetzner in Neurenberg, Duitsland. De relay bewaart nooit een privésleutel, behalve bij het gehoste ondertekenen op <code>/v1</code>. E-mail gaat nog via Resend in de VS: nooit het document, wel de links en codes die een bestand openen, zie <a class="buyer-qa-inline" href="/privacy">/privacy</a>.</p>
       <a class="buyer-qa-link" href="/security">Lees over de beveiliging &rarr;</a>
     </div>
   </section>
@@ -303,13 +303,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
     <a href="/help/gmail-extension" class="help-card">
       <div class="help-card-title">Extensie voor Gmail</div>
-      <div class="help-card-desc">Installeer en stel de Paramant-extensie voor Chrome in, om versleutelde bijlagen rechtstreeks vanuit Gmail te versturen.</div>
+      <div class="help-card-desc">Met de Paramant-extensie voor Chrome verstuurt u versleutelde bijlagen rechtstreeks vanuit Gmail. Zo stelt u hem in.</div>
       <span class="help-card-arrow">Lezen &rarr;</span>
     </a>
 
     <a href="/help/outlook-extension" class="help-card">
       <div class="help-card-title">Invoegtoepassing voor Outlook</div>
-      <div class="help-card-desc">Stel de Paramant-invoegtoepassing voor Outlook in, voor Microsoft 365 en Exchange. Versleutel bijlagen vanuit Outlook.</div>
+      <div class="help-card-desc">Met de Paramant-invoegtoepassing versleutelt u bijlagen vanuit Outlook, voor Microsoft 365 en Exchange. Zo stelt u hem in.</div>
       <span class="help-card-arrow">Lezen &rarr;</span>
     </a>
 
@@ -345,8 +345,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
 </main>
 
-<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help" hreflang="en" lang="en">This page in English</a></p>
-
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
@@ -354,6 +352,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p class="lang-switch"><a href="/en/help" hreflang="en" lang="en">This page in English</a></p>
       </div>
       <div>
         <div class="footer-col-label">Bedrijf</div>
@@ -377,7 +376,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 </footer>
 
-<script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/nav.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

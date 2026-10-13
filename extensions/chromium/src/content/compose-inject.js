@@ -6,7 +6,7 @@
 // link into the compose body. The page never sees the API key, and the whole file is never
 // held in memory at once (chunks are sliced lazily from disk).
 
-import { CHUNK_PLAIN } from '../../../shared/paramant-core.js';
+import { CHUNK_PLAIN, encodeChunkMessage } from '../../../shared/paramant-core.js';
 import { startUpload, showError, showUpgrade } from './shared/banner.js';
 import { buildLinkHtml } from './shared/link-replace.js';
 import { getSettings } from '../shared/settings.js';
@@ -147,8 +147,10 @@ async function uploadOne(composeWin, file, config) {
     for (let i = 0; i < total; i++) {
       if (cancelled) { await send({ type: 'TRANSFER_ABORT', transferId }).catch(() => {}); ui.remove(); return; }
       const slice = file.slice(i * CHUNK_PLAIN, Math.min((i + 1) * CHUNK_PLAIN, file.size));
-      const bytes = await slice.arrayBuffer();
-      const res = await send({ type: 'TRANSFER_CHUNK', transferId, index: i, bytes });
+      // base64, not the ArrayBuffer: sendMessage serialises as JSON and an
+      // ArrayBuffer arrives as {} (zero bytes). See decodeChunkMessage.
+      const b64 = encodeChunkMessage(await slice.arrayBuffer());
+      const res = await send({ type: 'TRANSFER_CHUNK', transferId, index: i, b64 });
       if (!res?.ok) throw new TransferError(res?.error, res);
       ui.setProgress((i + 1) / total);
     }

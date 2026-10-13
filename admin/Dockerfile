@@ -5,7 +5,7 @@ FROM node:24-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5
 
 # See relay/Dockerfile: default matches admin/package.json, CI overrides it per
 # build, and tests/version-consistency.test.mjs holds the two together.
-ARG IMAGE_VERSION=3.1.0
+ARG IMAGE_VERSION=3.1.3
 
 LABEL org.opencontainers.image.title="paramant-admin" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
@@ -37,6 +37,10 @@ COPY admin/server.js .
 COPY admin/lib/ lib/
 COPY admin/public/ public/
 COPY relay/lib/mail.js /app/relay/lib/mail.js
+# The public plan list reads the catalog the checkout sells from and the limit
+# table the relay enforces (admin/lib/public-plans.js). Both have no requires.
+COPY relay/lib/billing-catalog.js /app/relay/lib/billing-catalog.js
+COPY relay/lib/tiers.js /app/relay/lib/tiers.js
 # De e-mailblocklist die admin/lib/email-policy.js leest (../../deploy vanaf lib/).
 COPY deploy/email-blocklist.json /app/deploy/email-blocklist.json
 

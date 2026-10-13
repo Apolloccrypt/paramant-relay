@@ -4,7 +4,7 @@
 //   • Chromium extension service worker (Gmail)  — calls sealAndUploadChunk() per chunk
 //   • Outlook Office.js add-in (taskpane)         — calls encryptAndUpload() on the whole file
 //
-// The output is byte-compatible with the recipient page at paramant.app/parashare
+// The output is byte-compatible with the recipient page at paramant.app/get
 // (Thunderbird FileLink download mode), so links produced here are decrypted by the
 // existing, shipping receiver without any server-side change.
 //
@@ -32,7 +32,13 @@ export const PADDED_BLOCK = 5 * 1024 * 1024;               // 5_242_880
 export const PACKET_VERSION = 0x02;
 const PRSH_MAGIC = Object.freeze([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
 
-export const PARASHARE_BASE = 'https://paramant.app/parashare';
+// Where a receiver opens the link. /get is public: the receiver of a mail has
+// no Paramant account. This used to be /parashare, which is the sender's page
+// and sits behind the login, so a receiver was sent to /auth/login and never
+// reached the file. nginx forwards links already sent to /parashare?t= to /get.
+export const RECEIVE_BASE = 'https://paramant.app/get';
+/** @deprecated the old name; it now points at the public receiving page. */
+export const PARASHARE_BASE = RECEIVE_BASE;
 export const DEFAULT_RELAY  = 'https://relay.paramant.app';
 
 // Where a user upgrades when a monthly quota is hit. Surfaced verbatim in the
@@ -48,6 +54,43 @@ export const SECTOR_RELAYS = Object.freeze([
   'https://finance.paramant.app',
   'https://iot.paramant.app',
 ]);
+
+// Where the receiver opens a link, per relay.
+//
+// A Paramant relay: on paramant.app/get, which fetches only from the relays
+// above (its CSP names them). A self-hosted relay: on that relay's own /get,
+// which the relay serves itself (SERVE_FRONTEND=true, the install.sh default)
+// and which fetches from its own origin only. paramant.app/get never fetches
+// from a host it does not know, and a self-host never depends on paramant.app
+// (fase 1, EXT-09-A: the link used to point at paramant.app/get, which refused
+// the foreign relay, so the receiver saw "invalid link").
+//
+// A relay is accepted as an https origin and nothing more: no path, no query,
+// no user info, no plain http. That is what keeps r= from carrying anything
+// but a host to fetch from.
+export function relayOrigin(url) {
+  const raw = String(url || '').trim().replace(/\/+$/, '');
+  if (!raw) return null;
+  let u;
+  try { u = new URL(raw); } catch { return null; }
+  if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash) return null;
+  if (u.pathname && u.pathname !== '/') return null;
+  return u.origin;
+}
+export function isParamantRelay(url) {
+  return SECTOR_RELAYS.includes(relayOrigin(url) || '');
+}
+export function isReceivableRelay(url) {
+  return relayOrigin(url) !== null;
+}
+export function receiveBaseFor(relay) {
+  const o = relayOrigin(relay);
+  if (!o || SECTOR_RELAYS.includes(o)) return RECEIVE_BASE;
+  return `${o}/get`;
+}
+export const RELAY_NOT_HTTPS = 'Enter the relay as an https:// address without a path, for example https://relay.example.com.';
+/** @deprecated the old name: a self-hosted relay is supported now, only a non-https one is refused. */
+export const SELF_HOST_UNSUPPORTED = RELAY_NOT_HTTPS;
 
 const UPLOAD_TIMEOUT_MS = 120_000;
 const MAX_UPLOAD_RETRIES = 4;     // for 503 (capacity) / 429 (rate)
@@ -75,6 +118,45 @@ export function toBase64(u8) {
     binary += String.fromCharCode.apply(null, u8.subarray(i, i + WINDOW));
   }
   return btoa(binary);
+}
+
+export function fromBase64(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// ── Chunks across the extension message boundary ────────────────────────────────
+//
+// chrome.runtime.sendMessage serialises its message as JSON. An ArrayBuffer or a
+// Uint8Array does not survive that: it arrives as {} and new Uint8Array({}) is
+// zero bytes long. Until 2026-10-04 every attachment sent through Gmail or
+// Outlook web was sealed and uploaded as an empty file while the sender saw
+// "Encrypted link inserted" (fase 1, EXT-13-A). So a chunk crosses the boundary
+// as a base64 string, and the receiving side checks the decoded length against
+// the length that chunk must have. A chunk of the wrong size is refused, never
+// sealed: an upload that fails loudly beats a link to an empty file.
+
+export function expectedChunkLength(fileSize, index) {
+  const start = index * CHUNK_PLAIN;
+  return Math.max(0, Math.min(CHUNK_PLAIN, fileSize - start));
+}
+
+export function encodeChunkMessage(bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  return toBase64(u8);
+}
+
+export function decodeChunkMessage(b64, fileSize, index) {
+  if (typeof b64 !== 'string') {
+    throw new ParamantError('chunk_unreadable', 'The file could not be read. Please try again.');
+  }
+  const u8 = fromBase64(b64);
+  if (u8.length !== expectedChunkLength(fileSize, index)) {
+    throw new ParamantError('chunk_size_mismatch', 'The file could not be read whole. Nothing was sent. Please try again.');
+  }
+  return u8;
 }
 
 // URL-safe base64 (RFC 4648 §5), no padding — used for the key fragment.
@@ -175,9 +257,14 @@ export async function checkKey(relay, apiKey, signal) {
     headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
     signal: signal ?? AbortSignal.timeout(8000),
   });
+  // A 429 says nothing about the key. Reporting it as valid:false told a
+  // customer with a good key "Invalid API key" (fase 1, EXT-19-A, SEND-03-A).
+  if (res.status === 429) return { valid: false, plan: null, rateLimited: true };
   if (!res.ok) return { valid: false, plan: null };
   return res.json();
 }
+
+export const RATE_LIMITED_MESSAGE = 'Too many sign-in attempts from this network. Wait a minute and try again.';
 
 // Race check-key across the sectored relays and return the one that accepts the key.
 // Callers should cache the result per key to avoid repeating the fan-out every transfer.
@@ -190,20 +277,34 @@ export async function discoverRelay(apiKey, preferred) {
         headers: { 'X-Api-Key': apiKey },
         signal: AbortSignal.timeout(5000),
       });
+      if (r.status === 429) throw new Error('rate_limited');
       const d = await r.json();
       if (!d.valid) throw new Error('invalid');
       return url;
     })
   );
   const found = results.find(r => r.status === 'fulfilled');
-  return found ? found.value : DEFAULT_RELAY;
+  if (found) return found.value;
+  // No sector said yes. If one of them only said "slow down", the key may well
+  // be good: say that, instead of falling through to a verdict on the key.
+  if (results.some(r => r.status === 'rejected' && r.reason?.message === 'rate_limited')) {
+    throw new ParamantError('rate_limited', RATE_LIMITED_MESSAGE, { status: 429, retryable: true });
+  }
+  return DEFAULT_RELAY;
 }
 
 // ── Upload one padded blob ──────────────────────────────────────────────────────
 // Retries on 503 (relay at capacity) and 429 (rate/trial), honouring Retry-After.
 // Returns { token, effectiveTtlMs }.
 
-async function uploadPadded({ relay, apiKey, padded, meta, ttlMs, signal }) {
+// Exactly one credential: an API key (X-Api-Key) or a ParaSend session token
+// (Authorization: Bearer pst_...), which is what a signed-in account without a
+// key on this device uses.
+function authHeaders(apiKey, bearer) {
+  return bearer ? { Authorization: `Bearer ${bearer}` } : { 'X-Api-Key': apiKey };
+}
+
+async function uploadPadded({ relay, apiKey, bearer, padded, meta, ttlMs, signal }) {
   const hash = await sha256hex(padded);
   const body = JSON.stringify({ hash, payload: toBase64(padded), ttl_ms: ttlMs, meta });
 
@@ -212,7 +313,7 @@ async function uploadPadded({ relay, apiKey, padded, meta, ttlMs, signal }) {
     try {
       res = await fetch(`${relay}/v2/inbound`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+        headers: { 'Content-Type': 'application/json', ...authHeaders(apiKey, bearer) },
         body,
         signal: signal ?? AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
       });
@@ -264,11 +365,11 @@ async function uploadPadded({ relay, apiKey, padded, meta, ttlMs, signal }) {
 
 // Encrypt + upload a single chunk, transparently re-encrypting on the rare 409.
 // Returns { token, key, effectiveTtlMs }. Used by both consumers.
-export async function sealAndUploadChunk({ relay, apiKey, chunkU8, fileMeta, relayMeta, ttlMs, signal }) {
+export async function sealAndUploadChunk({ relay, apiKey, bearer, chunkU8, fileMeta, relayMeta, ttlMs, signal }) {
   for (let hashAttempt = 0; ; hashAttempt++) {
     const { padded, rawKey } = await encryptChunk(chunkU8, fileMeta);
     try {
-      const { token, effectiveTtlMs } = await uploadPadded({ relay, apiKey, padded, meta: relayMeta, ttlMs, signal });
+      const { token, effectiveTtlMs } = await uploadPadded({ relay, apiKey, bearer, padded, meta: relayMeta, ttlMs, signal });
       return { token, key: urlSafeKey(rawKey), effectiveTtlMs };
     } catch (e) {
       if (e.code === 'hash_collision' && hashAttempt < MAX_HASH_RETRIES) continue;
@@ -278,16 +379,21 @@ export async function sealAndUploadChunk({ relay, apiKey, chunkU8, fileMeta, rel
 }
 
 // ── Share URL ───────────────────────────────────────────────────────────────────
-// Format (verified against parashare.html receiver):
-//   {PARASHARE_BASE}?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2
-
+// Format (read by frontend/js/get.page.js, the FileLink branch):
+//   {receiveBaseFor(RELAY)}?t=T1,T2&c=N&r=RELAY#k=K1,K2
+//
+// For a Paramant relay that is paramant.app/get; for a self-hosted relay the
+// relay's own /get (see receiveBaseFor).
+//
+// No file name in the URL (hertest T4-9). The query of a link is sent to the
+// server on every open and ends up in mail logs, proxies and scanners; the
+// promise is "only an address and a link". The name travels inside the seal
+// (fileMeta.file_name) and the receiver reads it from there. `name` is still
+// accepted so existing callers keep working; it is not used.
 export function buildShareUrl({ tokens, name, chunks, relay, keys }) {
-  // Encoded exactly like the shipping sender so the parashare receiver
-  // (which does decodeURIComponent(sp.get('n'))) reads every field back intact.
   const t = tokens.map(encodeURIComponent).join(',');
-  const r = encodeURIComponent(relay);
-  const n = encodeURIComponent(name);
-  return `${PARASHARE_BASE}?t=${t}&n=${n}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
+  const r = encodeURIComponent(relayOrigin(relay) || relay);
+  return `${receiveBaseFor(relay)}?t=${t}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
 }
 
 // ── High-level orchestration (whole file already in memory) ──────────────────────
@@ -298,6 +404,10 @@ export function buildShareUrl({ tokens, name, chunks, relay, keys }) {
 
 export async function encryptAndUpload({
   bytes, fileName, fileSize, apiKey, relay, ttlMs, deviceId = 'paramant-mail', onProgress, signal,
+  // An e-mail + code session holds no API key: it uploads with a short-lived
+  // ParaSend session token as a Bearer. getBearer() is asked before every
+  // chunk, so a token that runs out halfway through a large file is renewed.
+  getBearer,
 }) {
   const total  = chunkCount(fileSize);
   const fileId = randomFileId();
@@ -312,8 +422,9 @@ export async function encryptAndUpload({
 
     onProgress?.({ phase: 'upload', chunkIndex: i, totalChunks: total, fraction: i / total });
 
+    const bearer = getBearer ? await getBearer() : undefined;
     const res = await sealAndUploadChunk({
-      relay, apiKey, chunkU8, ttlMs, signal,
+      relay, apiKey, bearer, chunkU8, ttlMs, signal,
       // Encrypted metadata (inside the blob, for the receiver). Never seen by the relay.
       fileMeta: { file_id: fileId, file_name: fileName, file_size: fileSize, chunk_index: i, total_chunks: total, chunk_size: chunkU8.length },
       // Cleartext metadata sent to the relay: only what it needs (dedup + routing). No filename, no size.

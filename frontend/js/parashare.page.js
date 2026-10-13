@@ -7,7 +7,8 @@
 const LANG = ((document.documentElement && document.documentElement.lang) || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
 const T = {
   en: {
-    usingAccount: 'Using your account',
+    usingAccount: 'You are signed in; we send on behalf of your account.',
+    signedInAs: (email) => 'Signed in as ' + email,
     waitingTitle: 'Waiting for receiver...',
     copied: 'Copied',
     copyFailed: 'Copy failed',
@@ -15,26 +16,31 @@ const T = {
     receiverConnected: 'Receiver connected',
     receiverWaits: 'Your receiver is waiting for you to compare the code',
     validPlan: (plan, sector) => `✓ Valid, plan: ${plan}${sector}`,
-    accountNoSector: 'This account is not active on any relay sector',
+    accountNoSector: 'This account is not active on any of our servers. Mail privacy@paramant.app and we will look into it.',
     keyInvalid: 'Invalid or revoked key',
-    noSectorAnswered: 'No relay sector answered. Check your connection and press Create secure session again.',
-    sectorUnreachable: 'Could not reach a relay sector. You can still continue.',
+    noSectorAnswered: 'Our server did not answer. Check your connection and try again.',
+    tooManyChecks: 'Too many checks from this network just now. Wait a minute and reload the page. Your key is not the problem.',
+    sectorUnreachable: 'Could not reach our server. You can still continue.',
     enterKey: 'Enter your API key to continue',
     notAKey: 'That does not look like a key. It starts with pgp_.',
-    noFile: 'No file selected',
-    filesPackage: (n) => n + ' files, sent as a single package',
-    lookingSector: 'Looking for a relay sector...',
+    noFile: 'No file chosen yet',
+    filesPackage: (n) => n + ' files, each locked on its own',
+    sendingPart: (name, i, n) => 'Sending ' + name + ', part ' + i + ' of ' + n + '...',
+    lookingSector: 'Connecting...',
     waitingOpen: 'Waiting for your receiver to open the link...',
     receiverClosed: 'Your receiver closed the link',
     receiverClosedLong: 'Your receiver closed the link before you compared the code. Nothing was uploaded and your file is still here in this browser.',
     connectionLost: 'Connection lost',
     connectionFailed: 'The connection failed before your receiver arrived. Nothing was uploaded and your file is still here in this browser.',
     connectionDropped: 'The connection dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.',
-    recipientsEmpty: 'Leave empty for one link that opens once. Fill it in and everyone gets their own link, and you see who collected.',
+    recipientsEmpty: 'Leave it empty and you pass the link on yourself. Fill it in and we email them their own link, and you see whether it was opened.',
     recipientsCount: (n, dubbel) => n + (n === 1 ? ' recipient' : ' recipients')
       + (dubbel ? ', ' + dubbel + ' duplicate' + (dubbel === 1 ? '' : 's') + ' ignored' : '')
       + '. Each one gets their own link and a code to this address.',
     xOfY: (a, b) => a + ' of ' + b,
+    testModeTitle: 'Not sent: test mode',
+    testModeLead: (n) => 'This server delivers no mail (test mode). The file is stored for ' + n + (n === 1 ? ' recipient' : ' recipients') + ', but no invitation went out.',
+    testModeNote: 'Ask the administrator to set up a mail provider (MAIL_PROVIDER), then send again.',
     sentTitle: 'Sent',
     invitesLead: (aantal) => aantal + ' invitations are on their way. Everyone got their own link.',
     invitesNote: 'They each prove their mailbox with a short code before the file opens. '
@@ -48,39 +54,62 @@ const T = {
     badAddress: 'That is not an address we can send to: ',
     noUsable: 'No usable address in that list.',
     sendNotCreated: 'The send could not be created.',
-    wasmMissing: 'ERROR: WASM crypto module not loaded, cannot encrypt safely. Refresh and try again.',
+    wasmMissing: 'The lock did not load, so sending safely does not work. Refresh the page and try again.',
     largeFile: (mb) => 'Large file (' + mb + ' MB). Reading and encrypting chunk by chunk...',
     fileNofM: (i, n) => 'File ' + i + '/' + n + ': ',
     encrypting: (done, total, i, n) => 'Encrypting ' + done + '/' + total + ' MB (chunk ' + i + '/' + n + ')...',
     uploading: (up, total) => 'Uploading ' + up + '/' + total + ' MB...',
-    liveOnePerson: 'A hand-over while you both watch goes to one person, '
-      + 'the one at the other screen. To send it to a list, pick "They open it later" instead.',
+    liveOnePerson: 'Extra safe goes to one person, the one at the other screen. '
+      + 'To send it to a list, choose "To several people" instead.',
     notifying: 'Notifying receiver...',
     filesOnWay: (n) => n + ' files are on their way',
     fileOnWay: (name) => name + ' is on its way',
     doneTitle: 'Sent to the other side.',
     doneLine: (what) => what + ' to the person you compared the code with. '
-      + 'Our copy is sealed and goes the moment they take it.',
+      + 'Our copy is locked and is gone the moment they collect it.',
     keepReceipt: 'Keep the receipt',
     days: (n) => n + ' days',
     hours: (n) => n + (n === 1 ? ' hour' : ' hours'),
     minutes: (n) => n + ' minutes',
     seconds: (n) => n + ' seconds',
-    linkTtl: (c, pr, ent) => 'The sealed file waits on our server for up to ' + c + ' on Community, '
+    linkTtl: (c, pr, ent) => 'The locked file waits on our server for up to ' + c + ' on Community, '
       + pr + ' on Firm and ' + ent + ' on Enterprise, and a link from this web app is wiped after the first download.',
     ttlNote: (d) => 'When the link runs out we destroy the file, picked up or not. '
-      + 'Your plan holds a link to ' + d + ' at most; a longer choice is shortened to that.',
-    noteLink: 'The other person does not have to be online: the file waits for them. A single link '
-      + 'carries up to 5 MB; fill in who it is for and it goes up in pieces, up to 25 MB.',
-    noteLive: 'The person you send to has to be online while you send; you confirm a '
-      + 'short code together. Up to 500 MB, and nothing is ever stored. '
-      + 'Sending to a group? Choose Send a link and list who it is for.',
-    btnLink: 'Seal the file and make a link →',
-    btnLive: 'Create secure session →',
+      + 'On your plan a link stays open for ' + d + ' at most.',
+    planOne: 'You send to 1 person.',
+    planMany: (n) => 'You send to up to ' + n + ' people at once.',
+    planTtl: (d) => ' A link stays open for up to ' + d + '.',
+    sizeLink: ' A file can be up to 5 MB.',
+    sizeNamed: (mb) => ' A file can be up to ' + mb + ' MB.',
+    sizeLive: ' With Extra safe it can be up to 500 MB, and nothing is stored.',
+    upsell: (n, d) => 'With Firm you send to ' + (n ? 'up to ' + n + ' people' : 'a whole group') + ' at once, '
+      + (d ? 'a link stays open for ' + d + ', ' : '') + 'and you see who has opened it.',
+    groupBody: (n) => 'Up to ' + n + ' people. Everyone gets their own link by email, and you see who has opened it.',
+    btnSend: 'Send',
+    btnSendTo: (n) => 'Send to ' + n + (n === 1 ? ' person' : ' people'),
+    btnLive: 'Start and wait for the other person',
+    whyAccount: 'Getting your account. One moment.',
+    whySignIn: 'Sign in again first.',
+    whySignedOut: 'Sign in first, or create a free account.',
+    upsellSignOnly: (name) => 'Your ' + name + ' plan covers signing. For sending you are on Community, with the limits above.',
+    upsellSignOnlyBtn: 'Send with Firm too',
+    whyLocked: 'Choose "To one person" to send now.',
+    whyFile: 'Choose a file first.',
+    whyNoAddress: 'Fill in at least one email address.',
+    whyBad: 'Fix the addresses in red first.',
+    whyBadOne: 'That email address does not look right.',
+    whyTooMany: (n, max) => 'You listed ' + n + ' people. Your plan sends to ' + max + ' at once.',
+    countOf: (n, max) => n + ' of ' + max,
+    countOnly: (n) => n + (n === 1 ? ' address' : ' addresses'),
+    badList: (list) => 'These do not look like email addresses: ' + list + '. Fix them or take them out.',
+    dupes: (n) => n + (n === 1 ? ' duplicate was' : ' duplicates were') + ' left out.',
+    groupHelp: 'Paste a list, or put the addresses on separate lines or with a comma between them.',
+    otherFile: 'Choose another file',
+    chooseFile: 'Choose a file',
     groupTooBig: (name, mb, max) => name + ' is ' + mb + ' MB, and sending to a list tops out at ' + max
-      + ' MB because your browser locks the whole file at once. Put it in a zip, split it, or hand it over live to one person.',
-    linkTooBig: (name, max) => name + ' is too big for a single link. A link is one sealed 5 MB block. '
-      + 'Fill in who it is for and it goes up in pieces instead, up to ' + max + ' MB.',
+      + ' MB because your browser locks the whole file at once. Put it in a zip, split it, or send it with Extra safe to one person.',
+    linkTooBig: (name, max) => name + ' is too big for a plain link, which carries up to 5 MB. '
+      + 'Fill in their email address and it can be up to ' + max + ' MB.',
     oneFileOnly: 'Sending to named people works with one file at a time. '
       + 'Put the documents in a zip, or send them one by one.',
     checkingList: 'Checking the list...',
@@ -90,6 +119,12 @@ const T = {
     stateDelivered: 'Downloaded, and the file is gone',
     stateExpired: 'Expired, and the file is gone',
     stateWaiting: 'Waiting for the receiver',
+    stateLost: 'Not downloaded: our server lost the file (restart). Send it again',
+    slowUpload: 'The upload is going very slowly, so it was stopped. Your connection seems slow right now. Try again on a faster connection, or send a smaller file.',
+    netUpload: 'The upload did not arrive: the connection dropped. Check your internet and try again. If it keeps failing, mail privacy@paramant.app.',
+    stateWithdrawn: 'Withdrawn, and the file is gone',
+    stateExhausted: 'Tried too often without a download, the file is gone',
+    stateGone: 'No longer available, not known whether it was downloaded',
     worksOnce: 'Works once, until ',
     checking: 'Checking...',
     checkAgain: 'Check again',
@@ -99,7 +134,7 @@ const T = {
     decSaving: 'Decrypted, saving file…',
     downloaded: 'Downloaded.',
     decSaved: 'File decrypted and saved. The key existed only in your browser.',
-    sessionFailed: 'Account session could not be started',
+    sessionFailed: 'We could not sign you in',
     globeFailed: 'Failed to load Globe.gl. Check your network.',
     yourNode: 'Your Node',
     awaitingReceiver: 'Awaiting receiver',
@@ -116,34 +151,40 @@ const T = {
     gpComplete: 'Transfer Complete ✓',
   },
   nl: {
-    usingAccount: 'Uw account wordt gebruikt',
+    usingAccount: 'U bent ingelogd; we versturen namens uw account.',
+    signedInAs: (email) => 'Ingelogd als ' + email,
     waitingTitle: 'Wachten op de ontvanger...',
     copied: 'Gekopieerd',
     copyFailed: 'Kopiëren mislukt',
     copyLink: 'Link kopiëren',
     receiverConnected: 'Ontvanger verbonden',
     receiverWaits: 'De ontvanger wacht tot u de controlecode vergelijkt',
-    validPlan: (plan, sector) => `✓ Geldig, abonnement: ${plan}${sector}`,
-    accountNoSector: 'Dit account is op geen enkele relay actief',
+    validPlan: (plan, sector) => `✓ Geldig, plan: ${plan}${sector}`,
+    accountNoSector: 'Dit account is op geen van onze servers actief. Mail privacy@paramant.app, dan zoeken we het uit.',
     keyInvalid: 'Ongeldige of ingetrokken sleutel',
-    noSectorAnswered: 'Geen relay gaf antwoord. Controleer uw verbinding en druk opnieuw op Veilige sessie starten.',
-    sectorUnreachable: 'Geen relay bereikbaar. U kunt wel verder.',
+    noSectorAnswered: 'Onze server gaf geen antwoord. Controleer uw verbinding en probeer het opnieuw.',
+    tooManyChecks: 'Even te veel controles vanaf dit netwerk. Wacht een minuut en laad de pagina opnieuw. Aan uw sleutel ligt het niet.',
+    sectorUnreachable: 'Onze server is niet bereikbaar. U kunt wel verder.',
     enterKey: 'Vul uw API-sleutel in om verder te gaan',
     notAKey: 'Dat lijkt geen sleutel. Een sleutel begint met pgp_.',
-    noFile: 'Geen bestand gekozen',
-    filesPackage: (n) => n + ' bestanden, verstuurd als één pakket',
-    lookingSector: 'Relay zoeken...',
+    noFile: 'Nog geen bestand gekozen',
+    filesPackage: (n) => n + ' bestanden, elk apart op slot',
+    sendingPart: (name, i, n) => name + ' wordt verstuurd, deel ' + i + ' van ' + n + '...',
+    lookingSector: 'Verbinding maken...',
     waitingOpen: 'Wachten tot de ontvanger de link opent...',
     receiverClosed: 'De ontvanger heeft de link gesloten',
     receiverClosedLong: 'De ontvanger sloot de link voordat u de controlecode vergeleek. Er is niets geüpload en uw bestand staat nog hier in deze browser.',
     connectionLost: 'Verbinding verbroken',
     connectionFailed: 'De verbinding mislukte voordat de ontvanger er was. Er is niets geüpload en uw bestand staat nog hier in deze browser.',
     connectionDropped: 'De verbinding viel weg voordat de ontvanger er was. Er is niets geüpload en uw bestand staat nog hier in deze browser.',
-    recipientsEmpty: 'Leeg laten geeft één link die één keer opent. Vult u het in, dan krijgt iedere ontvanger een eigen link en ziet u wie het heeft opgehaald.',
+    recipientsEmpty: 'Leeg laten: u stuurt de link zelf door. Vult u het in, dan mailen wij de ontvanger een eigen link en ziet u of het is geopend.',
     recipientsCount: (n, dubbel) => n + (n === 1 ? ' ontvanger' : ' ontvangers')
       + (dubbel ? ', ' + dubbel + (dubbel === 1 ? ' dubbel adres' : ' dubbele adressen') + ' overgeslagen' : '')
       + '. Iedere ontvanger krijgt een eigen link en een controlecode op dit adres.',
     xOfY: (a, b) => a + ' van ' + b,
+    testModeTitle: 'Niet verstuurd: testmodus',
+    testModeLead: (n) => 'Deze server bezorgt geen mail (testmodus). Het bestand staat klaar voor ' + n + (n === 1 ? ' ontvanger' : ' ontvangers') + ', maar er is geen uitnodiging verstuurd.',
+    testModeNote: 'Vraag de beheerder een mailprovider in te stellen (MAIL_PROVIDER) en verstuur het daarna opnieuw.',
     sentTitle: 'Verstuurd',
     invitesLead: (aantal) => aantal + ' uitnodigingen zijn onderweg. Iedere ontvanger kreeg een eigen link.',
     invitesNote: 'Iedere ontvanger bevestigt eerst het eigen e-mailadres met een controlecode. '
@@ -151,54 +192,83 @@ const T = {
     openDashboard: 'Naar uw dashboard',
     sendAnother: 'Nog een bestand versturen',
     sentTo: (aantal) => 'Verstuurd naar ' + aantal,
-    tooMany: (n, asked) => 'Uw abonnement verstuurt naar ' + (n === 1 ? '1 ontvanger' : n + ' ontvangers') + ' tegelijk. U noemde er ' + asked + '.',
-    removeNames: 'Haal namen van de lijst, of kies een abonnement voor meer ontvangers.',
+    tooMany: (n, asked) => 'Uw plan verstuurt naar ' + (n === 1 ? '1 ontvanger' : n + ' ontvangers') + ' tegelijk. U noemde er ' + asked + '.',
+    removeNames: 'Haal namen van de lijst, of kies een plan voor meer ontvangers.',
     starting: 'Starten...',
     badAddress: 'Naar dit adres kunnen we niet versturen: ',
     noUsable: 'Er staat geen bruikbaar adres in die lijst.',
     sendNotCreated: 'De verzending kon niet worden gemaakt.',
-    wasmMissing: 'De versleutelingsmodule is niet geladen, dus veilig verzegelen lukt niet. Vernieuw de pagina en probeer het opnieuw.',
-    largeFile: (mb) => 'Groot bestand (' + mb + ' MB). Het wordt deel voor deel gelezen en verzegeld...',
+    wasmMissing: 'Het slot is niet geladen, dus veilig versturen lukt niet. Vernieuw de pagina en probeer het opnieuw.',
+    largeFile: (mb) => 'Groot bestand (' + mb + ' MB). Het wordt deel voor deel gelezen en op slot gezet...',
     fileNofM: (i, n) => 'Bestand ' + i + '/' + n + ': ',
-    encrypting: (done, total, i, n) => 'Verzegelen ' + done + '/' + total + ' MB (deel ' + i + '/' + n + ')...',
+    encrypting: (done, total, i, n) => 'Op slot zetten ' + done + '/' + total + ' MB (deel ' + i + '/' + n + ')...',
     uploading: (up, total) => 'Uploaden ' + up + '/' + total + ' MB...',
-    liveOnePerson: 'Bij ‘Samen, nu’ gaat het bestand naar één ontvanger: de persoon achter het andere scherm. '
-      + 'Wilt u naar een lijst versturen, kies dan Later ophalen.',
+    liveOnePerson: 'Bij Extra veilig gaat het bestand naar één persoon: de persoon achter het andere scherm. '
+      + 'Wilt u naar een lijst versturen, kies dan Naar meerdere mensen.',
     notifying: 'Ontvanger op de hoogte brengen...',
     filesOnWay: (n) => n + ' bestanden zijn onderweg',
     fileOnWay: (name) => name + ' is onderweg',
-    doneTitle: 'Aangekomen bij de ontvanger.',
+    doneTitle: 'Verstuurd naar de ontvanger.',
     doneLine: (what) => what + ' naar de ontvanger met wie u de controlecode vergeleek. '
-      + 'Onze kopie is verzegeld en verdwijnt zodra de ontvanger hem ophaalt.',
+      + 'Onze kopie zit op slot en verdwijnt zodra de ontvanger hem ophaalt.',
     keepReceipt: 'Bewijs bewaren',
     days: (n) => n + ' dagen',
     hours: (n) => n + ' uur',
     minutes: (n) => n + ' minuten',
     seconds: (n) => n + ' seconden',
-    linkTtl: (c, pr, ent) => 'Het verzegelde bestand wacht op onze server tot ' + c + ' bij Community, '
+    linkTtl: (c, pr, ent) => 'Het bestand op slot wacht op onze server tot ' + c + ' bij Community, '
       + pr + ' bij Firm en ' + ent + ' bij Enterprise. Een link uit deze web app wordt na de eerste download gewist.',
     ttlNote: (d) => 'Als de link verloopt, vernietigen we het bestand, opgehaald of niet. '
-      + 'Met uw abonnement blijft een link hooguit ' + d + ' open. Kiest u langer, dan wordt dat ingekort.',
-    noteLink: 'De ontvanger hoeft niet online te zijn: het bestand wacht. Eén link '
-      + 'kan tot 5 MB bevatten. Vult u in voor wie het is, dan gaat het in delen, tot 25 MB.',
-    noteLive: 'De ontvanger moet online zijn terwijl u verstuurt. U controleert samen een '
-      + 'korte controlecode. Tot 500 MB, en er wordt niets bewaard. '
-      + 'Versturen naar een groep? Kies Later ophalen en vul in voor wie het is.',
-    btnLink: 'Bestand verzegelen en link maken →',
-    btnLive: 'Veilige sessie starten →',
+      + 'Met uw plan blijft een link hooguit ' + d + ' open.',
+    planOne: 'U stuurt naar 1 persoon.',
+    planMany: (n) => 'U stuurt naar maximaal ' + n + ' mensen tegelijk.',
+    planTtl: (d) => ' Een link blijft maximaal ' + d + ' open.',
+    sizeLink: ' Een bestand mag tot 5 MB zijn.',
+    sizeNamed: (mb) => ' Een bestand mag tot ' + mb + ' MB zijn.',
+    sizeLive: ' Met Extra veilig mag het tot 500 MB zijn, en er wordt niets bewaard.',
+    upsell: (n, d) => 'Met Firm stuurt u naar ' + (n ? 'maximaal ' + n + ' mensen' : 'een hele groep') + ' tegelijk, '
+      + (d ? 'blijft een link ' + d + ' open ' : '') + 'en ziet u wie het heeft geopend.',
+    groupBody: (n) => 'Tot ' + n + ' mensen. Iedereen krijgt een eigen link per e-mail, en u ziet wie het heeft geopend.',
+    btnSend: 'Verstuur',
+    btnSendTo: (n) => 'Verstuur naar ' + n + (n === 1 ? ' persoon' : ' mensen'),
+    btnLive: 'Start en wacht op de ontvanger',
+    whyAccount: 'Uw account wordt opgehaald. Een ogenblik.',
+    whySignIn: 'Log eerst opnieuw in.',
+    whySignedOut: 'Log eerst in, of maak een gratis account.',
+    upsellSignOnly: (name) => 'Uw ' + name + '-plan geldt voor ondertekenen. Voor versturen heeft u Community, met de grenzen hierboven.',
+    upsellSignOnlyBtn: 'Ook versturen met Firm',
+    whyLocked: 'Kies Naar één persoon om nu te versturen.',
+    whyFile: 'Kies eerst een bestand.',
+    whyNoAddress: 'Vul minstens één e-mailadres in.',
+    whyBad: 'Verbeter eerst de adressen in rood.',
+    whyBadOne: 'Dit e-mailadres klopt niet.',
+    whyTooMany: (n, max) => 'U noemt ' + n + ' mensen. Met uw plan kunnen er ' + max + ' tegelijk.',
+    countOf: (n, max) => n + ' van ' + max,
+    countOnly: (n) => n + (n === 1 ? ' adres' : ' adressen'),
+    badList: (list) => 'Dit zijn geen geldige e-mailadressen: ' + list + '. Verbeter ze of haal ze weg.',
+    dupes: (n) => n + (n === 1 ? ' dubbel adres is' : ' dubbele adressen zijn') + ' overgeslagen.',
+    groupHelp: 'Plak een lijst, of zet de adressen onder elkaar of met een komma ertussen.',
+    otherFile: 'Ander bestand kiezen',
+    chooseFile: 'Kies een bestand',
     groupTooBig: (name, mb, max) => name + ' is ' + mb + ' MB. Versturen naar een lijst gaat tot ' + max
-      + ' MB, omdat uw browser het hele bestand in één keer verzegelt. Zet het in een zip, splits het, of geef het met Samen, nu door aan één ontvanger.',
-    linkTooBig: (name, max) => name + ' is te groot voor één link. Een link is één verzegeld blok van 5 MB. '
-      + 'Vult u in voor wie het is, dan gaat het in delen, tot ' + max + ' MB.',
+      + ' MB, omdat uw browser het hele bestand in één keer op slot zet. Zet het in een zip, splits het, of verstuur het met Extra veilig naar één persoon.',
+    linkTooBig: (name, max) => name + ' is te groot voor een gewone link, die gaat tot 5 MB. '
+      + 'Vult u het e-mailadres van de ontvanger in, dan kan het tot ' + max + ' MB.',
     oneFileOnly: 'Versturen naar ontvangers met naam gaat met één bestand tegelijk. '
       + 'Zet de documenten in een zip, of verstuur ze een voor een.',
     checkingList: 'De lijst wordt gecontroleerd...',
-    sealingFile: (name) => name + ' wordt in deze browser verzegeld...',
-    lockingKeys: 'De sleutel wordt per ontvanger verzegeld...',
+    sealingFile: (name) => name + ' wordt in deze browser op slot gezet...',
+    lockingKeys: 'De sleutel wordt per ontvanger op slot gezet...',
     sendingInvites: 'De uitnodigingen worden verstuurd...',
     stateDelivered: 'Opgehaald, het bestand is weg',
     stateExpired: 'Verlopen, het bestand is weg',
     stateWaiting: 'Wacht op de ontvanger',
+    stateLost: 'Niet opgehaald: onze server is het bestand kwijt (herstart). Stuur het opnieuw',
+    slowUpload: 'De upload gaat erg langzaam en is daarom gestopt. Uw verbinding lijkt nu traag. Probeer het op een snellere verbinding, of verstuur een kleiner bestand.',
+    netUpload: 'De upload kwam niet aan: de verbinding viel weg. Controleer uw internet en probeer het opnieuw. Blijft het mislukken, mail dan privacy@paramant.app.',
+    stateWithdrawn: 'Ingetrokken, het bestand is weg',
+    stateExhausted: 'Te vaak geprobeerd zonder download, het bestand is weg',
+    stateGone: 'Niet meer beschikbaar, onbekend of het is opgehaald',
     worksOnce: 'Werkt één keer, tot ',
     checking: 'Kijken...',
     checkAgain: 'Opnieuw kijken',
@@ -208,11 +278,11 @@ const T = {
     decSaving: 'Ontsleuteld, bestand wordt opgeslagen…',
     downloaded: 'Opgehaald.',
     decSaved: 'Bestand ontsleuteld en opgeslagen. De sleutel bestond alleen in uw browser.',
-    sessionFailed: 'Uw accountsessie kon niet starten',
+    sessionFailed: 'We konden u niet aanmelden',
     globeFailed: 'Wereldbol laden mislukt. Controleer uw verbinding.',
     yourNode: 'Uw locatie',
     awaitingReceiver: 'Wacht op de ontvanger',
-    hudEncrypting: 'Verzegelen...',
+    hudEncrypting: 'Op slot zetten...',
     transferComplete: 'Verzending klaar',
     idle: 'Rust',
     noSession: 'Geen sessie',
@@ -273,17 +343,52 @@ let receiverPubs = null;
 // added for the sender whose receiver is not at a desk right now -- the file is
 // sealed in this browser, parked on the relay under a one-time download token,
 // and the key travels in the URL fragment where no server ever sees it.
-let sendMode = 'live';
+let sendMode = 'link';
+// Who it is for, and whether the one-person send is the live hand-over. The
+// page offers two choices in plain words ("To one person", "To several
+// people"); the live hand-over with a code to compare is the Extra safe tick
+// box under the first. sendMode is derived from these two and nothing else.
+let audience = 'one', extraSafe = false;
+// What the plan allows for named recipients, from GET /v2/check-key
+// (max_recipients, tiers.js) or, on a relay that does not serve that field
+// yet, from the limit an empty POST /v2/sends/precheck reports. 0 = not known,
+// and an unknown plan locks nothing: the relay still decides at the send.
+let planMaxRecipients = 0, planMaxByPlan = null;
+// The address the browser is signed in as, for "Signed in as". Never the token.
+let signedInEmail = '';
+let signPlanName = '';
 // The per-plan link lifetimes, straight from tiers.js by way of GET
 // /v2/check-key. Never written into the page by hand: see the comment on the
 // chooser in parashare.html.
 let planTtlByPlan = null, planTtlMs = 0;
 // True while a session runs (any step but step 1 and the end screens). See showStep.
 let sessionBusy = false;
-// The links this browser session has minted, newest last. Page-local on
-// purpose: the relay keeps no list of a sender's outstanding links, and
-// pretending otherwise would be a claim this build cannot keep.
+// The links this browser session has minted, newest last. The relay keeps no
+// list of a sender's outstanding links, so this browser does. In
+// sessionStorage (hertest T4-15: a reload emptied the list): it survives a
+// reload and "Nog een bestand versturen", and is gone when the tab closes. A
+// link carries its key, so it is kept no longer than the tab and never in
+// localStorage. Rows more than a day past their expiry are dropped.
 const sentLinks = [];
+const SENT_KEY = 'paramant.parashare.sentLinks.v1';
+function saveSentLinks() {
+  try {
+    sessionStorage.setItem(SENT_KEY, JSON.stringify(sentLinks.map((r) => ({
+      name: r.name, url: r.url, token: r.token, expires_ms: r.expires_ms, state: r.state,
+    }))));
+  } catch (_) { /* storage refused: the list lives as long as the page */ }
+}
+function loadSentLinks() {
+  let rows = [];
+  try { rows = JSON.parse(sessionStorage.getItem(SENT_KEY) || '[]'); } catch (_) { rows = []; }
+  if (!Array.isArray(rows)) return;
+  const cutoff = Date.now() - 86400000;
+  for (const r of rows) {
+    if (!r || typeof r.url !== 'string' || typeof r.token !== 'string' || !(Number(r.expires_ms) > cutoff)) continue;
+    sentLinks.push({ name: String(r.name || ''), url: r.url, token: r.token,
+                     expires_ms: Number(r.expires_ms), state: typeof r.state === 'string' ? r.state : 'waiting' });
+  }
+}
 
 // ── Helpers ──
 function $(id) { return document.getElementById(id); }
@@ -292,6 +397,44 @@ function $(id) { return document.getElementById(id); }
 // cannot import, so js/error-message.js is loaded above it as a plain script and
 // hangs its namespace off the global. The fallback string exists for the case
 // where that tag is missing; it is never the normal path.
+// One sealed block to the relay. The deadline used to be a flat 120 seconds,
+// and a 5 MB block (7 MB as base64) on a 0.3 Mbit/s line takes longer than
+// that, so a slow line ended in "something went wrong on our side", and every
+// retry failed the same way. Now the deadline scales with the block: two
+// minutes, or as long as the body takes at 16 KB/s, whichever is longer. If it
+// still runs out, or the line drops, the sender is told it is the connection.
+// A 503 from /v2/inbound is the relay's memory guard saying "not now", with a
+// Retry-After. It stored nothing, so the same block may go again. Until
+// 2026-10-04 the first 503 broke a 24 MB send at 36% with "Er ging aan onze
+// kant iets mis" (fase 1, SENDNAME-09-RAM). Three more tries, at most 30 s apart.
+const INBOUND_503_RETRIES = 3;
+async function postInbound(bodyStr) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await postInboundOnce(bodyStr);
+    if (r.status !== 503 || attempt >= INBOUND_503_RETRIES) return r;
+    const ra = parseInt(r.headers.get('Retry-After') || '', 10);
+    const waitS = Math.min(30, Number.isFinite(ra) && ra > 0 ? ra : 2 * (attempt + 1));
+    await new Promise((res) => setTimeout(res, waitS * 1000));
+  }
+}
+function postInboundOnce(bodyStr) {
+  const ms = Math.max(120000, Math.ceil(bodyStr.length / 16384) * 1000);
+  return relayFetch(RELAY_API + '/v2/inbound', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: bodyStr,
+    signal: AbortSignal.timeout(ms),
+  }).catch((e) => {
+    const slow = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    if (slow || e instanceof TypeError) {
+      const u = new Error(t(slow ? 'slowUpload' : 'netUpload'));
+      u.voorDeGebruiker = true;
+      throw u;
+    }
+    throw e;
+  });
+}
+
 function failureText(where, e) {
   // A sentence written for the sender passes straight through. Without this
   // exception "Your plan allows 10 recipients per send. You listed 20." was
@@ -329,7 +472,7 @@ function showStep(id) {
   // decided. Switching it there used to flip the mode under a live session
   // without going back to step 1, so the cards are locked until step 1 again.
   sessionBusy = (id !== 'step-setup') && !ENDED;
-  ['ps-mode-live', 'ps-mode-link'].forEach(function (cid) {
+  ['ps-mode-link', 'ps-mode-group', 'ps-extra-safe'].forEach(function (cid) {
     var c = $(cid);
     if (!c) return;
     c.disabled = sessionBusy;
@@ -383,13 +526,12 @@ function expandApiKeyCard() {
 // session key has really arrived: the mask, the label, and the green dot.
 function applySlimApiKeyView(shown) {
   if (!shown) return;
+  // No session token on the screen: it says nothing to a person and is
+  // machine detail (hertest r2 T5-11). The element stays for the layout.
   var mask = $('ps-key-mask');
-  if (mask) {
-    mask.textContent = shown.length > 14 ? shown.slice(0, 8) + '...' + shown.slice(-4) : shown;
-    mask.hidden = false;
-  }
+  if (mask) { mask.textContent = ''; mask.hidden = true; }
   var label = $('ps-key-slim-label');
-  if (label) label.textContent = t('usingAccount');
+  if (label) label.textContent = signedInEmail ? t('signedInAs')(signedInEmail) : t('usingAccount');
   var row = $('ps-key-slim');
   if (row) { row.classList.remove('is-loading'); row.hidden = false; }
   var s = $('step-setup');
@@ -604,6 +746,7 @@ async function fetchSessionToken() {
   if (!r.ok) {
     var refused = new Error('session token: HTTP ' + r.status);
     refused.expected = r.status === 401 || r.status === 403 || r.status === 404;
+    refused.status = r.status;
     throw refused;
   }
   var d = await r.json();
@@ -674,25 +817,33 @@ async function discoverRelay() {
       const r = await relayFetch(`${url}/v2/check-key`, {
         signal: AbortSignal.timeout(5000)
       });
+      // A 429 is "slow down", not an answer about the key. Read as valid:false
+      // it told a customer with a good key "Ongeldige of ingetrokken sleutel"
+      // (fase 1, P04 bij SEND-03-A).
+      if (r.status === 429) { const e = new Error('rate_limited'); e.rateLimited = true; throw e; }
       const d = await r.json();
       return {
         sector, url, plan: d.plan, valid: !!d.valid,
         link_ttl_ms: d.link_ttl_ms, link_ttl_ms_by_plan: d.link_ttl_ms_by_plan,
+        max_recipients: d.max_recipients, max_recipients_by_plan: d.max_recipients_by_plan,
       };
     })
   );
   const answered = results.filter(r => r.status === 'fulfilled').map(r => r.value);
   const valid = answered.filter(a => a.valid);
+  const rateLimited = results.some(r => r.status === 'rejected' && r.reason && r.reason.rateLimited);
   return {
-    // Every sector that spoke said no. That is a verdict on the key.
-    rejected: answered.length > 0 && valid.length === 0,
+    rateLimited,
+    // Every sector that spoke said no, and none of them only said "slow down":
+    // the one that holds the key may be the one that was busy.
+    rejected: answered.length > 0 && valid.length === 0 && !rateLimited,
     // Prefer health; otherwise first sector that responded
     found: valid.find(v => v.sector === 'health') || valid[0] || null
   };
 }
 
 // ── Credential validation ──
-// Nothing is written to localStorage, and on the hosted relay nothing that
+// No credential is written to localStorage, and on the hosted relay nothing that
 // reaches this page is an API key at all: the credential is a pst_ session
 // token, minted per browser session and scoped by the relay to the five routes
 // a transfer walks. The manual card below is the self-host path, and it is the
@@ -716,6 +867,9 @@ async function discoverAndReport() {
     applyPlanTtls(d.found);
     const sectorLabel = d.found.sector !== 'health' ? ` · ${d.found.sector}` : '';
     setStatus('key-status', t('validPlan')(d.found.plan, sectorLabel), 'ok');
+  } else if (d.rateLimited) {
+    relayError = t('tooManyChecks');
+    setStatus('key-status', t('tooManyChecks'), 'err');
   } else if (d.rejected) {
     // A sector answered and said no. On the session path that is a verdict on
     // the account, not on anything the sender typed, so it is not called a bad
@@ -768,27 +922,106 @@ function setCreateStatus(msg, cls) {
   el.className = 'status-line' + (cls ? ' ' + cls : '');
 }
 
+// Bytes into something a person reads, decimal comma on the Dutch page. The
+// status line used to say "(0.0 MB)" for a 40 KB payslip (fase 1, P04).
+function humanSize(n) {
+  const one = (x) => { const v = x.toFixed(1); return LANG === 'en' ? v : v.replace('.', ','); };
+  if (n >= 1048576) return one(n / 1048576) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
+  return n + ' B';
+}
+
 function onFileSelect() {
   const files = $('file-input').files;
   selectedFile = files[0] || null;
-  if (!files.length) { setStatus('file-status', t('noFile')); $('vault-list').style.display='none'; updateBtn(); return; }
+  const drop = $('ps-drop'), dropBtn = $('ps-drop-btn');
+  if (!files.length) {
+    setStatus('file-status', t('noFile')); $('vault-list').style.display='none';
+    if (drop) drop.classList.remove('has-file');
+    if (dropBtn) dropBtn.textContent = t('chooseFile');
+    updateBtn(); return;
+  }
   if (files.length === 1) {
-    setStatus('file-status', '✓ ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + ' MB)', 'ok');
+    setStatus('file-status', '✓ ' + files[0].name + ' (' + humanSize(files[0].size) + ')', 'ok');
     $('vault-list').style.display = 'none';
   } else {
     setStatus('file-status', '✓ ' + t('filesPackage')(files.length), 'ok');
     const vl = $('vault-list');
     vl.style.display = 'block';
-    vl.innerHTML = [...files].map(f =>
-      '<div style="font-size:10px;color:var(--ink-2);padding:2px 0;font-family:var(--mono)">' + f.name + ' <span style="color:var(--ink-dim)">(' + (f.size/1024/1024).toFixed(1) + ' MB)</span></div>'
-    ).join('');
+    vl.textContent = '';
+    [...files].forEach(function (f) {
+      const row = document.createElement('div');
+      row.className = 'ps-meta';
+      row.textContent = f.name + ' (' + humanSize(f.size) + ')';
+      vl.appendChild(row);
+    });
   }
+  // The icon ticks once when the file is taken. That is the whole animation,
+  // and it says the one thing the sender wants to know at that moment.
+  if (drop) {
+    drop.classList.add('has-file');
+    drop.classList.remove('just-taken');
+    void drop.offsetWidth;
+    drop.classList.add('just-taken');
+  }
+  if (dropBtn) dropBtn.textContent = t('otherFile');
   updateBtn();
+}
+
+// Drag and drop onto the picker. The dropped files go into the real input, so
+// everything after this reads $('file-input').files exactly as for a click.
+function wireDropZone() {
+  const drop = $('ps-drop'), input = $('file-input');
+  if (!drop || !input || !drop.addEventListener) return;
+  const over = function (e) { e.preventDefault(); if (!sessionBusy) drop.classList.add('is-over'); };
+  const out = function () { drop.classList.remove('is-over'); };
+  drop.addEventListener('dragenter', over);
+  drop.addEventListener('dragover', over);
+  drop.addEventListener('dragleave', out);
+  drop.addEventListener('drop', function (e) {
+    e.preventDefault(); out();
+    if (sessionBusy || !e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+    try { input.files = e.dataTransfer.files; } catch (_) { return; }
+    onFileSelect();
+  });
+}
+
+// Why the button waits, in one sentence, or '' when it does not.
+function whyNotReady() {
+  const keyErr = $('ps-key-error');
+  const out = $('ps-signedout');
+  if (!keyValid && out && !out.hidden) return t('whySignedOut');
+  if (!keyValid) return (keyErr && keyErr.classList.contains('is-shown')) ? t('whySignIn') : t('whyAccount');
+  if (audience === 'group' && groupLocked()) return t('whyLocked');
+  if (!selectedFiles.length) return t('whyFile');
+  if (audience === 'group') {
+    const l = leesLijst();
+    if (!l.uniek.length && !l.fout.length) return t('whyNoAddress');
+    if (l.fout.length) return t('whyBad');
+    if (planMaxRecipients && l.uniek.length > planMaxRecipients) return t('whyTooMany')(l.uniek.length, planMaxRecipients);
+  } else if (sendMode === 'link') {
+    const l = leesLijst();
+    if (l.fout.length) return t('whyBadOne');
+  }
+  return '';
 }
 
 function updateBtn() {
   selectedFiles = $('file-input') ? [...$('file-input').files] : [];
-  $('btn-create-session').disabled = !(keyValid && selectedFiles.length > 0);
+  const why = whyNotReady();
+  const btn = $('btn-create-session');
+  btn.disabled = !!why;
+  const whyEl = $('ps-go-why');
+  if (whyEl) whyEl.textContent = why;
+  // The label follows the choice: what pressing it will do, in those words.
+  let label = t('btnSend');
+  if (sendMode === 'live') label = t('btnLive');
+  else if (audience === 'group') {
+    const n = leesLijst().uniek.length;
+    if (n > 0) label = t('btnSendTo')(n);
+  }
+  btn.textContent = label;
+  renderLimit();
 }
 
 // ── Session creation ──
@@ -940,39 +1173,69 @@ async function waitForWindow(hash) {
 // arrive sooner, and hold less while it does.
 
 // Count as somebody types, so a list of twenty is something you can see rather
-// than something you have to trust. The ceiling itself is not shown: this page
-// does not know the plan, and a wrong number here is worse than no number. The
-// server decides, and says so in plain words when it refuses.
+// than something you have to trust. The ceiling is the plan's, from the plan
+// info; the relay still decides at the send, and says so in plain words when
+// it refuses.
 function onRecipientsInput() {
-  var status = document.getElementById('recipients-status');
-  if (!status) return;
-  var lijst = leesOntvangers();
-  if (!lijst.length) {
-    status.textContent = t('recipientsEmpty');
-    return;
+  const l = leesLijst();
+  if (audience === 'group') {
+    const count = $('ps-count');
+    if (count) {
+      const n = l.uniek.length;
+      const text = !n ? '' : planMaxRecipients ? t('countOf')(n, planMaxRecipients) : t('countOnly')(n);
+      if (count.textContent !== text) {
+        count.textContent = text;
+        count.classList.remove('bump'); void count.offsetWidth; count.classList.add('bump');
+      }
+      count.classList.toggle('is-over', !!(planMaxRecipients && n > planMaxRecipients));
+    }
+    const status = $('recipients-status');
+    if (status) status.textContent = l.dubbel ? t('groupHelp') + ' ' + t('dupes')(l.dubbel) : t('groupHelp');
+    const bad = $('recipients-bad');
+    if (bad) {
+      bad.hidden = !l.fout.length;
+      bad.textContent = l.fout.length ? t('badList')(l.fout.slice(0, 5).join(', ') + (l.fout.length > 5 ? ', ...' : '')) : '';
+    }
+    const veld = $('recipients-input');
+    if (veld) veld.setAttribute('aria-invalid', l.fout.length ? 'true' : 'false');
+  } else {
+    const one = $('recipient-one');
+    if (one) one.setAttribute('aria-invalid', l.fout.length ? 'true' : 'false');
   }
-  var uniek = [];
-  var gezien = {};
-  for (var i = 0; i < lijst.length; i++) {
-    var a = lijst[i].toLowerCase();
-    if (!gezien[a]) { gezien[a] = 1; uniek.push(a); }
-  }
-  var dubbel = lijst.length - uniek.length;
-  status.textContent = t('recipientsCount')(uniek.length, dubbel);
+  updateBtn();
 }
 
 // What she sees when it worked. Without this she was left on the progress bar
 // at 100 percent with one line of text: no confirmation, no way onward, and no
 // idea whether the invitations had gone out.
 function toonVerzending(verzending, naam) {
+  // The live block on step-done describes a hand-over with a check code and a
+  // key we never hold. That is not this path: show the honest one instead.
+  const live = $('done-details-live'), named = $('done-details-named');
+  if (live) live.hidden = true;
+  if (named) named.hidden = false;
+  // A relay without a mail provider (test mode) accepts the invitations and
+  // delivers none. Say that, not "sent to 2 of 2" (hertest L6).
+  if (verzending && verzending.mail_test_mode) {
+    if (window.paramantDone && paramantDone.fill) {
+      paramantDone.fill('step-done', {
+        title: t('testModeTitle'),
+        line: t('testModeLead')(verzending.recipients) + ' ' + t('testModeNote'),
+      });
+    }
+    showStep('step-done');
+    const kop0 = $('done-title');
+    if (kop0) kop0.textContent = t('testModeTitle');
+    return { send: verzending, name: naam };
+  }
   const aantal = t('xOfY')(verzending.invited, verzending.recipients);
   if (window.paramantDone && paramantDone.fill) {
     paramantDone.fill('step-done', {
       title: t('sentTitle'),
       lead: t('invitesLead')(aantal),
       note: t('invitesNote'),
-      actions: [{ label: t('openDashboard'), href: '/dashboard' },
-                { label: t('sendAnother'), href: LANG === 'en' ? '/en/parashare' : '/parashare' }],
+      // "Nog een bestand versturen" is already the primary button of step-done.
+      actions: [{ label: t('openDashboard'), href: LANG === 'en' ? '/en/dashboard' : '/dashboard' }],
     });
   }
   showStep('step-done');
@@ -987,13 +1250,35 @@ function toonVerzending(verzending, naam) {
 // used to count as one recipient and reach two mailboxes sharing a single
 // link. So whatever a person pastes gets taken apart where they pasted it, and
 // what leaves is a real list.
+// The field that counts depends on the choice: the list for a group, the one
+// optional address for one person, and nothing at all for Extra safe, where
+// the other person is at their screen and a list has nowhere to go.
+function ontvangersVeld() {
+  if (audience === 'group') return document.getElementById('recipients-input');
+  if (sendMode === 'link') return document.getElementById('recipient-one');
+  return null;
+}
 function leesOntvangers() {
-  var veld = document.getElementById('recipients-input');
+  var veld = ontvangersVeld();
   if (!veld) return [];
   return String(veld.value || '')
     .split(/[\n,;]+/)
     .map(function (a) { return a.trim(); })
     .filter(function (a) { return a.length > 0; });
+}
+// The same list, sorted into what can be sent to and what cannot. The check is
+// a shape check only, so a typo is red before the press; the relay's own
+// normaliseAddress stays the judge.
+const ADRES = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]{2,}$/;
+function leesLijst() {
+  const alle = leesOntvangers();
+  const gezien = {}, uniek = [], fout = [];
+  alle.forEach(function (a) {
+    if (!ADRES.test(a)) { fout.push(a); return; }
+    const k = a.toLowerCase();
+    if (!gezien[k]) { gezien[k] = 1; uniek.push(k); }
+  });
+  return { uniek: uniek, fout: fout, dubbel: alle.length - uniek.length - fout.length };
 }
 
 // "Your plan sends to 1 person at a time. You listed 2." One sentence for the
@@ -1052,14 +1337,41 @@ function backToSetup() {
 // After every block has landed, turn them into one send with a link per person.
 // A separate call on purpose: a file arrives as many blocks, and reading a
 // recipient list off one of them would make many sends out of one file.
+// The recipients' links of this send, kept in THIS browser only, so the
+// dashboard can send a reminder with the same link (DASH-15-A). The link is
+// the recipient's token; the relay never writes it down, so a reminder can
+// only be built here, the way the invitation was. Kept until the send closes
+// (at most eight days), wiped on sign-out and on an account switch
+// (nav-auth.js), never sent anywhere except back to the relay for a reminder
+// to that same person. On its own the token opens nothing: collecting needs
+// the code that goes to the recipient's mailbox.
+//
+// Sealed under the account key (js/account-seal.js, review #573 M4), never
+// readable in storage. Without a signed-in account nothing is kept.
+function rememberSendLinks(verzending, sealed) {
+  try {
+    if (!verzending || !verzending.send_id || !sealed) return;
+    const cap = Date.now() + 8 * 864e5;
+    const until = Date.parse(verzending.expires_at || '');
+    const links = Object.keys(sealed).map(function (e) { return { e: e, t: sealed[e].token }; });
+    import('/js/account-seal.js?v=1').then(function (m) {
+      return m.sealPut('paramant.send.links.v1:' + verzending.send_id, { links: links },
+        Number.isFinite(until) ? Math.min(until, cap) : cap);
+    }).catch(function () { /* no key or storage off: the dashboard says the links are not here */ });
+  } catch (_) { /* storage off */ }
+}
+
 async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed) {
   const r = await relayFetch(RELAY_API + '/v2/sends', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     // lang: de taal van de pagina, zodat de relay de uitnodiging en de code
     // aan de ontvangers in dezelfde taal mailt als de afzender hier leest.
+    // Geen bestandsnaam (hertest T4-9): de relay en de mailer krijgen alleen
+    // adressen en de verzegelde sleutels. De naam reist alleen IN het
+    // verzegelde bestand; de ontvangstpagina haalt hem daar uit.
     body: JSON.stringify({ hashes: hashes, recipients: ontvangers, sealed: sealed,
-                           filename: naam, ttl_ms: ttlMs, lang: LANG }),
+                           ttl_ms: ttlMs, lang: LANG }),
     signal: AbortSignal.timeout(60000)
   });
   const body = await r.json().catch(function () { return {}; });
@@ -1181,16 +1493,11 @@ async function confirmFingerprint() {
         const hashBuf = await crypto.subtle.digest('SHA-256', padded);
         const hash = u8toHex(new Uint8Array(hashBuf));
 
-        const ur = await relayFetch(RELAY_API + '/v2/inbound', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const ur = await postInbound(JSON.stringify({
             hash, payload: toB64(padded), ttl_ms: ttlMs,
             // file_name omitted — filename is only in the encrypted payload (finding #4)
             meta: { device_id: 'transfer-web', chunk_index: i, total_chunks: totalChunks, file_id: fileId }
-          }),
-          signal: AbortSignal.timeout(120000)
-        });
+          }));
         const ud = await ur.json();
         // Free monthly transfer limit: keep the relay's 402 JSON on the error
         // so the catch below renders the upgrade notice instead of a raw error.
@@ -1305,6 +1612,23 @@ async function confirmFingerprint() {
   }
 }
 
+// The receiver never heard a rejection: it has no API key, so no WebSocket
+// ticket and no socket, and waited ten minutes behind its code (fase 1,
+// SENDNAME-28-A). What it does poll is the `_ready` slot. A rejection fills
+// that slot with a record no real send can make, zero blocks and an all-zero
+// token, within the grammar relay/lib/handshake-record.js allows. The slot is
+// first-write-wins, so the session is spent either way; the sender starts a
+// fresh one.
+const REJECT_READY = { kyber_pub: 'file|0|0', ecdh_pub: '0'.repeat(48) };
+function announceRejection() {
+  if (!sessionToken) return;
+  relayFetch(RELAY_API + '/v2/pubkey', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id: sessionToken + '_ready', ...REJECT_READY }),
+  }).catch(() => {});
+}
+
 // ── Send a link ──────────────────────────────────────────────────────────────
 //
 // WHAT THIS STAND IS FOR. An administratiekantoor wants to mail a payslip to
@@ -1365,95 +1689,159 @@ function humanDuration(ms) {
   return t('seconds')(Math.round(n / 1000));
 }
 
-// The chooser's second sentence, written from the served table. Called once a
-// sector has answered; until then the markup's plan-free sentence stands, which
-// is true of every plan and names no time it might get wrong.
+// Everything the plan says, from the served table: the one limit line, the
+// quiet Firm line for Community, the lock on the group card, and which expiry
+// times the picker offers. Called once a sector has answered; until then the
+// block stays hidden, because a line that guesses is worse than no line.
 function applyPlanTtls(found) {
   planTtlMs = Number(found && found.link_ttl_ms) || 0;
   planTtlByPlan = (found && found.link_ttl_ms_by_plan) || null;
-  const el = $('ps-mode-link-ttl');
-  if (!el || !planTtlByPlan) return;
-  const c = humanDuration(planTtlByPlan.community);
-  // The table the relay serves is keyed by ENTITLEMENT TIER (tiers.js rows:
-  // community, pro, business, enterprise). The sentence names the PLAN a reader
-  // can buy, and since 6 September 2026 the plan that grants the 'pro' row is
-  // Firm; nobody can buy a plan called Pro any more. So the key stays 'pro' and
-  // the word beside it is Firm: 24 hours is what Firm actually gives you, which
-  // is the same 24 hour link expiry the Firm card prints on /pricing.
-  const pr = humanDuration(planTtlByPlan.pro);
-  // Enterprise, not Business. tiers.js carries a business row and it is
-  // load-bearing server-side, but the ParaSend price table sells Community,
-  // Firm and Enterprise, so a reader on none of them can only be told about a
-  // plan he could buy. The two rows hold the same ceiling today anyway.
-  const ent = humanDuration(planTtlByPlan.enterprise);
-  if (!c || !pr || !ent) return;
-  // "web app" is not decoration. tests/site-claims.test.mjs block 37 holds every
-  // page about a client that never sends max_views to naming that client beside
-  // a single-read claim, because "up to 10 reads on Firm" is something this page
-  // will never do: it asks the relay for no read count at all.
-  el.textContent = t('linkTtl')(c, pr, ent);
-  // The TTL picker in step 1 offers 24 hours to an account whose plan stops at
-  // one, and POST /v2/inbound silently clamps it. Saying the ceiling here is
-  // cheaper than letting the sender pick a number the relay will not honour.
-  const note = $('ttl-status');
-  if (note && planTtlMs) {
-    note.textContent = t('ttlNote')(humanDuration(planTtlMs));
+  const max = Number(found && found.max_recipients);
+  if (max > 0) planMaxRecipients = max;
+  planMaxByPlan = (found && found.max_recipients_by_plan) || planMaxByPlan;
+  // An older relay does not serve max_recipients yet. The precheck route does
+  // report the ceiling, also for an empty list, so it is asked once.
+  if (!planMaxRecipients) {
+    precheckOntvangers([]).then(function (pc) {
+      const n = Number(pc && pc.limit);
+      if (n > 0) { planMaxRecipients = n; renderChoice(); }
+    });
+  }
+  // Only times the plan honours are offered. POST /v2/inbound clamps anything
+  // longer, and offering 24 hours to an account held to one is a promise the
+  // relay will not keep. The options above the plan are taken out, not hidden:
+  // Safari on an iPhone ignores hidden on an <option>, so a 24-hour plan still
+  // offered "7 days" there (acceptatie 3.1.1, betalen).
+  rebuildTtlOptions();
+  applyTtlDefault();
+  renderChoice();
+}
+
+// The picker's default follows the plan. It used to be one hour for everyone,
+// so a Firm office that mailed a link in the afternoon had a client who found
+// it expired in the evening, and Enterprise could not pick its 7 days at all.
+// Default: the plan's ceiling, but no more than 24 hours; a longer window is a
+// choice, not something a sender gets without looking. Once the sender has
+// touched the picker, the page leaves it alone.
+const TTL_DAY_MS = 86_400_000;
+const TTL_WEEK_MS = 7 * TTL_DAY_MS;
+function applyTtlDefault() {
+  const sel = $('ttl-select');
+  if (!sel || !planTtlMs) return;
+  if (!sel.dataset.watch) {
+    sel.dataset.watch = '1';
+    sel.addEventListener('change', () => { sel.dataset.touched = '1'; });
+  }
+  if (sel.dataset.touched) return;
+  const want = Math.min(planTtlMs, TTL_DAY_MS);
+  let best = null;
+  for (const o of sel.options) {
+    const v = Number(o.value);
+    if (v <= want && (!best || v > Number(best.value))) best = o;
+  }
+  if (best) sel.value = best.value;
+}
+
+// The choices the picker can ever show, shortest first. The plan cuts the list.
+const TTL_CHOICES = [300000, 3600000, TTL_DAY_MS, TTL_WEEK_MS];
+function rebuildTtlOptions() {
+  const sel = $('ttl-select');
+  if (!sel || !planTtlMs) return;
+  const keep = Number(sel.value);
+  const allowed = TTL_CHOICES.filter(function (v) { return v <= planTtlMs; });
+  if (!allowed.length) allowed.push(TTL_CHOICES[0]);
+  while (sel.options.length) sel.remove(0);
+  allowed.forEach(function (v) {
+    const o = document.createElement('option');
+    o.value = String(v);
+    o.textContent = humanDuration(v);
+    sel.appendChild(o);
+  });
+  sel.value = String(allowed.indexOf(keep) !== -1 ? keep : allowed[allowed.length - 1]);
+}
+
+function groupLocked() { return planMaxRecipients === 1; }
+
+// The one line about what this account can do, built for the current choice.
+function renderLimit() {
+  const box = $('ps-plan'), line = $('ps-limit');
+  if (!box || !line) return;
+  if (!planTtlMs && !planMaxRecipients) { box.hidden = true; return; }
+  let text = '';
+  if (planMaxRecipients) text += planMaxRecipients > 1 ? t('planMany')(planMaxRecipients) : t('planOne');
+  if (planTtlMs) text += t('planTtl')(humanDuration(planTtlMs));
+  if (sendMode === 'live') text += t('sizeLive');
+  else if ((audience === 'group' && !groupLocked()) || leesOntvangers().length) text += t('sizeNamed')(Math.round(GROEP_MAX / 1048576));
+  else text += t('sizeLink');
+  line.textContent = text.trim();
+  box.hidden = false;
+  // Community only: what Firm adds, quietly, with one button. A paying plan
+  // gets what it can do and no sales line.
+  const up = $('ps-upsell'), upLine = $('ps-upsell-line');
+  const firmMax = planMaxByPlan && Number(planMaxByPlan.pro);
+  const firmTtl = planTtlByPlan && planTtlByPlan.pro ? humanDuration(planTtlByPlan.pro) : '';
+  if (up) up.hidden = !groupLocked();
+  const upBtn = $('ps-upsell-btn');
+  if (upLine && groupLocked()) {
+    upLine.textContent = signPlanName
+      ? t('upsellSignOnly')(signPlanName)
+      : t('upsell')(firmMax > 1 ? firmMax : 0, firmTtl);
+    if (upBtn) {
+      if (!upBtn.dataset.plain) upBtn.dataset.plain = upBtn.textContent;
+      upBtn.textContent = signPlanName ? t('upsellSignOnlyBtn') : upBtn.dataset.plain;
+    }
   }
 }
 
 // ── The chooser ──────────────────────────────────────────────────────────────
-// Both cards stay in the DOM; only what the chosen stand does not use is
-// hidden. The stepper is the live journey (share, compare) and describes
-// nothing the link stand walks, so it goes away rather than lying about where
-// the sender is.
-function setSendMode(mode) {
-  // A session in progress keeps its stand; see showStep.
-  if (sessionBusy) return;
-  sendMode = mode === 'link' ? 'link' : 'live';
-  const live = $('ps-mode-live'), link = $('ps-mode-link');
-  if (live) live.setAttribute('aria-checked', String(sendMode === 'live'));
-  if (link) link.setAttribute('aria-checked', String(sendMode === 'link'));
+// Two cards and a tick box. What the current choice does not use is hidden,
+// and the stepper (the Extra safe journey: share, compare) only shows there.
+function renderChoice() {
+  sendMode = (audience === 'one' && extraSafe) ? 'live' : 'link';
+  const one = $('ps-mode-link'), group = $('ps-mode-group');
+  if (one) one.setAttribute('aria-checked', String(audience === 'one'));
+  if (group) group.setAttribute('aria-checked', String(audience === 'group'));
+  const locked = groupLocked();
+  const lock = $('ps-mode-group-lock');
+  if (lock) lock.hidden = !locked;
+  const body = $('ps-mode-group-body');
+  const n = planMaxRecipients > 1 ? planMaxRecipients : (planMaxByPlan && Number(planMaxByPlan.pro)) || 0;
+  if (body && n > 1) body.textContent = t('groupBody')(n);
   const stepper = $('ps-stepper');
   if (stepper) stepper.style.display = (sendMode === 'link') ? 'none' : '';
-  // Named recipients belong to the link path: in a live hand-over the other
-  // person is already at their screen and you confirm a code together, so a
-  // list of twenty addresses has nothing to do there. Showing the field in both
-  // modes was how twenty addresses could be typed and silently ignored.
-  // De regel onder de kaarten zegt wat de GEKOZEN stand betekent. De maat
-  // verschilt per stand en per situatie: een enkele link is een verzegeld blok
-  // van 5 MB, een lijst gaat in blokken tot 25 MB, en live streamt tot 500 MB.
-  // Dat past niet in een ondertitel van een kaart, en het is precies wat een
-  // afzender moet weten voordat hij een bestand kiest.
-  const note = document.getElementById('ps-live-note');
-  if (note) {
-    note.textContent = (sendMode === 'link')
-      ? t('noteLink')
-      : t('noteLive');
-  }
-
-  const ontvangersKaart = document.getElementById('recipients-input');
-  const kaart = ontvangersKaart ? ontvangersKaart.closest('.card') : null;
-  if (kaart) kaart.hidden = (sendMode !== 'link');
-  // The sentence that used to sit here said the same thing as the card the
-  // sender just clicked, one block lower. Two blocks explaining one choice is
-  // how a page starts feeling like homework, so the card says it now and this
-  // is gone.
-  const btn = $('btn-create-session');
-  if (btn) btn.textContent = (sendMode === 'link') ? t('btnLink') : t('btnLive');
+  const show = function (id, on) { const el = $(id); if (el) el.hidden = !on; };
+  show('ps-safe', audience === 'one');
+  show('ps-one-field', audience === 'one' && !extraSafe);
+  show('ps-group-field', audience === 'group' && !locked);
+  show('ps-group-locked', audience === 'group' && locked);
+  show('ps-ttl-field', sendMode === 'link' && !(audience === 'group' && locked));
+  show('ps-file-field', !(audience === 'group' && locked));
+  const safe = $('ps-extra-safe');
+  if (safe) safe.checked = extraSafe;
+  onRecipientsInput();
   setCreateStatus('');
 }
-function chooseModeLive() { setSendMode('live'); }
-function chooseModeLink() { setSendMode('link'); }
 
-// Apply the starting mode once at load. Without this the page opened with
-// sendMode 'live' while the recipients card was still visible, so a sender
-// could type twenty addresses, press the live button, and watch a screen that
-// waits for a receiver who was never told to come. Nobody got post.
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function () { setSendMode(sendMode); });
-} else {
-  setSendMode(sendMode);
+// Kept under its old name: tests and the start-up call below use it.
+function setSendMode(mode) {
+  if (sessionBusy) return;
+  if (mode === 'group') { audience = 'group'; }
+  else { audience = 'one'; extraSafe = (mode === 'live'); }
+  renderChoice();
 }
+function chooseModeLive() { setSendMode('live'); }
+function chooseModeLink() { if (sessionBusy) return; audience = 'one'; renderChoice(); }
+function chooseModeGroup() { if (sessionBusy) return; audience = 'group'; renderChoice(); }
+function toggleExtraSafe(el) {
+  if (sessionBusy) { if (el) el.checked = extraSafe; return; }
+  extraSafe = !!(el ? el.checked : !extraSafe);
+  renderChoice();
+}
+
+// Apply the starting choice once at load, so the page never opens with a
+// field on screen that the chosen send would ignore.
+function bootChoice() { wireDropZone(); renderChoice(); }
+// (started at the bottom of this file, once every const above is defined)
 
 // The one button at the bottom of step 1, dispatched on the chosen stand. The
 // two flows share step 1 entirely -- same credential, same file picker, same
@@ -1504,6 +1892,9 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
     stukken.push(ct.subarray(at, Math.min(at + LINK_MAX_BLOB, ct.length)));
   }
   const hashes = [];
+  // One id for every block of this file (hertest T4-11): the relay counts one
+  // transfer and sends one notification per file_id, not one per block.
+  const fileId = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
   let eersteToken = null;
   // Het antwoord van het EERSTE blok, want dat is wat de afzender te zien
   // krijgt: de merkle-proof hangt eraan en de ttl is de gekapte waarde waar de
@@ -1513,24 +1904,18 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
   let eersteAntwoord = {};
   for (let i = 0; i < stukken.length; i++) {
     if (stukken.length > 1) {
-      $('seal-status').textContent = 'Sending ' + file.name + ', part '
-        + (i + 1) + ' of ' + stukken.length + '...';
+      $('seal-status').textContent = t('sendingPart')(file.name, i + 1, stukken.length);
       setSealProgress(Math.round(((i + 1) / stukken.length) * 90));
     }
     const deel = stukken[i];
     const hashBuf = await crypto.subtle.digest('SHA-256', deel);
     const hash = u8toHex(new Uint8Array(hashBuf));
-    const ur = await relayFetch(RELAY_API + '/v2/inbound', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const ur = await postInbound(JSON.stringify({
         hash, payload: toB64(deel), ttl_ms: ttlMs,
         // No file name and no size on the relay side: the name lives only inside
         // the sealed bytes, which is the same rule the live stand keeps.
-        meta: { device_id: 'transfer-web-link' }
-      }),
-      signal: AbortSignal.timeout(120000)
-    });
+        meta: { device_id: 'transfer-web-link', file_id: fileId }
+      }));
     const ud = await ur.json();
     if (window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(ur.status, ud)) {
       const qe = new Error(ud.error); qe.quota = ud; throw qe;
@@ -1606,6 +1991,8 @@ async function createLink() {
 
   showStep('step-sealing');
   setSealProgress(0);
+  // The rows of THIS send. sentLinks also holds earlier links of the session.
+  const nieuw = [];
   try {
     for (let i = 0; i < files.length; i++) {
       $('seal-status').textContent = (files.length > 1 ? t('fileNofM')(i + 1, files.length) : '') +
@@ -1617,7 +2004,7 @@ async function createLink() {
       // the file is burned when it is sitting on another sector.
       row.url = location.origin + '/get?t=' + encodeURIComponent(row.token) +
         '&r=' + encodeURIComponent(sector) + '#' + row.key;
-      sentLinks.push(row);
+      nieuw.push(row);
     }
     // ── a send to named recipients ───────────────────────────────────────
     // This is the path a sender takes when the receiver is not sitting at their
@@ -1630,12 +2017,15 @@ async function createLink() {
         throw new Error(t('oneFileOnly'));
       }
       $('seal-status').textContent = t('lockingKeys');
-      const geheim = paramantSendWrap.fromB64url(sentLinks[0].key);
+      const geheim = paramantSendWrap.fromB64url(nieuw[0].key);
       const sealed = {};
       for (const adres of ontvangers) {
         const token = paramantSendWrap.newToken();
-        // Wrapped here, in this browser. The relay receives the wrapping and
-        // the hash of the token, never the token and never the key.
+        // Wrapped here, in this browser. NOT zero-knowledge: the relay receives
+        // the token together with the wrapping, because it mails the token to
+        // the recipient in the invitation link. While it holds both it could
+        // unwrap the key. The end screen says so (done-details-named); a real
+        // recipient key for this path is issue #550.
         sealed[adres.toLowerCase()] = {
           token,
           wrapped_key: await paramantSendWrap.wrap(token, geheim),
@@ -1643,20 +2033,22 @@ async function createLink() {
       }
       $('seal-status').textContent = t('sendingInvites');
       const verzending = await maakVerzending(
-        sentLinks[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
-      sentLinks.length = 0;
+        nieuw[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
+      rememberSendLinks(verzending, sealed);
       setSealProgress(100);
       return toonVerzending(verzending, files[0].name);
     }
 
     setSealProgress(100);
+    sentLinks.push(...nieuw);
+    saveSentLinks();
     renderSentLinks();
     window.paramantDone.proof('step-link', {
       label: t('keepReceipt'),
       filename: 'paramant-receipt-' + new Date().toISOString().slice(0, 10) + '.json',
-      data: sentLinks.some(r => r.proof)
+      data: nieuw.some(r => r.proof)
         ? { kind: 'paramant-ct-inclusion', sent_utc: new Date().toISOString(),
-            entries: sentLinks.filter(r => r.proof).map(r => ({ file: r.name, chunk: 1, proof: r.proof })) }
+            entries: nieuw.filter(r => r.proof).map(r => ({ file: r.name, chunk: 1, proof: r.proof })) }
         : null,
     });
     showStep('step-link');
@@ -1680,19 +2072,29 @@ async function createLink() {
 // receipt on the API download path (GET /v2/outbound, fetched back from
 // /v2/transfers/:id/receipt); the browser download path, GET /v2/dl/:token/get,
 // signs nothing. What is left is GET /v2/dl/:token/info, which answers 200 with
-// the time remaining while the link is live and 404 once it is "not found, used,
-// or expired" -- one status for three outcomes. This page separates the last two
-// with its own clock: a 404 before the expiry it recorded means the file was
-// taken, after it means it timed out. That is an inference, and the note under
-// the list calls it one.
+// the time remaining while the link is live and 404 once it is gone, with a
+// `reason`. "Opgehaald" is shown ONLY for reason "downloaded", which the relay
+// sets when the receiver's page confirmed a completed, decrypted download (or,
+// for an old client, when the last byte left). A 404 before the expiry used to
+// be read as "taken"; a mail scanner, a wrong key or a relay restart all
+// produced that 404, so the sender was told the file had arrived when it had not.
 function linkStateLabel(row) {
   if (row.state === 'delivered') return t('stateDelivered');
   if (row.state === 'expired')   return t('stateExpired');
+  if (row.state === 'lost')      return t('stateLost');
+  if (row.state === 'withdrawn') return t('stateWithdrawn');
+  if (row.state === 'exhausted') return t('stateExhausted');
+  if (row.state === 'gone')      return t('stateGone');
   return t('stateWaiting');
 }
+const LINK_REASON_STATE = { downloaded: 'delivered', expired: 'expired', lost: 'lost', withdrawn: 'withdrawn', exhausted: 'exhausted' };
 
 function renderSentLinks() {
-  const list = $('ps-link-list');
+  for (const id of ['ps-link-list', 'ps-earlier-list']) renderSentLinksInto($(id));
+  const earlier = $('ps-earlier');
+  if (earlier) earlier.hidden = sentLinks.length === 0;
+}
+function renderSentLinksInto(list) {
   if (!list) return;
   list.innerHTML = '';
   sentLinks.forEach((row, i) => {
@@ -1718,15 +2120,16 @@ function renderSentLinks() {
     copy.textContent = t('copyLink');
     li.appendChild(copy);
 
-    // One line, one date format (#424): day, month in full, year and a 24-hour
-    // clock in UTC, because a one-hour link is a moment and not a day. The two
-    // things a sender needs about a link are how often it opens and when it
-    // stops, so they are one sentence and not two badges.
+    // One line: day, month in full, year and a 24-hour clock, because a
+    // one-hour link is a moment and not a day. In the sender's own clock with
+    // the zone named, the same way the mail says it (hertest r2 T4-L4: this
+    // line said UTC and the mail CEST). The two things a sender needs about a
+    // link are how often it opens and when it stops: one sentence.
     const meta = document.createElement('p');
     meta.className = 'ps-link-meta done-link-meta';
-    meta.textContent = t('worksOnce') + (window.paramantDate
-      ? window.paramantDate.moment(row.expires_ms)
-      : new Date(row.expires_ms).toISOString());
+    meta.textContent = t('worksOnce') + (window.paramantDate && window.paramantDate.localMoment
+      ? window.paramantDate.localMoment(row.expires_ms)
+      : new Date(row.expires_ms).toLocaleString());
     li.appendChild(meta);
 
     const state = document.createElement('p');
@@ -1757,26 +2160,36 @@ async function copySentLink(el) {
 // route family and takes none. Sending the session token here would be widening
 // a fifteen-minute credential to a route that does not want it.
 async function refreshSentLinks() {
-  const btn = $('ps-link-refresh');
-  if (btn) { btn.disabled = true; btn.textContent = t('checking'); }
+  const btns = [$('ps-link-refresh'), $('ps-earlier-refresh')].filter(Boolean);
+  for (const btn of btns) { btn.disabled = true; btn.textContent = t('checking'); }
   for (const row of sentLinks) {
     if (row.state !== 'waiting') continue;
     try {
-      const r = await fetch(RELAY_API + '/v2/dl/' + encodeURIComponent(row.token) + '/info',
+      // The relay of the row itself: after a reload RELAY_API may not be
+      // known yet, and an account lives on one sector, named in the link.
+      let rowRelay = RELAY_API;
+      try { rowRelay = RELAY_SECTORS[new URL(row.url).searchParams.get('r')] || RELAY_API; } catch (_) { /* keep RELAY_API */ }
+      const r = await fetch(rowRelay + '/v2/dl/' + encodeURIComponent(row.token) + '/info',
         { signal: AbortSignal.timeout(8000) });
       if (r.ok) row.state = 'waiting';
-      else if (r.status === 404) row.state = (Date.now() < row.expires_ms) ? 'delivered' : 'expired';
+      else if (r.status === 404 || r.status === 410) {
+        const j = await r.json().catch(() => ({}));
+        row.state = LINK_REASON_STATE[j && j.reason]
+          || (Date.now() >= row.expires_ms ? 'expired' : 'gone');
+      }
     } catch (_) {
       // A check that did not arrive says nothing about the link. Leave the row
       // as it was rather than reporting a delivery that may not have happened.
     }
   }
+  saveSentLinks();
   renderSentLinks();
-  if (btn) { btn.disabled = false; btn.textContent = t('checkAgain'); }
+  for (const btn of btns) { btn.disabled = false; btn.textContent = t('checkAgain'); }
 }
 
 function rejectFingerprint() {
-  ws.close();
+  announceRejection();
+  try { if (ws) ws.close(); } catch (_) { /* already closed */ }
   showStep('step-setup');
   setStatus('key-status', t('fpMismatch'), 'err');
 }
@@ -1792,84 +2205,44 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && globeOpen) toggleGlobe();
 });
 
-// ── Thunderbird FileLink download — URL format: ?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2 ──
-// Keys travel in the fragment (never sent to server). Relay only sees download tokens.
-async function tbDecryptChunk(blobBytes, rawKeyB64url) {
-  // Decode URL-safe base64 (no padding)
-  const b64 = rawKeyB64url.replace(/-/g,'+').replace(/_/g,'/');
-  const padded64 = b64 + '=='.slice(0, (4 - b64.length % 4) % 4);
-  const rawKey = Uint8Array.from(atob(padded64), c => c.charCodeAt(0));
-  const blob = new Uint8Array(blobBytes);
-  const version = blob[0];
-  if (version !== 0x02) throw new Error('Unsupported packet version ' + version + '. This link was made by an older version.');
-  const nonce  = blob.slice(1, 13);
-  const ctLen  = new DataView(blob.buffer, 13, 4).getUint32(0, false);
-  const ct     = blob.slice(17, 17 + ctLen);
-  const symKey = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
-  const plain  = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, symKey, ct));
-  // PRSH layout: magic(4) | metaLen(4) | metaJSON | chunkData
-  if (plain[0]!==0x50||plain[1]!==0x52||plain[2]!==0x53||plain[3]!==0x48) throw new Error('Invalid decrypted payload. Wrong key?');
-  const metaLen = new DataView(plain.buffer, 4, 4).getUint32(0, false);
-  const data = plain.slice(8 + metaLen);
-  return data;
-}
-
-async function tbDownload(tokensParam, name, relay, keysParam) {
-  const tokens = tokensParam.split(',');
-  const keys   = keysParam.split(',');
-  if (tokens.length !== keys.length) throw new Error('Token/key count mismatch in URL');
-  const dlStatus = $('tb-dl-status');
-  const dlBar    = $('tb-dl-bar');
-  const chunks = [];
-  for (let i = 0; i < tokens.length; i++) {
-    dlStatus.textContent = t('dlChunk')(i+1, tokens.length);
-    dlBar.style.width = Math.round((i / tokens.length) * 60) + '%';
-    const resp = await fetch(relay + '/v2/dl/' + tokens[i] + '/get');
-    if (!resp.ok) throw new Error('Download failed: HTTP ' + resp.status + ' for chunk ' + i);
-    const buf = await resp.arrayBuffer();
-    dlStatus.textContent = t('decChunk')(i+1);
-    const data = await tbDecryptChunk(buf, keys[i]);
-    chunks.push(data);
-    dlBar.style.width = Math.round(((i+1) / tokens.length) * 90) + '%';
-  }
-  // Reassemble
-  const total = chunks.reduce((n, c) => n + c.length, 0);
-  const assembled = new Uint8Array(total);
-  let off = 0;
-  for (const c of chunks) { assembled.set(c, off); off += c.length; }
-  dlBar.style.width = '100%';
-  dlStatus.className = 'status-line ok';
-  dlStatus.textContent = t('decSaving');
-  // Trigger browser download
-  const url = URL.createObjectURL(new Blob([assembled]));
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-  $('tb-dl-title').textContent = t('downloaded');
-  $('tb-dl-sub').textContent   = t('decSaved');
-  $('tb-dl-dot').className     = 'dot';
+// ── Receiving links (add-in, extension, Thunderbird FileLink) ────────────────
+// ?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2 is a RECEIVING link, and receiving lives
+// on /get: public, nothing fetched before a click, nothing burned before the
+// file is decrypted. In production nginx already forwards these before the
+// login gate; this covers a self-hosted or local server that serves this page
+// without one. The fragment is passed along by hand, it never left the browser.
+function forwardReceivingLink() {
+  const sp = new URLSearchParams(location.search);
+  if (!sp.get('t') || !location.hash.startsWith('#k=')) return false;
+  const base = (document.documentElement.lang || 'nl').slice(0, 2) === 'en' ? '/en/get' : '/get';
+  location.replace(base + location.search + location.hash);
+  return true;
 }
 
 // Auto-init globe as background on load, restore saved API key
 document.addEventListener('DOMContentLoaded', () => {
-  // Thunderbird FileLink download mode — check before restoring upload UI
-  const sp = new URLSearchParams(location.search);
-  const tbTokens = sp.get('t');
-  const tbRelay  = sp.get('r');
-  const tbKeys   = location.hash.startsWith('#k=') ? location.hash.slice(3) : null;
-  if (tbTokens && tbKeys && tbRelay) {
-    showStep('step-tb-download');
-    tbDownload(tbTokens, decodeURIComponent(sp.get('n') || 'download'), decodeURIComponent(tbRelay), tbKeys)
-      .catch(e => {
-        $('tb-dl-status').className = 'status-line err';
-        $('tb-dl-status').textContent = failureText('download', e);
-        $('tb-dl-dot').className = 'dot red';
-      });
-    return;
-  }
+  // A receiving link goes to /get before the upload UI starts.
+  if (forwardReceivingLink()) return;
 
+  loadSentLinks();
+  if (sentLinks.length) { renderSentLinks(); refreshSentLinks(); }
   loadSessionCredential();
+  loadSignedInEmail();
 });
+
+// "Signed in as ...", from the same answer the navigation reads. Only the
+// address is used; if it does not come, the row says "You are signed in".
+async function loadSignedInEmail() {
+  try {
+    const r = await fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d || !d.authenticated || typeof d.email !== 'string' || !d.email) return;
+    signedInEmail = d.email;
+    const row = $('ps-key-slim'), label = $('ps-key-slim-label');
+    if (row && label && !row.classList.contains('is-loading')) label.textContent = t('signedInAs')(signedInEmail);
+  } catch (_) { /* the row keeps its plain sentence */ }
+}
 
 // The session is the only source of the credential, and the credential is no
 // longer the account key. The page asks the admin for a pst_ session token; the
@@ -1888,18 +2261,69 @@ async function loadSessionCredential() {
     // here to show. The manual box stays empty, which is what makes the two
     // credentials impossible to confuse.
     applySlimApiKeyView(d.token);
+    loadAccountPlans();
     await useSessionToken();
   } catch (e) {
+    keyValid = false;
+    // Two different events, told apart (acceptatie 3.1.1). A visitor without
+    // a session, the one "Try it yourself" on the home page sends here, gets
+    // the signed-out explanation with Sign in and Create account: nothing went
+    // wrong for him. Only a session that exists and still yields no token gets
+    // the red banner. The token route answers 401/403 for both, so the session
+    // probe decides; a probe that does not answer counts as a failure, which
+    // keeps the banner for the case it was built for.
+    if (e && (e.status === 401 || e.status === 403) && !(await hasSession())) {
+      showSignedOut(true);
+      updateBtn();
+      return;
+    }
+    showSignedOut(false);
     setKeyError(true);
-    // The banner carries the sentence either way. Only the unplanned half gets
-    // reported: a 500, or a fetch that never arrived. Reporting the planned half
-    // would put a console error on every signed-out page load, which is both
-    // noise and a false alarm for the heartbeat that reads that console.
+    // Only the unplanned half gets reported: a 500, or a fetch that never
+    // arrived. Reporting the planned half would put a console error on every
+    // page load, which is noise and a false alarm for the heartbeat.
     if (!e || !e.expected) failureText('session token', e);
     setStatus('key-status', t('sessionFailed'), 'err');
-    keyValid = false;
     updateBtn();
   }
+}
+
+// true: a session is there. false: there is none. A probe that does not answer
+// (503, network) returns true, so the page falls back to the failure banner
+// instead of telling a signed-in customer he is signed out.
+async function hasSession() {
+  try {
+    const r = await fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return true;
+    const d = await r.json();
+    return !(d && d.authenticated === false);
+  } catch (_) { return true; }
+}
+
+function showSignedOut(on) {
+  const box = $('ps-signedout');
+  if (box) box.hidden = !on;
+  const row = $('ps-key-slim');
+  if (row && on) row.hidden = true;
+  if (on) setKeyError(false);
+}
+
+// What the account holds on ParaSign, from /api/user/me. Only used to say the
+// truth to a customer whose plan covers signing and not sending (a term from
+// before Firm wrote both products): the send limits stay Community, and the
+// line under them no longer offers him "Firm" as if he had nothing.
+async function loadAccountPlans() {
+  try {
+    const r = await fetch('/api/user/me', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const tier = d && d.plan_parasign;
+    const until = d && d.paid_until_parasign;
+    const live = tier && ['pro', 'business', 'enterprise'].indexOf(tier) !== -1
+      && (!until || Date.parse(until) > Date.now());
+    signPlanName = live ? ({ pro: 'Firm', business: 'Business', enterprise: 'Enterprise' })[tier] : '';
+    renderLimit();
+  } catch (_) { /* the plain Community line stays */ }
 }
 
 // Ctrl+G, and nothing else, opens this. Until 6 September 2026 the page booted
@@ -2221,8 +2645,17 @@ act('input','onRecipientsInput',()=>onRecipientsInput());
 act('click','confirmFingerprint',()=>confirmFingerprint());act('click','copyLink',()=>copyLink());
 act('click','createSession',()=>startSend());act('click','expandApiKeyCard',()=>expandApiKeyCard());
 act('click','chooseModeLive',()=>chooseModeLive());act('click','chooseModeLink',()=>chooseModeLink());
+act('click','chooseModeGroup',()=>chooseModeGroup());act('change','toggleExtraSafe',(el)=>toggleExtraSafe(el));
 act('click','backToSetup',()=>backToSetup());
 act('click','copySentLink',(el)=>copySentLink(el));act('click','refreshSentLinks',()=>refreshSentLinks());
 act('click','rejectFingerprint',()=>rejectFingerprint());act('input','onKeyInput',()=>onKeyInput());
 act('click','reload',()=>location.reload());
 act('click','reopenSession',()=>reopenSession());
+
+// Start-up of the chooser, last, so every const it reads (GROEP_MAX and the
+// rest) is defined by the time it runs.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootChoice);
+} else {
+  bootChoice();
+}

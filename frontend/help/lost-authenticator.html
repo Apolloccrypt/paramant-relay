@@ -73,8 +73,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=32">
-<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
@@ -268,8 +268,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Probeer uw back-upcodes</h2>
-      <p>Vul op het inlogscherm uw e-mailadres en API-sleutel in en klik op <strong>Inloggen met een back-upcode</strong>. Vul een van de 10 eenmalige codes in die u kreeg toen u uw authenticator-app voor het eerst koppelde.</p>
-      <p>Werkt de code, ga dan naar <strong>Account &rarr; Beveiliging &rarr; Nieuwe authenticator-app instellen</strong>. Koppel een nieuwe authenticator-app voordat uw sessie verloopt.</p>
+      <p>Klik op het inlogscherm op <strong>Authenticator-app kwijt? Inloggen met een back-upcode</strong>. Op die pagina (<a href="/auth/backup">/auth/backup</a>) vult u uw e-mailadres in en een van de 10 eenmalige codes die u kreeg toen u uw authenticator-app voor het eerst koppelde.</p>
+      <p>Werkt de code, ga dan naar <a href="/account">Account</a> &rarr; <strong>Beveiliging</strong> &rarr; <strong>Nieuwe authenticator-app instellen</strong>. U krijgt een instelmail waarmee u een nieuwe app koppelt. Doe dat meteen: een sessie loopt af na een uur zonder activiteit.</p>
+      <p>Liever niet inloggen? Op <a href="/auth/request-reset">/auth/request-reset</a> vult u uw e-mailadres en een back-upcode in, en dan krijgt u de instelmail zonder in te loggen. Ook daar is een back-upcode nodig: de mailbox alleen is niet genoeg.</p>
       <div class="tip"><p>Heeft u de instelhandleiding gevolgd, dan staan uw back-upcodes in uw wachtwoordbeheerder. Kijk in 1Password, Bitwarden of waar u beveiligde notities bewaart.</p></div>
     </div>
   </div>
@@ -299,7 +300,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6">De datum waarop u voor het laatst kon inloggen, als u die nog weet</li>
         <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6">Verzend-ID&#39;s of bestandsnamen van recente activiteit, zodat we kunnen controleren wie u bent</li>
       </ul>
-      <p>U krijgt binnen 48 uur antwoord. We stellen eerst aanvullende vragen om te controleren wie u bent, voordat we iets herstellen.</p>
+      <p>U krijgt binnen 48 uur antwoord. Voordat we iets herstellen, stellen we eerst een paar vragen om te controleren wie u bent.</p>
       <div class="warn"><p>Zonder controle van uw identiteit kunnen we geen account herstellen. Dat is bewust. Zo kan een aanvaller niet via support een account overnemen.</p></div>
     </div>
   </div>
@@ -323,7 +324,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">Mijn hele team kan er niet meer in en het is dringend.</div>
-    <div class="a">Zet "URGENT" in de onderwerpregel en leg uit wat de gevolgen voor uw werk zijn. Een team dat helemaal niet meer bij zijn account kan, krijgt voorrang. Heeft een teamlid nog beheerderstoegang, dan kan die vanuit het dashboard namens u een herstel starten.</div>
+    <div class="a">Zet "URGENT" in de onderwerpregel en leg uit wat de gevolgen voor uw werk zijn. Elk account heeft zijn eigen authenticator-app en back-upcodes; een collega kan uw toegang niet vanuit zijn eigen account herstellen.</div>
   </div>
 
   <div class="troubleshoot-item">
@@ -347,8 +348,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
 </main>
 
-<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/lost-authenticator" hreflang="en" lang="en">This page in English</a></p>
-
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
@@ -356,6 +355,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p class="lang-switch"><a href="/en/help/lost-authenticator" hreflang="en" lang="en">This page in English</a></p>
       </div>
       <div>
         <div class="footer-col-label">Bedrijf</div>
@@ -379,7 +379,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 </footer>
 
-<script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/nav.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

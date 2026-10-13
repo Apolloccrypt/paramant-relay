@@ -116,7 +116,7 @@ test('the share link serves the sealed bytes once and refuses the second time', 
   assert.equal(first.status, 200, 'the first download failed; the link a sender handed out does not work');
   assert.equal(Buffer.compare(first.buf, b.payload), 0,
     'the bytes came back changed; a receiver decrypting these would get a GCM failure and be told the link was tampered with');
-  assert.equal(first.headers['x-burned'], 'true');
+  assert.equal(first.headers['x-burned'], 'on-delivery');
 
   const second = await dlSrv.get(`/v2/dl/${dl}/get`);
   assert.equal(second.status, 410,

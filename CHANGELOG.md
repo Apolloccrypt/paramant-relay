@@ -9,6 +9,62 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-10-07
+
+Tagged `v3.1.3` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+`v3.1.2` stays where it is; a published tag is not moved.
+
+### Changed
+- The examples on the landing page are calm and real: no badge, no stamps, no
+  drawn fake UI; one heading, one sentence, one button each (PR #577).
+- `deploy/de-server.json` no longer lists the 3.1.1 version gap, production
+  runs 3.1.2 (PR #578).
+
+## [3.1.2] - 2026-10-06
+
+Tagged `v3.1.2` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+
+**In short.** The public CT log tells the truth about itself. The mirror of
+other relays' tree heads only holds heads from pinned keys (PR #576), the 39
+April 2026 entries on health get a proof and a listed tree hash from the
+current tree, and a customer can check a receipt with `scripts/klant-controle.py`.
+
+### Fixed
+- `/v2/sth/ingest` only mirrors heads from a key pinned to its `relay_id`
+  (`relay/lib/fleet-pins.js`); a name with a dot at the end is refused (403).
+  Exact duplicate heads are not stored again and a mirror file is compacted past
+  `PEER_STH_FILE_MAX`. Retired pins keep the mirror of a rotated key instead of
+  moving it to `purged/` (RUNBOOK.md section 9, `relay/lib/relay-identity-next.js`).
+- `/v2/ct/log` lists `tree_hash` from the full tree, equal to `/v2/ct/proof`;
+  entries whose stored value came from an earlier tree also show it as
+  `stored_tree_hash` with `from_earlier_tree: true`.
+- `scripts/klant-controle.py` finds the leaf through `/v2/ct/proof`, so a receipt
+  older than the 10,000 entries `/v2/ct/log` lists no longer fails falsely.
+- `/ct-log` says what is proven about April 2026: entries 42-46 come from a
+  restarted tree, for 1-34 that is likely.
+
+### Deploy
+- `deploy/deploy-3.1.sh` backs up `/data/peer-sths` of every relay before phase 4
+  (step 2c) and stops when a relay container has `NODE_ENV` test or development
+  or `PARAMANT_FLEET_GOSSIP=0` (steps 1a2 and 6k0), because from 3.1.2 such a
+  relay does not gossip to the fleet.
+
+## [3.1.1] - 2026-10-06
+
+Tagged `v3.1.1` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+
+**In short.** The screens and the mails now say the same thing. An invitation
+to sign tells you plainly that you need a free account on the invited address,
+the paid plan is called Firm everywhere, and nothing that is paid once is called
+a subscription. English buyers get their invoice, payment description and PDF in
+English, Dutch buyers in Dutch. Visitors who are not signed in get an
+explanation on the send page instead of an error, an old tab picks up a sign-in
+from another tab by itself, and the admin log now shows sign-ups and logins.
+Every changed sentence is listed in `docs/acceptatie-3.1.1-oud-nieuw.md`.
+
 ### Added
 - **A gate that counts the work that never landed.** `fix/sector-port-drift` was
   ready on 10 June 2026 and fixes four fallback ports in `admin/server.js` that
@@ -31,6 +87,27 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lying turns the gate red.
 
 ### Fixed
+- **What a broken download without a claim costs, said precisely.** A claimless
+  read on `/v2/dl` or `/v2/outbound` counts once the relay has written the last
+  byte to the connection, not once it arrived. The operating system buffers a
+  few MB per connection, so up to the 5 MB default blob size a download broken
+  off after the first kilobytes has as a rule already used the read; only a
+  larger blob comes back. Measured with a 4 MB blob under the default limit.
+  `docs/api.md` and /docs say so and point at `?claim=` as the mode in which a
+  broken download costs nothing. Both routes now serve a blob at most five
+  times in all, broken reads included (`/v2/outbound` allowed a sixth).
+- **What a buyer reads around paying matches what he gets** (betaaltest
+  2026-10-05). Business now carries the ParaSend half of Firm, written by the
+  payment and floored at read time for older Business accounts, so /parashare
+  no longer sends a Business customer to Firm. The dashboard says what Mollie
+  says became of the last checkout (cancelled, failed, expired) with a button
+  to pay again, instead of "being confirmed". A one-off payment shows "paid
+  until, renewing possible from today" and no cancel button, and the cancel
+  route refuses it without a mail. /account writes one line per product. The
+  101st signature counts signatures and names Business. The English checkout
+  stays English from sign-in to dashboard. /pricing (NL and EN) shows per plan
+  what you can do afterwards, pinned to `tiers.js` and to the dashboard lines,
+  and says when VAT is reverse charged; so do the terms.
 - **A business in another EU country paid 21% Dutch VAT.** A service to a
   business established in another member state is taxed where that business is,
   and the VAT is reverse charged (Directive 2006/112/EC art. 44 and 196). The

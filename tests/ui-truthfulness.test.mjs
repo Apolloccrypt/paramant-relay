@@ -12,13 +12,20 @@ const email = read('admin/lib/email-templates.js');
 
 assert.doesNotMatch(account + accountJs + adminHtml + adminJs, /Delete account permanently|Account deleted|permanent, cannot undo|Account definitief verwijderen|Account verwijderd|definitief, kan niet ongedaan/i);
 assert.match(account, /werkt de API-sleutel niet meer/i);
-assert.match(account, /sessies en de koppeling met uw authenticator-app worden verwijderd/i);
-assert.match(account, /accountrecord blijft bewaard/i);
+// What deactivation erases, said the same way on the screen and in the mail
+// (acceptatie 3.1.1, taal #8): the screen said "the account record is kept"
+// while the mail said "your personal data has been erased".
+assert.match(account, /Uw sessies, de koppeling met uw authenticator-app en open ondertekenverzoeken verdwijnen/i);
+assert.match(account, /persoonsgegevens wissen we/i);
+assert.doesNotMatch(account, /accountrecord blijft bewaard/i);
 assert.doesNotMatch(account, /Stub mode|No real payments are charged|Mollie integration pending/i);
-assert.match(adminHtml, /blocks the account key and removes active sessions and TOTP/i);
-assert.match(adminHtml, /Type DEACTIVATE to confirm/);
-assert.match(adminJs, /Account deactivated/);
-// frontend/admin.html is Dutch only; admin/public stays English.
+// Both admin screens speak Dutch since 2026-10-05 (admin/public was English).
+// Each one on its own must say what deactivation does, so they are read apart.
+const adminMainHtml = read('admin/public/index.html');
+const adminMainJs = read('admin/public/app.js');
+assert.match(adminMainHtml, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
+assert.match(adminMainHtml, /Typ DEACTIVATE om te bevestigen/);
+assert.match(adminMainJs, /Account gedeactiveerd/);
 const adminNl = read('frontend/admin.html');
 const adminNlJs = read('frontend/js/admin.page.js');
 assert.match(adminNl, /blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP/i);
@@ -29,8 +36,11 @@ assert.match(adminNlJs, /Account gedeactiveerd/);
 // left the address in users.json (audit finding 5 of 2026-07-21). A mail that
 // undersells an erasure is as untrue as one that oversells it, which is what
 // this file exists to catch.
-assert.match(email, /Personal data removed from our systems/);
-assert.match(email, /Billing records kept for as long as tax law requires/);
+assert.match(email, /personal data have been erased/);
+assert.match(email, /persoonsgegevens zijn gewist/);
+assert.match(email, /Invoices are kept for as long as tax law requires/);
+// After an erasure there is nothing to switch back on.
+assert.doesNotMatch(email, /wilt u weer toegang|want access again/i);
 assert.doesNotMatch(email, /Account record and audit entries retained/);
 assert.doesNotMatch(email, /sign up again|Files already relayed are not affected/i);
 
@@ -116,14 +126,36 @@ assert.doesNotMatch(signJs, /showProofScope\([^)]*signingMode/,
 // 2. A visitor without a session is told what signing needs BEFORE picking a
 // file, not after. The page used to be behind an nginx auth_request; moving the
 // dead end to the last step would be worse than the redirect it replaced.
-assert.match(signHtml, /Voor ondertekenen is een account nodig/i,
+// Said once, in the bar above the steps; the block under it says what works
+// without an account instead of repeating the requirement (acceptatie 3.1.1
+// ronde 2, taal #18).
+assert.match(signHtml, /Om te tekenen of te versturen heeft u een gratis Community-account nodig\./,
   'sign.html must state the account requirement up front');
+assert.doesNotMatch(signHtml, /Voor ondertekenen is een account nodig/i,
+  'sign.html says the requirement twice, in the bar and in the block under it');
 assert.match(signHtml, /een verzoek openen dat iemand u stuurde/i,
   'sign.html must say what an invited signer can still do without an account');
-assert.match(signEnHtml, /Signing a document needs an account/i,
+assert.match(signEnHtml, /To sign or send it, you need a free Community account\./,
   'en/sign.html must state the account requirement up front');
+assert.doesNotMatch(signEnHtml, /Signing a document needs an account/i,
+  'en/sign.html says the requirement twice');
 assert.match(signEnHtml, /open a signing request someone sent you/i,
   'en/sign.html must say what an invited signer can still do without an account');
+// And it may not promise signing WITHOUT an account: co-sign.js asks the
+// invitee to sign in with the invited mailbox before the sign step, and sends
+// someone without an account to /signup with the invitation's address first
+// ("Nog geen account? Maak er gratis een met het e-mailadres van deze
+// uitnodiging"). So the page says an account is made first, then signed.
+assert.doesNotMatch(signHtml, /tekenen met de link uit die e-mail/i,
+  'sign.html must not promise signing without an account');
+assert.doesNotMatch(signEnHtml, /sign it with the link from that email/i,
+  'en/sign.html must not promise signing without an account');
+assert.match(signHtml, /Maak dan gratis een account op dat adres/i,
+  'sign.html must say the invitee makes a free account on the invited address first');
+assert.match(signEnHtml, /Create a free one on that address/i,
+  'en/sign.html must say the invitee makes a free account on the invited address first');
+assert.match(read('frontend/co-sign.js'), /Maak er gratis een<\/a> met het e-mailadres van deze uitnodiging/,
+  'co-sign.js still sends an invitee without an account to signup with the invited address');
 assert.match(signJs, /function showSessionRequirement/,
   'sign-flow.js must have the session-requirement control');
 
@@ -139,16 +171,17 @@ assert.match(signJs, /function showSessionRequirement/,
 const authFirstSentence = {
   'frontend/en/auth/login.html': /No password to type: sign in with your passkey/i,
   'frontend/en/auth/setup.html': /Pick one now and add the other later/i,
-  'frontend/en/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
-  'frontend/en/auth/request-reset.html': /if it matches an account, we send a link/i,
+  'frontend/en/auth/backup.html': /Each code works once\. You do not need your authenticator app for it/i,
+  // A back-up code is required since the mailbox alone stopped being enough.
+  'frontend/en/auth/request-reset.html': /one of your backup codes\. If they match, we first send an email to confirm the request/i,
   'frontend/en/auth/reset-confirm.html': /You get two emails, one after the other/i,
   'frontend/en/signup/verified.html': /Paramant has no passwords/i,
   'frontend/auth/login.html': /Geen wachtwoord nodig: log in met uw passkey/i,
   'frontend/auth/setup.html': /Kies er nu één en voeg de andere later toe/i,
-  'frontend/auth/backup.html': /Elke code\s+werkt één keer en laat u binnen zonder uw authenticator-app/i,
-  'frontend/auth/request-reset.html': /Hoort het bij een account, dan sturen wij\s+een link/i,
-  'frontend/auth/reset-confirm.html': /U krijgt twee mails, na elkaar/i,
-  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoorden/i,
+  'frontend/auth/backup.html': /Elke code werkt één keer\. Uw authenticator-app heeft u er niet voor nodig/i,
+  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan krijgt u eerst een mail om het verzoek te bevestigen/i,
+  'frontend/auth/reset-confirm.html': /U krijgt twee mails na elkaar/i,
+  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoord/i,
 };
 for (const [file, rx] of Object.entries(authFirstSentence)) {
   assert.match(read(file), rx, `${file} must open by saying what this screen does`);
@@ -272,12 +305,16 @@ assert.match(requestResetJs, /a confirmation email is on its way/i,
   'request-reset must say the first mail confirms the request, not that it carries the setup link');
 assert.match(requestResetJs, /valid for 60 minutes/i,
   'the confirmation token is EX 3600, so the success message must say 60 minutes');
-assert.match(requestResetJs, /that one works for 14 days/i,
-  'the 14 days belong to the second mail, the one with the setup link');
+// The setup link lives SETUP_TOKEN_TTL_S, two days since the 2026-09-05
+// review (admin/server.js); it was fourteen before that, and this page said so.
+assert.match(read('admin/server.js'), /SETUP_TOKEN_TTL_S[^\n]*2 \* 86400/,
+  'the setup link lasts two days; if that changes, change the sentence below with it');
+assert.match(requestResetJs, /that one works for two days/i,
+  'the two days belong to the second mail, the one with the setup link');
 assert.match(requestResetJs, /Die eerste mail bevestigt alleen het verzoek, en de link werkt 60 minuten/,
   'the Dutch success message must attach the 60 minutes to the first mail');
-assert.match(requestResetJs, /Die werkt 14 dagen/,
-  'and the 14 days to the second');
+assert.match(requestResetJs, /Die werkt twee dagen/,
+  'and the two days to the second');
 assert.doesNotMatch(requestResetJs, /a setup link is on its way|een instellink is onderweg/i,
   'no setup link exists until the confirmation is opened');
 
@@ -301,7 +338,7 @@ assert.match(requestResetJs, /res\.status === 429/,
   'request-reset must handle 429 separately: retrying does not help for up to a day');
 assert.match(requestResetJs, /up to 24 hours to clear/i,
   'the 429 text must state the wait the server actually imposes (retry_after 86400)');
-assert.match(requestResetJs, /dus dit kan tot 24 uur duren/,
+assert.match(requestResetJs, /Het kan dus tot 24 uur duren/,
   'the Dutch 429 text must state the same wait');
 
 // 5. Every one of these screens must name the party behind the product and the
@@ -394,8 +431,11 @@ const onPage = (page) => (amount) => new RegExp(`(?:&euro;${amount.replace(/[.]/
 // per-signature rate; that rate was never charged and the line is gone, so the
 // floor moved down with it rather than the check being weakened for something
 // else. Dutch: the two amounts of the one offer, 0 and 29.
+// Since acceptance 3.1.1 the English homepage has the Dutch homepage's cards
+// and sells the same one offer, so it is held to the same two amounts.
 const homePricesEn = pricesOf(home);
-assert.ok(homePricesEn.length >= 5, `expected the English homepage to quote its tiers, found ${homePricesEn.length} prices`);
+assert.ok(homePricesEn.includes('0') && homePricesEn.includes('29'),
+  `expected the English homepage to name Community at 0 and Firm at 29, found ${homePricesEn.join(', ')}`);
 const homePrices = pricesOf(homeNl);
 assert.ok(homePrices.includes('0') && homePrices.includes('29'),
   `expected the Dutch homepage to name Community at 0 and the kantoorplan at 29, found ${homePrices.join(', ')}`);
@@ -839,8 +879,8 @@ assert.doesNotMatch(pricingVisible, /Mick Beer/,
 // /dashboard, a page nobody without an account can open.
 const freeCardCtas = [...pricingVisible.matchAll(/<div class="tier-name">Community<\/div>[\s\S]*?<a href="([^"]+)"[^>]*class="btn btn-primary"/g)].map((m) => m[1]);
 assert.ok(freeCardCtas.length >= 2, 'pricing.html must still have Community cards with a primary action');
-assert.deepEqual([...new Set(freeCardCtas)], ['/signup'],
-  `the Community cards must send a visitor to /signup, not to a page they cannot open: ${freeCardCtas.join(', ')}`);
+assert.deepEqual([...new Set(freeCardCtas)], ['/en/signup'],
+  `the Community cards must send a visitor to /en/signup (this is the English page), not to a page they cannot open: ${freeCardCtas.join(', ')}`);
 
 console.log('ui-truthfulness: /pricing says what it sells, with the number, above the tables');
 
@@ -897,7 +937,7 @@ for (const page of [docsEn, docsHtml]) {
   const docsActions = (page.match(/<div class="docs-hero-actions">[\s\S]*?<\/div>/) || [''])[0];
   assert.match(docsActions, /<a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">/,
     'the developer keeps the primary button on /docs: Quick start');
-  assert.match(docsActions, /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
+  assert.match(docsActions, page === docsEn ? /<a href="\/en\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/ : /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
     'the buyer gets a real button to /pricing beside it, not only a text link');
 }
 assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API-toegang zit in het abonnement vanaf Firm/,
@@ -929,7 +969,7 @@ assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}
   'pricing.html is the source of the ParaSign Community allowance quoted on /help');
 assert.match(pricing, /&euro;29<span/,
   'pricing.html is the source of the Firm price quoted on /help');
-assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% btw/,
+assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% VAT/,
   'pricing.html is the source of the incl. btw figure quoted on /help');
 assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures a month\./,
   'help/index.html must name the free allowance, not just promise that free exists');
@@ -954,13 +994,16 @@ assert.doesNotMatch(helpBody, /Pay for volume, never for security/,
 // not repeated here.
 assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
   'security.html must keep the server location row /help quotes');
-assert.match(homeGrid, /No US provider in the data path\. Email \(only the email address and the invite link, never the document or a key\) still goes through Resend Inc\. in the United States for now, as <a href="\/privacy">\/privacy<\/a> sets out\. That is the one exception in the chain; we are moving to a Dutch provider\./,
+// Fase 2 (SITE-34): the old line said the email carries "never ... a key".
+// For a send to named recipients the email carries the token that opens the
+// file, so the home page now says that, and /help says it shorter.
+assert.match(homeGrid, /Email still goes through Resend in the United States for now\. For a send to named recipients that email carries the link with the token/,
   'index.html is the source of the data-path wording and its Resend exception');
-assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext\./,
+assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext/,
   'help/index.html must answer where the documents live, and say they are ciphertext there');
-assert.match(helpAnswers, /no US provider is in the data path/,
-  'help/index.html must scope the claim to the data path');
-assert.match(helpAnswers, /Email \(only the email address and the invite link, never the document or a key\) still goes through Resend Inc\. in the United States for now, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
+assert.match(helpAnswers, /under EU law/,
+  'help/index.html must say which law the stored files sit under');
+assert.match(helpAnswers, /Email still goes through Resend in the United States for now: never the document, but the links and codes that open a file, as <a class="buyer-qa-inline" href="\/en\/privacy">\/privacy<\/a> sets out\./,
   'help/index.html must name the Resend exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpAnswers, /no US company/i,
   'help/index.html must not repeat the unqualified no-US-company row from /security');
@@ -974,9 +1017,12 @@ assert.doesNotMatch(helpAnswers, /no US company/i,
 // would quote back. So /help may name a key only in the negative: any sentence
 // that mentions a key and a piece of infrastructure must be saying the key is
 // not there.
-assert.match(homeGrid, /Generated on your device, never sent/,
-  'index.html is the source of the promise that a key never reaches a server');
-assert.match(securityHtml, /relay holds only ciphertext, never keys/,
+// The English homepage lost its rules grid in acceptance 3.1.1 (it has the
+// Dutch homepage's four cards now); /en/parasend carries the rule.
+assert.match(read('frontend/en/parasend.html'), /Generated on your device, never sent/,
+  'en/parasend.html is the source of the promise that a key never reaches a server');
+// Fase 2 (SITE-30): the row now names its three exceptions.
+assert.match(securityHtml, /sends to named recipients and the extensions, the relay holds only ciphertext, no keys/,
   'security.html is the source of the promise that the relay holds no keys');
 // The sentence carries its exception since 5 September 2026. relay/lib/
 // parasign-store.js calls the /v1 hosted ceremony "the ONE deliberate break of
@@ -1006,9 +1052,9 @@ for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/))
 const helpNlAnswers = [...helpNlHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
 assert.equal(helpNlAnswers.split('\n').length, 3,
   'help/index.html must keep the three buyer answers in the Dutch block too');
-assert.match(helpNlAnswers, /Voor het ondertekenen van een document heeft u een account nodig\./,
+assert.match(helpNlAnswers, /Om te ondertekenen heeft u een account nodig\./,
   'help/index.html must answer whether an account is required');
-assert.match(helpNlAnswers, /Zonder account kunt u een verzoek tot ondertekenen wel openen\./,
+assert.match(helpNlAnswers, /Kreeg u een verzoek om te ondertekenen\? Dat opent u ook zonder account\./,
   'help/index.html must say what an invited signer can do without an account');
 assert.match(helpNlAnswers, /ParaSign Community is gratis, voor altijd, zonder betaalkaart: 2 handtekeningen per maand\./,
   'help/index.html must name the free allowance, not just promise that free exists');
@@ -1020,7 +1066,8 @@ assert.match(helpNlAnswers, /Uw documenten staan versleuteld op servers van Hetz
   'help/index.html must answer where the documents live, and say they are ciphertext there');
 assert.match(helpNlAnswers, /bewaart nooit een privésleutel, behalve bij het gehoste ondertekenen op <code>\/v1<\/code>/,
   'help/index.html must say where the keys are not, exception included');
-assert.match(helpNlAnswers, /Alleen e-mail \(adres en link, nooit het document of een sleutel\) gaat nog via Resend Inc\. in de VS, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
+// Fase 2 (SITE-34): "nooit ... een sleutel" was onwaar voor versturen op naam.
+assert.match(helpNlAnswers, /E-mail gaat nog via Resend in de VS: nooit het document, wel de links en codes die een bestand openen, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
   'help/index.html must name the mail exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpNlHtml.slice(helpNlHtml.indexOf('</head>')), /Betaal voor volume|Pay for volume, never for security/i,
   'help/index.html must not carry the sales line anywhere in the body; it is a support page');
@@ -1090,27 +1137,33 @@ const signVisibleText = visible('frontend/sign.html');
 // Proof 1. The EU claim is about the data path, not the whole chain, and the
 // Resend exception travels with it. A page may shorten the long form on
 // /rules to this one; it may never drop the second half.
-const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
+// Fase 2 (SITE-34, 2026-10-04): "No US provider in the data path" and "never
+// ... a key" were not true for a send to named recipients or an invitation to
+// sign, whose emails carry what opens the file. The claim is now about where
+// the encrypted files are, and the exception says what the email carries.
+const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). The encrypted';
 // De uitzondering, op elke pagina met dezelfde woorden: mail gaat nog via
 // Resend in de VS. Mailjet stond hier tot 23 september 2026, maar is nooit
 // aangezet; zie deploy/partners.json en tests/partners.test.mjs.
-const EU_EXCEPTION = 'Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now';
+const EU_EXCEPTION = 'Email still goes through Resend in the United States for now';
 const homeVisible = visible('frontend/en/index.html');
+// The homepage says it in its "Why Dutch matters" card, in that card's words.
+const EU_CLAIM_HOME = 'Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. The encrypted files sit only there.';
 for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
-  assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
+  assert.ok(text.includes(name === 'index' ? EU_CLAIM_HOME : EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
   assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
 }
 // /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
 // begrenzing tot de weg van de data, in de taal van de pagina.
-assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Uw bestanden gaan niet langs een Amerikaanse partij.'),
+assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). De versleutelde bestanden staan alleen op onze servers in de EU.'),
   'parasend.html lost the data-path wording of the EU claim');
-assert.ok(parasend.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
+assert.ok(parasend.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasend.includes('bevat die mail de link met het token'),
   'parasend.html states the EU claim without naming the Resend exception');
 // /parasign is Dutch since 23 September 2026. The same two halves, in the
 // wording the Dutch homepage uses for proof 1.
-assert.ok(parasign.includes('Uw bestanden gaan niet langs een Amerikaanse partij.'),
+assert.ok(parasign.includes('De versleutelde documenten staan alleen op onze servers in de EU.'),
   'parasign.html lost the data-path wording of the EU claim');
-assert.ok(parasign.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
+assert.ok(parasign.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasign.includes('wel de helft van de documentsleutel'),
   'parasign.html states the EU claim without naming the mail exception');
 // And it may not be offered against a source that does not carry it. The
 // Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
@@ -1143,8 +1196,8 @@ assert.doesNotMatch(parasign, /geen Amerikaanse (partij|aanbieder|bedrijf) in de
 // window check that keeps the two together lives further down this file.
 assert.ok(!/no US company/i.test(security),
   'security.html must no longer claim "no US company", which is broader than /privacy supports');
-assert.ok(security.includes('No US provider in the data path'),
-  'security.html must carry proof 1 in the data-path wording the guide fixes');
+assert.ok(security.includes('The encrypted files sit only on our servers in the EU'),
+  'security.html must carry proof 1 in the wording of fase 2 (where the encrypted files are)');
 
 // ── "Why Dutch matters", 5 September ────────────────────────────────────────
 // Mick: "the pride in being Dutch is missing, it is too well behaved". The
@@ -1175,8 +1228,10 @@ for (const claim of [
   'Paramantis Solutions B.V., Harderwijk, KvK 42115132. Its parent is Paramantis Digital B.V., also Dutch, KvK 42114664. There is no parent company abroad.',
   'Dutch law governs the terms you agree to, and a Dutch court hears the dispute.',
   // Proof 1, in this section\u2019s own words, with the exception in the same breath.
-  'No US provider is in the data path of your files and keys.',
-  'Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. That is the one exception in the chain; we are moving to a Dutch provider.',
+  // Fase 2 (SITE-34): the emails of a named send carry what opens the file.
+  'The encrypted files sit only there.',
+  'For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file.',
+  'Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider.',
   // The sentence that carries the pride. It claims nothing a reader cannot check.
   'We are Dutch, and we would rather say so than hide behind a Delaware address.',
 ]) {
@@ -1252,9 +1307,9 @@ assert.ok(parasign.includes('niet om functies vrij te spelen, en dat houdt het C
   'parasign.html lost the Community-plan promise');
 // /sign carries the same split in one line, next to the account requirement,
 // and it names the plan the way /pricing names it.
-assert.match(signVisibleText, /Met een Community-account ondertekent u 2 documenten per maand/,
+assert.match(signVisibleText, /Met een Community-account zet u 2 handtekeningen per maand/,
   'sign.html must keep the free-tier line, under the plan name /pricing uses');
-assert.match(visible('frontend/en/sign.html'), /Community accounts sign 2 documents a month/,
+assert.match(visible('frontend/en/sign.html'), /A Community account gives you 2 signatures a month/,
   'en/sign.html must keep the free-tier line, under the plan name /pricing uses');
 assert.doesNotMatch(signVisibleText, /\bFree accounts\b|tier named Free|the tier is called Free/,
   'sign.html must not call the Community plan Free; one name across the site');
@@ -1504,24 +1559,23 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // Resend, a US provider. The guide (section 9.2) says that row is the one that
   // has to move to the data-path wording, and it may never be written without
   // its one exception in the same breath.
-  assert.match(securityRaw, /No US provider in the data path/,
-    'security.html must state the jurisdiction claim about the data path, not about the whole chain');
+  // Fase 2 (SITE-30/34): the claim is where the encrypted files sit, and the
+  // mail exception travels with it, now saying what the mail carries.
+  assert.match(securityRaw, /The encrypted files sit only on our servers in the EU/,
+    'security.html must state where the encrypted files are');
   assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Resend)/,
     'security.html must not claim "no US company" without naming the mail carrier beside it');
-  // "In the same breath" is the whole point of the wording, so it is measured
-  // as a window and not as "somewhere on the page": an earlier version of this
-  // check let a card drop Resend entirely, because the jurisdiction table lower
-  // down still carried the word.
+  // "In the same breath" is measured as a window, not as "somewhere on the page".
   const WINDOW = 420;
   for (const [label, html] of [['security.html', securityRaw]]) {
     let at = -1, seen = 0;
-    while ((at = html.indexOf('No US provider in the data path', at + 1)) !== -1) {
+    while ((at = html.indexOf('The encrypted files sit only on our servers in the EU', at + 1)) !== -1) {
       seen += 1;
-      assert.match(html.slice(at, at + WINDOW), /Resend Inc\. in the United States/,
-        `${label} states the data-path claim without naming the mail carrier within ${WINDOW} characters of it`);
+      assert.match(html.slice(at, at + WINDOW), /Resend in the United States/,
+        `${label} states where the files are without naming the mail carrier within ${WINDOW} characters of it`);
     }
     assert.ok(seen >= 2,
-      `${label} must carry the data-path wording in both the card and the jurisdiction row, found ${seen}`);
+      `${label} must carry the wording in both the card and the jurisdiction row, found ${seen}`);
   }
 
   // The certification limit, stated in the same voice as the proofs.
@@ -1554,7 +1608,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   assert.match(aboutHero, /Mick Beer/, 'about.html must name the founder in the hero');
   assert.match(aboutHero, /Privacy and security researcher, founder of Paramantis Solutions B\.V\./,
     'about.html must carry the founder title in the hero');
-  assert.match(aboutHero, /href="\/pricing" class="btn btn-primary"/,
+  assert.match(aboutHero, /href="\/en\/pricing" class="btn btn-primary"/,
     'about.html must offer a next step in the hero');
   // Nobody can promise ten years. The lede used to end on "the cryptography is
   // post-quantum, which is the proof that it still holds up in ten years", which
@@ -1584,9 +1638,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // fails here.
   const heroOf = (html) => html.slice(html.indexOf('<section class="page-hero'), html.indexOf('<main'));
   const securityHero = heroOf(securityRaw);
-  assert.match(securityHero, /href="\/pricing" class="btn btn-primary"/,
+  assert.match(securityHero, /href="\/en\/pricing" class="btn btn-primary"/,
     'security.html must offer a next step in the first screen, not only at the foot of the page');
-  assert.match(securityHero, /href="\/verify" class="btn btn-secondary"/,
+  assert.match(securityHero, /href="\/en\/verify" class="btn btn-secondary"/,
     'security.html must offer the verify step in the first screen');
   // Mick, 4 September: the founder line left this page. Who is accountable is
   // the company, where it sits and its registration, and that has to stay.
@@ -1640,7 +1694,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // /security with "an independent firm" left the suite green. Pinned on both.
   assert.match(securityRaw, /two by R\. Zwarts, one by Ryan Williams of Smart Cyber Solutions/,
     'security.html must name the auditors it credits');
-  assert.match(securityRaw, /href="\/docs#audits"/,
+  assert.match(securityRaw, /href="\/en\/docs#audits"/,
     'security.html must link the audit table that carries the counts');
   assert.doesNotMatch(securityRaw, /full audit history[^<]*<a href="\/architecture"/,
     'security.html must not send the reader to /architecture for audit material it sends back');
@@ -1718,9 +1772,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 
     // The hero addresses "anyone who has to check a supplier". That reader used to
     // get one text link in the middle of a paragraph as the only way onward.
-    assert.match(trustHero, /href="\/security" class="btn btn-primary"/,
+    assert.match(trustHero, new RegExp('href="' + (t.file.startsWith('en/') ? '/en' : '') + '/security" class="btn btn-primary"'),
       'trust.html must give the reviewer a real next step in the hero');
-    assert.match(trustHero, /href="\/pricing" class="btn btn-secondary"/,
+    assert.match(trustHero, new RegExp('href="' + (t.file.startsWith('en/') ? '/en' : '') + '/pricing" class="btn btn-secondary"'),
       'trust.html must offer pricing from the hero as well');
 
     // "the operator who runs the relay" was the first sentence under the hero, and
@@ -2395,55 +2449,38 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
   const parashareEn = read('frontend/en/parashare.html');
   const psJs = read('frontend/js/parashare.page.js');
 
-  assert.match(parashareEn, /The person you send to has to be online while you send; you confirm a short code together\./,
-    '/en/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
-  assert.match(parashareEn, /id="ps-mode-live"[^>]*aria-checked="true"/,
-    '/en/parashare: the live stand must be the one selected on arrival');
-  assert.match(psJs, /does not have to be online/,
-    'the English "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
+  // Since 24 September 2026 the page opens on "To one person" with a plain
+  // link, and the live hand-over is a tick box under it, "Extra safe". The
+  // promise that belongs above step 1 is now the label of that box: the other
+  // person has to be reachable now, and the two of you check a short code. It
+  // must stand inside #step-setup and above the file picker, the box must be
+  // unticked on arrival (the link is the default, and a sender who ticks
+  // nothing must not read a promise about a live wait), and the page must
+  // really derive the live stand from that box and nothing else.
+  // Sabotage: drop the label, pre-tick the box, or let sendMode go live
+  // without extraSafe, and this goes red.
+  // Acceptatie 3.1.1 (taal 36): a condition, not a claim. "The other person is
+  // available right now" read as a statement the page made about him.
+  const LIVE_EN = /<strong>Extra safe<\/strong>: choose this when the other person is at a screen right now too\. You compare a short code together, and nothing is stored\./;
+  const LIVE_NL = /<strong>Extra veilig<\/strong>: kies dit als de ontvanger nu ook achter een scherm zit\. U vergelijkt samen een korte code, en er wordt niets bewaard\./;
+  for (const [naam, html, zin, box] of [['/en/parashare', parashareEn, LIVE_EN, 'Extra safe'], ['/parashare', parashare, LIVE_NL, 'Extra veilig']]) {
+    assert.match(html, zin, `${naam} must say, on the Extra safe box, that the other person has to be there now and that you check a code together`);
+    assert.match(html, /<input type="checkbox" id="ps-extra-safe"(?![^>]*checked)[^>]*>/,
+      `${naam}: Extra safe must be unticked on arrival; the plain link is the default`);
+    assert.match(html, /id="ps-mode-link"[^>]*aria-checked="true"/,
+      `${naam}: "To one person" must be the choice selected on arrival`);
+    assert.match(html, /id="ps-mode-group"[^>]*aria-checked="false"/,
+      `${naam}: "To several people" must not be pre-selected`);
+    const setupAt = html.indexOf('id="step-setup"');
+    const noteAt = html.indexOf(`<strong>${box}</strong>`);
+    const kiezerAt = html.indexOf('id="file-input"');
+    assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
+      `${naam}: the Extra safe promise must stand inside #step-setup and above the file picker`);
+  }
+  assert.match(psJs, /sendMode = \(audience === 'one' && extraSafe\) \? 'live' : 'link';/,
+    'the live stand must follow from the Extra safe box and nothing else; otherwise the page can wait for a receiver nobody told to be there');
   assert.match(parashareEn, /Compare this code together/,
     '/en/parashare: the card where the two of you compare must be named after what it asks you to do');
-  {
-    const setupAt = parashareEn.indexOf('id="step-setup"');
-    const noteAt = parashareEn.indexOf('The person you send to has to be online');
-    const kiezerAt = parashareEn.indexOf('id="file-input"');
-    assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
-      '/en/parashare: the sentence must stand inside #step-setup and above the file picker');
-  }
-
-  assert.match(parashare, /De ontvanger moet online zijn terwijl u verstuurt\. U controleert samen een korte controlecode\./,
-    '/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
-
-  // The sentence above became a sentence about ONE of two stands the moment
-  // /parashare grew "Send a link", so it may only be shown while that stand is
-  // chosen. Three things have to hold together or the page starts lying in one
-  // direction or the other: the chooser exists and offers both, the live
-  // sentence is the DEFAULT (the live stand is the one selected on arrival, so
-  // a sender who chooses nothing reads the promise that is true of what he is
-  // about to do), and the sentence is really swapped when the other stand is
-  // picked rather than left standing over a flow it does not describe.
-  // Sabotage: delete either mode card, flip aria-checked to the link card, or
-  // take the swap out of setSendMode, and this goes red.
-  assert.match(parashare, /id="ps-mode-live"[^>]*aria-checked="true"/,
-    'the live stand must be the one selected on arrival: it is the stand the sentence above step 1 describes');
-  assert.match(parashare, /id="ps-mode-link"[^>]*aria-checked="false"/,
-    'the "Send a link" stand must not be pre-selected while the live sentence stands above step 1');
-  assert.match(psJs, /note\.textContent = \(sendMode === 'link'\)/,
-    'setSendMode no longer swaps the live-handshake sentence; choosing "Send a link" would leave a promise on screen that that stand does not keep');
-  assert.match(psJs, /hoeft niet online te zijn/,
-    'the "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
-  // Above step 1 means above it, not somewhere on the page: the sentence has to
-  // sit before the step-1 guide inside #step-setup.
-  const setupAt = parashare.indexOf('id="step-setup"');
-  const noteAt = parashare.indexOf('De ontvanger moet online zijn');
-  // De bovengrens was "Step 1 of 5", en die tekst is weg: de stepper telde
-  // stappen mee die in de link-stand niet bestaan, en werd weggehaald toen dat
-  // scherm te vol bleek. De eis eronder is niet veranderd -- de zin moet boven
-  // de bestandskiezer staan, want daar leest een afzender voordat hij kiest --
-  // dus die is nu aan de bestandskiezer zelf gehangen.
-  const kiezerAt = parashare.indexOf('id="file-input"');
-  assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
-    'the sentence must stand inside #step-setup and above the step-1 guide, which is where a sender reads before choosing a file');
 
   // Claim 1: sending really does wait for the other person. createSession goes
   // to the waiting step and opens the socket, and nothing else advances.

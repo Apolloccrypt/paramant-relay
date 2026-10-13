@@ -68,7 +68,11 @@ function okAll(name, condition, detail='') { checks.push({ name, pass:!!conditio
 // Dutch on / and English on /en, each in its own month names.
 const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
-const dayIn = (months) => (v) => { const d = new Date(v); return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+// Dutch time, like js/format-date.js since acceptatie 3.1.1 ronde 2.
+const dayIn = (months) => (v) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(new Date(v)).map((x) => [x.type, x.value]));
+  return `${Number(p.day)} ${months[Number(p.month) - 1]} ${p.year}`;
+};
 const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString();
 const agoDays = (n) => new Date(Date.now() - n * 86400000).toISOString();
 
@@ -265,7 +269,7 @@ for (const state of states) {
   }
   ok(`${state.title}: the reader is never left with three buttons over a hole`, m.gap <= 120, `gap ${m.gap}px, cards ${m.cards}`);
   ok(`${state.title}: the words are the reader's, not the relay's`, !JARGON.test(m.text), (m.text.match(JARGON) || [''])[0]);
-  ok(`${state.title}: the three actions stay, and stay in order`, JSON.stringify(m.actions) === JSON.stringify(['/dashboard','/sign','/parashare']), JSON.stringify(m.actions));
+  ok(`${state.title}: the three actions stay, and stay in order`, JSON.stringify(m.actions) === JSON.stringify(['/dashboard','/sign','/parashare'].map((h) => (L.key === 'en' ? '/en' + h : h))), JSON.stringify(m.actions));
   await page.close();
 }
 
@@ -322,7 +326,7 @@ ok('a new account: the card says both first steps and how long they take', L.not
 // row underneath is taken away in this one state and Documents stays in the
 // nav's user menu.
 ok('a new account: the two first steps are offered once, not twice', seen.empty.buttons.length === 2
-  && JSON.stringify(seen.empty.buttons) === JSON.stringify(['/sign','/parashare']), JSON.stringify(seen.empty.buttons));
+  && JSON.stringify(seen.empty.buttons) === JSON.stringify(['/sign','/parashare'].map((h) => (L.key === 'en' ? '/en' + h : h))), JSON.stringify(seen.empty.buttons));
 ok('every other state keeps the three actions on screen', seen.open.buttons.length === 3 && seen.recent.buttons.length === 3 && seen.down.buttons.length === 3,
   JSON.stringify([seen.open.buttons, seen.recent.buttons, seen.down.buttons]));
 

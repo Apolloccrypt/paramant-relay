@@ -67,14 +67,18 @@ ok('6 checkout buttons with data-billing-*');
 for (const b of buttons) {
   assert(!/payment-links\.mollie\.com/.test(b.href),
     'checkout button falls back to a static Mollie link (no metadata, unattributable): ' + b.href);
-  assert(b.href.startsWith('/auth/login'),
-    'no-JS fallback must be sign-in, got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
+  // Since 13-10-2026 (test with a stranger) the fallback is the free account,
+  // /signup?next=..., because a visitor without a session nearly always has
+  // no account yet; the signup page links on to the sign-in. Either way the
+  // payment is made by an account, which is the point of this check.
+  assert(/^\/(en\/)?(auth\/login|signup)\?next=\/(en\/)?pricing$/.test(b.href),
+    'no-JS fallback must be the account (signup or sign-in, back to pricing), got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
   // Every button, not only the variants below: a button the checkout refuses
   // is a price the site shows and nobody can pay.
   assert(!catalog.resolveSale(b).error,
     'the checkout refuses a button on the page: ' + b.product + '/' + b.plan + '/' + b.interval);
 }
-ok('no-JS fallback on every button is sign-in, never a metadata-less payment link');
+ok('no-JS fallback on every button is the account (signup or sign-in), never a metadata-less payment link');
 
 for (const v of VARIANTS) {
   const btn = buttons.find(b => b.product === v.product && b.plan === v.plan && b.interval === v.interval);
@@ -147,9 +151,10 @@ for (const s of ['&euro;29<', 'Annual &euro;290 excl.']) {
 ok('Firm excl-btw amounts visible in the ParaSend grid');
 
 // Excl-btw framing plus the incl-21% checkout notice.
-assert(/excl\. btw/.test(html), 'missing "excl. btw" mention');
-assert(/incl\. 21% btw/.test(html), 'missing "incl. 21% btw" checkout notice');
-ok('page states excl. btw and that checkout charges incl. 21% btw');
+assert(/excl\. VAT/.test(html), 'missing "excl. VAT" mention (English page, acceptatie 3.1.1 taal 53)');
+assert(/incl\. 21% VAT/.test(html), 'missing "incl. 21% VAT" checkout notice');
+assert(!/\bbtw\b/.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'the English pricing page says btw; it says VAT');
+ok('page states excl. VAT and that checkout charges incl. 21% VAT');
 
 // The Community limits on the page are the ones the relay actually enforces.
 //
@@ -978,7 +983,7 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert.deepStrictEqual(buys.map((b) => `${b.product}/${b.plan}/${b.interval}`), ['firm/firm/monthly', 'firm/firm/yearly'],
     'the Dutch /pricing sells Firm, monthly and yearly, and nothing else');
   for (const b of buys) {
-    assert(b.href.startsWith('/auth/login'), 'no-JS fallback on the Dutch page must be sign-in, got ' + b.href);
+    assert(b.href === '/signup?next=/pricing', 'no-JS fallback on the Dutch page must be the free account, back to pricing, got ' + b.href);
     assert(!catalog.resolveSale(b).error, 'the checkout refuses ' + b.product + '/' + b.plan + '/' + b.interval);
   }
   assert(/class="btn btn-primary/.test(buys[0].rest), 'the monthly Firm button is the primary action');
@@ -994,7 +999,13 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert(body.includes(`Voor uw kantoor: ${monthlyExcl} euro per maand.`), 'the offer must name the catalog amount excl. btw: ' + monthlyExcl);
   assert(body.includes(`&euro;${nl(monthlyIncl)} per maand, inclusief 21% btw`), 'the offer must name the incl. amount the checkout charges: ' + nl(monthlyIncl));
   assert(body.includes(`&euro;${nl(yearlyIncl)} incl. btw (&euro;${yearlyExcl} excl.)`), 'the yearly line must be the catalog yearly amount');
-  assert(/Meer nodig\? Mail Mick: <a href="mailto:privacy@paramant\.app/.test(body), 'Business and Enterprise are reached through "Meer nodig?", with a way to reach Mick');
+  // Since 05-10-2026 the line says who it is for: a larger organisation, and
+  // the one address to write to. Still no Business button on this page.
+  // Since acceptatie 3.1.1 (taal 5) the line names Business, on request, with
+  // what it adds and its price, and the table has a Business column: the same
+  // plans as the English page, but still no Business button or card.
+  assert(/Grotere organisatie\? Dan is er Business, op aanvraag: [^<]*Neem contact op: <a href="mailto:privacy@paramant\.app/.test(body), 'Business is reached through "Grotere organisatie? Dan is er Business, op aanvraag", with the contact address');
+  assert(body.includes('<th scope="col">Business (op aanvraag)</th>'), 'the Dutch table names Business as on request');
   assert(!/class="tier-card|data-billing-plan="business"|>Business<|>Enterprise</.test(body), 'no Business or Enterprise card on the Dutch /pricing');
 
   const lim = (tier, dim) => tiers.tierLimit(tier, dim);

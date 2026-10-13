@@ -364,11 +364,19 @@ input, button, textarea, select {
   background: none;
   border: none;
 }
+/* A field in a row gives way to the button beside it. Without this a flex
+   item's floor is its intrinsic width, about 20 characters, and at 390px the
+   search field on /ct-log pushed its button past the edge. */
+input, textarea, select { min-width: 0; max-width: 100%; }
 
 table {
   border-collapse: collapse;
   width: 100%;
 }
+/* A table cell may break a long word (an e-mail address, a path like /dpa
+   after a long Dutch compound) rather than push the table past the screen.
+   Only a table that has run out of room breaks anything. */
+td, th { overflow-wrap: anywhere; }
 
 
 /* ═══════════════════════════════════════════════════
@@ -1374,7 +1382,13 @@ h1 em::after {
               color var(--duration-base) var(--ease-sharp),
               border-color var(--duration-base) var(--ease-sharp),
               transform var(--duration-fast) var(--ease-out);
-  white-space: nowrap;
+  /* One line while the label fits, a second line when it does not: a button
+     never runs out of its card. It used to be nowrap, and at 320px or in a
+     zoomed window a long label ("Nieuwe authenticator-app instellen") pushed
+     the button past the card edge. max-width holds it to its container. */
+  white-space: normal;
+  max-width: 100%;
+  text-align: center;
   line-height: 1;
   user-select: none;
 }
@@ -3204,3 +3218,49 @@ h1.paramant-h2 { font-size: var(--text-3xl); font-weight: inherit; letter-spacin
 .legal-strip a:hover { color: var(--navy, #0B3A6A); border-bottom-color: var(--lime, #B2FF3F); }
 .legal-strip a:focus-visible { outline: 2px solid var(--lime, #B2FF3F); outline-offset: 2px; }
 .legal-strip .legal-sep { padding: 0 8px; opacity: 0.5; }
+
+/* ── Autofill ───────────────────────────────────────────────
+   A browser that fills in a field paints it in its own colour, light blue in
+   Chrome and yellow in older builds, with !important in its own stylesheet.
+   On the dark edition that was a light slab with light letters on it (the
+   e-mail field on /auth/login, 2026-09-24). A background cannot beat that
+   rule, an inset shadow can: it is drawn over the background, in the field's
+   own colour. The ink and the caret are set too, because the browser forces
+   its own text colour with the same !important. --field-bg and --field-ink
+   are for a
+   field whose ground is not the bone token (app-2026.css sets it where the
+   fields sit on --surface); tests/responsive-overflow
+   .test.mjs checks every text field on every page against its own colour. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--field-ink, var(--ink));
+  caret-color: var(--field-ink, var(--ink));
+  box-shadow: 0 0 0 1000px var(--field-bg, var(--bone)) inset;
+  transition: background-color 0s 600000s;
+}
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill:focus {
+  box-shadow: 0 0 0 1000px var(--field-bg, var(--bone)) inset, var(--ring, 0 0 0 0 transparent);
+}
+
+/* ── Language line ("This page in English") ─────────────────
+   The link to the same page in the other language lives in the footer: in
+   the brand column of the site footer, as the last item of the legal strip on
+   pages that carry only the strip. apply-nav.py puts it there. It used to be
+   a loose paragraph with an inline style between the page and the footer. */
+.lang-switch { margin: var(--space-3, 12px) 0 0; font-size: 13px; }
+.lang-switch a { color: var(--ink-2, #4A4A44); }
+.lang-switch a:hover { color: var(--cobalt, #1D4ED8); }
+.legal-strip .lang-switch { margin: 0; font-size: inherit; white-space: nowrap; }
+.legal-strip .lang-switch a { color: var(--ink-dim, #64748b); }
+/* A page without a footer keeps the line at the end of its content. */
+main .lang-switch, body > .lang-switch {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-5, 24px) 16px;
+  font-size: 14px;
+  text-align: center;
+}

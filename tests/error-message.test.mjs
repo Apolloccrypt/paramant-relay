@@ -61,9 +61,9 @@ test('every shape that is not a planned failure lands on the same sentence', () 
 });
 
 test('the three planned failures keep their own instruction', () => {
-  assert.match(errors.userFacingMessage({ code: 'totp_invalid' }), /huidige 6-cijferige code/);
-  assert.match(errors.userFacingMessage({ code: 'totp_required' }), /Vul de 6-cijferige code/);
-  assert.match(errors.userFacingMessage({ code: 'totp_unavailable' }), /authenticator-app in op uw account/);
+  assert.match(errors.userFacingMessage({ code: 'totp_invalid' }), /code die uw app nu toont/);
+  assert.match(errors.userFacingMessage({ code: 'totp_required' }), /Vul de code van 6 cijfers/);
+  assert.match(errors.userFacingMessage({ code: 'totp_unavailable' }), /authenticator-app aan uw account/);
   assert.equal(errors.isKnownFailure({ code: 'nonesuch' }), false);
 });
 
@@ -95,7 +95,7 @@ test('a planned failure keeps its code and its words through reportFailure', () 
     console.error = original;
   }
   assert.equal(replacement.code, 'totp_invalid');
-  assert.match(replacement.message, /huidige 6-cijferige code/);
+  assert.match(replacement.message, /code die uw app nu toont/);
 });
 
 // ── the callers, so the translator cannot be right and unused ────────────────

@@ -1,4 +1,120 @@
 (function() {
+  // What a signed-in customer leaves in THIS browser, and when it goes
+  // (security review r2 (a)): the /sign draft (IndexedDB paramant-sign-draft,
+  // sealed with an account key the page only holds in memory) and the whole
+  // document key K a sender keeps per envelope (localStorage
+  // paramant.cosign.key.v1:<id>, with an expiry). Both are wiped on sign-out
+  // and when another account signs in here; expired ones on any page.
+  var COSIGN_KEY = 'paramant.cosign.key.v1:';
+  var OWNER = 'paramant.local.owner';
+  function wipeDraft() {
+    try { indexedDB.deleteDatabase('paramant-sign-draft'); } catch (e) { /* no IndexedDB */ }
+  }
+  function cosignKeys() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_KEY) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    return out;
+  }
+  var COSIGN_LINKS = 'paramant.cosign.links.v1:';
+  // The recipients' links of a send by name (parashare.page.js
+  // rememberSendLinks), kept for the reminder: same lifetime, same wipes.
+  var SEND_LINKS = 'paramant.send.links.v1:';
+  function cosignLinks() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && (k.indexOf(COSIGN_LINKS) === 0 || k.indexOf(SEND_LINKS) === 0)) out.push(k); } } catch (e) { /* storage off */ }
+    return out;
+  }
+  // The signer's own key half per request (js/cosign-share-memory.js).
+  var COSIGN_SHARE = 'paramant.cosign.share.v1:';
+  function cosignShares() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_SHARE) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    return out;
+  }
+  // Which request a reader came from before making an account
+  // (login-return.js): path, envelope id, party index and expiry only. It
+  // goes on sign-out and when it expires, not on an account switch: making
+  // that account IS the switch.
+  var SIGNUP_RETURN = 'paramant:signup-return';
+  function wipeLocal() {
+    wipeDraft();
+    cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    cosignLinks().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    cosignShares().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    try { localStorage.removeItem(OWNER); } catch (e) {}
+  }
+  window.paramantWipeLocal = wipeLocal;
+  // A session that simply ran out takes K with it too, not only an explicit
+  // sign-out (review #555, M4): the key of every open envelope must not sit in
+  // a browser nobody is signed in to.
+  function wipeCosignKeys() {
+    cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+  }
+  // K lives at most 24 hours (review #555, M4). Expired entries go; an entry
+  // with a later expiry (the 31 days of before) is brought back to 24 hours
+  // from now; an old bare value (no expiry yet) gets 24 hours.
+  var COSIGN_KEY_MAX_MS = 864e5;
+  (function sweep() {
+    var now = Date.now();
+    // The signer links (sign-flow.js rememberSignerLinks) and the signer's own
+    // key halves (cosign-share-memory.js) go when they expire.
+    // Only the sealed form (js/account-seal.js, v 2) may stay, and never past
+    // eight days from now (review #573, M4); a readable older record goes.
+    cosignLinks().concat(cosignShares()).forEach(function(k) {
+      try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || r.v !== 2 || !(now < Number(r.exp)) || Number(r.exp) > now + 8 * 864e5) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
+    });
+    // An older record also held the invite link itself (url): it goes.
+    try {
+      var sr = localStorage.getItem(SIGNUP_RETURN);
+      if (sr !== null) {
+        var r = null; try { r = JSON.parse(sr); } catch (e) { r = null; }
+        if (!r || r.url !== undefined || !(now < Number(r.exp)) || Number(r.exp) > now + 864e5) localStorage.removeItem(SIGNUP_RETURN);
+      }
+    } catch (e) { /* storage off */ }
+    cosignKeys().forEach(function(k) {
+      try {
+        var raw = localStorage.getItem(k) || '';
+        var rec = null;
+        try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+        if (!rec || typeof rec !== 'object') { localStorage.setItem(k, JSON.stringify({ f: raw, exp: now + COSIGN_KEY_MAX_MS })); return; }
+        if (!(now < Number(rec.exp))) { localStorage.removeItem(k); return; }
+        if (Number(rec.exp) > now + COSIGN_KEY_MAX_MS) localStorage.setItem(k, JSON.stringify({ f: rec.f, exp: now + COSIGN_KEY_MAX_MS }));
+      } catch (e) { /* storage off */ }
+    });
+    try {
+      if (!indexedDB.databases) return;
+      indexedDB.databases().then(function(list) {
+        if (!list.some(function(d) { return d.name === 'paramant-sign-draft'; })) return;
+        var r = indexedDB.open('paramant-sign-draft');
+        r.onsuccess = function() {
+          var db = r.result;
+          try {
+            var g = db.transaction('kv').objectStore('kv').get('current');
+            g.onsuccess = function() {
+              var v = g.result;
+              db.close();
+              if (v && (v.v !== 2 || !(now < v.expiresAt))) wipeDraft();
+            };
+            g.onerror = function() { db.close(); };
+          } catch (e) { db.close(); }
+        };
+      }).catch(function() {});
+    } catch (e) { /* no IndexedDB */ }
+  })();
+  // Another account signs in here: whatever the previous one left goes.
+  window.paramantNoteAccount = function(email) {
+    try {
+      if (!email || !crypto.subtle) return;
+      crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(email).trim().toLowerCase())).then(function(buf) {
+        var h = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        var prev = null;
+        try { prev = localStorage.getItem(OWNER); } catch (e) {}
+        if (prev && prev !== h) wipeLocal();
+        try { localStorage.setItem(OWNER, h); } catch (e) {}
+      }).catch(function() {});
+    } catch (e) { /* nothing to compare */ }
+  };
+
   var container = document.getElementById('nav-auth');
   if (!container) return;
 
@@ -20,12 +136,14 @@
     ['Prijzen', '/pricing']
   ] : [
     // The English bar points at the English pages (apply-nav.py
-    // to_english_links); /gereedschap has no English page and keeps its route.
-    ['Product', '/en#products'],
-    ['Tools', '/gereedschap'],
+    // to_english_links), /en/gereedschap included since fase 2 SITE-03-A.
+    // The same five destinations as the Dutch bar since acceptance 3.1.1:
+    // the two products first, then tools, security and pricing.
+    ['Send', '/en/parasend'],
+    ['Sign', '/en/parasign'],
+    ['Tools', '/en/gereedschap'],
     ['Security', '/en/security'],
-    ['Pricing', '/en/pricing'],
-    ['Docs', '/en/docs']
+    ['Pricing', '/en/pricing']
   ];
   // The workspace bar is verbs: what you came here to do, in the order you do
   // it. Send and Sign were the two; locking a file with a passphrase is the
@@ -40,13 +158,19 @@
     ['Controleren', '/verify'],
     ['Instellingen', '/account']
   ] : [
-    ['Documents', '/dashboard'],
-    ['Send', '/parashare'],
-    ['Sign', '/sign'],
-    ['Lock a file', '/vault'],
-    ['Verify', '/verify'],
-    ['Settings', '/account']
+    // The English pages exist for each of these (frontend/en/), so an English
+    // reader stays English (fase 1 SITE-06).
+    ['Documents', '/en/dashboard'],
+    ['Send', '/en/parashare'],
+    ['Sign', '/en/sign'],
+    ['Lock a file', '/en/vault'],
+    ['Verify', '/en/verify'],
+    ['Settings', '/en/account']
   ];
+  // Where Help, Sign in and Create account lead, per language.
+  var R = DUTCH
+    ? { help: '/help', login: '/auth/login', signup: '/signup', dashboard: '/dashboard', account: '/account', pricing: '/pricing' }
+    : { help: '/en/help', login: '/en/auth/login', signup: '/en/signup', dashboard: '/en/dashboard', account: '/en/account', pricing: '/en/pricing' };
 
   function setNavigation(items, label) {
     var lists = document.querySelectorAll('nav.nav .nav-links');
@@ -78,9 +202,20 @@
       ? '<a href="/help" class="nav-help">Hulp</a>' +
         '<a href="/auth/login" class="nav-signin">Inloggen</a>' +
         '<a href="/signup" class="nav-cta">Account maken</a>'
-      : '<a href="/help" class="nav-help">Help</a>' +
-        '<a href="/auth/login" class="nav-signin">Sign in</a>' +
-        '<a href="/signup" class="nav-cta">Create account</a>';
+      : '<a href="' + R.help + '" class="nav-help">Help</a>' +
+        '<a href="' + R.login + '" class="nav-signin">Sign in</a>' +
+        '<a href="' + R.signup + '" class="nav-cta">Create account</a>';
+  }
+
+  // The session check itself failed (429, 5xx, no network): we do not know
+  // whether this visitor is signed in. Telling a signed-in customer "Create
+  // account" was wrong (fase 1 SITE-02-K), so offer the one link that is right
+  // either way: the account page, which sends a stranger to the login.
+  function renderUnknown() {
+    setNavigation(PUBLIC_NAV, DUTCH ? 'Hoofdmenu' : 'Primary');
+    container.innerHTML =
+      '<a href="' + R.help + '" class="nav-help">' + (DUTCH ? 'Hulp' : 'Help') + '</a>' +
+      '<a href="' + R.account + '" class="nav-signin">' + (DUTCH ? 'Mijn account' : 'My account') + '</a>';
   }
 
   function renderLoggedIn(email) {
@@ -100,13 +235,13 @@
     // with it (one .nav-prefs row; a page stamped before it has .nav-lang).
     if (tail) {
       var langSwitch = tail.querySelector('.nav-prefs') || tail.querySelector('.nav-lang');
-      tail.innerHTML = '<a href="/help" class="nav-tail-link">' + (DUTCH ? 'Hulp' : 'Help') + '</a>';
+      tail.innerHTML = '<a href="' + R.help + '" class="nav-tail-link">' + (DUTCH ? 'Hulp' : 'Help') + '</a>';
       if (langSwitch) tail.appendChild(langSwitch);
     }
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
     // Help sits where it sits signed out: a text link left of the account
     // control. nav.css hides it below 700px, where the drawer tail above takes
-    // over, and gives it a 44px target from 1023px down.
+    // over, and gives it a 44px target from 1279px down.
     //
     // Never interpolate the email into innerHTML (stored/self DOM XSS): the
     // signup regex permits HTML metacharacters. Build static markup, then set
@@ -115,22 +250,22 @@
       help: 'Hulp', docs: 'Documenten', account: 'Account', dev: 'Ontwikkelaarsinstellingen',
       plan: 'Abonnement en betaling', out: 'Uitloggen'
     } : {
-      help: 'Help', docs: 'Documents', account: 'Account', dev: 'Developer settings',
+      help: 'Help', docs: 'Documents', account: 'Account', dev: 'Developer settings (in Dutch)', devLang: 'nl',
       plan: 'Plan &amp; billing', out: 'Sign out'
     };
     container.innerHTML =
-      '<a href="/help" class="nav-help">' + T.help + '</a>' +
+      '<a href="' + R.help + '" class="nav-help">' + T.help + '</a>' +
       '<div class="nav-user">' +
         '<button type="button" class="nav-user-trigger" aria-expanded="false">' +
           '<span class="nav-user-email"></span>' +
           '<span class="nav-user-chevron">\u25be</span>' +
         '</button>' +
         '<div class="nav-user-menu" hidden>' +
-          '<a href="/dashboard" class="nav-menu-item">' + T.docs + '</a>' +
-          '<a href="/account" class="nav-menu-item">' + T.account + '</a>' +
-          '<a href="/developer" class="nav-menu-item">' + T.dev + '</a>' +
-          '<a href="/pricing" class="nav-menu-item">' + T.plan + '</a>' +
-          '<a href="/help" class="nav-menu-item">' + T.help + '</a>' +
+          '<a href="' + R.dashboard + '" class="nav-menu-item">' + T.docs + '</a>' +
+          '<a href="' + R.account + '" class="nav-menu-item">' + T.account + '</a>' +
+          '<a href="/developer" class="nav-menu-item"' + (T.devLang ? ' hreflang="' + T.devLang + '"' : '') + '>' + T.dev + '</a>' +
+          '<a href="' + R.pricing + '" class="nav-menu-item">' + T.plan + '</a>' +
+          '<a href="' + R.help + '" class="nav-menu-item">' + T.help + '</a>' +
           '<div class="nav-menu-divider"></div>' +
           '<button type="button" class="nav-menu-item nav-menu-signout" id="nav-signout">' + T.out + '</button>' +
         '</div>' +
@@ -160,6 +295,8 @@
       try {
         await fetch('/api/user/logout', { method: 'POST', credentials: 'include' });
       } catch (err) {}
+      wipeLocal();
+      try { localStorage.removeItem(SIGNUP_RETURN); } catch (err) {}
       try { localStorage.removeItem('paramant_api_key'); } catch (err) {} // legacy: /parashare no longer writes it, clear an old one
       if (location.pathname === '/account' || location.pathname.startsWith('/auth/')) {
         location.href = '/';
@@ -172,21 +309,38 @@
   setNavigation(PUBLIC_NAV, DUTCH ? 'Hoofdmenu' : 'Primary');
   container.innerHTML = '<span class="nav-signin" aria-hidden="true">' + (DUTCH ? 'Even kijken' : 'Checking session') + '</span>';
 
-  (async function check() {
+  // A page that signs the visitor in without a reload (the login tip, the end
+  // of the account setup) says so, and the bar follows: it showed "Account
+  // maken" to somebody who was already signed in (hertest r2 K4).
+  window.addEventListener('paramant:session-changed', function() { check(); });
+  check();
+  async function check() {
     try {
-      var res = await fetch('/api/user/session/verify', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      if (!res.ok) { renderLoggedOut(); return; }
+      var res = null;
+      // A busy relay (429) or a hiccup (5xx) is not "signed out": ask again a
+      // couple of times, honouring a short Retry-After, before giving up.
+      for (var attempt = 0; attempt < 3; attempt++) {
+        res = await fetch('/api/user/session/verify', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (res.status !== 429 && res.status < 500) break;
+        if (attempt === 2) break;
+        var wait = Math.min(5, Number(res.headers.get('Retry-After')) || (attempt + 1));
+        await new Promise(function(r) { setTimeout(r, wait * 1000); });
+      }
+      if (res.status === 429 || res.status >= 500) { renderUnknown(); return; }
+      if (!res.ok) { wipeCosignKeys(); renderLoggedOut(); return; }
       var data = await res.json();
       if (data.authenticated && data.email) {
+        window.paramantNoteAccount(data.email);
         renderLoggedIn(data.email);
       } else {
+        wipeCosignKeys();
         renderLoggedOut();
       }
     } catch (err) {
-      renderLoggedOut();
+      renderUnknown();
     }
-  })();
+  }
 })();

@@ -92,8 +92,9 @@ async function pickJpeg(page) {
 // ── signed out: the bar, and what it does not do ─────────────────────────────
 const out = await openSign(false);
 await out.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
+// Mick 05-10: taalronde
 ok('signed out, the flow carries a bar that says so',
-  /U bent niet ingelogd\. U kunt hier een document klaarzetten; voor ondertekenen of versturen is een gratis Community-account nodig\./.test(await out.locator('#ds-signedout').innerText()),
+  /U bent niet ingelogd\. U kunt al wel een document klaarzetten\. Om te tekenen of te versturen heeft u een gratis Community-account nodig\./.test(await out.locator('#ds-signedout').innerText()),
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /sign afterwards',
@@ -119,9 +120,14 @@ ok('the send button asks for the session instead of promising to send',
 ok('and it says the prepared document does not survive signing in',
   /is niet geüpload/i.test(await out.locator('#ds-recipients-hint').innerText()),
   await out.locator('#ds-recipients-hint').innerText());
+// A request needs someone to go to: the button checks that before the sign-in
+// (test with a stranger, 13-10-2026), so fill one person in first.
+await out.locator('#ds-add-recipient').click();
+await out.locator('[data-field="label"]').nth(0).fill('Signer Demo');
+await out.locator('[data-field="email"]').nth(0).fill('demo@example.com');
 await out.locator('#ds-recipients-continue').click();
 await out.waitForURL(/\/auth\/login\?next=%2Fsign|\/auth\/login\?next=\/sign/, { timeout: 15000 }).catch(() => {});
-ok('pressing it goes to the sign-in and back to /sign', /\/auth\/login\?next=(\/|%2F)sign$/.test(out.url()), out.url());
+ok('pressing it goes to the sign-in and back to /sign', /\/auth\/login\?next=(\/|%2F)sign(%3Fherstel%3D1)?$/.test(out.url()), out.url());
 await out.close();
 
 // ── signed in: nothing of the above ──────────────────────────────────────────
@@ -147,7 +153,7 @@ await pickJpeg(jpeg);
 await jpeg.locator('#ds-doc-error:not([hidden])').waitFor({ timeout: 15000 });
 ok('a JPEG is refused, and named',
   (await jpeg.locator('#ds-doc-error').innerText()).trim()
-    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent pdf-documenten. Exporteer of print uw bestand eerst naar pdf.',
+    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent alleen pdf. Zet uw bestand eerst om naar pdf: exporteer het, of druk het af als pdf.',
   await jpeg.locator('#ds-doc-error').innerText());
 ok('a refused file does not move the flow on',
   await jpeg.locator('#step-doc').isVisible()

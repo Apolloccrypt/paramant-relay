@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
-[ -f .env ] && export $(grep -v '^#' .env | grep -v '^$' | xargs) 2>/dev/null
+# Read one value from .env without sourcing or exporting it. The old
+# `export $(... | xargs)` line split a value with a space in it (MAIL_FROM) into
+# pieces and exported every line of .env into this shell. Surrounding quotes
+# are stripped.
+envget() {
+    [ -f .env ] || return 0
+    grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
+}
+[ -z "${HTTP_PORT:-}" ] && HTTP_PORT="$(envget HTTP_PORT)"
+[ -z "${HTTPS_PORT:-}" ] && HTTPS_PORT="$(envget HTTPS_PORT)"
 echo ""; echo -e "${BLUE}╔═══════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║     PARAMANT Pre-flight Check         ║${NC}"; echo -e "${BLUE}╚═══════════════════════════════════════╝${NC}"; echo ""
 HTTP_PORT=${HTTP_PORT:-80}; HTTPS_PORT=${HTTPS_PORT:-443}; ISSUES=0
@@ -105,6 +114,50 @@ else
         echo -e "${YELLOW}   Read it when you need it:${NC}  grep '^ADMIN_TOKEN=' .env"; echo ""
     fi
 fi
+# The other secrets docker-compose.yml needs. ADMIN_TOKEN above can be made
+# here; these are named with the command that makes them, because a missing
+# one is not a warning about comfort: redis refuses to start without
+# REDIS_PASSWORD (--requirepass), and that used to pass as "All checks passed".
+check_secret() {
+    local name=$1 why=$2 gen=$3
+    if [ -n "$(envget "$name")" ]; then
+        echo -e "${GREEN}✓  ${name} configured${NC}"
+    else
+        echo -e "${RED}✗  ${name} not set in .env: ${why}${NC}"
+        echo -e "   Generate one: ${gen}"
+        ISSUES=$((ISSUES + 1))
+    fi
+}
+check_secret REDIS_PASSWORD "redis will not start (docker-compose.yml runs it with --requirepass)" "openssl rand -hex 32"
+RP="$(envget REDIS_PASSWORD)"; RRU="$(envget RELAY_REDIS_URL)"
+if [ -n "$RP" ]; then
+    case "$RRU" in
+        *CHANGE_ME*|"") echo -e "${RED}✗  RELAY_REDIS_URL does not carry REDIS_PASSWORD: the relays cannot reach redis${NC}"
+                        echo "   Set: RELAY_REDIS_URL=redis://:<REDIS_PASSWORD>@redis:6379"; ISSUES=$((ISSUES + 1)) ;;
+        *":${RP}@"*)    echo -e "${GREEN}✓  RELAY_REDIS_URL uses REDIS_PASSWORD${NC}" ;;
+        *)              echo -e "${RED}✗  RELAY_REDIS_URL has a different password than REDIS_PASSWORD${NC}"
+                        echo "   Set: RELAY_REDIS_URL=redis://:<REDIS_PASSWORD>@redis:6379"; ISSUES=$((ISSUES + 1)) ;;
+    esac
+fi
+# relay_id in every signed tree head and receipt. Missing, docker-compose.yml
+# falls back to a paramant.app host; left at the .env.example value, the
+# proofs name relay.example.org. Neither is this relay (SELF-19).
+SELF_BAD=""
+for sec in MAIN HEALTH FINANCE LEGAL IOT; do
+    v="$(envget "RELAY_SELF_URL_${sec}")"
+    case "$v" in
+        ""|*example.org*|*paramant.app*) SELF_BAD="$SELF_BAD RELAY_SELF_URL_${sec}" ;;
+    esac
+done
+if [ -z "$SELF_BAD" ]; then
+    echo -e "${GREEN}✓  RELAY_SELF_URL_<SECTOR> set to your own address${NC}"
+else
+    echo -e "${RED}✗  Not your own public URL yet:${SELF_BAD}${NC}"
+    echo "   Signed proofs would name relay.example.org or a paramant.app host. Set them to this relay's URL."
+    ISSUES=$((ISSUES + 1))
+fi
+check_secret PARAMANT_TOTP_MASTER_KEY "the relays cannot store TOTP secrets" "openssl rand -base64 32"
+check_secret INTERNAL_AUTH_TOKEN "admin to relay calls are refused" "openssl rand -hex 32"
 echo ""
 if [ "$ISSUES" -gt 0 ]; then
     echo -e "${YELLOW}⚠  Pre-flight complete with ${ISSUES} warning(s)${NC}"; echo -e "   Proceeding may cause issues."; echo ""

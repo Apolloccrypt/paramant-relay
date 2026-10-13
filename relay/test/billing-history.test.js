@@ -140,6 +140,41 @@ test('a partial credit says it is partial, and the invoice row stays', async () 
   did();
 });
 
+// ── 1b. the Dutch page ───────────────────────────────────────────────────────
+// /account is Dutch and printed these labels in English ("Credit note for
+// invoice", "Paid", "term ended"; fase 1, PLAN-19). Every row carries a Dutch
+// label and detail beside the English ones, built from the record's own fields.
+
+test('every row carries a Dutch label and detail for the Dutch /account', async () => {
+  const redis = fakeRedis();
+  await pay(redis, 'tr_nl', { at: '2026-01-10T12:00:00Z', until: '2026-02-10T12:00:00Z', interval: 'monthly' });
+  await credit.issueCreditNote({
+    payment: Object.assign(payment('tr_nl', 'pro', 'monthly'), { amountRefunded: { value: '10.00', currency: 'EUR' } }),
+    now: new Date('2026-01-20T09:00:00Z'),
+  }, redis);
+  const rows = await build(redis);
+  assert.deepStrictEqual(typesOf(rows), ['term_ended', 'credit_note', 'invoice']);
+  assert.strictEqual(rows[0].label_nl, 'Termijn ParaSign Pro afgelopen');
+  assert.strictEqual(rows[0].detail_nl, 'Account terug op Community');
+  assert.strictEqual(rows[1].label_nl, 'Creditnota voor factuur PS-2026-0001 (gedeeltelijk)');
+  assert.strictEqual(rows[1].detail_nl, 'Terugbetaald');
+  assert.strictEqual(rows[2].label_nl, 'Paramant ParaSign Pro, maandplan');
+  assert.strictEqual(rows[2].detail_nl, 'Betaald');
+  did();
+});
+
+test('a Firm invoice and a gift name their contents in Dutch', async () => {
+  const firm = history.documentRow({ kind: 'invoice', number: 'PS-2026-0009', issued_at: '2026-10-05T00:00:00.000Z',
+    product: 'firm', plan: 'firm', interval: 'yearly', description: 'Paramant Firm (ParaSign Pro and ParaSend Pro), yearly plan', amount_gross: '350.90' });
+  assert.strictEqual(firm.label_nl, 'Paramant Firm (ParaSign Pro en ParaSend Pro), jaarplan');
+  // A gift recorded before label_nl existed is rebuilt from its grants.
+  const gift = history.giftRow({ code: 'OUDECODE', label: 'Gift: 3 months of ParaSign Pro, code OUDECODE',
+    grants: [{ product: 'parasign', tier: 'pro', days: 90 }], redeemed_at: '2026-10-01T00:00:00.000Z' });
+  assert.strictEqual(gift.label_nl, 'Cadeau: 3 maanden ParaSign Pro, code OUDECODE');
+  assert.strictEqual(gift.detail_nl, 'Geen betaling, geen factuur');
+  did();
+});
+
 // ── 2. the terms ─────────────────────────────────────────────────────────────
 
 test('a term that has run out is a row of its own, on the day it ended', async () => {

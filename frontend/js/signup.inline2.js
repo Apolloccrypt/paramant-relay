@@ -15,6 +15,7 @@
       if (sf) { sf.inert = true; sf.classList.add("is-standby"); }
       document.getElementById("already-signout").addEventListener("click", async function() {
         await fetch("/api/user/logout", {method:"POST",credentials:"include"});
+        try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
         location.reload();
       });
     }

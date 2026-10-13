@@ -53,13 +53,28 @@
           'Content-Type': 'application/json',
           Accept: 'application/json'
         },
+        /* lang: the relay sends the buyer back to /en/dashboard after paying
+         * when he bought on the English page, and to /dashboard otherwise. */
         body: JSON.stringify({
           product: btn.getAttribute('data-billing-product'),
           plan: btn.getAttribute('data-billing-plan'),
-          interval: btn.getAttribute('data-billing-interval')
+          interval: btn.getAttribute('data-billing-interval'),
+          lang: NL ? 'nl' : 'en'
         })
       });
     }).then(function (r) {
+      /* A 409 is an answer, not a failure: the relay refused on purpose
+       * (other_plan_running: a second plan next to a running one would be
+       * paid twice) and says why. Until 2026-10-05 the body was thrown away
+       * and the buyer read "Could not start checkout... Please try again",
+       * an invitation to repeat the refused purchase (fase 1, PLAN-07). */
+      if (r.status === 409) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          var e = new Error('checkout_http_409');
+          e.body = j || {};
+          throw e;
+        });
+      }
       if (!r.ok) throw new Error('checkout_http_' + r.status);
       return r.json();
     }).then(function (j) {
@@ -110,6 +125,28 @@
     } catch (e) { /* private mode: the visitor just clicks again, no worse than before */ }
   }
 
+  /* The plan in the way back: product.plan.interval, three words from the
+   * button itself. Only a value that matches a button on this page is ever
+   * used, so the parameter cannot ask for anything the page does not offer. */
+  function intentCode(btn) {
+    return [btn.getAttribute('data-billing-product'), btn.getAttribute('data-billing-plan'),
+      btn.getAttribute('data-billing-interval')].join('.');
+  }
+
+  function takeIntentFromUrl() {
+    var q = new URLSearchParams(location.search);
+    var code = q.get('koop');
+    if (!code) return null;
+    q.delete('koop');
+    try {
+      var rest = q.toString();
+      history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    } catch (e) { /* the address keeps it; harmless */ }
+    var parts = String(code).split('.');
+    if (parts.length !== 3) return null;
+    return { product: parts[0], plan: parts[1], interval: parts[2] };
+  }
+
   function takeIntent() {
     var raw = null;
     try { raw = sessionStorage.getItem(INTENT); sessionStorage.removeItem(INTENT); }
@@ -139,6 +176,38 @@
   // /pricing is Dutch since 23 September 2026, /en/pricing is the English copy.
   var NL = document.documentElement.lang === 'nl';
 
+  var PRODUCT = { parasign: 'ParaSign', parasend: 'ParaSend' };
+  var TIER = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+  var MONTHS_NL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli',
+    'augustus', 'september', 'oktober', 'november', 'december'];
+
+  /* The refusal in the page's language. The relay's own `message` is English
+   * and is what the English page shows; the Dutch page builds the same
+   * sentence from the fields that come with it. Nothing was charged, and the
+   * way to change plans is a mail, so the text says that and does not ask the
+   * buyer to try again. */
+  function refusalText(body) {
+    if (body.error !== 'other_plan_running') {
+      return NL
+        ? 'U kunt dit plan nu niet kopen. Er is niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
+        : (body.message || 'This plan cannot be bought right now. Nothing has been charged. To change plans, mail privacy@paramant.app.');
+    }
+    if (!NL && body.message) return body.message;
+    var plan = (PRODUCT[body.product] || 'Paramant') + ' ' + (TIER[body.running] || body.running || '');
+    var until = '';
+    if (body.paid_until) {
+      var d = new Date(body.paid_until);
+      if (!isNaN(d.getTime())) {
+        until = NL
+          ? ' tot ' + d.getUTCDate() + ' ' + MONTHS_NL[d.getUTCMonth()] + ' ' + d.getUTCFullYear()
+          : ' until ' + d.toISOString().slice(0, 10);
+      }
+    }
+    return NL
+      ? 'U heeft al ' + plan.trim() + until + '. Dit plan zou ernaast lopen, en dan betaalt u dezelfde weken twee keer. Daarom is er geen betaling gestart en niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
+      : 'You already have ' + plan.trim() + until + '. This plan would run alongside it and you would pay twice for the same weeks, so no payment was started. To change plans, mail privacy@paramant.app.';
+  }
+
   Array.prototype.forEach.call(buttons, function (btn) {
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
@@ -164,11 +233,24 @@
             msg === 'token_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
             msg.indexOf('checkout_http_403') === 0) {
           rememberIntent(btn);
-          window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
+          /* Signed out is, for nearly everyone who gets here, "no account
+           * yet". Sending them to the sign-in put a stranger on "Welkom
+           * terug" (test with a stranger, 13-10-2026). So the way out is the
+           * free account, in the language of this page, and the way back
+           * names the plan: ?koop= survives the two mails of the signup, where
+           * this tab's sessionStorage does not. Who already has an account
+           * signs in from the signup page, with the same way back. */
+          var back = encodeURIComponent(location.pathname + '?koop=' + intentCode(btn));
+          if (NL) window.location.href = '/signup?next=' + back;
+          else window.location.href = '/en/signup?next=' + back;
+          return;
+        }
+        if (msg === 'checkout_http_409') {
+          showError(btn, refusalText(err.body || {}));
           return;
         }
         showError(btn, NL
-          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw, of mail privacy@paramant.app, dan lossen we het op.'
+          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw. Lukt het weer niet? Mail privacy@paramant.app, dan lossen we het op.'
           : 'Could not start checkout. Nothing has been charged. ' +
             'Please try again, or mail privacy@paramant.app and we will sort it out.');
       });
@@ -179,7 +261,25 @@
    * once, because takeIntent clears the store as it reads. A failure here shows
    * the same inline error as a normal click, so a visitor is never left on a
    * page that silently did nothing. */
+  /* Back from making an account, in another tab: the choice comes from the
+   * address (?koop=). That address can be shared and pasted, so it does not
+   * press the button by itself: it points at the plan, says so, and the buyer
+   * presses once. A checkout is never started by a link alone. */
+  var fromUrl = takeIntentFromUrl();
   var pending = takeIntent();
+  if (!pending && fromUrl) {
+    var chosen = buttonFor(fromUrl);
+    if (chosen) {
+      var say = document.createElement('div');
+      say.setAttribute('role', 'status');
+      say.id = 'billing-resume-note';
+      say.style.cssText = 'margin-top:.6rem;font-size:.85rem;color:#334155';
+      say.textContent = NL ? 'Uw account staat klaar. Klik op de knop hierboven om dit plan af te rekenen.'
+        : 'Your account is ready. Click the button above to pay for this plan.';
+      if (chosen.parentNode) chosen.parentNode.insertBefore(say, chosen.nextSibling);
+      try { chosen.scrollIntoView({ block: 'center' }); chosen.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
+    }
+  }
   if (pending) {
     var target = buttonFor(pending);
     if (target) {

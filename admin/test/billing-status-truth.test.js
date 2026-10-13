@@ -129,14 +129,48 @@ test('the account page renders the term end', () => {
   // /account is Dutch since 23 September 2026; /en/account is its English copy.
   const html = fs.readFileSync(
     path.join(__dirname, '..', '..', 'frontend', 'en', 'account.html'), 'utf8');
-  assert.match(html, /Access until/, 'the row must name what the date is');
+  // Since 05-10-2026 the date is one sentence, written by the script: "Paid
+  // until <date>, renewing is possible from today". The separate "Access
+  // until" row is gone: it carried a second date after an upgrade.
+  assert.match(js, /'Paid until '/, 'the term line must name what the date is');
+  assert.match(js, /'Betaald tot '/, 'the Dutch term line must name what the date is');
+  assert.doesNotMatch(html, /id="billing-next-row"/, 'one date per page: no second "Access until" row');
   assert.doesNotMatch(html, /Next billing date/,
     'nothing bills again by itself, so no row may promise a next billing date');
   assert.doesNotMatch(html, /renewal date and invoices are below/,
     'neither a renewal date nor an invoice is produced today');
   const htmlNl = fs.readFileSync(
     path.join(__dirname, '..', '..', 'frontend', 'account.html'), 'utf8');
-  assert.match(htmlNl, /Toegang tot/, 'the Dutch row must name what the date is');
   assert.doesNotMatch(htmlNl, /Volgende betaaldatum|Volgende factuurdatum|Volgende incasso/,
     'nothing bills again by itself, so no Dutch row may promise a next billing date');
+});
+
+// A one-off payment is not a subscription (besluit 05-10-2026). The account
+// page showed "Plan opzeggen" on every paid plan, and the route behind it wrote
+// a cancel date equal to the end of the term and mailed "Opzegging gepland ...
+// Bedacht? Beantwoord deze mail" about a plan that was never going to renew
+// (betaaltest 05-10, row 3). Now the route asks relay-main whether anything
+// collects, and without a subscription it refuses before it writes or mails.
+test('cancel refuses a one-off payment before it writes a date or sends a mail', () => {
+  const body = handlerOf2('/user/billing/cancel').replace(/^[ \t]*\/\/.*$/gm, '');
+  const refuse = body.indexOf('"nothing_to_cancel"');
+  assert.ok(refuse !== -1, 'the route must answer nothing_to_cancel for a one-off payment');
+  assert.match(body.slice(0, refuse), /relayFetch\("main", "\/v2\/admin\/keys\?reveal=1"/,
+    'whether something collects is relay-main\'s answer, as on GET /user/billing/status');
+  assert.match(body.slice(0, refuse), /!mainKey\.auto_renews/, 'refused exactly when nothing renews');
+  for (const effect of ['plan_cancel_at', 'sendCancellationScheduled(', 'logAuditEvent(']) {
+    const at = body.indexOf(effect);
+    assert.ok(at > refuse, `${effect} may only run after the one-off refusal`);
+  }
+  assert.match(body.slice(refuse - 80, refuse), /status\(409\)/, 'a refusal, not a success');
+});
+
+test('the account page offers no cancel button on a one-off payment', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'js', 'account.inline1.js'), 'utf8');
+  assert.match(js, /if \(d\.auto_renews\) document\.getElementById\('billing-cancel-btn'\)\.classList\.remove\('hidden'\)/,
+    'the cancel button appears only when something renews');
+  for (const p of ['account.html', 'en/account.html']) {
+    const html = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', p), 'utf8');
+    assert.doesNotMatch(html, /abonnement en geschiedenis|subscription and history/, `${p}: a one-off payment is no subscription`);
+  }
 });

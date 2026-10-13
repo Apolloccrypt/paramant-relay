@@ -39,6 +39,7 @@ const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
 const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
+const dpaMail       = require('./lib/dpa-mail');        // DPA confirmation, NL or EN
 const rateLimit     = require('./lib/rate-limit');
 const mailer        = require('./lib/mail');            // one way out, carrier is a setting
 const authThrottle  = require('./lib/auth-throttle');
@@ -173,6 +174,12 @@ const creditNote       = require('./lib/credit-note');        // credit notes (C
 const billingMail      = require('./lib/billing-mail');       // bilingual (NL, then EN) text of the invoice and credit-note mails
 const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
 const billingExport    = require('./lib/billing-export');     // period export of both series, CSV/JSON, for the books
+const { neutralize: _csvNeutralize } = require('./lib/csv-safe');
+// One cell of GET /v2/audit?format=csv: formula guard, then RFC 4180 quoting.
+function _csvAuditCell(v) {
+  const s = _csvNeutralize(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
 const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
 const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
@@ -276,17 +283,20 @@ function modeAllows(p) {
 // from a phishing attempt, and a corporate spam filter will treat it as one.
 // Answering both costs three lines and is the difference between a document
 // that arrives and a ticket at somebody's IT desk.
+// "Paramant bewaart het bestand" read as storage, while /pricing says the
+// file lives in memory and is wiped (acceptatie 3.1.1, taal #37): the footer
+// says how long it waits and that it is gone after.
 function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'een klant van Paramant')
-       + ' uw adres heeft ingevuld. Paramant verstuurt het bestand versleuteld en '
-       + 'kan het zelf niet openen.'
+       + ' uw adres heeft ingevuld. Het bestand staat versleuteld klaar tot het is opgehaald '
+       + 'of de link verloopt. Daarna is het weg. De link in deze mail opent het. Die link bewaren wij niet.'
        + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
   const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'a Paramant customer')
-       + ' entered your address. Paramant carries the file in encrypted form and '
-       + 'cannot open it.'
+       + ' entered your address. The file waits, encrypted, until it is picked up or the '
+       + 'link expires. Then it is gone. The link in this mail opens it, and we do not keep that link.'
        + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
   const tekst = taal === 'en' ? en
               : taal === 'nl' ? nl
@@ -319,7 +329,11 @@ function tweetaligHtml(taal, nl, en) {
        + '<div lang="en">' + en + '</div>';
 }
 function mailDatum(ms, taal, opties) {
-  return new Date(ms).toLocaleString(taal === 'en' ? 'en-GB' : 'nl-NL', opties);
+  // Explicit zone and its name (hertest T4-L4): the container runs in UTC, the
+  // sender's page showed UTC, and the mail printed a bare "15:08" that meant
+  // one or the other depending on where the relay happened to run.
+  return new Date(ms).toLocaleString(taal === 'en' ? 'en-GB' : 'nl-NL',
+    { timeZone: 'Europe/Amsterdam', timeZoneName: 'short', ...opties });
 }
 
 // Which sector an account lives on, from its key label -- the same derivation
@@ -351,6 +365,25 @@ function veiligCodeer(waarde) {
       return encodeURIComponent(String(waarde).replace(/[\uD800-\uDFFF]/g, ''));
     } catch (e2) { return 'file'; }
   }
+}
+
+// A sender-chosen file name, made safe to print in a mail to somebody who is
+// not our customer: one line, printable, no link and no address. Used by the
+// invitation AND the code mail (hertest T4-10: the code mail printed
+// "PARAMANT SUPPORT bevestig uw account op www.evil-example.com" verbatim).
+// Returns '' for an empty name; the caller picks the fallback wording.
+function veiligeBestandsnaam(raw) {
+  return String(raw == null ? '' : raw)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[\uD800-\uDFFF]/gu, '') // lone halves only; an emoji stays
+    .replace(/\s+/g, ' ')
+    .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
+    .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
+    // A bare domain ("evil-example.com") is made clickable by most clients too.
+    .replace(/\b(?:[a-z0-9-]+\.)+(?:com|net|org|nl|be|de|eu|io|app|info|biz|co|uk|ru|xyz|top|site|online)\b(?:\/\S*)?/gi, '[link]')
+    .trim()
+    .slice(0, 120);
 }
 
 // HTML-escape user-supplied strings before embedding in email templates.
@@ -468,6 +501,12 @@ const CT_MAX = 10000;
 // pruned index return null instead of the wrong entry.
 const { CtWindow, reindexEntries } = require('./lib/ct-window');
 const ctWindow = new CtWindow(CT_MAX);
+// The Merkle tree itself covers the WHOLE log, not the window (lib/ct-tree).
+// The window only bounds how many full entries (ts, type, stored proof) stay in
+// memory; every leaf hash stays, so tree_size, roots, audit paths and
+// consistency proofs keep working past CT_MAX and after a rotation.
+const { CtMerkle } = require('./lib/ct-tree');
+const ctTree = new CtMerkle();
 // Where the transparency log lives on disk.
 //
 // This used to be `process.env.CT_FILE || null`: opt-in, RAM-only unless a
@@ -498,6 +537,10 @@ const CT_FILE = process.env.CT_FILE !== undefined
   ? (process.env.CT_FILE || null)   // explicit, empty means RAM-only on purpose
   : _ctFileDefault();
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
+// Compact leaf file next to CT_FILE: 32 raw bytes per leaf, append-only and
+// never rotated. CT_FILE rotates at CT_MAX_SIZE; this is what lets a restart
+// after a rotation rebuild the full tree (32 MB per million entries).
+const CT_LEAVES_FILE = CT_FILE ? CT_FILE + '.leaves' : null;
 
 // Set the moment a shutdown starts, and never cleared. Both append logs check
 // it before taking another line out of their queue, so from that point the exit
@@ -507,7 +550,8 @@ let _shuttingDown = false;
 
 // Fix 8: async CT write stream with queued writes and log rotation
 let _ctStream    = null;
-let _ctWriteQueue = [];
+let _ctLeafStream = null;
+let _ctWriteQueue = [];   // [{ line, leaf }]
 let _ctDraining  = false;
 
 function _ctOpenStream() {
@@ -519,6 +563,10 @@ function _ctOpenStream() {
     fs.mkdirSync(nodePath.dirname(CT_FILE), { recursive: true });
     _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
     _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+    if (!_ctLeafStream) {
+      _ctLeafStream = fs.createWriteStream(CT_LEAVES_FILE, { flags: 'a' });
+      _ctLeafStream.on('error', e => log('warn', 'ct_leaf_stream_error', { err: e.message }));
+    }
   } catch (e) {
     log('error', 'ct_log_not_persisted', {
       err: e.message, file: CT_FILE,
@@ -535,20 +583,61 @@ async function _ctRotate() {
     const stat = await fs.promises.stat(CT_FILE).catch(() => null);
     if (!stat || stat.size < CT_MAX_SIZE) return;
     if (_ctStream) { await new Promise(r => _ctStream.end(r)); _ctStream = null; }
-    await fs.promises.rename(CT_FILE, CT_FILE + '.1').catch(() => {});
+    // Numbered, never overwritten. This used to rename to CT_FILE + '.1' every
+    // time, so the second rotation destroyed the first one's entries, and the
+    // startup read only CT_FILE: after rotation plus restart the tree came
+    // back with a handful of leaves and the relay refused every next head.
+    // The leaf file is what rebuilds the tree now; the numbered parts keep the
+    // full entries for anyone who needs them.
+    const target = _ctNextRotatedName();
+    await fs.promises.rename(CT_FILE, target).catch(e => log('warn', 'ct_rotate_rename_failed', { err: e.message }));
     _ctOpenStream();
-    log('info', 'ct_log_rotated', { file: CT_FILE });
+    log('info', 'ct_log_rotated', { file: CT_FILE, archived_as: target });
   } catch(e) { log('warn', 'ct_rotate_error', { err: e.message }); }
+}
+
+// The rotated parts of CT_FILE, oldest first: CT_FILE.1, CT_FILE.2, ...
+function _ctRotatedFiles() {
+  if (!CT_FILE) return [];
+  const dir = nodePath.dirname(CT_FILE);
+  const base = nodePath.basename(CT_FILE) + '.';
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  return names
+    .filter(n => n.startsWith(base) && /^\d+$/.test(n.slice(base.length)))
+    .map(n => ({ n: parseInt(n.slice(base.length), 10), file: nodePath.join(dir, n) }))
+    .sort((a, b) => a.n - b.n)
+    .map(x => x.file);
+}
+
+function _ctNextRotatedName() {
+  const parts = _ctRotatedFiles();
+  const last = parts.length ? parseInt(parts[parts.length - 1].slice(CT_FILE.length + 1), 10) : 0;
+  return CT_FILE + '.' + (last + 1);
 }
 
 async function _ctDrain() {
   if (_ctDraining || !_ctStream) return;
   _ctDraining = true;
   while (_ctWriteQueue.length > 0 && !_shuttingDown) {
-    const line = _ctWriteQueue.shift();
-    await new Promise((resolve, reject) => {
-      _ctStream.write(line, err => err ? reject(err) : resolve());
-    }).catch(e => log('warn', 'ct_write_error', { err: e.message }));
+    const item = _ctWriteQueue.shift();
+    // Both writes are handed to their streams in the SAME tick and only then
+    // awaited. Awaiting the leaf before writing the line left a gap in which a
+    // shutdown could end the streams; the line then hit "write after end",
+    // that error destroyed the stream, and every line still buffered in it was
+    // lost (route-ct-exit-durability: 10 of 40 on disk). The leaf goes first
+    // into its stream; a leaf with no line costs one entry's details after a
+    // crash, an entry with no leaf is recovered from CT_FILE at the next start.
+    const writes = [];
+    if (_ctLeafStream && item.leaf) {
+      writes.push(new Promise((resolve, reject) => {
+        _ctLeafStream.write(item.leaf, err => err ? reject(err) : resolve());
+      }).catch(e => log('warn', 'ct_leaf_write_error', { err: e.message })));
+    }
+    writes.push(new Promise((resolve, reject) => {
+      _ctStream.write(item.line, err => err ? reject(err) : resolve());
+    }).catch(e => log('warn', 'ct_write_error', { err: e.message })));
+    await Promise.all(writes);
   }
   _ctDraining = false;
   // Check rotation after draining. Not during a shutdown: rotation ends the
@@ -558,7 +647,7 @@ async function _ctDrain() {
 
 function ctWrite(entry) {
   if (!CT_FILE || !_ctStream || _shuttingDown) return;
-  _ctWriteQueue.push(JSON.stringify(entry) + '\n');
+  _ctWriteQueue.push({ line: JSON.stringify(entry) + '\n', leaf: Buffer.from(entry.leaf_hash, 'hex') });
   setImmediate(_ctDrain);
 }
 
@@ -567,27 +656,39 @@ function ctWrite(entry) {
 // them to reach the fd.
 function _flushCtOnExit() {
   if (!_ctStream || _ctWriteQueue.length === 0) return;
-  for (const line of _ctWriteQueue) { try { _ctStream.write(line); } catch {} }
+  for (const item of _ctWriteQueue) {
+    if (_ctLeafStream && item.leaf) { try { _ctLeafStream.write(item.leaf); } catch {} }
+    try { _ctStream.write(item.line); } catch {}
+  }
   _ctWriteQueue = [];
 }
 
+// Parse one CT_FILE (or rotated part) into an oldest-first entry list.
+function _ctReadEntries(file) {
+  const lines = fs.readFileSync(file, 'utf8').split('\n').filter(l => l.trim());
+  const loaded = [];
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
+        }
+      } else {
+        loaded.push(parsed);
+      }
+    } catch {}
+  }
+  return loaded;
+}
+
+const _isLeafHex = (h) => typeof h === 'string' && /^[0-9a-f]{64}$/i.test(h);
+
 // Load persisted CT log on startup (sync read only at startup, not on hot path)
 if (CT_FILE) {
+  let loaded = [];
   try {
-    const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
-    const loaded = [];
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (Array.isArray(parsed)) {
-          for (const entry of parsed) {
-            if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
-          }
-        } else {
-          loaded.push(parsed);
-        }
-      } catch {}
-    }
+    loaded = _ctReadEntries(CT_FILE);
     // One-shot, idempotent recount of the stored index field (2026-09). The
     // public log had five entries whose persisted .index was stale after an
     // April rebuild: positions 42..46 carried indices 4..8, so /v2/ct/log
@@ -610,11 +711,98 @@ if (CT_FILE) {
         log('warn', 'ct_log_reindex_write_failed', { err: e.message, file: CT_FILE });
       }
     }
-    ctWindow.load(loaded);
-    if (ctWindow.windowLength) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, file: CT_FILE });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message });
   }
+
+  // Rebuild the full tree. Source of truth is the leaf file; whatever it is
+  // missing (a relay upgrading from the window code has none, a crash can lose
+  // its tail) is recovered from the entries in CT_FILE and, for indices older
+  // than CT_FILE's first entry, from the rotated parts.
+  let leafBuf = Buffer.alloc(0);
+  try { leafBuf = fs.readFileSync(CT_LEAVES_FILE); }
+  catch (e) { if (e.code !== 'ENOENT') log('warn', 'ct_leaves_load_failed', { err: e.message }); }
+  const leafCount = Math.floor(leafBuf.length / 32);
+  let leafFileAligned = true;
+  for (let i = 0; i < leafCount; i++) ctTree.append(leafBuf.toString('hex', i * 32, (i + 1) * 32));
+  if (leafBuf.length % 32) {
+    // A crash or a full disk in the middle of a 32-byte write leaves a partial
+    // last leaf. Cut it off BEFORE anything is appended: recovered leaves and
+    // new ones written after it would otherwise sit 1..31 bytes out of step,
+    // and the next boot would read a different tree (review #555, M1). The
+    // leaf it belonged to is recovered from CT_FILE below like any other.
+    log('warn', 'ct_leaves_partial_tail', { bytes: leafBuf.length % 32 });
+    try {
+      fs.truncateSync(CT_LEAVES_FILE, leafCount * 32);
+      log('info', 'ct_leaves_partial_tail_cut', { leaves: leafCount });
+    } catch (e) {
+      log('error', 'ct_leaves_truncate_failed', { err: e.message, file: CT_LEAVES_FILE });
+      leafFileAligned = false;
+    }
+  }
+
+  const firstIdx = loaded.length ? loaded[0].index : 0;
+  const wantSize = loaded.length ? firstIdx + loaded.length : 0;
+  const recovered = [];
+  if (ctTree.size < wantSize) {
+    if (ctTree.size < firstIdx) {
+      // Older leaves live only in the rotated parts.
+      const byIndex = new Map();
+      for (const part of _ctRotatedFiles()) {
+        try {
+          const ents = _ctReadEntries(part);
+          reindexEntries(ents);
+          for (const e of ents) if (Number.isInteger(e.index) && e.index >= ctTree.size && e.index < firstIdx) byIndex.set(e.index, e.leaf_hash);
+        } catch (e) { log('warn', 'ct_rotated_read_failed', { file: part, err: e.message }); }
+      }
+      while (ctTree.size < firstIdx && _isLeafHex(byIndex.get(ctTree.size))) {
+        const h = byIndex.get(ctTree.size); ctTree.append(h); recovered.push(h);
+      }
+    }
+    if (ctTree.size >= firstIdx) {
+      for (let p = ctTree.size - firstIdx; p < loaded.length; p++) {
+        const h = loaded[p].leaf_hash;
+        if (!_isLeafHex(h)) break;
+        ctTree.append(h); recovered.push(h);
+      }
+    }
+  }
+  if (recovered.length && leafFileAligned) {
+    try { fs.appendFileSync(CT_LEAVES_FILE, Buffer.concat(recovered.map(h => Buffer.from(h, 'hex'))), { flag: 'a' }); }
+    catch (e) { log('warn', 'ct_leaves_recover_write_failed', { err: e.message }); }
+    log('info', 'ct_leaves_recovered', { leaves: recovered.length, tree_size: ctTree.size });
+  }
+
+  if (ctTree.size === wantSize) {
+    ctWindow.load(loaded);
+    // Self-check: the newest entry must say the same root the tree now has.
+    const last = ctWindow.last();
+    if (last && last.tree_hash && last.tree_hash !== ctTree.root()) {
+      log('error', 'ct_tree_root_mismatch', {
+        tree_size: ctTree.size, entry_root: String(last.tree_hash).slice(0, 16) + '…',
+        tree_root: ctTree.root().slice(0, 16) + '…',
+        hint: 'The leaf file and CT_FILE disagree. Restore both from the same backup.',
+      });
+    }
+  } else if (ctTree.size > wantSize) {
+    // Leaves made it to disk, entry lines did not (crash between the two).
+    // The tree is complete; only those entries' details are gone, so the
+    // window restarts empty at the tree size rather than with a gap in it.
+    ctWindow.load([]);
+    ctWindow.base = ctTree.size;
+    log('warn', 'ct_entries_behind_leaves', { tree_size: ctTree.size, entries_through: wantSize });
+  } else {
+    // Leaves are missing that nothing on disk can give back. Carry on from what
+    // is whole; produceSth will refuse to sign a size below one already signed,
+    // and /v2/sth says so, which is the honest outcome of lost data.
+    ctWindow.load([]);
+    ctWindow.base = ctTree.size;
+    log('error', 'ct_tree_incomplete', {
+      tree_size: ctTree.size, expected: wantSize,
+      hint: 'Leaves are missing from both the leaf file and the CT_FILE parts. Restore them from backup.',
+    });
+  }
+  if (ctTree.size) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, tree_size: ctTree.size, file: CT_FILE });
   _ctOpenStream();
 }
 
@@ -794,7 +982,7 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
 }
 
 // CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
-const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
+const { ctNodeHash, blobLeafHash } = require('./lib/ct-hash');
 
 // The field gate. Every name that reaches a log entry, a leaf preimage or an
 // entry type is declared in ./lib/ct-fields, and relay/test/ct-fields.test.js
@@ -885,6 +1073,19 @@ function canonicalJSON(obj) {
   return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k])).join(',') + '}';
 }
 
+// Put a new leaf into the full tree and hand back what its entry carries: the
+// index it sits at, the root of the tree it completes, and its audit path in
+// that tree. O(log n): the old code rebuilt the window's tree twice per append
+// (130-240 ms at 10 000 entries, synchronously on the request thread).
+function ctStage(leaf_hash) {
+  const index = ctTree.size;
+  if (index !== ctWindow.nextIndex()) {
+    throw new Error(`ct: tree size ${index} != window next index ${ctWindow.nextIndex()}`);
+  }
+  ctTree.append(leaf_hash);
+  return { index, tree_hash: ctTree.root(), proof: ctTree.inclusionProof(index, index + 1) };
+}
+
 // Every ctAppend* below takes its index from ctWindow.nextIndex(), which is
 // base + window length: the position the new leaf is about to occupy. The
 // value is stored on the entry as a convenience for the response it goes into,
@@ -895,15 +1096,12 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
   const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1); // real audit path at the new leaf position
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('key_reg', { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof });
   ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -915,10 +1113,7 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   const urlSectorHash = crypto.createHash('sha3-256').update(relayUrl + '|' + sector).digest('hex');
   // ctLeafHash(deviceIdHash, pubKeyHex, ts) — reuse with urlSectorHash as identity, pkHash as key
   const leaf_hash = ctLeafHash(urlSectorHash, pkHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('relay_reg', {
     index, type: 'relay_reg', leaf_hash, tree_hash,
     device_hash: pkHash,          // reused field — relay public key hash
@@ -930,7 +1125,7 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -941,17 +1136,14 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
 function ctAppendTransfer(blobHash, sector) {
   const ts = new Date().toISOString();
   const leaf_hash = blobLeafHash(blobHash, sector, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('transfer', {
     index, type: 'transfer', leaf_hash, tree_hash,
     blob_hash: blobHash, sector, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  const sth = produceSth(allEntries.length, entry.tree_hash);
+  const sth = produceSth(ctTree.size, entry.tree_hash);
   return { ...entry, sth };
 }
 
@@ -962,17 +1154,14 @@ function ctAppendTransfer(blobHash, sector) {
 function ctAppendParasign(documentHashHex, signerPkHash) {
   const ts = new Date().toISOString();
   const leaf_hash = ctLeafHash(signerPkHash, documentHashHex, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('parasign', {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1003,17 +1192,14 @@ function ctAppendEnvelope(eventType, envelopeId, payload) {
     .update(eventType).update('|').update(envelopeId).update('|')
     .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('envelope', {
     index, type, leaf_hash, tree_hash,
     envelope_id: envelopeId, payload: gatedPayload, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1032,17 +1218,14 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
   const ts = new Date().toISOString();
   const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
   const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('signing_pk', {
     index, type: eventType, leaf_hash, tree_hash,
     user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1141,7 +1324,34 @@ const PEER_STH_MAX = parseInt(process.env.PEER_STH_MAX || '500'); // per peer
 // the least-recently-updated peer (closing its fd) when full.
 const PEER_STH_MAX_PEERS = parseInt(process.env.PEER_STH_MAX_PEERS || '256');
 // peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string, last: epoch_ms }
+// ONLY pinned relays live here, because this map IS the public mirror
+// (/v2/sth/peers and /v2/sth/peers/:id). See lib/fleet-pins.js for why.
 const peerSths = new Map();
+const fleetPins = require('./lib/fleet-pins');
+const PEER_PINS = fleetPins.buildPins(process.env.PEER_STH_PINS || '',
+  [...fleetPins.RETIRED_PARAMANT_FLEET, ...fleetPins.parseRetiredPins(process.env.PEER_STH_RETIRED_PINS || '')]);
+// Heads from relays nobody pinned: kept in memory for the operator's log and
+// nothing else. Never published, never persisted, small and bounded, so a key
+// minted per request costs us a Map entry that falls off the end.
+const unpinnedPeerSths = new Map(); // pk_hash → { relay_id, count, last_tree_size, first_seen, last_seen }
+const UNPINNED_PEER_MAX = 64;
+// The mirror FILE of one pinned key. Exact duplicates never reach it (see the
+// ingest route), so it only grows with heads the key holder really signed, but
+// that is still one head per append for years. Past PEER_STH_FILE_MAX lines it
+// is compacted to the newest PEER_STH_FILE_KEEP (tmp file + rename, never a
+// half-written mirror). The public ring is PEER_STH_MAX, far below both.
+const PEER_STH_FILE_MAX = Math.max(parseInt(process.env.PEER_STH_FILE_MAX || '10000', 10) || 10000, 2);
+const PEER_STH_FILE_KEEP = Math.max(1, Math.min(parseInt(process.env.PEER_STH_FILE_KEEP || '5000', 10) || 5000, PEER_STH_FILE_MAX - 1));
+// One head is one (tree_size, root) pair. Two heads with the same pair are the
+// same statement, whatever their timestamp; a different root at the same size
+// is a fork and is kept, because that is exactly the evidence a mirror is for.
+function peerHeadKey(s) { return `${s && s.tree_size}|${String((s && s.sha3_root) || '').toLowerCase()}`; }
+// The public mirror says when a head arrived to the hour and no finer. A head
+// is gossiped the instant it is signed and it is signed on every append, so a
+// millisecond received_at is the leaf's own time, and that is exactly what the
+// hour rounding of the log exists to hide (measured 2026-10-06: 115 of 116
+// mirrored health heads gave the leaf's moment to the millisecond).
+function peerReceivedAt(ms) { return ctCoarseTs(new Date(ms).toISOString()); }
 const _peerSthStreams = new Map(); // pk_hash → fs.WriteStream
 
 function _peerSthStreamFor(pkHash) {
@@ -1182,9 +1392,80 @@ function _evictPeerSthsIfNeeded() {
 }
 
 function _peerSthWrite(pkHash, sth) {
+  const p = peerSths.get(pkHash);
+  if (p && p.compacting) { p.pending.push(sth); return; }
   const stream = _peerSthStreamFor(pkHash);
   if (!stream) return;
   try { stream.write(JSON.stringify(sth) + '\n'); } catch {}
+}
+
+// Clean what the open ingest route let in before peers were pinned. A file is
+// one key's mirror; every head in it must name a relay that is pinned to that
+// key. Heads that do not are dropped, and a file with nothing left is moved out
+// of the mirror into PEER_STH_DIR/purged/ (kept as evidence, never served).
+// Every purge is logged with the name the head claimed and why it went.
+function purgePeerSthFile(id, sths) {
+  const kept = [];
+  const dropped = new Map(); // relay_id → { count, reason }
+  for (const s of sths) {
+    const c = fleetPins.classifyPeer(PEER_PINS, s && s.relay_id, id);
+    if ((c.verdict === 'pinned' || c.verdict === 'retired') && (!s.relay_pk_hash || s.relay_pk_hash === id)) { kept.push(s); continue; }
+    const rid = String((s && s.relay_id) || '').slice(0, 80);
+    const d = dropped.get(rid) || { count: 0, reason: c.reason || c.verdict };
+    d.count++;
+    dropped.set(rid, d);
+  }
+  for (const [relay_id, d] of dropped) {
+    log('warn', 'peer_sth_purged', { id: id.slice(0, 16), relay_id, heads: d.count, reason: d.reason, kept: kept.length });
+  }
+  return { kept, changed: dropped.size > 0 };
+}
+
+// After a compaction the file no longer holds the oldest heads, so the seen
+// set cannot recognise them either. A head older than everything the file
+// still holds is then a replay, not news: refused. Before the first compaction
+// there is no floor.
+function peerFloorTs(sths) {
+  if (!sths || sths.length < PEER_STH_FILE_KEEP) return null;
+  const t = Number(sths[0] && sths[0].timestamp);
+  return Number.isFinite(t) ? t : null;
+}
+
+// The append stream is ended and AWAITED before the file is read, and heads
+// that arrive meanwhile wait in peer.pending, so no head is written to the
+// inode the rename is about to replace.
+async function _peerSthCompactIfNeeded(pkHash, peer) {
+  if (!peer || peer.compacting || (peer.fileLines || 0) <= PEER_STH_FILE_MAX) return;
+  peer.compacting = true;
+  peer.pending = [];
+  const full = nodePath.join(PEER_STH_DIR, pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64) + '.jsonl');
+  try {
+    const stream = _peerSthStreams.get(pkHash);
+    _peerSthStreams.delete(pkHash);
+    if (stream) await new Promise((r) => { try { stream.end(r); } catch { r(); } });
+    const lines = fs.readFileSync(full, 'utf8').split('\n').filter(l => l.trim());
+    const keep = lines.slice(-PEER_STH_FILE_KEEP);
+    const tmp = full + '.tmp';
+    fs.writeFileSync(tmp, keep.join('\n') + '\n');
+    fs.renameSync(tmp, full);
+    const kept = [];
+    for (const l of keep) { try { kept.push(JSON.parse(l)); } catch {} }
+    peer.seen = new Set(kept.map(peerHeadKey));
+    peer.fileLines = kept.length;
+    peer.floorTs = peerFloorTs(kept);
+    log('info', 'peer_sth_compacted', { id: pkHash.slice(0, 16), from: lines.length, kept: kept.length });
+  } catch (e) {
+    log('warn', 'peer_sth_compact_failed', { id: pkHash.slice(0, 16), err: e.message });
+  } finally {
+    peer.compacting = false;
+    const pending = peer.pending || [];
+    peer.pending = [];
+    for (const x of pending) {
+      peer.seen.add(peerHeadKey(x));
+      peer.fileLines = (peer.fileLines || 0) + 1;
+      _peerSthWrite(pkHash, x);
+    }
+  }
 }
 
 function loadPeerSths() {
@@ -1194,13 +1475,41 @@ function loadPeerSths() {
     for (const file of files) {
       const id = file.replace(/\.jsonl$/, '');
       try {
-        const lines = fs.readFileSync(nodePath.join(PEER_STH_DIR, file), 'utf8').split('\n').filter(l => l.trim());
-        const sths = [];
-        for (const line of lines) { try { sths.push(JSON.parse(line)); } catch {} }
+        // A mirror file is named after its key. Anything else in this
+        // directory is not ours to judge: leave it where it is, unread.
+        if (!/^[0-9a-f]{64}$/.test(id)) { log('warn', 'peer_sth_file_skipped', { file: file.slice(0, 80) }); continue; }
+        const full = nodePath.join(PEER_STH_DIR, file);
+        const lines = fs.readFileSync(full, 'utf8').split('\n').filter(l => l.trim());
+        const parsed = [];
+        for (const line of lines) { try { parsed.push(JSON.parse(line)); } catch {} }
+        const purged = purgePeerSthFile(id, parsed);
+        // Duplicates written before 3.1.2 go too: one line per (size, root).
+        const seen = new Set();
+        const sths = purged.kept.filter(x => { const k = peerHeadKey(x); if (seen.has(k)) return false; seen.add(k); return true; });
+        const changed = purged.changed || sths.length !== purged.kept.length;
+        if (changed) {
+          // Copy to purged/ first, then put the cleaned file in place with a
+          // rename. A crash at any point leaves the original in one of the two.
+          try {
+            const purgedDir = nodePath.join(PEER_STH_DIR, 'purged');
+            fs.mkdirSync(purgedDir, { recursive: true });
+            fs.copyFileSync(full, nodePath.join(purgedDir, `${file}.${Date.now()}`));
+            if (sths.length > 0) {
+              const tmp = full + '.tmp';
+              fs.writeFileSync(tmp, sths.map(x => JSON.stringify(x)).join('\n') + '\n');
+              fs.renameSync(tmp, full);
+            } else {
+              fs.unlinkSync(full); // its only content is the copy in purged/
+            }
+            if (sths.length !== purged.kept.length) log('info', 'peer_sth_duplicates_dropped', { id: id.slice(0, 16), dropped: purged.kept.length - sths.length, kept: sths.length });
+          } catch (e) { log('warn', 'peer_sth_purge_failed', { id: id.slice(0, 16), err: e.message }); }
+        }
+        if (sths.length === 0) continue;
         const recent = sths.slice(-PEER_STH_MAX);
         const pk_b64 = recent.length > 0 ? (recent[recent.length - 1].public_key || '') : '';
         const lastRec = recent.length > 0 ? Date.parse(recent[recent.length - 1].received_at || '') : 0;
-        peerSths.set(id, { sths: recent, pk_b64, last: Number.isFinite(lastRec) ? lastRec : 0 });
+        peerSths.set(id, { sths: recent, pk_b64, last: Number.isFinite(lastRec) ? lastRec : 0,
+                           seen, fileLines: sths.length, floorTs: peerFloorTs(sths) });
       } catch {}
     }
     _evictPeerSthsIfNeeded();
@@ -1218,9 +1527,53 @@ function loadPeerSths() {
 // Outbound HTTPS goes through safeHttpsRequest so the per-request DNS guard
 // catches peers that registered with a public hostname but DNS-rebound to a
 // private/loopback IP before gossip fires. Same defence as pushWebhooks.
+// A test or dev stack never talks to the production fleet unless told to.
+// Measured 2026-10-06: production mirrored heads from local acceptance stacks
+// (relay.telling.test, relay.p10-test.nl, and 15 fresh keys calling
+// themselves https://health.paramant.app). The way in: docker-compose.yml
+// defaults RELAY_SELF_URL_<SECTOR> to the paramant.app names, so in any local
+// compose run the sister relays register with the local health under the
+// production URLs, and that health then gossips its heads to the real
+// https://relay.paramant.app and friends. A copied CT log does the same,
+// because the registry is rebuilt from its relay_reg leaves.
+//
+// So a relay sends to a paramant.app name only when it IS a pinned Paramant
+// relay (its own key is the pin for its own RELAY_SELF_URL) and is not running
+// as test or development, or when PARAMANT_FLEET_GOSSIP=1 says so explicitly.
+// The production relays carry their pinned keys, so nothing changes there.
+function mayTalkToParamantFleet() {
+  return fleetPins.mayTalkToParamantFleet({ env: process.env, selfUrl: RELAY_SELF_URL,
+    selfPkHash: relayIdentity && relayIdentity.pk_hash, pins: PEER_PINS });
+}
+const isParamantUrl = fleetPins.isParamantUrl;
+function fleetGossipState() {
+  return fleetPins.fleetGossipState({ env: process.env, selfUrl: RELAY_SELF_URL,
+    selfPkHash: relayIdentity && relayIdentity.pk_hash, pins: PEER_PINS });
+}
+// Not silent. A test stack logs the skip once, as a warning. A relay that
+// calls itself a Paramant relay but signs with a key that is not (or no
+// longer) its pin, which is what a key rotation without the matching release
+// looks like, logs an ERROR every hour, and /health (admin) says it too.
+let _fleetGossipSkipLoggedAt = 0;
+
 async function broadcastSTH(sth) {
   if (!sth || !relayIdentity) return;
-  const peers = [...relayRegistry.values()].filter(r => r.url && r.url !== RELAY_SELF_URL);
+  const fleetOk = mayTalkToParamantFleet();
+  const peers = [...relayRegistry.values()].filter(r => r.url && r.url !== RELAY_SELF_URL)
+    .filter(r => {
+      if (fleetOk || !isParamantUrl(r.url)) return true;
+      const st = fleetGossipState();
+      const loud = st.reason === 'own_key_not_pinned' || st.reason === 'own_key_retired';
+      const now = Date.now();
+      if (!_fleetGossipSkipLoggedAt || (loud && now - _fleetGossipSkipLoggedAt >= 3_600_000)) {
+        _fleetGossipSkipLoggedAt = now;
+        log(loud ? 'error' : 'warn', 'gossip_to_paramant_fleet_skipped', { url: String(r.url).slice(0, 60), reason: st.reason,
+          hint: loud
+            ? 'This relay runs as a Paramant host but its identity key is not the pinned one. Its heads reach nobody. Finish the key rotation (RUNBOOK.md, "Relay identity key rotation").'
+            : 'This relay is not a pinned Paramant relay, so it does not send heads to paramant.app. Set PARAMANT_FLEET_GOSSIP=1 only if that is really meant.' });
+      }
+      return false;
+    });
   if (peers.length === 0) return;
   const body = JSON.stringify({
     ...sth,
@@ -1246,35 +1599,12 @@ async function broadcastSTH(sth) {
 
 // ── RFC 6962 consistency proof ─────────────────────────────────────────────────
 // Proves the tree at toSize is an append-only extension of the tree at fromSize.
-function _merkleRootOf(leafHashes) {
-  if (leafHashes.length === 0) return '0'.repeat(64);
-  let h = [...leafHashes];
-  while (h.length > 1) {
-    const next = [];
-    for (let i = 0; i < h.length; i += 2)
-      next.push(i + 1 < h.length ? ctNodeHash(h[i], h[i + 1]) : h[i]);
-    h = next;
-  }
-  return h[0];
-}
-
-function _subproof(m, nodes, b) {
-  const n = nodes.length;
-  if (m === n) return b ? [] : [_merkleRootOf(nodes)];
-  let k = 1;
-  while (k * 2 < n) k *= 2; // k = largest power of 2 strictly less than n
-  if (m <= k) return _subproof(m, nodes.slice(0, k), b).concat([_merkleRootOf(nodes.slice(k))]);
-  return [_merkleRootOf(nodes.slice(0, k))].concat(_subproof(m - k, nodes.slice(k), false));
-}
-
-// Consistency proof over the retained window. fromSize/toSize are leaf counts
-// within the in-memory tree (0 ≤ from ≤ to ≤ windowLength); entries pruned past
-// the CT_MAX window cannot participate.
+// Over the FULL tree (lib/ct-tree): any 0 <= from <= to <= tree size works, also
+// for sizes whose entries have left the in-memory window. The old window
+// version put MTH(left) before the subproof and started with b=false, so none
+// of its proofs verified against a standard RFC 9162 verifier.
 function ctConsistencyProof(fromSize, toSize) {
-  if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) return null;
-  if (fromSize === 0 || fromSize === toSize) return [];
-  const leaves = ctWindow.entries.slice(0, toSize).map(e => e.leaf_hash);
-  return _subproof(fromSize, leaves, fromSize === leaves.length);
+  return ctTree.consistencyProof(fromSize, toSize);
 }
 
 // ── Fingerprint — out-of-band key verification ────────────────────────────────
@@ -1327,7 +1657,7 @@ function renderPrometheus() {
   // signing a second history, and a relay that has refused to sign has stopped
   // producing heads entirely. Both were invisible before: the first showed as
   // nothing at all, the second as a log that simply went quiet.
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctTree.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -1383,6 +1713,37 @@ function verifyTotp(token) {
   }
   return matched;
 }
+// Wrong TOTP codes per ACCOUNT on the signing-key routes (security review r2
+// (b)): nginx counted per address only, so a stolen session could guess from
+// many addresses. After TOTP_ACCOUNT_FREE wrong codes in an hour the account is
+// locked for 1 min, doubling with every further wrong code, up to an hour. A
+// right code clears the count. Fails closed when redis cannot answer.
+const TOTP_ACCOUNT_FREE = 5;
+const TOTP_FAIL_WINDOW_S = 3600;
+const TOTP_LOCK_BASE_MS = 60 * 1000;
+const TOTP_LOCK_MAX_MS = 60 * 60 * 1000;
+async function totpAccountLocked(userId) {
+  const ttl = await redisClient.pTTL(`paramant:user:totplock:${userId}`);
+  return ttl > 0 ? ttl : 0;
+}
+async function totpAccountFailed(userId) {
+  const k = `paramant:user:totpfail:${userId}`;
+  const n = await redisCounter.incrInWindow(redisClient, k, TOTP_FAIL_WINDOW_S);
+  if (n >= TOTP_ACCOUNT_FREE) {
+    const ms = Math.min(TOTP_LOCK_MAX_MS, TOTP_LOCK_BASE_MS * 2 ** (n - TOTP_ACCOUNT_FREE));
+    await redisClient.set(`paramant:user:totplock:${userId}`, '1', { PX: ms });
+    return ms;
+  }
+  return 0;
+}
+async function totpAccountOk(userId) {
+  await redisClient.del(`paramant:user:totpfail:${userId}`);
+}
+function totpLockedReply(res, ms) {
+  res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(ms / 1000)) });
+  return res.end(J({ error: 'totp_locked', retry_after: Math.ceil(ms / 1000) }));
+}
+
 async function verifyTotpGeneric(token, secret, opts = {}) {
   // Delegates to the extracted pure core; redisClient is the injected replay store.
   return totpLib.verifyTotpGeneric(token, secret, opts, redisClient);
@@ -1391,6 +1752,134 @@ async function verifyTotpGeneric(token, secret, opts = {}) {
 
 // ── Download tokens — one-time public download links
 const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
+
+// What became of a link, after the relay forgot it.
+//
+// downloadTokens and the blobs live in memory, so a relay restart, a burn or
+// the hourly sweep below all end in the same place: the token is unknown. The
+// receiver's page used to call every one of those "already downloaded", which
+// is false for an expired link and false for a link the relay lost in a
+// restart, and it sent the receiver back to a sender who believed the file had
+// arrived. So each token leaves a small record in redis: when it expires and,
+// later, whether it was downloaded or withdrawn. The key is a hash of the
+// token, never the token itself, and it holds no blob hash and no metadata.
+// It outlives the link by a week so "expired" stays answerable after expiry.
+// Without redis the answer is the honest "unknown".
+const DL_TOMB_GRACE_MS = 7 * 86_400_000;
+// One upload notification per file (hertest T4-11). Keyed on a hash of
+// account + meta.file_id, an hour long, capped so it cannot grow unbounded.
+const _gemeldeBestanden = new Map();
+function _alGemeld(account, fileId) {
+  if (!fileId) return false;
+  const k = crypto.createHash('sha256').update(String(account || '') + '|' + String(fileId)).digest('hex').slice(0, 32);
+  const now = Date.now();
+  const tot = _gemeldeBestanden.get(k);
+  if (tot && tot > now) return true;
+  if (_gemeldeBestanden.size > 5000) {
+    for (const [kk, t] of _gemeldeBestanden) { if (t <= now) _gemeldeBestanden.delete(kk); }
+    if (_gemeldeBestanden.size > 5000) _gemeldeBestanden.delete(_gemeldeBestanden.keys().next().value);
+  }
+  _gemeldeBestanden.set(k, now + 3_600_000);
+  return false;
+}
+// The download event, for every way a blob leaves: the link (claim + ack, or
+// the claimless GET) and GET /v2/outbound. /parasend and /pricing sell
+// "webhooks and mail on upload and download"; until now the download webhook
+// never existed and the download mail fired only on the API route, not when a
+// receiver used the link (SEND-33/34). One file mails once, like the upload.
+function _notifyDownloaded(entry, hash, opts) {
+  if (!entry) return;
+  try {
+    const ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
+    const once = entry.file_id ? !_alGemeld(entry.account_id, 'dl:' + entry.file_id) : true;
+    if (once && !(opts && opts.skipMail)) {
+      transferNotify.maybeNotify({ keyData: ownerKd, event: 'download', hashPrefix: hash, bytes: entry.size || 0, sendEmail: mailLater, lang: entry.lang || '' });
+    }
+    if (entry.device_id && entry.apiKey) {
+      pushWebhooks(entry.apiKey, entry.device_id, 'blob_downloaded', { hash, size: entry.size || 0, via: (opts && opts.via) || 'link' }).catch(() => {});
+    }
+  } catch (e) { log('warn', 'download_notify_failed', { err: e.message }); }
+}
+
+// A download in claim mode (?claim=) is only burned when the receiver's page
+// confirms it decrypted the file (POST /v2/dl/:token/ack). Until then the blob
+// stays, so an interrupted or slow download, or a key with one wrong character,
+// costs nothing. Two bounds keep that from turning into "readable forever":
+// one claim at a time with a lease, and at most DL_MAX_FETCHES fetches per
+// link, after which it burns as before.
+const DL_MAX_FETCHES = 5;
+// How long a claim stays held once the bytes are out, waiting for the ack.
+// Was three minutes, and a receiver who closed the tab mid-download and opened
+// the link again was told "already being downloaded" for all three (hertest
+// T4, new). The page now gives the claim back on close (sendBeacon release),
+// a tab of the same browser reuses its claim, and a lost release costs one
+// minute. Decrypting even a 30 MB file takes seconds.
+const DL_CLAIM_LEASE_MS = 60_000;
+const DL_CLAIM_RE = /^[a-f0-9]{32}$/;
+function _dlRk(token) {
+  return 'dl:tok:' + crypto.createHash('sha256').update('paramant-dl:' + token).digest('hex').slice(0, 40);
+}
+function dlRemember(token, expiresMs) {
+  if (!redisClient || !redisClient.isReady) return;
+  const px = Math.max(1000, expiresMs - Date.now()) + DL_TOMB_GRACE_MS;
+  Promise.resolve(redisClient.set(_dlRk(token), J({ e: expiresMs }), { PX: px })).catch(() => {});
+}
+function dlMarkGone(token, td, how) {
+  if (!redisClient || !redisClient.isReady) return;
+  const e = (td && td.expires_ms) || Date.now();
+  const px = Math.max(1000, e - Date.now()) + DL_TOMB_GRACE_MS;
+  Promise.resolve(redisClient.set(_dlRk(token), J({ e, g: how, at: Date.now() }), { PX: px })).catch(() => {});
+}
+// One of: downloaded | expired | withdrawn | exhausted | lost | unknown.
+async function dlWhyGone(token, td) {
+  const now = Date.now();
+  if (td) {
+    if (td.used) return td.gone || 'downloaded';
+    if (now > td.expires_ms) return 'expired';
+    return 'lost'; // the token is known but its blob is not: evicted or dropped
+  }
+  if (!redisClient || !redisClient.isReady) return 'unknown';
+  try {
+    const raw = await redisClient.get(_dlRk(token));
+    if (!raw) return 'unknown';
+    const rec = JSON.parse(raw);
+    if (rec.g) return rec.g;
+    if (now > rec.e) return 'expired';
+    return 'lost'; // created, never burned, not expired: this relay restarted
+  } catch (_) { return 'unknown'; }
+}
+const DL_GONE_TEXT = {
+  downloaded: 'This file has already been downloaded and burned',
+  expired: 'Link expired',
+  withdrawn: 'The sender withdrew this file',
+  exhausted: 'This link was tried too often and has been burned',
+  lost: 'The relay no longer holds this file (it was restarted or the file was removed); ask the sender to send it again',
+  unknown: 'Link not found: expired, already used, or never issued',
+};
+function dlGoneJson(res, reason) {
+  res.writeHead(reason === 'unknown' ? 404 : 410, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+  return res.end(J({ ok: false, error: DL_GONE_TEXT[reason] || DL_GONE_TEXT.unknown, reason }));
+}
+function dlGoneHtml(res, reason, status) {
+  res.writeHead(status || (reason === 'unknown' ? 404 : 410), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  return res.end(_dlBurnedPage(DL_GONE_TEXT[reason] || DL_GONE_TEXT.unknown));
+}
+// The one place a download token is burned, so the redis record cannot be
+// forgotten at a call site.
+// Five claimed fetches went out and none was confirmed, and nobody holds a
+// claim now: the next opening could only burn the link without delivering.
+// /info, release and a legacy GET say so up front (hertest r2 T4, new).
+function dlExhausted(td, now = Date.now()) {
+  return !!td && !td.used && (td.fetches || 0) >= DL_MAX_FETCHES
+    && !(td.claim && now < td.claim.until) && !td.in_progress;
+}
+
+function dlBurn(token, td, how) {
+  td.used = true;
+  td.gone = how || 'downloaded';
+  td.claim = null;
+  dlMarkGone(token, td, td.gone);
+}
 
 // ── DPA rate limiting — prevents spam/storage churn on the public sign-dpa endpoint
 const dpaIpRequests    = new Map(); // ip    → [timestamps]
@@ -1403,6 +1892,66 @@ setInterval(() => {
 
 // Known link-preview bots — serve safe HTML placeholder, never trigger burn
 const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
+// The download itself (/v2/dl/:token/get) is what an SDK or a script calls:
+// docs/api.md shows it with curl and Python. Blocking python-requests and
+// Go-http-client there answered 403 to exactly those clients (fase 1). Link
+// PREVIEWERS never call /get, they fetch the page above; they stay blocked
+// here too, in case one follows the button.
+const PREVIEW_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver/i;
+
+const DL_CONFIRM_JS = `'use strict';
+(function () {
+  var a = document.querySelector('a.btn[data-token]');
+  var st = document.getElementById('dl-state');
+  if (!a || !window.fetch || !window.crypto || !crypto.getRandomValues) return;
+  var tok = a.getAttribute('data-token');
+  if (!/^[a-f0-9]{48}$/.test(tok)) return;
+  var b = crypto.getRandomValues(new Uint8Array(16));
+  var claim = Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  var busy = false;
+  function say(m) { if (st) st.textContent = m; }
+  function release() {
+    var body = JSON.stringify({ claim: claim });
+    try { if (navigator.sendBeacon && navigator.sendBeacon('/v2/dl/' + tok + '/release', body)) return; } catch (e) {}
+    fetch('/v2/dl/' + tok + '/release', { method: 'POST', body: body, keepalive: true }).catch(function () {});
+  }
+  addEventListener('pagehide', function () { if (busy) release(); });
+  a.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    say('Downloading...');
+    fetch('/v2/dl/' + tok + '/get?claim=' + claim, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) {
+        busy = false;
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          say(r.status === 409 ? 'This file is being downloaded right now. Try again in a minute.'
+            : 'This link no longer works (' + ((j && j.reason) || r.status) + ').');
+        });
+      }
+      var total = Number(r.headers.get('Content-Length')) || 0;
+      return r.arrayBuffer().then(function (buf) {
+        if (total && buf.byteLength !== total) throw new Error('short');
+        return fetch('/v2/dl/' + tok + '/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claim: claim }) }).then(function () {
+          busy = false;
+          var url = URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' }));
+          var s = document.createElement('a');
+          s.href = url; s.download = 'paramant-encrypted-payload';
+          document.body.appendChild(s); s.click(); s.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+          a.hidden = true;
+          say('Downloaded. The copy on the relay is now deleted.');
+        });
+      });
+    }).catch(function () {
+      if (busy) release();
+      busy = false;
+      say('The download did not arrive in full. Nothing was deleted: try again.');
+    });
+  });
+})();
+`;
 
 function _dlConfirmPage(token, encMeta, sizeStr, ttlStr) {
   // encMeta is ciphertext only — relay never sees plaintext filename (finding #4)
@@ -1452,8 +2001,11 @@ h1{font-size:1.1rem;font-weight:600;margin-bottom:8px}
     <div class="meta-row"><span class="meta-label">Size</span><span class="meta-val">${sizeStr}</span></div>
     <div class="meta-row"><span class="meta-label">Expires in</span><span class="meta-val">${ttlStr}</span></div>
   </div>
-  <p class="warn">⚠ This file is deleted from the server immediately after download. You get one chance.</p>
-  <a class="btn" href="/v2/dl/${token}/get">Download &amp; Burn</a>
+  <p class="warn">This file is deleted from the server once it has arrived in full. A broken download costs nothing: try again.</p>
+  <a class="btn" href="/v2/dl/${token}#download" data-token="${token}" rel="nofollow">Download &amp; Burn</a>
+  <noscript><form method="post" action="/v2/dl/${token}/get"><button class="btn" type="submit">Download &amp; Burn</button></form></noscript>
+  <p class="sub" id="dl-state" role="status" aria-live="polite"></p>
+  <script src="/v2/dl/confirm.js" defer></script>
   <p class="footer">ML-KEM-768 encrypted · Zero plaintext stored · PARAMANT</p>
 </div>
 </body></html>`;
@@ -1770,11 +2322,22 @@ function ramStats() {
 //      in that the budget does not model -- a 5 MiB blob arrives base64'd inside
 //      a JSON body, so it is roughly 19 MB of transient buffers before it
 //      becomes a 5 MiB Buffer.
+//
+// THE SECOND QUESTION IS ANSWERED FROM OUR OWN BYTES NOW, not from RSS. RSS
+// does not come back down after a burst: glibc and V8 keep the freed pages for
+// reuse, so after one peak of fifty 5 MB uploads RSS stayed at ~1.1 GB with
+// 15 MB of blobs held, and this gate answered 503 to every upload from then on
+// (sweep-chaos 7, SENDNAME-09-RAM). Memory the allocator keeps is memory the
+// next upload reuses, so it is not a reason to refuse. What is modelled is
+// what this process is asked to hold: the blobs it keeps plus, for every
+// upload in flight and the one asking, the ~4x transient a base64 JSON body
+// costs on the way in. The sum still has to fit under RAM_LIMIT_MB +
+// RAM_RESERVE_MB, which scripts/check-guards.mjs holds below the cgroup limit.
 function ramOk() {
-  const { rssMB } = ramStats();
   const wouldHold = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB;
   if (wouldHold > BLOB_BUDGET_BYTES) return false;
-  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  const modelled = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB * 4;
+  if (modelled > (RAM_LIMIT_MB + RAM_RESERVE_MB) * 1048576) return false;
   return true;
 }
 
@@ -1877,6 +2440,97 @@ function accountVan(userId) {
 // Returns '' when the account cannot be named. The caller then says so rather
 // than dropping a document somebody is waiting on: an unnamed sender is a worse
 // row, an invisible request is a worse product.
+// A signature on the sender's envelope was refused because the SENDER's
+// monthly signatures are used up. Mail the sender (not the signer), at most
+// once a day per envelope. No account numbers, no envelope id in the mail.
+async function notifySenderQuota(envelopeId, accountId) {
+  const to = senderLabelOf(accountId);
+  if (!to || !redisClient || !redisClient.isReady) return false;
+  const k = 'paramant:sign:quota-notice:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
+  const first = await redisClient.set(k, '1', { NX: true, EX: 86400 });
+  if (first !== 'OK') return false;
+  const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const r = await mailer.stuur({
+    to,
+    // Both languages in the subject and a link in both halves; "handtekeningen
+    // op" instead of "tegoed", which reads as prepaid credit (acceptatie
+    // 3.1.1, taal #44).
+    subject: 'Een ondertekenaar kan nog niet tekenen: uw handtekeningen voor deze maand zijn op / A signer cannot sign yet: your signatures for this month are used up',
+    text: tweetaligTekst('nl',
+      'Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.'
+      + '\n\nKies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.'
+      + '\n\n' + base + '/pricing',
+      'Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.'
+      + '\n\nChoose a larger plan or wait until next month. Then the signer can sign with the same link.'
+      + '\n\n' + base + '/en/pricing'),
+    html: tweetaligHtml('nl',
+      '<p>Iemand wilde een document tekenen dat u verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is dus niet gezet. Het verzoek blijft open.</p>'
+      + '<p>Kies een groter plan of wacht tot volgende maand. Daarna kan de ondertekenaar met dezelfde link tekenen.</p>'
+      + '<p><a href="' + base + '/pricing">Plannen bekijken</a></p>',
+      '<p>Someone wanted to sign a document you sent, but your signatures for this month are used up. So the signature was not recorded. The request stays open.</p>'
+      + '<p>Choose a larger plan or wait until next month. Then the signer can sign with the same link.</p>'
+      + '<p><a href="' + base + '/en/pricing">See the plans</a></p>'),
+  });
+  log('info', 'sender_quota_notice', { delivered: !!(r && r.ok) });
+  return !!(r && r.ok);
+}
+
+// A signer asked for the invitation again. Only the sender's browser holds the
+// link with the key half that opens the document (sign-flow.js
+// rememberSignerLinks); no server has it. So the sender gets a mail with one
+// button, to the resend action for this signer in the dashboard, which builds
+// the invitation again in that browser exactly like the first one. At most
+// once an hour per envelope. The envelope id rides in the button: this mail
+// goes to the owner of the envelope, the one person who already has it.
+async function notifySenderLinkRequested(envelopeId, accountId, partyLabel, partyIndex) {
+  const to = senderLabelOf(accountId);
+  if (!to || !redisClient || !redisClient.isReady) return false;
+  const k = 'paramant:sign:link-request:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
+  // The NX key reserves the hour before the mail goes out, so two requests at
+  // once send one mail. It only stays when the mail was delivered: a failed
+  // mail gives the hour back (review-574 L1), otherwise a retry within the hour
+  // would answer "asked the sender" while nothing went out.
+  const first = await redisClient.set(k, '1', { NX: true, EX: 3600 });
+  if (first !== 'OK') return true; // told already within the hour
+  const giveBack = async () => { try { await redisClient.del(k); } catch (_) { /* expires within the hour */ } };
+  const who = veiligeBestandsnaam(partyLabel || '') || 'Een ondertekenaar';
+  const whoEn = veiligeBestandsnaam(partyLabel || '') || 'A signer';
+  const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const knop = base + '/dashboard?herzend=' + encodeURIComponent(String(envelopeId))
+             + '&p=' + encodeURIComponent(String(Number(partyIndex) || 0));
+  const knopHtml = (tekst) => '<p><a href="' + escHtml(knop) + '" style="display:inline-block;padding:11px 18px;'
+             + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">' + tekst + '</a></p>';
+  let r = null;
+  try {
+    r = await mailer.stuur({
+      to,
+      subject: 'Een ondertekenaar vraagt de uitnodiging opnieuw',
+      // Plain words, no "key" and no explanation of where it lives
+      // (acceptatie 3.1.1, taal #12): what to press, where, and the way out.
+      text: tweetaligTekst('nl',
+        `${who} vraagt de uitnodiging om te tekenen opnieuw. Alleen uw eigen browser kan die uitnodiging maken, zodat niemand anders het document kan openen.`
+        + '\n\nOpen deze link in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen:\n' + knop
+        + '\n\nDe ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer. Lukt het niet in die browser? Trek het verzoek dan in en stuur het opnieuw.',
+        `${whoEn} asks for the signing invitation again. Only your own browser can make that invitation, so nobody else can open the document.`
+        + '\n\nOpen this link in the browser you sent the request from and click Send the invitation again:\n' + knop
+        + '\n\nThe signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.'),
+      html: tweetaligHtml('nl',
+        `<p>${escHtml(who)} vraagt de uitnodiging om te tekenen opnieuw. Alleen uw eigen browser kan die uitnodiging maken, zodat niemand anders het document kan openen.</p>`
+        + '<p>Klik op de knop in de browser waarmee u het verzoek verstuurde, en daarna op Uitnodiging opnieuw sturen.</p>'
+        + knopHtml('Uitnodiging opnieuw sturen')
+        + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer. Lukt het niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
+        `<p>${escHtml(whoEn)} asks for the signing invitation again. Only your own browser can make that invitation, so nobody else can open the document.</p>`
+        + '<p>Click the button in the browser you sent the request from, then click Send the invitation again.</p>'
+        + knopHtml('Send the invitation again')
+        + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.</p>'),
+    });
+  } catch (_) { r = null; }
+  const delivered = !!(r && r.ok);
+  if (!delivered) await giveBack();
+  log('info', 'sender_link_request_notice', { delivered });
+  return delivered;
+}
+
 function senderLabelOf(accountId) {
   if (!accountId) return '';
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
@@ -1921,11 +2575,41 @@ function _termView(v, product) {
   return { tier: now.tier, paidUntil: last ? last.paidUntil : null };
 }
 
+// Where the checkout an account started last is remembered (see POST
+// /v2/billing/checkout and GET /v2/billing/last-payment).
+function _lastCheckoutKey(accountId) {
+  return `paramant:billing:last-checkout:${String(accountId).slice(0, 128)}`;
+}
+
+// Every paid term one product holds that still runs, highest tier first, as
+// [{ tier, until (ISO or null), bundle }]. What /account and /dashboard need to
+// say "Business until the 5th, then Firm until the 5th of the month after" in
+// one line per product, instead of two end dates with nothing between them
+// (betaaltest 05-10, row 8).
+function _runningTermsView(v, product) {
+  const now = Date.now();
+  return entitlements.termsOf(v, product)
+    .filter((t) => t.until === null || t.until > now)
+    .sort((a, b) => entitlements.tierRank(product, b.tier) - entitlements.tierRank(product, a.tier))
+    .map((t) => ({ tier: t.tier, until: t.until === null ? null : new Date(t.until).toISOString(), bundle: t.bundle || null }));
+}
+
 function entitlementRecordOf(accountId) {
   if (!accountId) return null;
   const acct = accounts.get(accountId);
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   return entitlements.mergeAccountRecord(acct, [...members].map(m => apiKeys.get(m)));
+}
+
+// The account's ParaSign entitlement, ONE reading for every ParaSign limit: the
+// party cap at envelope create and the signs gate on the sign path both ask it,
+// so a buyer can never be Business for one and the free floor for the other.
+// It reads plan_parasign (the field a Mollie purchase writes) through the
+// merged account record, falls back to the legacy plan on its own, and a lapsed
+// paid term falls to the floor. `fallback` is the record to read when the
+// account has none yet (a bare key).
+function parasignEntitlementOf(accountId, fallback) {
+  return entitlements.getEntitlements(entitlementRecordOf(accountId) || fallback || {}).parasign;
 }
 
 // May this account start new ParaSign API work? One answer for both doors: POST
@@ -2080,6 +2764,46 @@ const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest
 const relayRegisterIpRequests = new Map(); // ip → [timestamps] for /v2/relays/register (unauthenticated)
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
+// Streaming manifests of live inv_ hand-overs: inv id -> { owner, total, tokens, meta, expires }.
+const invManifests = new Map();
+const invRejections = new Map(); // inv id -> expires (ms)
+const INV_MANIFEST_TTL_MS = 60 * 60 * 1000;
+const INV_MANIFEST_MAX = 5000;
+// Memory bounds (review #555, M5): 5000 manifests of 100 000 tokens each, from
+// any free key, was a few GB of heap with nothing in front of an OOM. Now a
+// manifest lists at most 20 000 blocks (90 GB at 4.5 MB a block), an account
+// holds at most 5 live hand-overs, and all manifests together hold at most
+// 200 000 tokens.
+//
+// Fairness (herreview #560, M5): the 200 000 was one shared bucket, and three
+// free accounts filled it in seconds, after which every hand-over answered
+// 503 for up to an hour. Now an account has its own cap on live tokens (a free
+// account far less than a paid one), and free accounts together hold at most
+// half of the total, so paid hand-overs always find room. The env names exist
+// for the tests and deploy/.env.example; production runs on the defaults.
+const _invEnvInt = (raw, def) => { const n = parseInt(raw || '', 10); return Number.isFinite(n) && n > 0 ? n : def; };
+const INV_TOTAL_CHUNKS_MAX = 20000;
+const INV_MANIFESTS_PER_ACCOUNT = 5;
+const INV_TOKENS_TOTAL_MAX = _invEnvInt(process.env.INV_TOKENS_TOTAL_MAX, 200000);
+const INV_TOKENS_ACCOUNT_MAX = _invEnvInt(process.env.INV_TOKENS_ACCOUNT_MAX, INV_TOTAL_CHUNKS_MAX);
+const INV_TOKENS_FREE_ACCOUNT_MAX = _invEnvInt(process.env.INV_TOKENS_FREE_ACCOUNT_MAX, 2000);
+const INV_TOKENS_FREE_POOL_MAX = Math.floor(INV_TOKENS_TOTAL_MAX / 2);
+let invTokenCount = 0;
+let invFreeTokenCount = 0;
+const invTokensByOwner = new Map(); // owner -> live tokens over all its manifests
+function _invCountAdd(m, n) {
+  invTokenCount = Math.max(0, invTokenCount + n);
+  if (m.free) invFreeTokenCount = Math.max(0, invFreeTokenCount + n);
+  const left = (invTokensByOwner.get(m.owner) || 0) + n;
+  if (left > 0) invTokensByOwner.set(m.owner, left); else invTokensByOwner.delete(m.owner);
+}
+function _invDrop(k) {
+  const m = invManifests.get(k);
+  if (!m) return;
+  _invCountAdd(m, -m.tokens.size);
+  invManifests.delete(k);
+}
+setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) _invDrop(k); }, 60000).unref();
 
 // Eviction sweep for the limiter maps that lacked one (the other limiters already
 // self-evict). Without this they grow unbounded — slow memory/audit creep,
@@ -2182,7 +2906,7 @@ const envCreateLimits = new Map();        // apiKey  -> { count, resetAt }
 const envViewLimits   = new Map();        // ip      -> { count, resetAt }
 const envSignLimits   = new Map();        // ip      -> { count, resetAt }
 function envCreateRateOk(apiKey) {
-  return rateLimit.fixedWindowAllow(envCreateLimits, apiKey, 50, 3600_000);
+  return rateLimit.slidingWindowAllow(envCreateLimits, apiKey, ENV_CREATE_LIMIT, 3600_000);
 }
 function envViewRateOk(ip) {
   return rateLimit.fixedWindowAllow(envViewLimits, ip, 30, 60_000);
@@ -2190,27 +2914,45 @@ function envViewRateOk(ip) {
 function envSignRateOk(ip) {
   return rateLimit.fixedWindowAllow(envSignLimits, ip, 10, 60_000);
 }
+// POST /v2/verify without a key (hertest T3-12): stateless, reads nothing
+// stored, so the only cost is CPU. 20 a minute per address bounds that.
+const verifyLimits = new Map();           // ip      -> { count, resetAt }
+// IPv6 per /64, not per address: one customer line hands out a whole /64, and
+// counting per /128 let one caller use 2^64 budgets (review r2 (e)).
+function verifyRateKey(ip) {
+  const a = String(ip || '').replace(/^::ffff:(?=\d+\.)/i, '');
+  if (!a.includes(':')) return a;
+  const [head, tail = ''] = a.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const full = a.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return full.slice(0, 4).map((x) => (x || '0').toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+function verifyRateOk(ip) {
+  return rateLimit.fixedWindowAllow(verifyLimits, verifyRateKey(ip), 20, 60_000);
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of verifyLimits) if (now > v.resetAt + 60_000) verifyLimits.delete(k); }, 120_000);
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of envCreateLimits) if (now > v.resetAt + 60_000) envCreateLimits.delete(k);
+  for (const [k, v] of envCreateLimits) if (!Array.isArray(v) || !v.length || now > v[v.length - 1] + 3600_000) envCreateLimits.delete(k);
   for (const [k, v] of envViewLimits)   if (now > v.resetAt + 60_000) envViewLimits.delete(k);
   for (const [k, v] of envSignLimits)   if (now > v.resetAt + 60_000) envSignLimits.delete(k);
 }, 120_000);
 
 // Fleet-wide envelope-create rate limit. The per-process envCreateLimits above
 // only bound ONE relay instance; behind the multi-instance deployment a client
-// got N times the intended 50/hour. This shares the counter in redis: INCR a
-// per-key hourly bucket, EXPIRE it on first hit. Fails OPEN to the per-process
-// limiter when redis is down, so an outage never hard-blocks paying integrators
-// (they still get the local 50/hour cap). The bucket rolls hourly by wall clock.
+// got N times the intended 50/hour. This shares the window in redis. Fails OPEN
+// to the per-process limiter when redis is down, so an outage never hard-blocks
+// paying integrators (they still get the local 50/hour cap).
+// A sliding hour, not the clock hour (matrix API-20-N): the bucket rolled at
+// :00, so 50 creates at 10:59 and 50 more at 11:00 all passed against a docs
+// promise of 50 per hour. Answers { ok, retryAfterMs }.
 const ENV_CREATE_LIMIT = 50;
 async function envCreateRateOkShared(apiKey) {
   if (!redisClient || !redisClient.isReady) return envCreateRateOk(apiKey);
   try {
-    const bucket = Math.floor(Date.now() / 3600_000);
-    const rk = `paramant:rl:envcreate:${bucket}:${apiKey}`;
-    const n = await redisCounter.incrInWindow(redisClient, rk, 3600);
-    return n <= ENV_CREATE_LIMIT;
+    const rk = `paramant:rl:envcreate:sw:${crypto.createHash('sha256').update(String(apiKey)).digest('hex').slice(0, 32)}`;
+    return await rateLimit.slidingWindowAllowRedis(redisClient, rk, ENV_CREATE_LIMIT, 3600_000);
   } catch (e) {
     log('warn', 'env_create_rl_redis_fail', { err: e.message });
     return envCreateRateOk(apiKey);
@@ -2296,7 +3038,13 @@ function J(o) { return JSON.stringify(o); }
 // loopback. The edge configs now set the header everywhere, and
 // test/trusted-edge-gate.test.js keeps them that way; this is the lock on the
 // other side of that door, so a single missed nginx block is no longer a bypass.
-const getClientIp = clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS });
+// A request the admin makes for a user names that user's address in
+// X-Paramant-Client-IP, believed only next to a valid X-Internal-Auth. Without
+// it every admin-proxied call shared the admin container's address, and so one
+// envelope sign/view bucket for every customer. See lib/client-ip.js.
+const getClientIp = clientIpLib.withInternalClientIp(
+  clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS }),
+  { token: () => process.env.INTERNAL_AUTH_TOKEN, internalAuthOk: authGate.internalAuthOk });
 
 // ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
 function escHtml(s) {
@@ -2331,6 +3079,96 @@ function zeroBuffer(buf) {
     try { crypto.randomFillSync(buf); } catch {}
     try { buf.fill(0); } catch {}
   }
+}
+
+// ── Burn after delivery, never on the request ───────────────────────────────
+// A download without a claim (old SDKs, scripts, curl) used to be burned when
+// the request came in (/v2/outbound) or on 'finish' (/v2/dl), and a receiver
+// whose line broke lost the file (matrix API-24-K, API-30-K, API-35-K).
+// 'finish' only says the last byte left this process. What tells a complete
+// delivery from a broken one is the socket afterwards: a client that read
+// every byte closes cleanly (FIN) or keeps the connection for its next
+// request; a client that stopped early closes with unread bytes in its
+// buffer, and its kernel answers with a reset (ECONNRESET / EPIPE here).
+// But a reset after 'finish' cannot be told apart from a reader that took
+// every byte and then reset on purpose (SO_LINGER 0): putting the blob back
+// on that reset made burn-after-delivery repeatable without end (review #565,
+// B1). And a reader that stops 16 bytes short already has all the plaintext
+// (one AES-GCM stream, tag at the end). So once the last byte was written the
+// read counts, whatever the socket does next; only a download broken off
+// before 'finish' costs nothing, and those are bounded too (DL_MAX_FETCHES).
+// The bytes are hidden on 'finish' and destroyed after DELIVERY_SETTLE_MS or
+// on close. The one exception is a clean close inside that window on
+// /v2/outbound, which is what a proxy in front of us does when its client gave
+// up: the same key may fetch once more (onCleanCloseEarly), once per blob.
+// The claim mode (?claim= + ack on /v2/dl) stays the exact path.
+// hash -> { entry, key, until, timer }: see onCleanCloseEarly on GET /v2/outbound.
+const outboundRetryHold = new Map();
+const DELIVERY_SETTLE_MS = Math.max(0, parseInt(process.env.DELIVERY_SETTLE_MS || '3000', 10) || 0);
+function afterDelivery(req, res, { onFinish, onDelivered, onAborted, onCleanCloseEarly }) {
+  const sock = req.socket;
+  let state = 'sending'; // sending -> settling -> delivered | aborted
+  let timer = null;
+  const cleanup = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (sock) { sock.removeListener('error', onSockError); sock.removeListener('close', onSockClose); }
+  };
+  const abort = (why) => {
+    if (state === 'delivered' || state === 'aborted') return;
+    const wasSettling = state === 'settling';
+    state = 'aborted'; cleanup();
+    try { onAborted(why, wasSettling); } catch (e) { log('warn', 'delivery_abort_handler_failed', { err: e.message }); }
+  };
+  const deliver = () => {
+    if (state !== 'settling') return;
+    state = 'delivered'; cleanup();
+    try { onDelivered(); } catch (e) { log('warn', 'delivery_handler_failed', { err: e.message }); }
+  };
+  // After 'finish' a reset is a delivery, never an abort (see above).
+  function onSockError(e) { if (state === 'settling') return deliver(); abort((e && e.code) || 'socket_error'); }
+  function onSockClose(hadError) {
+    if (state === 'sending') return abort(hadError ? 'reset' : 'closed_before_finish');
+    if (hadError) return deliver();
+    // A clean close inside the window is what a complete download looks like,
+    // and also what a proxy in front of us does when ITS client gave up: the
+    // proxy had already read every byte, so no reset reaches us. A caller
+    // that can tell its own receiver apart (the API key) may hold the bytes
+    // for a retry instead.
+    if (state === 'settling' && onCleanCloseEarly) {
+      state = 'delivered'; cleanup();
+      try { onCleanCloseEarly(); } catch (e) { log('warn', 'delivery_close_handler_failed', { err: e.message }); }
+      return;
+    }
+    deliver();
+  }
+  if (sock) { sock.on('error', onSockError); sock.on('close', onSockClose); }
+  res.on('finish', () => {
+    if (state !== 'sending') return;
+    state = 'settling';
+    try { if (onFinish) onFinish(); } catch (e) { log('warn', 'delivery_finish_handler_failed', { err: e.message }); }
+    if (!sock || sock.destroyed) return deliver();
+    timer = setTimeout(deliver, DELIVERY_SETTLE_MS);
+    if (timer.unref) timer.unref();
+  });
+  res.on('close', () => { if (!res.writableFinished) abort('closed_before_finish'); });
+}
+// Writes a buffer in pieces, each only after the socket took the last one, so
+// 'finish' cannot fire while a reader that stopped early still has megabytes
+// to go (measured on loopback with one res.end(blob)).
+function writeInPieces(res, blob) {
+  const PIECE = 64 * 1024;
+  let off = 0;
+  const pump = () => {
+    while (off < blob.length) {
+      if (res.destroyed) return;
+      const end = Math.min(blob.length, off + PIECE);
+      const more = res.write(blob.subarray(off, end));
+      off = end;
+      if (!more) { res.once('drain', pump); return; }
+    }
+    res.end();
+  };
+  pump();
 }
 
 // ── HKDF-SHA256 — compatible met Python cryptography library ──────────────────
@@ -2664,24 +3502,49 @@ let _usersWriteQueue = Promise.resolve();
 // Atomic write: tmp + rename eliminates the O_TRUNC window where a concurrent
 // reader sees an empty file mid-write. Combined with the sanity check in
 // /v2/reload-users this prevents the apiKeys-wipe race on plan_change.
+//
+// fsync before the rename, so a power cut cannot leave a renamed but empty
+// file. The directory is created when missing.
 async function _atomicWriteUsers(data) {
-  const tmp = `${USERS_FILE}.tmp.${process.pid}.${Date.now()}`;
-  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2));
-  await fs.promises.rename(tmp, USERS_FILE);
+  await fs.promises.mkdir(nodePath.dirname(nodePath.resolve(USERS_FILE)), { recursive: true });
+  const tmp = `${USERS_FILE}.tmp.${process.pid}.${Date.now()}.${crypto.randomBytes(3).toString('hex')}`;
+  const fh = await fs.promises.open(tmp, 'w', 0o600);
+  try {
+    await fh.writeFile(JSON.stringify(data, null, 2));
+    await fh.sync();
+  } finally { await fh.close(); }
+  try { await fs.promises.rename(tmp, USERS_FILE); }
+  catch (e) { await fs.promises.unlink(tmp).catch(() => {}); throw e; }
+}
+// The returned promise REJECTS when the write fails, so a caller's
+// `.then(() => log(..., persisted: true))` only runs when it is true. It used
+// to resolve either way: on a fresh relay users.json did not exist, every
+// write failed with ENOENT, and the log still said persisted:true. The queue
+// itself never stays rejected, so one failure does not block the next write.
+function _queueUsersWrite(job) {
+  const run = _usersWriteQueue.then(job);
+  _usersWriteQueue = run.catch(e => log('error', 'users_write_error', { err: e.message, file: USERS_FILE }));
+  return run;
 }
 function _writeUsersJson(data) {
-  _usersWriteQueue = _usersWriteQueue.then(() => _atomicWriteUsers(data))
-    .catch(e => log('warn', 'users_write_error', { err: e.message }));
-  return _usersWriteQueue;
+  return _queueUsersWrite(() => _atomicWriteUsers(data));
 }
 function _mutateUsersJson(fn) {
-  _usersWriteQueue = _usersWriteQueue.then(async () => {
-    const raw = await fs.promises.readFile(USERS_FILE, 'utf8');
-    const data = JSON.parse(raw);
+  return _queueUsersWrite(async () => {
+    let data;
+    try {
+      data = JSON.parse(await fs.promises.readFile(USERS_FILE, 'utf8'));
+    } catch (e) {
+      // Missing is a fresh relay: start empty. Unreadable or corrupt is not
+      // ours to overwrite; refuse, loudly.
+      if (e.code !== 'ENOENT') throw e;
+      data = { api_keys: [] };
+    }
+    if (!data || typeof data !== 'object') throw new Error('users.json is not an object');
+    if (!Array.isArray(data.api_keys)) data.api_keys = [];
     fn(data);
     await _atomicWriteUsers(data);
-  }).catch(e => log('warn', 'users_write_error', { err: e.message }));
-  return _usersWriteQueue;
+  });
 }
 
 // ── Billing auto-grant: paid Pro plan → parasign entitlement ──────────────
@@ -2706,6 +3569,13 @@ function grantParasignOnPaidPlan(accountId) {
     .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
   return { ok: true, keys: members.size, changed };
 }
+
+// ── Billing ledger: every settled Mollie payment id, durable ──────────────
+const { BillingLedger, backfillLedger } = require('./lib/billing-ledger');
+const webhookSign = require('./lib/webhook-sign');
+const BILLING_LEDGER_FILE = process.env.BILLING_LEDGER_FILE
+  || nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'billing-processed.jsonl');
+const billingLedger = new BillingLedger(BILLING_LEDGER_FILE, log).load();
 
 // ── Per-product entitlement setter (billing) ──────────────────────────────
 // Set ONE product's plan (plan_parasign OR plan_parasend) for an account,
@@ -2747,13 +3617,17 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
       };
     }
   }
+  // shorten: a reversal taking back one paid period (lib/billing revoke).
+  // It must also travel to the other containers, whose merge only ever keeps
+  // the longer term, so the shared row is published as a replacement.
+  const _applyOpts = (opts && opts.shorten) ? { shorten: true } : undefined;
   let changed = 0;
   for (const m of members) {
     const mv = apiKeys.get(m);
     if (!mv) continue;
     // Single field-level rule (writes only this product's field + the parasign
     // access flag; never the other product or the unified `plan`).
-    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle).changed) changed++;
+    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle, _applyOpts).changed) changed++;
   }
   // Mirror onto the accounts summary too. Readers that only hold an account_id
   // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
@@ -2761,7 +3635,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   // outvote a paid grant on any future read path either.
   const _acct = accounts.get(accountId);
   if (_acct) {
-    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle);
+    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle, _applyOpts);
     _acct.plan_updated = new Date().toISOString();
   }
   // paidUntil is passed on to the DISK write as well. Without it the period
@@ -2772,7 +3646,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   _mutateUsersJson(ud => {
     for (const entry of ud.api_keys) {
       if ((entry.account_id || entry.key) === accountId) {
-        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle);
+        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle, _applyOpts);
         entry.plan_updated = new Date().toISOString();
       }
     }
@@ -2791,7 +3665,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   // which is where both customer grant paths land -- the Mollie webhook and
   // POST /v2/billing/redeem -- while every screen and the ParaSign signature
   // gate are served off relay-health by the admin plane. See lib/shared-grants.
-  _publishSharedGrant(accountId);
+  _publishSharedGrant(accountId, _applyOpts ? { replace: true } : undefined);
   return { ok: true, product, tier: norm, keys: members.size, changed };
 }
 
@@ -2801,11 +3675,17 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
 // as _indexAccountExpiry does, so a grant that left one product alone publishes
 // what is really on file for both. Fire-and-forget: a redis outage may delay the
 // other containers, never the grant itself.
-function _publishSharedGrant(accountId) {
+function _publishSharedGrant(accountId, popts) {
   if (!redisClient || !redisClient.isReady || !accountId) return;
   const rec = entitlementRecordOf(accountId);
   if (!rec) return;
-  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec))
+  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec, popts))
+    .then((r) => {
+      // Remember the replacement we wrote ourselves, so our own subscriber
+      // does not apply it a second time.
+      if (r && r.ok && r.replacedAt) _markGrantReplaced(accountId, r.replacedAt);
+      return r;
+    })
     .then((r) => {
       if (!r || r.ok) return;
       log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: r.error });
@@ -2829,14 +3709,45 @@ function _publishSharedGrant(accountId) {
 // this account has no paid term at all. That is the ONE downgrade this path
 // applies, and it exists because the container that took the money back is not
 // the container the customer's screens are served from.
-function _hydrateSharedGrant(accountId, grant, revoked) {
+// The newest shared-row replacement this container has applied, per account.
+// In memory and on the key records (grant_replaced_at), so a restart does not
+// re-apply an old replacement over a newer grant.
+function _grantReplacedAt(accountId) {
+  const rec = entitlementRecordOf(accountId);
+  return (rec && rec.grant_replaced_at) || '';
+}
+function _markGrantReplaced(accountId, at) {
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) { const mv = apiKeys.get(m); if (mv) mv.grant_replaced_at = at; }
+  const acct = accounts.get(accountId);
+  if (acct) acct.grant_replaced_at = at;
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) if ((entry.account_id || entry.key) === accountId) entry.grant_replaced_at = at;
+  }).catch(we => log('warn', 'shared_grant_persist_failed', { err: we.message }));
+}
+
+function _hydrateSharedGrant(accountId, grant, revoked, replacedAt) {
   if (!accountId || (!grant && !revoked)) return [];
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   if (members.size === 0) return [];
   // Decide once, against the account's best current grant, so five member keys
   // do not each answer the question differently.
   const merged = { ...(entitlementRecordOf(accountId) || {}) };
-  const moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
+  let moved;
+  if (grant && replacedAt && replacedAt > _grantReplacedAt(accountId)) {
+    // A replacement (a reversal that shortened a term): the row is the fact,
+    // copied as it is. A merge would keep this container's longer term, which
+    // is the month the customer took his money back for.
+    moved = [];
+    for (const product of entitlements.PRODUCTS) {
+      const before = JSON.stringify(entitlements.termsOf(merged, product));
+      entitlements.copyProductGrant(merged, grant, product);
+      if (JSON.stringify(entitlements.termsOf(merged, product)) !== before) moved.push(product);
+    }
+    _markGrantReplaced(accountId, replacedAt);
+  } else {
+    moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
+  }
   if (moved.length === 0) return [];
   for (const product of moved) {
     // The decision was taken on `merged`; every store gets exactly that, every
@@ -2871,7 +3782,7 @@ async function _pullSharedGrant(accountId) {
   if (!redisClient || !redisClient.isReady || !accountId) return [];
   const row = await sharedGrants.readRow(redisClient, accountId);
   if (!row) return [];
-  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt);
+  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt, row.replacedAt);
 }
 
 // One reconciliation pass, both directions, over the accounts that have a term.
@@ -2918,7 +3829,7 @@ async function _reseedSharedGrants() {
   // longer be handing out.
   let hydrated = 0;
   for (const [accountId, row] of shared) {
-    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt).length) hydrated++;
+    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt, row.replacedAt).length) hydrated++;
   }
   return hydrated;
 }
@@ -3238,6 +4149,12 @@ let _sellerVatWarned = false;
 // produce a second invoice, and a first attempt that lost redis gets a second
 // chance instead of leaving the customer with nothing. Never throws: an
 // entitlement that was granted must not be undone by paperwork.
+// The language an account last bought in, 'nl' or 'en' (acceptatie 3.1.1,
+// betalen punt 5). Set when a checkout starts, read when the invoice for that
+// payment, or a later renewal of it, is issued. Not personal data and not part
+// of the Mollie payload, so the /dpa row for Mollie stays what it is.
+function _buyerLangKey(accountId) { return 'paramant:billing:buyer-lang:' + String(accountId); }
+
 async function _issueInvoiceForPayment(payment, outcome) {
   try {
     const md = (payment && payment.metadata) || {};
@@ -3261,6 +4178,10 @@ async function _issueInvoiceForPayment(payment, outcome) {
       });
     }
     const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+    // The language the buyer bought in (kept at checkout, never sent to
+    // Mollie): the document, its line and its mail follow it.
+    let lang = null;
+    try { lang = redis && md.accountId ? await redis.get(_buyerLangKey(md.accountId)) : null; } catch { lang = null; }
     const out = await invoiceMod.issueDocument({
       payment,
       order: Object.assign({ accountId: md.accountId }, order),
@@ -3268,6 +4189,7 @@ async function _issueInvoiceForPayment(payment, outcome) {
       buyer: await _billingBuyerOf(md.accountId),
       periodEnd: outcome && outcome.paidUntil,
       vat: vatTerms,
+      lang,
     }, redis);
 
     // The invoice exists, so the VIES proof it rests on is kept as long as the
@@ -3412,6 +4334,23 @@ function _persistParaSignScope(key, { parasign, plan } = {}) {
   return { ok: true };
 }
 
+// Where sign_url and the receipt's relay_pubkey_url point when the operator
+// set no PARASIGN_PUBLIC_ORIGIN (P10 API-16-N). It used to be paramant.app on
+// every relay, so a self-host without the variable handed its signers links to
+// the hosted service and told verifiers to fetch the hosted relay's key. The
+// next operator-set value is this relay's own public URL (RELAY_SELF_URL,
+// never a request header, so it cannot be spoofed); paramant.app is left only
+// for a relay that names neither, and that relay says so once at start.
+function parasignFallbackOrigin() {
+  // A paramant.app RELAY_SELF_URL is the hosted fleet (or compose's default for
+  // an unset variable): that keeps https://paramant.app, exactly as before.
+  if (RELAY_SELF_URL && /^https:\/\/[^/\s]+/i.test(RELAY_SELF_URL)
+      && !/^https:\/\/([a-z0-9-]+\.)*paramant\.app(\/|:|$)/i.test(RELAY_SELF_URL)) {
+    return RELAY_SELF_URL.replace(/\/+$/, '');
+  }
+  return 'https://paramant.app';
+}
+
 // -- ParaSign /v1 key issuance -- THE single generator -------------------------
 // Used by BOTH /v2/user/parasign-keys (self-serve) and /v2/admin/keys/mint-parasign
 // (admin), so there is exactly one psk_ format + one storage path (no drift).
@@ -3438,8 +4377,7 @@ function mintParasignKey(accountId, opts = {}) {
   // atomic in the event loop, the same property the /v2/admin/keys mint relies
   // on. Throws rather than answering, because the two callers own their own
   // response shape; both map `code` to a 402.
-  const _capPlan = tiers.normalisePlan((acct && acct.plan) || plan);
-  const _cap = ACCOUNT_KEY_LIMIT[_capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+  const { plan: _capPlan, cap: _cap } = accountKeyCap(accountId, (acct && acct.plan) || plan);
   const _active = [...(accountKeys.get(accountId) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
   if (_active >= _cap) {
     const e = new Error(`Account key limit reached (${_cap} keys on the ${_capPlan} plan).`);
@@ -3500,7 +4438,9 @@ function mintParasignKey(accountId, opts = {}) {
   // The same pass the pgp_ mint runs. Without it a psk_ key was invisible to
   // over_limit until the next reload-users, which is only ever manual.
   applyKeyLimitEnforcement();
-  return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+  // plan is the legacy unified plan; plan_parasign is the ParaSign tier this
+  // key works under, which is what a ParaSign key page shows (P10 API-05-A).
+  return { key, kid, account_id: accountId, plan: record.plan, plan_parasign: record.plan_parasign || null, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
 }
 
 // A mint refused by a cap is a 402 with the numbers, not a 400 or a 500. Shared
@@ -3510,6 +4450,50 @@ function keyCapReject(err, res) {
   res.writeHead(402, { 'Content-Type': 'application/json' });
   res.end(J({ error: err.message, current_keys: err.current, max_keys: err.cap === Infinity ? null : err.cap, upgrade_url: 'https://paramant.app/pricing' }));
   return true;
+}
+
+// ── One-time setup token (first-run wizard) ──────────────────────────────
+// /v2/setup/apply used to be open to anyone while the relay had no keys. The
+// token is made from fresh random bytes on every start of a relay that still
+// needs setup and written next to users.json (mode 0600), so only someone with
+// the volume can finish setup. PARAMANT_SETUP_TOKEN pins it from the
+// environment instead.
+//
+// An existing setup-token file is NEVER read: a file that was already there
+// may come from a git checkout (one was committed once, review #555 B3) or
+// from anyone else who could write the directory. It is replaced, atomically,
+// and the log says only that the file exists, never the token.
+const SETUP_TOKEN_FILE = nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'setup-token');
+let _setupTokenValue = null;
+function _setupToken() { return process.env.PARAMANT_SETUP_TOKEN || _setupTokenValue; }
+function _writeSetupTokenFile(value) {
+  const tmp = SETUP_TOKEN_FILE + '.' + process.pid + '.' + crypto.randomBytes(4).toString('hex') + '.tmp';
+  try {
+    fs.writeFileSync(tmp, value + '\n', { mode: 0o600, flag: 'wx' });
+    fs.chmodSync(tmp, 0o600);
+    fs.renameSync(tmp, SETUP_TOKEN_FILE);
+    return true;
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}
+    log('warn', 'setup_token_file_not_written', { err: e.message, file: SETUP_TOKEN_FILE });
+    return false;
+  }
+}
+function _initSetupToken() {
+  if (process.env.PARAMANT_SETUP_TOKEN) return;
+  if (apiKeys.size > 0 && process.env.SETUP_MODE !== 'true') return;
+  _setupTokenValue = 'pst_' + crypto.randomBytes(24).toString('hex');
+  const written = _writeSetupTokenFile(_setupTokenValue);
+  log('info', 'setup_token_ready', {
+    file: written ? SETUP_TOKEN_FILE : null,
+    hint: written
+      ? 'First-run setup: open /setup and paste the token from this file (mode 0600). It stops working once setup is done.'
+      : 'First-run setup: the token file could not be written; set PARAMANT_SETUP_TOKEN or fix the data directory and restart.',
+  });
+}
+function _setupTokenConsumed() {
+  _setupTokenValue = null;
+  try { fs.unlinkSync(SETUP_TOKEN_FILE); } catch {}
 }
 
 function loadUsers() {
@@ -3532,7 +4516,28 @@ function loadUsers() {
     keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
     rebuildApiKeyHashIndex();
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
-  } catch(e) { log('warn', 'no_users_file'); }
+  } catch(e) {
+    if (e.code === 'ENOENT') {
+      // A fresh relay: create the file now, so the first key minted through
+      // the API or the setup wizard has somewhere to land. Before this the
+      // file never existed, every persist failed, and a restart dropped every
+      // key made since boot (the setup admin key included).
+      try {
+        fs.mkdirSync(nodePath.dirname(nodePath.resolve(USERS_FILE)), { recursive: true });
+        const tmp = `${USERS_FILE}.tmp.${process.pid}.init`;
+        fs.writeFileSync(tmp, JSON.stringify({ api_keys: [], updated: new Date().toISOString() }, null, 2), { mode: 0o600 });
+        fs.renameSync(tmp, USERS_FILE);
+        log('info', 'users_file_created', { file: USERS_FILE });
+      } catch (ce) {
+        log('error', 'users_file_not_writable', {
+          err: ce.message, file: USERS_FILE,
+          hint: 'Keys made through the API will not survive a restart. Point USERS_FILE at a writable volume.',
+        });
+      }
+    } else {
+      log('error', 'users_file_unreadable', { err: e.message, file: USERS_FILE });
+    }
+  }
 }
 
 function loadTrialKeys() {
@@ -3657,8 +4662,64 @@ async function safeHttpsRequest(urlStr, opts = {}) {
 }
 
 // ── Webhook push ──────────────────────────────────────────────────────────────
+// Webhook registrations live in redis too (API-26-K): the in-memory map was
+// lost on every restart and not shared between the sector relays, so a
+// registration silently stopped working after a deploy. Memory is the cache.
+const _webhookRedisKey = (k) => 'paramant:webhooks:' + crypto.createHash('sha256').update(k).digest('hex').slice(0, 40);
+// Bounded on every axis (review #555, H3): redis runs with noeviction, so an
+// unbounded registration list was a way for one key to fill it and turn every
+// write of every customer into an error. Per device: a short list. Per
+// account: a cap on device ids. In total: a cap over all accounts. And every
+// registration expires unless it is registered again.
+const WEBHOOK_URL_MAX = 512;
+const WEBHOOK_DEVICE_ID_MAX = 128;
+const WEBHOOK_PER_DEVICE = Math.max(1, parseInt(process.env.WEBHOOK_PER_DEVICE || '5', 10));
+const WEBHOOK_DEVICES_PER_ACCOUNT = Math.max(1, parseInt(process.env.WEBHOOK_DEVICES_PER_ACCOUNT || '20', 10));
+const WEBHOOK_TOTAL_MAX = Math.max(1, parseInt(process.env.WEBHOOK_TOTAL_MAX || '20000', 10));
+const WEBHOOK_TTL_S = Math.max(60, parseInt(process.env.WEBHOOK_TTL_S || String(90 * 86400), 10));
+const _webhookAcctKey = (acct) => 'paramant:webhooks:acct:' + crypto.createHash('sha256').update(String(acct)).digest('hex').slice(0, 40);
+const WEBHOOK_ALL_KEY = 'paramant:webhooks:all';
+// KEYS: account zset, global zset, device list. ARGV: now ms, expiry ms,
+// device member, per-account cap, total cap, entry json, per-device cap, ttl s.
+// Returns 1 stored, -1 account cap, -2 total cap.
+const WEBHOOK_REGISTER_LUA = `
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
+local gm = KEYS[1] .. '|' .. ARGV[3]
+if not redis.call('ZSCORE', KEYS[1], ARGV[3]) then
+  if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[4]) then return -1 end
+  if redis.call('ZCARD', KEYS[2]) >= tonumber(ARGV[5]) then return -2 end
+end
+redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
+redis.call('ZADD', KEYS[2], ARGV[2], gm)
+redis.call('RPUSH', KEYS[3], ARGV[6])
+redis.call('LTRIM', KEYS[3], -tonumber(ARGV[7]), -1)
+redis.call('EXPIRE', KEYS[3], ARGV[8])
+redis.call('EXPIRE', KEYS[1], ARGV[8])
+return 1`;
+// The in-memory cache obeys the same caps, for a relay without redis.
+function _webhookMemAllowed(k, acct) {
+  if (webhooks.has(k)) return 0;
+  if (webhooks.size >= WEBHOOK_TOTAL_MAX) return -2;
+  let n = 0;
+  const suffix = ':' + acct;
+  for (const key of webhooks.keys()) if (key.endsWith(suffix) && ++n >= WEBHOOK_DEVICES_PER_ACCOUNT) return -1;
+  return 0;
+}
+async function _webhooksFor(k) {
+  // Redis is the store when there is one (its TTLs and caps hold); the
+  // in-memory map is only for a relay without redis.
+  if (redisClient && redisClient.isReady) {
+    try {
+      const raw = await redisClient.lRange(_webhookRedisKey(k), -WEBHOOK_PER_DEVICE, -1);
+      const list = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((h) => h && typeof h.url === 'string');
+      if (list.length) return list;
+    } catch { /* fall back to memory */ }
+  }
+  return webhooks.get(k) || [];
+}
 async function pushWebhooks(apiKey, deviceId, event, data) {
-  const hooks = webhooks.get(`${deviceId}:${acctOf(apiKey)}`) || [];
+  const hooks = await _webhooksFor(`${deviceId}:${acctOf(apiKey)}`);
   for (const hook of hooks) {
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
     try {
@@ -3673,7 +4734,8 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
         method:  'POST',
         timeout: 5000,
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
-                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, 'User-Agent': `paramant-relay/${VERSION}` },
+                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, ...webhookSign.signatureHeaders(hook.secret, payload),
+                   'User-Agent': `paramant-relay/${VERSION}` },
         body: payload,
       });
       stats.webhooks_sent++;
@@ -3775,6 +4837,16 @@ function authByDid(didStr, signature, ctx) {
   return null;
 }
 
+// The invite token of a co-sign link. The page sends it in a header, so it
+// stays out of request lines and access logs. ?t= is still read for a page
+// that was loaded before this change.
+function inviteTokenFrom(req, query) {
+  const h = req && req.headers ? req.headers['x-parasign-invite-token'] : '';
+  const fromHeader = (Array.isArray(h) ? h[0] : h) || '';
+  if (fromHeader) return String(fromHeader);
+  return (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+}
+
 // ── CORS ──────────────────────────────────────────────────────────────────────
 function isAllowedOrigin(origin) {
   if (!origin) return false;
@@ -3789,11 +4861,17 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce, X-Parasign-Invite-Token');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
-  res.setHeader('Strict-Transport-Security',    'max-age=63072000; includeSubDomains; preload');
+  // No Strict-Transport-Security from the relay (CT-DEDUP, second round). The
+  // relay speaks plain HTTP behind a TLS edge, a browser ignores HSTS on plain
+  // HTTP, and the edge (deploy/caddy/Caddyfile, nginx-selfhost.conf) already
+  // sets it. Sending it here doubled the header on every relay answer: measured
+  // 2026-10-06, /health on all six hosts carried it twice. A relay exposed
+  // over TLS without an edge can ask for it with RELAY_SEND_HSTS=1.
+  if (process.env.RELAY_SEND_HSTS === '1') res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   res.setHeader('Referrer-Policy',              'no-referrer');
   // A relay answers json to script, never inside a frame. frame-ancestors in
   // the CSP above already says so to a current browser; this is the same
@@ -3835,14 +4913,11 @@ function ctAppendEvent(eventType, did, payload) {
     .update(eventType).update('|').update(did).update('|')
     .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(did, valueHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('did_event', { index, type: eventType, leaf_hash, tree_hash, did, payload: gatedPayload, ts, proof });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -3879,7 +4954,19 @@ if (_static.serveFrontend) log('info', 'static_serving_enabled', { root: _static
 //
 // Redis unreachable is 503 (the service could not answer, the caller did
 // nothing wrong); anything else is 500.
+// Requests in flight, for the drain on SIGTERM (see _onExitSignal).
+let _inFlightRequests = 0;
+let _draining = false;
 const server = http.createServer((req, res) => {
+  if (_draining) {
+    // Shutting down: tell the client to come back rather than half-handle it.
+    res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '2', 'Connection': 'close' });
+    return res.end(J({ error: 'restarting', retry_after_s: 2 }));
+  }
+  _inFlightRequests++;
+  let done = false;
+  const finish = () => { if (!done) { done = true; _inFlightRequests--; } };
+  res.on('finish', finish); res.on('close', finish);
   handleRelayRequest(req, res).catch((err) => relayRequestFailed(req, res, err));
 });
 
@@ -4009,7 +5096,7 @@ async function handleRelayRequest(req, res) {
     res.writeHead(402, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       error: 'This relay has reached its user limit. Please contact the relay operator.',
-      operator_hint: 'Relay operators: add PARAMANT_LICENSE=plk_... to .env to unlock unlimited users. See https://paramant.app/pricing',
+      operator_hint: 'Relay operators: add PLK_KEY=plk_... to .env to unlock unlimited users. See https://paramant.app/pricing',
       docs: 'https://github.com/Apolloccrypt/paramant-relay#license--pricing'
     }));
   }
@@ -4102,11 +5189,12 @@ async function handleRelayRequest(req, res) {
     const _host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
     const _hostOk = /^([a-z0-9-]+\.)*paramant\.app$/i.test(_host);
     const _publicOrigin = process.env.PARASIGN_PUBLIC_ORIGIN
-      || (_hostOk ? `https://${_host}` : 'https://paramant.app');
+      || (_hostOk ? `https://${_host}` : parasignFallbackOrigin());
     return parasignOpenApi.route({
       req, res, method: req.method, path, query, clientIp,
       authHeader: req.headers['authorization'] || '',
       publicOrigin: _publicOrigin,
+      relayId: RELAY_SELF_URL || _publicOrigin,
       apiKeys,
       // The ACCOUNT's right to start new work, asked before every new envelope
       // and not only when a key is minted: the scope on a psk_ key outlives a
@@ -4154,11 +5242,18 @@ async function handleRelayRequest(req, res) {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     const adminOk  = adminTok && safeEqual(adminTok, process.env.ADMIN_TOKEN || '');
     const ram = ramStatus();
+    // With redis as the store a registration lives only there (review #555,
+    // H3) and the in-memory map stays empty, so counting the map reported 0.
+    // Count the unexpired account|device entries in the global set instead.
+    let webhookCount = [...webhooks.values()].flat().length;
+    if (adminOk && redisClient && redisClient.isReady) {
+      try { webhookCount = await redisClient.zCount(WEBHOOK_ALL_KEY, Date.now(), '+inf'); } catch (_) {}
+    }
     const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION,
       max_keys: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS,
       ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at, license_issued_to: LICENSE_PAYLOAD.issued_to } : {}) };
     const full = { ...base, ...ram, pubkeys: pubkeys.size,
-      webhooks: [...webhooks.values()].flat().length, stats,
+      webhooks: webhookCount, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
       encryption: 'ML-KEM-768 + ECDH P-256 + AES-256-GCM',
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ML-DSA-65 unavailable: signing disabled',
@@ -4168,7 +5263,8 @@ async function handleRelayRequest(req, res) {
       jurisdiction: 'EU/DE, GDPR, no US CLOUD Act',
       edition: EDITION,
       key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS,
-      active_keys: [...apiKeys.values()].filter(k => k.active !== false).length };
+      active_keys: [...apiKeys.values()].filter(k => k.active !== false).length,
+      fleet_gossip: fleetGossipState() };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));
   }
@@ -4301,6 +5397,14 @@ async function handleRelayRequest(req, res) {
   function _setupModeOn() {
     return apiKeys.size === 0 || process.env.SETUP_MODE === 'true';
   }
+  function _setupAuthorized(rq) {
+    const given = String(rq.headers['x-setup-token'] || '');
+    const adminGiven = String(rq.headers['x-admin-token'] || '');
+    const eq = (a, b) => a.length > 0 && b.length > 0 && a.length === b.length
+      && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    const tok = _setupToken();
+    return (tok && eq(given, tok)) || (eq(adminGiven, process.env.ADMIN_TOKEN || ''));
+  }
 
   // GET /v2/setup/check -- is the relay in first-time setup mode?
   if (req.method === 'GET' && path === '/v2/setup/check') {
@@ -4341,6 +5445,14 @@ async function handleRelayRequest(req, res) {
     if (!_setupModeOn()) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Setup is already complete on this relay.' }));
+    }
+    // Not anonymous. A fresh relay is reachable before its operator gets to
+    // it, and whoever posted here first walked off with an enterprise key.
+    // The operator proves ownership with the one-time setup token the relay
+    // printed in its log and wrote next to users.json, or with ADMIN_TOKEN.
+    if (!_setupAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'setup_token_required', detail: 'Send the setup token from the file ' + nodePath.basename(SETUP_TOKEN_FILE) + ' next to users.json in the X-Setup-Token header.' }));
     }
     try {
       const body = JSON.parse((await readBody(req, 16384)).toString());
@@ -4406,13 +5518,24 @@ async function handleRelayRequest(req, res) {
       };
       const adminKey = mint('enterprise', 'setup-admin', adminEmail);
       const firstUserKey = firstUser ? mint(firstUser.plan, firstUser.label, firstUser.email) : null;
-      await _mutateUsersJson(d => {
-        d.api_keys = d.api_keys || [];
-        const now = new Date().toISOString();
-        d.api_keys.push({ key: adminKey, plan: 'enterprise', label: 'setup-admin', email: adminEmail, active: true, created: now, is_admin: true });
-        if (firstUserKey) d.api_keys.push({ key: firstUserKey, plan: firstUser.plan, label: firstUser.label, email: firstUser.email, active: true, created: now });
-        d.updated = now;
-      }).catch(we => log('warn', 'setup_persist_failed', { err: we.message }));
+      try {
+        await _mutateUsersJson(d => {
+          d.api_keys = d.api_keys || [];
+          const now = new Date().toISOString();
+          d.api_keys.push({ key: adminKey, plan: 'enterprise', label: 'setup-admin', email: adminEmail, active: true, created: now, is_admin: true });
+          if (firstUserKey) d.api_keys.push({ key: firstUserKey, plan: firstUser.plan, label: firstUser.label, email: firstUser.email, active: true, created: now });
+          d.updated = now;
+        });
+      } catch (we) {
+        // Not on disk means gone at the next restart, and the wizard open
+        // again for whoever comes first. Take the keys back and say so.
+        apiKeys.delete(adminKey);
+        if (firstUserKey) apiKeys.delete(firstUserKey);
+        log('error', 'setup_persist_failed', { err: we.message, file: USERS_FILE });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'setup_not_persisted', detail: 'users.json could not be written (' + (we.code || we.message) + '). Make USERS_FILE writable and try again.' }));
+      }
+      _setupTokenConsumed();
 
       // -- write .env (atomic temp+rename, back up existing) --
       const envPath = process.env.SETUP_ENV_FILE || nodePath.join(process.cwd(), '.env');
@@ -4514,7 +5637,12 @@ async function handleRelayRequest(req, res) {
       } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
     } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
 
-    let tlsStatus = 'yellow', tlsDetail = 'TLS terminated at the edge (not on this relay)';
+    // A relay behind a proxy that holds the certificate is the normal setup
+    // (install.sh, docker-compose), and a new install has no API keys yet.
+    // Neither is a warning about this relay, so both report 'info': shown,
+    // never counted in the verdict. A fresh install used to read "Actief, met
+    // waarschuwingen" forever and never "Alles werkt" (fase 2 SITE-13-A).
+    let tlsStatus = 'info', tlsDetail = 'TLS terminated at the edge (not checked on this relay)';
     try {
       const certFile = process.env.TLS_CERT_FILE || nodePath.join(process.cwd(), 'deploy/certs/cert.pem');
       if (fs.existsSync(certFile) && typeof crypto.X509Certificate === 'function') {
@@ -4526,7 +5654,8 @@ async function handleRelayRequest(req, res) {
     } catch (e) { tlsDetail = 'cert unreadable: ' + (e.code || e.message); }
     add('tls', tlsStatus, tlsDetail);
 
-    add('users', apiKeys.size > 0 ? 'green' : 'yellow', apiKeys.size + ' API key(s) loaded');
+    add('users', apiKeys.size > 0 ? 'green' : 'info',
+      apiKeys.size > 0 ? apiKeys.size + ' API key(s) loaded' : 'no API keys yet (normal on a new install)');
     add('audit', 'green', 'Merkle hash chain active');
 
     // The store, said out loud. Until now nothing in either health route
@@ -4548,7 +5677,7 @@ async function handleRelayRequest(req, res) {
       }
     }
 
-    const rank = { green: 0, yellow: 1, red: 2 };
+    const rank = { info: 0, green: 0, yellow: 1, red: 2 };
     const overall = checks.reduce((m, c) => (rank[c.status] > rank[m] ? c.status : m), 'green');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ overall, version: VERSION, sector: SECTOR, checks }));
@@ -4690,8 +5819,18 @@ async function handleRelayRequest(req, res) {
   if (req.method === "POST" && path === "/v2/user/verify-totp") {
     if (!_internalOk()) return _internalReject();
     try {
-      const { user_id, totp, throttled_upstream } = JSON.parse((await readBody(req, 4096)).toString());
+      const { user_id, totp, throttled_upstream, fresh_factor } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      // fresh_factor: the admin asks for a TOTP as a fresh second factor from
+      // someone who already holds this account's session (delete account,
+      // passkey, signing key, backup codes). That caller can only aim at its
+      // own account, so a hard per-account lockout is safe here, and it shares
+      // the counter of the signing-key routes (review #555, H2). The login
+      // path does not send it: a lockout there would let anyone lock anyone out.
+      if (fresh_factor === true) {
+        const lockedMs = await totpAccountLocked(user_id);
+        if (lockedMs) return totpLockedReply(res, lockedMs);
+      }
       // Throttle, never refuse: see userMfaDelayMs.
       //
       // WHY throttled_upstream EXISTS. This sleep is charged to an account, and
@@ -4738,9 +5877,16 @@ async function handleRelayRequest(req, res) {
         res.writeHead(503, { "Content-Type": "application/json" });
         return res.end(J({ error: "replay_store_unavailable" }));
       }
-      if (!result || !result.valid) userMfaNoteFailure(user_id);
+      if (!result || !result.valid) {
+        userMfaNoteFailure(user_id);
+        if (fresh_factor === true) {
+          const lockMs = await totpAccountFailed(user_id);
+          if (lockMs) return totpLockedReply(res, lockMs);
+        }
+      }
       if (result && result.valid) {
         userMfaAttemptReset(user_id);
+        if (fresh_factor === true) await totpAccountOk(user_id);
         // Dual-verify accepted this code. If it validated under SHA-1, record a
         // structured, countable event (never the code or the secret) so SHA-1-app
         // usage is measurable in the logs. This is the login/verify path.
@@ -5041,7 +6187,11 @@ async function handleRelayRequest(req, res) {
 
       const made = await _sendStore().create({
         plan: _tier, blob, addresses: input.recipients, sealed,
-        ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
+        // The file's name is never taken from the request: the web app no
+        // longer sends it, and an old client, an API caller or a fork would
+        // otherwise still leak it to the mailer and the store. It travels
+        // inside the sealed metadata only (security review r2 (f)).
+        ttlMs: input.ttl_ms, filename: '', accountId: acctOf(apiKey),
         // From the key record, never from the request: a sender may not choose
         // whose name appears above a mail thirty strangers receive.
         sender: { naam: kd.label || '', email: kd.email || '', taal: mailTaal(input.lang) },
@@ -5057,6 +6207,25 @@ async function handleRelayRequest(req, res) {
         // "your plan allows 25" while the 25 was megabytes and the number
         // beside it was 27263003 bytes. A sender reading that would go and
         // delete recipients from a list that was never the problem.
+        if (made.reason === 'store_full') {
+          // Not the sender's fault and not his plan: every open send together
+          // has reached what the store may hold. A 503 he can retry, with the
+          // reason in words.
+          log('warn', 'send_refused', { reason: 'store_full', limit_mb: made.limit });
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '900' });
+          return res.end(J({ error: 'send_store_full', retry_after_s: 900,
+            message: 'Too many large sends are open right now. Nothing was sent; try again later or send a smaller file.',
+            message_nl: 'Er staan nu te veel grote verzendingen open. Er is niets verstuurd; probeer het later opnieuw of verstuur een kleiner bestand.' }));
+        }
+        if (made.reason === 'account_store_full') {
+          // This account's own open sends fill its share of the store (review
+          // #555, M6). His sends free it as they expire or are opened.
+          log('warn', 'send_refused', { reason: 'account_store_full', limit_mb: made.limit });
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '900' });
+          return res.end(J({ error: 'send_account_store_full', limit_mb: made.limit, retry_after_s: 900,
+            message: 'Your open sends together have reached what one account may hold at once. Nothing was sent; try again when earlier sends have been collected or have expired.',
+            message_nl: 'Uw openstaande verzendingen samen hebben bereikt wat een account tegelijk mag hebben staan. Er is niets verstuurd; probeer het opnieuw als eerdere verzendingen zijn opgehaald of verlopen.' }));
+        }
         const _dim = made.dimension
           || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
         const status = made.reason === 'over_limit' ? 403
@@ -5094,21 +6263,14 @@ async function handleRelayRequest(req, res) {
       // that throw happens in writeHead on the pickup route -- after the token
       // is claimed. The recipient got a 500 and then already_collected on every
       // retry: a file destroyed by its own name.
-      const naamRuw = (String((input.filename == null ? '' : input.filename))
-        .replace(/[\r\n\t]+/g, ' ')
-        .replace(/[\u0000-\u001f\u007f]/g, '')
-        .replace(/[\uD800-\uDFFF]/g, '')
-        .replace(/\s+/g, ' ')
-        // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
-        // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
-        // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
-        // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
-        // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
-        // onze eigen link, dertig keer.
-        .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
-        .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
-        .trim()
-        .slice(0, 120)) || (taal === 'en' ? 'a file' : 'een bestand');
+      // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
+      // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
+      // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
+      // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
+      // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
+      // onze eigen link, dertig keer. De opschoning staat in
+      // veiligeBestandsnaam, gedeeld met de codemail (hertest T4-10).
+      const naamRuw = taal === 'en' ? 'a file' : 'een bestand';   // never the name (see create above)
       const naam = escHtml(naamRuw);
       // The human above the mail. Thirty people who are not our customers get
       // this, and a message with no sender in it reads as phishing no matter
@@ -5116,6 +6278,9 @@ async function handleRelayRequest(req, res) {
       const wieRuw = mailer.veiligeNaam(kd.label || '');
       const wie = escHtml(wieRuw);
       let gemaild = 0;
+      // dryrun answers ok without delivering: counted apart, so the page can
+      // say "nothing went out" instead of "sent to 2 of 2" (hertest L6).
+      let echtBezorgd = 0;
       // One invitation per person, never a visible list of the others: who else
       // receives a confidential document is not for the group to know.
       const sector = sectorOfKey(kd);
@@ -5143,7 +6308,7 @@ async function handleRelayRequest(req, res) {
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
-              + ' uw adres heeft ingevuld. Paramant verstuurt het bestand, maar kan het niet openen.'
+              + ' uw adres heeft ingevuld. Het bestand staat versleuteld klaar tot het is opgehaald of de link verloopt. Daarna is het weg. Deze link bewaren wij niet.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
                 (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
               + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
@@ -5151,7 +6316,7 @@ async function handleRelayRequest(req, res) {
               + 'to this address, so only somebody who can read this mailbox can collect the '
               + 'file. Available until ' + totEn + '.'
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
-              + ' entered your address. Paramant carries the file; we cannot open it.'
+              + ' entered your address. The file waits, encrypted, until it is picked up or the link expires. Then it is gone. We do not keep this link.'
               + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
           html: tweetaligHtml(taal,
                 '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'
@@ -5176,14 +6341,16 @@ async function handleRelayRequest(req, res) {
               + 'this mailbox can collect the file.<br>Available until ' + totEn + '.</p>')
               + VOET(wieRuw, kd.email, taal),
         });
-        if (bezorgd && bezorgd.ok) gemaild += 1;
+        if (bezorgd && bezorgd.ok) { gemaild += 1; if (bezorgd.delivered !== false) echtBezorgd += 1; }
         else log('warn', 'invitation_failed', { reason: bezorgd && bezorgd.reason });
       }
       log('info', 'send_invitations', { id: made.id, mailed: gemaild, of: made.count });
 
       res.writeHead(201, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
-                         invited: gemaild, size: blob.length,
+                         invited: gemaild, delivered: echtBezorgd,
+                         ...(gemaild > 0 && echtBezorgd === 0 ? { mail_test_mode: true } : {}),
+                         size: blob.length,
                          expires_at: new Date(made.expires_at).toISOString() }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
@@ -5258,16 +6425,24 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/user/sends/reinvite ──────────────────────────────────────────
-  // A REMINDER, and it carries no new link.
+  // A REMINDER, with the SAME link as the invitation.
   //
-  // It used to mint a fresh token and kill the old one, and that destroyed the
-  // file for the person it was meant to help: the file key is wrapped under the
-  // recipient's own token, and this relay cannot make a new wrapping because it
-  // never holds the key. They spent their one-time link on bytes that opened
-  // into nothing. Keeping the token instead is not an option either -- not
-  // writing it down is the whole reason the relay cannot open what it stores.
+  // The link is the recipient's own token, and this relay cannot rebuild it:
+  // the file key is wrapped under that token in the sender's browser, and the
+  // token was mailed once and never written down. Minting a fresh one is not
+  // an option either, because this relay never holds the file key to wrap
+  // again. So the reminder is built where the token still lives: the sender's
+  // browser kept it beside the send (parashare.page.js rememberSendLinks) and
+  // hands it back here, exactly the way the invitation did at create time.
+  // The relay checks that it is the token of THIS recipient and mails it.
   //
-  // So this points at the invitation they already have, which still works.
+  // BE PRECISE ABOUT WHAT THAT PROVES. As with the invitation, the relay sees
+  // the token for the moment it mails it, so this is "not stored", not
+  // zero-knowledge (issue #550). Nothing extra is stored for a reminder.
+  //
+  // No token from the browser (another browser, storage wiped) means no
+  // reminder: a mail without a working link only sent people looking for the
+  // first one. The dashboard says how to go on instead.
   if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
     if (!_internalOk()) return _internalReject();
     try {
@@ -5284,6 +6459,8 @@ async function handleRelayRequest(req, res) {
       //
       // The seat is taken before the send store is touched, and handed back
       // below if the reminder turns out not to be allowed.
+      const token = typeof input.token === 'string' ? input.token : '';
+      if (!token) { res.writeHead(400); return res.end(J({ error: 'link_not_in_browser' })); }
       const _remH = inviteRateOk(accountVan(userId), apiKeys.get(userId) || null, 1);
       if (!_remH.ok) {
         log('warn', 'reminder_rate_limited', { limit: _remH.limit, used: _remH.used });
@@ -5292,7 +6469,7 @@ async function handleRelayRequest(req, res) {
         return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
                            limit: _remH.limit, retry_after_s: _remH.retry_after_s }));
       }
-      const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
+      const out = await _sendStore().reinvite(sendId, (input.email || '').toString(), token);
       if (!out.ok) {
         inviteRateGeef(accountVan(userId), 1);
         res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
@@ -5305,6 +6482,12 @@ async function handleRelayRequest(req, res) {
       const totEn = mailDatum(out.expires_at || Date.now(), 'en', _remOpt);
       // Awaited, so the dashboard's "reminder sent" is about what happened.
       const wie3 = mailer.veiligeNaam(out.sender_name || '');
+      const base3 = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+      // The same link as the invitation, built the same way (see POST /v2/sends).
+      const link3 = base3 + (taal3 === 'en' ? '/en' : '') + '/ontvang/' + encodeURIComponent(token)
+                  + '?r=' + encodeURIComponent(sectorOfKey(apiKeys.get(userId) || null));
+      const knop3 = (tekst) => '<p><a href="' + link3 + '" style="display:inline-block;padding:11px 18px;'
+                  + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">' + tekst + '</a></p>';
       const bezorgd = await mailer.stuur({
         to: out.email,
         from: mailer.afzenderNamens(undefined, wie3),
@@ -5315,23 +6498,26 @@ async function handleRelayRequest(req, res) {
           : (wie3 ? 'Herinnering van ' + wie3 + ': uw bestand staat nog klaar'
                   : 'Herinnering: er staat nog een bestand voor u klaar'),
         text: tweetaligTekst(taal3,
-              'Er staat nog een bestand voor u klaar.\n\nGebruik de link uit de eerdere mail '
-            + 'van Paramant. Die werkt nog en is nog steeds alleen voor u. '
+              'Er staat nog een bestand voor u klaar.\n\n' + link3
+            + '\n\nDit is dezelfde link als in de eerste mail. Hij is alleen voor u en werkt één keer. '
+            + 'Als u hem opent, sturen we een korte controlecode naar dit adres. '
             + 'Beschikbaar tot ' + tot + '.',
-              'A file is still waiting for you.\n\nUse the link in the earlier mail '
-            + 'from Paramant; it still works and it is still yours alone. '
+              'A file is still waiting for you.'
+            + (taal3 === 'en' ? '\n\n' + link3 : '\n\nUse the link above.')
+            + '\n\nIt is the same link as in the first mail. It is yours alone and works once. '
+            + 'Opening it sends a short code to this address. '
             + 'Available until ' + totEn + '.'),
         html: tweetaligHtml(taal3,
               '<p>Er staat nog een bestand voor u klaar.</p>'
-            + '<p>Gebruik de link uit de eerdere mail van Paramant. Die werkt nog '
-            + 'en is nog steeds alleen voor u.</p>'
-            + '<p style="color:#666;font-size:13px">Beschikbaar tot ' + escHtml(tot) + '. '
-            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.</p>',
+            + knop3('Bestand openen')
+            + '<p style="color:#666;font-size:13px">Dit is dezelfde link als in de eerste mail. '
+            + 'Hij is alleen voor u en werkt één keer. Als u hem opent, sturen we een korte '
+            + 'controlecode naar dit adres.<br>Beschikbaar tot ' + escHtml(tot) + '.</p>',
               '<p>A file is still waiting for you.</p>'
-            + '<p>Use the link in the earlier mail from Paramant. It still works, '
-            + 'and it is still yours alone.</p>'
-            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(totEn) + '. '
-            + 'Cannot find that mail? Ask the sender to send the file again.</p>')
+            + (taal3 === 'en' ? knop3('Open the file') : '<p>Use the button above to open the file.</p>')
+            + '<p style="color:#666;font-size:13px">It is the same link as in the first mail. '
+            + 'It is yours alone and works once. Opening it sends a short code to this address.'
+            + '<br>Available until ' + escHtml(totEn) + '.</p>')
             + VOET(wie3, out.sender_email, taal3),
       });
       if (!bezorgd || !bezorgd.ok) {
@@ -5405,9 +6591,16 @@ async function handleRelayRequest(req, res) {
       // on you any more". A caller who is not the party learns nothing, not even
       // that the id exists.
       if (!invite) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      // The key half that opens the document lives only in the link the
+      // sender's browser built and must not reach a server that also holds
+      // the other half (COSIGN-46). So the sender is asked, once an hour, to
+      // send the invitation again from that browser; the admin no longer
+      // mails a link that opens only the request.
+      const senderNotified = await notifySenderLinkRequested(parasignResendMatch[1], invite.sender_account_id, invite.party_label, invite.party_index).catch(() => false);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
       return res.end(J({
         ok: true,
+        sender_notified: !!senderNotified,
         party_index: invite.party_index,
         party_label: invite.party_label,
         invite_token: invite.invite_token,
@@ -5442,6 +6635,7 @@ async function handleRelayRequest(req, res) {
       // TOTP gate — sensitive op, prevents session-hijack pk-swap
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
+      { const lockedMs = await totpAccountLocked(user_id); if (lockedMs) return totpLockedReply(res, lockedMs); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
         window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
@@ -5451,11 +6645,18 @@ async function handleRelayRequest(req, res) {
         res.writeHead(503, { "Content-Type": "application/json" });
         return res.end(J({ error: "replay_store_unavailable" }));
       }
-      if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      if (!totpResult.valid) {
+        const lockMs = await totpAccountFailed(user_id);
+        log("warn", "totp_signing_key_failed", { account: String(user_id).slice(0, 12), locked_ms: lockMs });
+        if (lockMs) return totpLockedReply(res, lockMs);
+        res.writeHead(403); return res.end(J({ error: "invalid_totp" }));
+      }
+      await totpAccountOk(user_id);
       // Store (server-side pk_hash computation — never trust client)
       let result;
       try {
-        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label });
+        // A code-bound key is made for one signature and lapses by itself (36-K).
+        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label, expiresInMs: userSigning.CODE_KEY_TTL_MS });
       } catch (e) {
         res.writeHead(400, { "Content-Type": "application/json" });
         return res.end(J({ error: e.message }));
@@ -5494,12 +6695,16 @@ async function handleRelayRequest(req, res) {
       const user_id = query.user_id;
       if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
       const arr = await userSigning.getSigningPks(redisClient, user_id);
+      const _now = Date.now();
       const projected = arr.map(e => ({
         alg: e.alg,
         pk_hash_sha3: e.pk_hash_sha3,
         label: e.label,
         enrolled_at: e.enrolled_at,
         revoked_at: e.revoked_at,
+        expires_at: e.expires_at || null,
+        expired: userSigning.isExpired(e, _now),
+        active: userSigning.isActive(e, _now),
       }));
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, keys: projected, total: projected.length }));
@@ -5520,6 +6725,7 @@ async function handleRelayRequest(req, res) {
       if (!totp || !/^\d{6}$/.test(String(totp))) { res.writeHead(400); return res.end(J({ error: "totp_required" })); }
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
+      { const lockedMs = await totpAccountLocked(user_id); if (lockedMs) return totpLockedReply(res, lockedMs); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
         window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
@@ -5529,7 +6735,13 @@ async function handleRelayRequest(req, res) {
         res.writeHead(503, { "Content-Type": "application/json" });
         return res.end(J({ error: "replay_store_unavailable" }));
       }
-      if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      if (!totpResult.valid) {
+        const lockMs = await totpAccountFailed(user_id);
+        log("warn", "totp_signing_key_failed", { account: String(user_id).slice(0, 12), locked_ms: lockMs });
+        if (lockMs) return totpLockedReply(res, lockMs);
+        res.writeHead(403); return res.end(J({ error: "invalid_totp" }));
+      }
+      await totpAccountOk(user_id);
       if (totpResult.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "sign" });
       let result;
       try {
@@ -5886,7 +7098,7 @@ async function handleRelayRequest(req, res) {
       const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
       log("info", "parasign_key_self_minted", { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode });
       res.writeHead(201, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, plan_parasign: out.plan_parasign, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
@@ -5907,6 +7119,15 @@ async function handleRelayRequest(req, res) {
         .map(k => [k, apiKeys.get(k)])
         .filter(([k, v]) => v && (v.scope === "parasign" || v.product === "parasign" || /^psk_/.test(k)))
         .map(([k, v]) => ({ kid: v.kid || keysTable.computeKid(k), key_masked: maskKey(k), mode: /^psk_test_/.test(k) ? "test" : "live", plan: v.plan, label: v.label || "", active: v.active !== false, created: v.created || null }));
+      // The same question as POST (P10 API-11-A). An account without the
+      // ParaSign API got 200 and an empty list, so /account showed it a key
+      // block whose only button answered 403. Without the right AND without a
+      // key it is the same 403; an account that lost the right but still holds
+      // keys keeps seeing them, so it can revoke what it has.
+      if (keys.length === 0 && !parasignApiEntitled(accountId)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten." }));
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, account_id: accountId, count: keys.length, keys }));
     } catch (err) {
@@ -5985,16 +7206,30 @@ async function handleRelayRequest(req, res) {
     // Enterprise" to a reader who is on none of them yet. Business stays in
     // the payload because it is a real server-side ceiling; it is not a
     // ParaSend plan, so the page does not name it.
+    //
+    // `max_recipients` and its table follow the same rule for the other
+    // question the page asks before a file is picked: may this account send to
+    // a group, and to how many. It is the number POST /v2/sends/precheck and
+    // POST /v2/sends hold the list to (checkRecipients on the ParaSend tier),
+    // so the page cannot show a ceiling the send will not honour.
+    const _psLim = parasendLimitsOf(kd);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({
       valid: !!(kd?.active),
       plan: kd?.plan || null,
-      link_ttl_ms: parasendLimitsOf(kd).limits.view_ttl_ms,
+      link_ttl_ms: _psLim.limits.view_ttl_ms,
       link_ttl_ms_by_plan: {
         community:  tiers.tierLimit('community',  'view_ttl_ms'),
         pro:        tiers.tierLimit('pro',        'view_ttl_ms'),
         business:   tiers.tierLimit('business',   'view_ttl_ms'),
         enterprise: tiers.tierLimit('enterprise', 'view_ttl_ms'),
+      },
+      max_recipients: tiers.tierLimitNum(_psLim.tier, 'max_recipients'),
+      max_recipients_by_plan: {
+        community:  tiers.tierLimitNum('community',  'max_recipients'),
+        pro:        tiers.tierLimitNum('pro',        'max_recipients'),
+        business:   tiers.tierLimitNum('business',   'max_recipients'),
+        enterprise: tiers.tierLimitNum('enterprise', 'max_recipients'),
       },
     }));
   }
@@ -6104,33 +7339,17 @@ async function handleRelayRequest(req, res) {
       const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: maskIp(getClientIp(req)) });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
-      // Send countersigned DPA email
+      // Send countersigned DPA email, in the language the page was signed in.
       if (mailer.gereed()) {
-        const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
-          <p style="color:#888;margin-bottom:24px">This email confirms that a Data Processing Agreement (GDPR Art. 28) has been signed on behalf of <strong style="color:#ededed">${escHtml(org)}</strong>.</p>
-          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px;font-size:13px">
-            <div style="color:#555;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Agreement details</div>
-            <table style="width:100%;border-collapse:collapse">
-              <tr><td style="color:#555;padding:4px 0;width:40%">Reference</td><td style="color:#ededed">${ref}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${escHtml(version)}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
-            </table>
-          </div>
-          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
-          <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
-        </div>`;
+        const { subject: dpaSubject, html } = dpaMail.dpaConfirmation({
+          name, title, org, ref, signed_at, version, lang: d.lang === 'nl' ? 'nl' : 'en' });
         // Through the one door, like every other message. A DPA confirmation
         // that talks about EU jurisdiction should not be carried out of it.
         mailer.stuur({
           from: 'PARAMANT <privacy@paramant.app>',
           to: email,
           cc: 'privacy@paramant.app',
-          subject: `DPA signed — ${org} (${ref})`,
+          subject: dpaSubject,
           html,
         }).then(r => {
           if (r.ok) log('info', 'dpa_email_sent', { ref, email: maskEmail(email), provider: r.provider });
@@ -6206,13 +7425,13 @@ async function handleRelayRequest(req, res) {
     // log. Every projection that leaves this process goes through ctCoarseTs;
     // the full ts stays in the stored entry and in the receipt.
     const last50 = ctWindow.recentPage(50);
-    const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
+    const root   = ctTree.root();
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({
       relay_id: relayIdentity ? relayIdentity.pk_hash : null,
       sector:   SECTOR,
       version:  VERSION,
-      tree_size: ctWindow.size,
+      tree_size: ctTree.size,
       root,
       entries: last50.entries.map((e, i) => ({
         i:    last50.start_index + i,
@@ -6226,8 +7445,12 @@ async function handleRelayRequest(req, res) {
 
   // ── GET /v2/ct/log + /v2/ct/proof — publiek, geen auth ──────────────────────
   if (path === '/v2/ct/log') {
-    const limit = Math.min(parseInt(query.limit || '100'), 1000);
-    const from  = parseInt(query.from || '0');
+    // Clamped (limit=-1 used to return the whole window, limit=abc nothing),
+    // and `offset` accepted as the docs call it (API-31-B).
+    const _lim = parseInt(query.limit || '100', 10);
+    const limit = Number.isFinite(_lim) ? Math.max(1, Math.min(_lim, 1000)) : 100;
+    const _from = parseInt(query.from !== undefined ? query.from : (query.offset || '0'), 10);
+    const from  = Number.isFinite(_from) && _from >= 0 ? _from : 0;
     // Privacy: the public log projection deliberately omits device_hash and
     // coarsens timestamps to the hour. device_hash is a stable, deterministic
     // function of a participant public key, so publishing it unauthenticated
@@ -6242,22 +7465,61 @@ async function handleRelayRequest(req, res) {
     // reported indices 4..8 twice while the entries really sat at 42..46. The
     // Merkle tree, /v2/ct/proof and the STH were all correct throughout,
     // because they address the log by position; only this projection lied.
+    //
+    // tree_hash is the root of the tree at index + 1 leaves, computed from the
+    // full tree, exactly what /v2/ct/proof/:index returns. It used to be the
+    // value stored at append time, and on health 39 entries from April 2026
+    // carry one from an earlier, restarted tree. Those entries keep their
+    // stored value visibly, as stored_tree_hash with from_earlier_tree: true,
+    // so the listing neither hides the old value nor presents it as current.
     const pageR = ctWindow.page(from, limit);
-    const entries = pageR.entries.map((e, i) => ({ index: pageR.start_index + i, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
+    const entries = pageR.entries.map((e, i) => {
+      const index = pageR.start_index + i;
+      const tree_hash = index < ctTree.size ? ctTree.root(index + 1) : (e.tree_hash || null);
+      const stale = !!e.tree_hash && tree_hash !== null && String(e.tree_hash).toLowerCase() !== String(tree_hash).toLowerCase();
+      return { index, type: e.type, leaf_hash: e.leaf_hash, tree_hash, ts: ctCoarseTs(e.ts),
+               ...(stale ? { stored_tree_hash: e.tree_hash, from_earlier_tree: true } : {}) };
+    });
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, size: ctWindow.size, root: ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64), entries }));
+    return res.end(J({ ok: true, size: ctTree.size, root: ctTree.root(), entries }));
   }
   const ctpm0 = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
   const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
   if (ctpm0 || (ctpq0 !== null && ctpq0 !== undefined)) {
     const idx = parseInt(ctpm0 ? ctpm0[1] : ctpq0);
-    // Positional by construction: get() resolves idx - base into the window, so
-    // this route never consulted the stored index field and was already right
-    // while the listing was wrong. The echoed `index` is the requested one.
+    // Every field below comes from the full tree (lib/ct-tree), never from the
+    // tree_hash and proof stored with the entry. The stored pair is what the
+    // relay computed at append time, and on health 39 entries from April 2026
+    // (positions 1-34 and 42-46) carry a pair from an earlier, restarted tree:
+    // /v2/ct/proof/45 used to hand out a path that folds to a root of a tree
+    // that starts at position 38, so no verifier could check it against the
+    // published log. The leaves themselves are in the right place; only the
+    // stored proof was stale. Recomputing is O(log n) and always right.
+    //
+    // ?tree_size=N asks for the path to the root at N leaves, so a client can
+    // check inclusion straight against a signed tree head (N = sth.tree_size)
+    // without a separate consistency proof. Without it N = idx + 1, exactly
+    // what this route always returned.
+    if (!Number.isInteger(idx) || idx < 0 || idx >= ctTree.size) {
+      res.writeHead(404); return res.end(J({ error: 'Index not found' }));
+    }
+    let size = idx + 1;
+    if (query.tree_size !== undefined) {
+      const n = Number(query.tree_size);
+      if (!Number.isInteger(n) || n <= idx || n > ctTree.size) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: `tree_size must be an integer with index < tree_size <= ${ctTree.size}` }));
+      }
+      size = n;
+    }
+    // Positional by construction: get() resolves idx - base into the window.
+    // An entry that aged out of the window is still in the tree; only its full
+    // timestamp is gone, so ts is null rather than invented.
     const entry = ctWindow.get(idx);
-    if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: ctCoarseTs(entry.ts) }));
+    return res.end(J({ ok: true, index: idx, leaf_hash: ctTree.leaf(idx), tree_size: size,
+                       tree_hash: ctTree.root(size), proof: ctTree.inclusionProof(idx, size),
+                       ts: entry ? ctCoarseTs(entry.ts) : null, ...(entry ? {} : { pruned: true }) }));
   }
 
   // ── GET /v2/sth, /v2/sth/history, /v2/sth/:timestamp — Signed Tree Head (public) ──
@@ -6405,7 +7667,9 @@ async function handleRelayRequest(req, res) {
     const all = [...relayRegistry.values()];
     const page = all.slice(offset, offset + limit).map(r => ({
       url: r.url, sector: r.sector, version: r.version, edition: r.edition,
-      pk_hash: r.pk_hash, verified_since: r.verified_since, last_seen: r.last_seen,
+      // To the hour, like the log: verified_since is the ts of a relay_reg leaf
+      // and a precise one undoes the rounding of that leaf.
+      pk_hash: r.pk_hash, verified_since: ctCoarseTs(r.verified_since), last_seen: ctCoarseTs(r.last_seen),
       ct_index: r.ct_index, last_ct_index: r.last_ct_index
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -6464,8 +7728,53 @@ async function handleRelayRequest(req, res) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Signature verification failed' }));
     }
+    // A valid signature only proves the head came with its own key. Whether
+    // that key may speak for relay_id is the question the route never asked;
+    // lib/fleet-pins.js answers it.
+    const pinCheck = fleetPins.classifyPeer(PEER_PINS, relay_id, computedPkHash);
+    if (pinCheck.verdict === 'refused') {
+      log('warn', 'sth_ingest_refused', { relay_id: String(relay_id).slice(0, 80), pk_hash: computedPkHash.slice(0, 16),
+                                         reason: pinCheck.reason, ip: getClientIp(req) });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'This relay_id is pinned to a different key, or this key to a different relay_id', reason: pinCheck.reason }));
+    }
+    if (pinCheck.verdict === 'retired') {
+      log('warn', 'sth_ingest_refused', { relay_id: String(relay_id).slice(0, 80), pk_hash: computedPkHash.slice(0, 16),
+                                         reason: 'retired_key', ip: getClientIp(req) });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'This key was retired for this relay_id. The heads it sent before stay mirrored; new ones are not accepted.',
+                         reason: 'retired_key', retired_at: pinCheck.retired_at || null }));
+    }
+    if (pinCheck.verdict === 'unpinned') {
+      // Not refused (a self-hosted fleet gossips like this), not published.
+      const known = unpinnedPeerSths.get(computedPkHash);
+      const nowIso = new Date().toISOString();
+      unpinnedPeerSths.delete(computedPkHash); // re-insert: Map order = recency
+      unpinnedPeerSths.set(computedPkHash, {
+        relay_id: String(relay_id).slice(0, 200), count: (known?.count || 0) + 1,
+        last_tree_size: tree_size, first_seen: known?.first_seen || nowIso, last_seen: nowIso,
+      });
+      while (unpinnedPeerSths.size > UNPINNED_PEER_MAX) unpinnedPeerSths.delete(unpinnedPeerSths.keys().next().value);
+      if (!known) log('info', 'sth_ingest_unpinned', { relay_id: String(relay_id).slice(0, 80), pk_hash: computedPkHash.slice(0, 16), ip: getClientIp(req) });
+      res.writeHead(202, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, relay_pk_hash: computedPkHash, mirrored: false,
+                         reason: 'This relay is not pinned here (PEER_STH_PINS), so its heads are not published in /v2/sth/peers' }));
+    }
+    // The same head twice is one statement. Real heads are public
+    // (/v2/sth/history), so without this anyone could resend them, push the
+    // genuine ring out of memory and grow the file without end.
+    const known = peerSths.get(computedPkHash);
+    const headKey = peerHeadKey({ tree_size, sha3_root });
+    if (known && known.seen && known.seen.has(headKey)) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, relay_pk_hash: computedPkHash, stored: false, duplicate: true }));
+    }
+    if (known && known.floorTs != null && Number(timestamp) < known.floorTs) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'This head is older than every head this mirror still holds for that relay', reason: 'older_than_mirror', stored: false }));
+    }
     if (!peerSths.has(computedPkHash)) {
-      peerSths.set(computedPkHash, { sths: [], pk_b64: public_key, last: Date.now() });
+      peerSths.set(computedPkHash, { sths: [], pk_b64: public_key, last: Date.now(), seen: new Set(), fileLines: 0, floorTs: null });
       _evictPeerSthsIfNeeded(); // bound distinct peers (Map entries + fds + .jsonl files)
     }
     const peer = peerSths.get(computedPkHash);
@@ -6478,10 +7787,14 @@ async function handleRelayRequest(req, res) {
     peer.pk_b64 = public_key;
     peer.last = Date.now();
     const record = { relay_id, relay_pk_hash: computedPkHash, sha3_root, timestamp, tree_size,
-                     version: version || 1, signature, public_key, received_at: new Date().toISOString() };
+                     version: version || 1, signature, public_key, received_at: peerReceivedAt(Date.now()) };
     peer.sths.push(record);
     if (peer.sths.length > PEER_STH_MAX) peer.sths.shift();
+    if (!peer.seen) peer.seen = new Set();
+    peer.seen.add(headKey);
+    peer.fileLines = (peer.fileLines || 0) + 1;
     _peerSthWrite(computedPkHash, record);
+    _peerSthCompactIfNeeded(computedPkHash, peer).catch(() => {});
     log('info', 'sth_ingested', { relay_id: String(relay_id).slice(0, 32), tree_size, root: String(sha3_root).slice(0, 16) });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, relay_pk_hash: computedPkHash }));
@@ -6498,7 +7811,9 @@ async function handleRelayRequest(req, res) {
         sth_count: peer.sths.length,
         latest_root: latest?.sha3_root || null,
         latest_tree_size: latest?.tree_size ?? null,
-        latest_ts: latest?.received_at || null,
+        latest_ts: latest?.received_at ? ctCoarseTs(latest.received_at) : null,
+        // A retired key: what it sent before the rotation, kept as evidence.
+        ...(PEER_PINS.retired.has(pkHash) ? { retired: true, retired_at: PEER_PINS.retired.get(pkHash).retired_at } : {}),
       });
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -6516,21 +7831,24 @@ async function handleRelayRequest(req, res) {
     const lim = Math.min(parseInt(query.limit || '100') || 100, 500);
     const off  = Math.max(parseInt(query.offset || '0') || 0, 0);
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    // received_at is coarsened on the way out as well as on the way in: heads
+    // mirrored before 3.1.2 were stored with the millisecond.
+    const sths = peer.sths.slice(off, off + lim).map(x => (x && x.received_at ? { ...x, received_at: ctCoarseTs(x.received_at) } : x));
     return res.end(J({ ok: true, relay_pk_hash: sthPeerMatch[1],
-                       sths: peer.sths.slice(off, off + lim), total: peer.sths.length, limit: lim, offset: off }));
+                       sths, total: peer.sths.length, limit: lim, offset: off }));
   }
 
   // ── GET /v2/sth/consistency — RFC 6962 consistency proof ──────────────────────
   if (path === '/v2/sth/consistency' && req.method === 'GET') {
     const fromSize = parseInt(query.from);
-    const toSize   = query.to !== undefined ? parseInt(query.to) : ctWindow.windowLength;
+    const toSize   = query.to !== undefined ? parseInt(query.to) : ctTree.size;
     if (isNaN(fromSize) || isNaN(toSize)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Query params required: from=<integer> (and optionally to=<integer>)' }));
     }
-    if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) {
+    if (fromSize < 0 || toSize < fromSize || toSize > ctTree.size) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ window size (${ctWindow.windowLength})` }));
+      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ tree size (${ctTree.size})` }));
     }
     const proof = ctConsistencyProof(fromSize, toSize);
     if (proof === null) { res.writeHead(500); return res.end(J({ error: 'Could not compute proof' })); }
@@ -6569,6 +7887,20 @@ async function handleRelayRequest(req, res) {
     return res.end(J(entry.doc));
   }
 
+  // ── GET /v2/dl/confirm.js: the confirm page's button, in claim mode ───────
+  // Hertest T4-3: the button on the confirm page above was a plain link to
+  // .../get without a claim, so it burned on 'finish' ("handed to the kernel
+  // or the proxy"), and a download broken off after 80 KB cost the receiver
+  // the file. With JavaScript the button now claims, reads every byte,
+  // checks the length, and only then acks; a broken or closed download gives
+  // the claim back. Without JavaScript the link is the old route, unchanged
+  // (SDK and CLI semantics, see the comment at .../get). A file, not inline:
+  // the relay CSP is script-src 'self'.
+  if (path === '/v2/dl/confirm.js' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+    return res.end(DL_CONFIRM_JS);
+  }
+
   // ── GET /v2/dl/:token — two-step: HTML confirm page (safe for link preloaders)
   const dlm = path.match(/^\/v2\/dl\/([a-f0-9]{48})$/);
   if (dlm && req.method === 'GET') {
@@ -6601,78 +7933,224 @@ async function handleRelayRequest(req, res) {
     return res.end(_dlConfirmPage(token, td.enc_meta || null, sizeStr, ttlStr));
   }
 
-  // ── GET /v2/dl/:token/get — actual burn + download (human must click confirm)
+  // ── GET /v2/dl/:token/get: the download (human must click confirm)
+  //
+  // Two modes. Without ?claim= it is the old burn-on-read: the blob is dropped
+  // the moment Node has handed the last byte to the socket. That is what every
+  // SDK and CLI already in the field expects, so it stays exactly as it was.
+  //
+  // With ?claim=<32 hex, chosen by the client> nothing is burned here. The
+  // receiver's page fetches, decrypts and checks, and only then confirms with
+  // POST /v2/dl/:token/ack. 'finish' means "written to the kernel or to the
+  // proxy in front of us", never "arrived", so a burn on 'finish' cost the
+  // receiver the file on every slow or broken line, and a wrong key burned it
+  // before it was ever tried. See DL_MAX_FETCHES for the bound on retries.
+  // The confirm page never links here with a plain href any more (review
+  // #555, LAAG): a crawler or link checker that followed the "Download &
+  // Burn" link burned the file. The button is a script that claims and acks;
+  // without script it is a POST form, which crawlers do not submit. A GET
+  // without a claim stays for the SDKs and CLIs in the field.
   const dlgm = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/get$/);
-  if (dlgm && req.method === 'GET') {
+  if (dlgm && (req.method === 'GET' || req.method === 'POST')) {
     const token = dlgm[1];
     const ua = req.headers['user-agent'] || '';
-    if (PRELOAD_BOTS.test(ua)) {
+    const claim = typeof query.claim === 'string' && DL_CLAIM_RE.test(query.claim) ? query.claim : null;
+    if (PREVIEW_BOTS.test(ua)) {
       res.writeHead(403); return res.end(J({ error: 'Automated clients not permitted' }));
     }
+    const gone = (reason, status) => claim ? dlGoneJson(res, reason) : dlGoneHtml(res, reason, status);
     const td = downloadTokens.get(token);
-    if (!td) {
-      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('Link not found or already used'));
-    }
-    if (td.used) {
-      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('This file has already been downloaded and burned'));
-    }
+    if (!td || td.used) return gone(await dlWhyGone(token, td), td ? 410 : 410);
     if (Date.now() > td.expires_ms) {
       downloadTokens.delete(token);
-      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('Link expired'));
+      return gone('expired');
     }
     const entry = blobStore.get(td.hash);
     if (!entry) {
       downloadTokens.delete(token);
-      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('File not found — already burned'));
+      return gone(await dlWhyGone(token, td), 404);
     }
-    // Fix 4: block concurrent downloads before transfer starts
-    if (td.in_progress) {
+    const now = Date.now();
+    const claimHeld = td.claim && now < td.claim.until;
+    // Fix 4: block concurrent downloads before transfer starts. A claim held by
+    // somebody else counts as a download in progress too.
+    const busy = claim
+      ? (claimHeld && td.claim.id !== claim) || (td.in_progress && !(td.claim && td.claim.id === claim))
+      : (td.in_progress || claimHeld);
+    if (busy) {
+      if (claim) {
+        res.writeHead(409, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J({ ok: false, error: 'Download already in progress', reason: 'busy' }));
+      }
       res.writeHead(409, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(_dlBurnedPage('Download already in progress'));
     }
-    td.in_progress = true;
     const blobHash = td.hash;
     const blob = entry.blob;
+    if (claim) {
+      if ((td.fetches || 0) >= DL_MAX_FETCHES) {
+        dlBurn(token, td, 'exhausted');
+        blobDrop(blobHash);
+        log('warn', 'dl_token_exhausted', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
+        return dlGoneJson(res, 'exhausted');
+      }
+      td.fetches = (td.fetches || 0) + 1;
+      td.claim = { id: claim, until: now + DL_CLAIM_LEASE_MS };
+      td.in_progress = true;
+      td.in_progress_by = claim;
+      log('info', 'dl_token_claimed', { token: token.slice(0,8), hash: blobHash.slice(0,16), fetch: td.fetches });
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': 'attachment; filename="paramant-encrypted-payload"',
+        'Cache-Control': 'no-store',
+        'Content-Length': blob.length,
+        'X-Burned': 'pending-ack',
+        'X-Hash': blobHash,
+      });
+      // Only the write that started the transfer in progress may say the line
+      // is free: after a release the next download (another tab, or a legacy
+      // GET without a claim) may already be running (review r2 (d)).
+      const mine = () => td.in_progress_by === claim;
+      res.on('finish', () => {
+        if (mine()) td.in_progress = false;
+        if (td.claim && td.claim.id === claim) td.claim.until = Date.now() + DL_CLAIM_LEASE_MS;
+      });
+      res.on('close', () => {
+        if (!res.writableFinished) {
+          if (mine()) td.in_progress = false;
+          if (td.claim && td.claim.id === claim) td.claim = null;
+          log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16), mode: 'claim' });
+        }
+      });
+      return res.end(blob);
+    }
+    if (dlExhausted(td, now)) {
+      dlBurn(token, td, 'exhausted');
+      blobDrop(blobHash);
+      return gone('exhausted');
+    }
+    // Counted like a claimed fetch: a download broken off before the last
+    // byte costs nothing, but not more than DL_MAX_FETCHES times (review #565).
+    td.fetches = (td.fetches || 0) + 1;
+    td.in_progress = true;
+    const legacyTag = 'legacy:' + crypto.randomBytes(8).toString('hex');
+    td.in_progress_by = legacyTag;
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       // Relay never stores plaintext filename (finding #4) — receiver SDK decrypts enc_meta to recover name
       'Content-Disposition': 'attachment; filename="paramant-encrypted-payload"',
       'Cache-Control': 'no-store',
-      'X-Burned': 'true',
+      'Content-Length': blob.length,
+      // Not 'true' any more: nothing is burned yet. It burns once the whole
+      // body is delivered (afterDelivery), and a broken line keeps the file.
+      'X-Burned': 'on-delivery',
       'X-Hash': blobHash,
+      // No proxy buffer in between: nginx would take the whole file at once
+      // and 'finish' would mean "nginx has it", not "the client has it".
+      'X-Accel-Buffering': 'no',
     });
-    // Fix 4: only burn blob after response has fully flushed to the client
-    res.on('finish', () => {
-      td.used = true;
-      blobDrop(blobHash);
-      try { blob.fill(0); } catch {}
+    // Burned once the last byte was written (matrix API-30-K, review #565 B1):
+    // hidden on 'finish' so a second GET answers 410 at once, destroyed after
+    // the settle window. Broken off before 'finish', nothing was hidden.
+    afterDelivery(req, res, {
+      onFinish: () => {
+        td.used = true; td.gone = 'downloaded'; td.claim = null;
+        blobDrop(blobHash, false);
+      },
+      onDelivered: () => {
+        dlMarkGone(token, td, 'downloaded');
+        if (td.in_progress_by === legacyTag) td.in_progress = false;
+        _notifyDownloaded(entry, blobHash, { via: 'link' });
+        zeroBuffer(blob);
+      },
+      onAborted: (why) => {
+        if (td.in_progress_by === legacyTag) td.in_progress = false;
+        log('warn', 'dl_aborted_before_delivery', { token: token.slice(0,8), hash: blobHash.slice(0,16), why, fetch: td.fetches });
+      },
     });
-    // Fix 4: on socket error before finish, allow retry
-    res.on('close', () => {
-      if (!td.used) {
-        td.in_progress = false;
-        log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
-      }
-    });
-    return res.end(blob);
+    return writeInPieces(res, blob);
   }
 
   // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
+  // A gone link answers 404 as it always did (callers test for it), now with a
+  // `reason` so a page can say WHY: downloaded, expired, withdrawn, exhausted,
+  // lost (relay restart) or unknown. See dlWhyGone.
   const dlim = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/info$/);
   if (dlim && req.method === 'GET') {
     const token = dlim[1];
     const td = downloadTokens.get(token);
-    if (!td || td.used || Date.now() > td.expires_ms) {
-      res.writeHead(404); return res.end(J({ ok: false, error: 'Link not found, used, or expired' }));
+    if (dlExhausted(td) && blobStore.has(td.hash)) {
+      // Not "available": the next opening could only burn it. Say so, and
+      // burn it now, so the sender's list says it too.
+      dlBurn(token, td, 'exhausted');
+      blobDrop(td.hash);
+    }
+    if (!td || td.used || Date.now() > td.expires_ms || !blobStore.has(td.hash)) {
+      const reason = await dlWhyGone(token, td);
+      res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: false, error: 'Link not found, used, or expired', reason }));
     }
     const ttl_left = Math.round((td.expires_ms - Date.now()) / 1000);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, enc_meta: td.enc_meta || null, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
+  }
+
+  // ── POST /v2/dl/:token/ack and /release: the end of a claimed download ──
+  // ack:     the receiver decrypted the file. Burn it now. Idempotent for the
+  //          claim that burned it, so a retried ack after a lost answer is fine.
+  // release: the receiver could NOT decrypt (wrong key, damaged link). Give the
+  //          claim back without burning, so the right link still works.
+  const dlam = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/(ack|release)$/);
+  if (dlam && req.method === 'POST') {
+    const token = dlam[1];
+    let claim = null;
+    try {
+      const b = JSON.parse((await readBody(req, 1024)).toString() || '{}');
+      if (typeof b.claim === 'string' && DL_CLAIM_RE.test(b.claim)) claim = b.claim;
+    } catch (_) { /* answered below */ }
+    if (!claim) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: false, error: 'claim (32 hex) required' }));
+    }
+    const td = downloadTokens.get(token);
+    if (dlam[2] === 'release') {
+      // Also while the relay is still writing: a tab that is closed mid-download
+      // sends this from pagehide, and the response it abandons may still be
+      // flushing into a proxy buffer. The claim goes back now; the old write
+      // ends on its own and touches only a claim with its own id.
+      if (td && !td.used && td.claim && td.claim.id === claim) {
+        td.claim = null;
+        if (td.in_progress_by === claim) td.in_progress = false;
+      }
+      // That was the last allowed try: burn now, so /info and the sender see
+      // it, instead of a next opening that burns without delivering.
+      if (dlExhausted(td) && blobStore.has(td.hash)) {
+        dlBurn(token, td, 'exhausted');
+        blobDrop(td.hash);
+        log('warn', 'dl_token_exhausted', { token: token.slice(0,8), hash: td.hash.slice(0,16), at: 'release' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, burned: true, reason: 'exhausted' }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true }));
+    }
+    if (td && td.used && td.acked_by === claim) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, burned: true }));
+    }
+    if (!td || td.used) return dlGoneJson(res, await dlWhyGone(token, td));
+    if (!td.claim || td.claim.id !== claim) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: false, error: 'This download was not claimed with that id', reason: 'not_claimed' }));
+    }
+    td.acked_by = claim;
+    _notifyDownloaded(blobStore.get(td.hash), td.hash, { via: 'link' });
+    dlBurn(token, td, 'downloaded');
+    blobDrop(td.hash);
+    log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16), mode: 'ack' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, burned: true }));
   }
 
   // ── GET /v2/dl/<anything else>: a token that is not [a-f0-9]{48} ─────────
@@ -6799,7 +8277,12 @@ async function handleRelayRequest(req, res) {
 
     // Refuse to wipe a populated Map with an empty load — defends against the
     // 2026-05-08 race where a concurrent write left the file readable but empty.
-    if (candidate.size === 0 && prevCount > 0) {
+    // A file whose keys are all there and all revoked (active:false, the mark
+    // paramant-admin.py revoke writes) is not that race: it is the operator
+    // revoking the last key. Refused, that key stayed valid (SELF-11-A), so it
+    // goes through; only a file with no entries at all is still refused.
+    const allRevoked = parsed.api_keys.length > 0 && parsed.api_keys.every((k) => k && typeof k.key === 'string' && k.active === false);
+    if (candidate.size === 0 && prevCount > 0 && !allRevoked) {
       log('warn', 'reload_users_rejected', { prev: prevCount, candidate: 0, reason: 'refusing_to_wipe_populated_map' });
       res.writeHead(409); return res.end(J({ ok: false, error: 'sanity_check_failed', prev: prevCount, candidate: 0 }));
     }
@@ -6838,7 +8321,15 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/pubkey' && req.method === 'POST') {
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
-      if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
+      // A PURE post-quantum registration is valid too: sdk-js 3.3 (wire format
+      // v1, ML-KEM only) sends kem_pub/kyber_pub and no ecdh_pub, and every
+      // registerPubkeys() from it answered 400 (sweep-api finding 5). The
+      // browser's hybrid handshake and the inv_ rendezvous still need ecdh_pub.
+      if (d && !d.ecdh_pub && !d.kyber_pub && typeof d.kem_pub === 'string') d.kyber_pub = d.kem_pub;
+      const _pqOnly = !!(d && !d.ecdh_pub && typeof d.kyber_pub === 'string' && /^[0-9a-fA-F]{64,8192}$/.test(d.kyber_pub));
+      if (!d.device_id || (!d.ecdh_pub && !_pqOnly)) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub (or, for a post-quantum-only key, kem_pub) required' })); }
+      if (_pqOnly && typeof d.device_id === 'string' && /^inv_/.test(d.device_id)) { res.writeHead(400); return res.end(J({ error: 'the inv_ rendezvous needs ecdh_pub' })); }
+      if (_pqOnly) d.ecdh_pub = '';
       // M3: reject oversized device_id to prevent memory exhaustion / map-key attacks
       if (typeof d.device_id !== 'string' || d.device_id.length > 256) { res.writeHead(400); return res.end(J({ error: 'device_id must be a string of at most 256 characters' })); }
       if (INVITE_RE.test(d.device_id)) {
@@ -6919,8 +8410,8 @@ async function handleRelayRequest(req, res) {
         }
       }
       const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
-      const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
-      const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
+      const ctEntry = ctAppend(d.device_id, d.ecdh_pub || d.kyber_pub, apiKey);
+      const attestResult = verifyAttestation(d.ecdh_pub || d.kyber_pub, d.device_id, d.attestation || null);
       const existingPubkey = pubkeys.get(_pkSlot);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
         res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
@@ -6938,6 +8429,94 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, fingerprint: fp, dsa_supported: !!mlDsa, ct_index: ctEntry.index, ct_tree_hash: ctEntry.tree_hash, attested: attestResult.valid, attestation_method: attestResult.method || null }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── The streaming manifest for a live hand-over ("Samen nu", inv_) ─────────
+  // The pss_ manifest below needs a pss_ session; the web page's live
+  // hand-over runs on an inv_ rendezvous, so every block it announced got 404
+  // (and 403 first: the route was not in the pst_ token's scope), and the
+  // receiver's keyless read got 401. Streaming was off in practice and the
+  // relay held the whole file in RAM until `_ready` (SENDNAME-29-K).
+  // Same rules as the inv_ pubkey slot it hangs off: writing needs the
+  // sender's credential and the first writer owns it; reading needs only the
+  // inv_ id, which is the capability, and the tokens it lists are useless
+  // without the receiver's private key.
+  // POST /v2/session/inv_<id>/reject -- the sender compared the fingerprint
+  // and said no. The receiver used to keep waiting on "read this code to the
+  // sender" until the ten-minute limit (SENDNAME-28-A); the stopgap was an
+  // empty `_ready` record. This is the honest signal: the inv_ id is marked
+  // rejected, and the receiver's next read of the `_ready` slot or of the
+  // manifest answers 410 handover_rejected. Sender's credential required, the
+  // same one that registered nothing on the inv_ slot: only the side that
+  // compares fingerprints can say no.
+  const invRejm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/reject$/);
+  if (invRejm && req.method === 'POST') {
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    // Only the account that owns the running hand-over may stop it (review
+    // #555, M5): any key could reject any inv_ id and wipe the sender's
+    // manifest. Before the first block there is no owner yet, and the
+    // rejection is the sender's own first word on the inv_ id.
+    const _rm = invManifests.get(invRejm[1]);
+    if (_rm && Date.now() <= _rm.expires && _rm.owner !== acctOf(apiKey)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'This hand-over belongs to a different account' }));
+    }
+    if (invRejections.size >= INV_MANIFEST_MAX) for (const [k, t] of invRejections) if (Date.now() > t) invRejections.delete(k);
+    // Hard cap: the oldest rejection goes first, the map never grows past it.
+    while (invRejections.size >= INV_MANIFEST_MAX) invRejections.delete(invRejections.keys().next().value);
+    invRejections.set(invRejm[1], Date.now() + INV_MANIFEST_TTL_MS);
+    _invDrop(invRejm[1]);
+    log('info', 'handover_rejected', { inv: invRejm[1].slice(0, 8) });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, rejected: true }));
+  }
+  const _invRejected = (inv) => { const t = invRejections.get(inv); if (!t) return false; if (Date.now() > t) { invRejections.delete(inv); return false; } return true; };
+
+  const invMfm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/manifest$/);
+  if (invMfm && req.method === 'GET') {
+    if (_invRejected(invMfm[1])) { res.writeHead(410, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'handover_rejected' })); }
+    const m = invManifests.get(invMfm[1]);
+    if (!m || Date.now() > m.expires) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, total: 0, chunks: [], complete: false })); }
+    const chunks = [...m.tokens.entries()].sort((a, b) => a[0] - b[0]).map(([index, token]) => ({ index, token }));
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, total: m.total, meta: m.meta, chunks, complete: chunks.length === m.total }));
+  }
+  if (invMfm && req.method === 'POST') {
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    let d;
+    try { d = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch (e) { res.writeHead(400); return res.end(J({ error: 'bad_request' })); }
+    const idx = Number(d.index); const total = Number(d.total_chunks);
+    const token = typeof d.token === 'string' ? d.token : '';
+    if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > INV_TOTAL_CHUNKS_MAX) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer of at most ' + INV_TOTAL_CHUNKS_MAX })); }
+    if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
+    const owner = acctOf(apiKey);
+    let m = invManifests.get(invMfm[1]);
+    if (m && Date.now() > m.expires) { _invDrop(invMfm[1]); m = null; }
+    if (!m) {
+      if (invManifests.size >= INV_MANIFEST_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      let _mine = 0;
+      const _now = Date.now();
+      for (const x of invManifests.values()) if (x.owner === owner && _now <= x.expires) _mine++;
+      if (_mine >= INV_MANIFESTS_PER_ACCOUNT) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'too_many_handovers', max: INV_MANIFESTS_PER_ACCOUNT })); }
+      const free = tiers.normalisePlan(keyData.plan) === 'community';
+      m = { owner, total, free, tokens: new Map(), meta: null, expires: Date.now() + INV_MANIFEST_TTL_MS };
+      invManifests.set(invMfm[1], m);
+    }
+    if (m.owner !== owner) { res.writeHead(403); return res.end(J({ error: 'This hand-over belongs to a different account' })); }
+    if (m.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
+    if (!m.tokens.has(idx)) {
+      const acctMax = m.free ? INV_TOKENS_FREE_ACCOUNT_MAX : INV_TOKENS_ACCOUNT_MAX;
+      if ((invTokensByOwner.get(owner) || 0) >= acctMax) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'too_many_handover_blocks', max: acctMax })); }
+      if (invTokenCount >= INV_TOKENS_TOTAL_MAX || (m.free && invFreeTokenCount >= INV_TOKENS_FREE_POOL_MAX)) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      m.tokens.set(idx, token);
+      _invCountAdd(m, 1);
+    }
+    if (typeof d.meta === 'string' && d.meta.length <= 2048 && !m.meta) m.meta = d.meta;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, have: m.tokens.size, total }));
   }
 
   // ── GET /v2/pubkey/:device ───────────────────────────────────────────────────
@@ -6959,6 +8538,12 @@ async function handleRelayRequest(req, res) {
     if (!INVITE_RE.test(deviceId) && !keyData?.active) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
+    // A rejected hand-over (POST /v2/session/inv_<id>/reject): the receiver
+    // polling the `_ready` slot learns it now instead of at the time limit.
+    if (INVITE_RE.test(deviceId) && _invRejected(deviceId.replace(/_ready$/, ''))) {
+      res.writeHead(410, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'handover_rejected' }));
     }
     // Invite sessions: stored and retrieved without API key
     const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
@@ -7097,6 +8682,7 @@ async function handleRelayRequest(req, res) {
       anonInboundIpRequests.set(ip, ipTimes);
       const dlToken = require('crypto').randomBytes(24).toString('hex');
       downloadTokens.set(dlToken, { hash, key: null, expires_ms: now + ttl, used: false, enc_meta: safeEncMeta, file_size: blob.length });
+      dlRemember(dlToken, now + ttl);
       incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
       stats.inbound++; stats.bytes_in += blob.length;
       log('info', 'anon_blob_stored', { hash: hash.slice(0, 16), size: blob.length });
@@ -7106,16 +8692,60 @@ async function handleRelayRequest(req, res) {
     finally { inFlightInbound--; }
   }
 
+  // ── POST /v2/verify, above the key gate: public (hertest T3-12) ──────────
+  // Checks an old (v1/v2) .psign against THIS relay's notary key. A pure
+  // function of the posted bytes: it stores nothing, reads no account and
+  // answers only valid/errors. /verify promised "offline and without an
+  // account" while v1/v2 asked for an API key. Rate-limited per address for
+  // keyless callers (relay/lib/public-routes.js has the declaration).
+  if (path === '/v2/verify' && req.method === 'POST') {
+    if (!keyData?.active && !verifyRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 65536)).toString());
+      if (!d.envelope) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope required' })); }
+      const documentHashHex = d.document_hash ? d.document_hash.toString().trim().toLowerCase() : null;
+
+      const result = parasign.verifyEnvelope(
+        { documentHashHex, envelope: d.envelope },
+        { sigVerify: (sig, msg, pub) => { try { return registry.getSig(0x0002).verify(sig, msg, pub); } catch (e) { return false; } },
+          relayPub: relayIdentity.pk });
+
+      // The envelope signature can only be checked here if THIS relay notarised it.
+      if (d.envelope.notary && d.envelope.notary.relay_pk_hash && d.envelope.notary.relay_pk_hash !== relayIdentity.pk_hash) {
+        result.note = 'envelope was notarised by a different relay; verify its envelope_signature against notary.relay_pubkey_url';
+      }
+
+      // The reasons, without the text of an internal exception ("... verify
+      // error: Maximum call stack size exceeded"): fixed words only (review r2 (e)).
+      const cleanErrors = (result.errors || []).map((m) => String(m)
+        .replace(/ verify error: [\s\S]*$/, ' could not be checked')
+        .replace(/^invalid appearance manifest: [\s\S]*$/, 'invalid appearance manifest'));
+      const out = { valid: result.valid, errors: cleanErrors, verified_at: new Date().toISOString(),
+        signer_label: (d.envelope.signer && d.envelope.signer.label) || null };
+      if (result.note) out.note = result.note;
+      res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
+      return res.end(J(out));
+    } catch (e) {
+      // Fixed codes only: never internal error text (review r2 (e)).
+      const tooLarge = e && e.message === 'Too large';
+      const code = tooLarge ? 'too_large' : (e instanceof SyntaxError ? 'invalid_json' : 'invalid_envelope');
+      res.writeHead(tooLarge ? 413 : 400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: code }));
+    }
+  }
+
   // Admin paths: ONLY ADMIN_TOKEN is accepted — no enterprise keys, no pgp_ keys
   // All other paths: require a valid X-Api-Key (pgp_ key in users.json)
   const isAdminPath = path.startsWith('/v2/admin');
+
   // Public envelope recipient endpoints: GET status, POST view, POST sign
   // are reachable without an API key (the recipient may be an external
   // party). POST /v2/envelopes (create) is intentionally NOT in this list
   // and is still gated.
   const isEnvelopePublic = path.startsWith('/v2/envelopes/') && (
     req.method === 'GET' ||
-    (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
+    (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign') || path.endsWith('/decline')))
   );
   // ── De ontvangerskant, en hij staat BOVEN de sleutelpoort ────────────────
   //
@@ -7199,7 +8829,10 @@ async function handleRelayRequest(req, res) {
       // DIFFERENT sender than the mail it belongs to, which is the single most
       // reliable way to make a legitimate code look like a scam.
       const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
-      const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
+      // Cleaned again here: sends filed before the name was cleaned on the way
+      // in still carry the raw one.
+      const bestandRuw2 = veiligeBestandsnaam(vraag.filename);
+      const bestand2 = escHtml(bestandRuw2);
       const taal2 = mailTaal(vraag.lang);
       const bezorgd = await mailer.stuur({
         to: vraag.email,
@@ -7208,13 +8841,13 @@ async function handleRelayRequest(req, res) {
         subject: taal2 === 'en' ? 'Your code to open the file'
                                 : 'Uw controlecode om het bestand te openen',
         text: tweetaligTekst(taal2,
-              'Uw controlecode is ' + vraag.code + '. De code is ' + minuten + ' minuten geldig.'
-            + (vraag.filename ? '\n\nVoor het bestand: ' + vraag.filename : '')
+              'Uw controlecode is ' + vraag.code + '. De code werkt ' + minuten + ' minuten.'
+            + (bestandRuw2 ? '\n\nVoor het bestand: ' + bestandRuw2 : '')
             + (wie2 ? '\nGestuurd door ' + wie2 + ' via Paramant.' : '')
             + '\n\nHeeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders uw link. '
             + 'Geef de code niet door en laat het de afzender weten.',
               'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
-            + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
+            + (bestandRuw2 ? '\n\nIt opens: ' + bestandRuw2 : '')
             + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
             + '\n\nIf you did not just ask for this code, somebody else has your link. '
             + 'Do not pass the code on, and let the sender know.'),
@@ -7223,8 +8856,8 @@ async function handleRelayRequest(req, res) {
             + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
             + (bestand2 ? '<p style="color:#666;font-size:13px">Voor het bestand: <strong>'
                           + bestand2 + '</strong></p>' : '')
-            + '<p style="color:#666;font-size:13px">De code is ' + minuten
-            + ' minuten geldig.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
+            + '<p style="color:#666;font-size:13px">De code werkt ' + minuten
+            + ' minuten.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
             + 'uw link. Geef de code niet door en laat het de afzender weten.</p>',
               '<p>Your code to open the file' + (taal2 === 'en' ? ':' : ' is the one above.') + '</p>'
             + (taal2 === 'en'
@@ -7452,7 +9085,7 @@ async function handleRelayRequest(req, res) {
     const total = Number(d.total_chunks);
     const token = typeof d.token === 'string' ? d.token : '';
     if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
-    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > INV_TOTAL_CHUNKS_MAX) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer of at most ' + INV_TOTAL_CHUNKS_MAX })); }
     if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
     if (!sess.manifest) sess.manifest = { total, tokens: new Map(), meta: null };
@@ -7662,6 +9295,7 @@ async function handleRelayRequest(req, res) {
       // cap is reached. Access to existing blobs (download/view) is never gated.
       // A continuing multi-chunk upload (dedup hit) and Redis outages both pass
       // (fail-open) — this only declines fresh active use over the cap.
+      let _volgblok = false; // a later block of a file already counted
       if (keyData && keyData.account_id) {
         const _dedupKey = (meta && meta.file_id)
           ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
@@ -7679,12 +9313,18 @@ async function handleRelayRequest(req, res) {
           res.writeHead(402, { 'Content-Type': 'application/json' });
           return res.end(J({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: _psend.tier, limit: _tLimit }));
         }
+        _volgblok = !!_tGate.deduped;
       }
 
       // Append transfer to CT log before storing — so proof is available at outbound time
       const ctEntry = ctAppendTransfer(hash, SECTOR);
       blobPut(hash, { blob, ts: Date.now(), ttl, size: blob.length,
         account_id: acctOf(apiKey),
+        // For the download event (webhook + mail): which device's hooks, and
+        // which file a block belongs to so one file mails once.
+        device_id: (meta && typeof meta.device_id === 'string') ? meta.device_id.slice(0, 128) : null,
+        file_id: (meta && meta.file_id) ? String(meta.file_id).slice(0, 128) : null,
+        lang: (meta && (meta.lang === 'nl' || meta.lang === 'en')) ? meta.lang : '',
         sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
         sector: SECTOR,
         ct_entry: {
@@ -7714,7 +9354,14 @@ async function handleRelayRequest(req, res) {
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned', ...(viaSessionToken ? { via: 'pst' } : {}) });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
       // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
-      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
+      // One file is one mail (hertest T4-11): a 24 MB send arrives as five
+      // blocks under one meta.file_id, and every block used to mail "Your
+      // Paramant transfer is ready". Only the block that was counted mails.
+      // Remembered in memory as well, so it holds without redis (the quota
+      // gate fails open there and cannot say "already counted").
+      if (!_volgblok && !_alGemeld(acctOf(apiKey), meta && meta.file_id)) {
+        transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater, lang: (meta && (meta.lang === 'nl' || meta.lang === 'en')) ? meta.lang : '' });
+      }
 
       // (Transfer already counted by the quota gate above, before storage.)
 
@@ -7736,6 +9383,7 @@ async function handleRelayRequest(req, res) {
         enc_meta: safeEncMeta,  // encrypted filename/metadata (ciphertext only) — finding #4 closed
         file_size: blob.length,
       });
+      dlRemember(dlToken, downloadTokens.get(dlToken).expires_ms);
       const merkleProof = {
         leaf_hash:  ctEntry.leaf_hash,
         leaf_index: ctEntry.index,
@@ -7769,7 +9417,7 @@ async function handleRelayRequest(req, res) {
     if (!entry.apiKey || entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     blobDrop(delm[1]);
     // Remove associated download token if present
-    for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { downloadTokens.delete(t); break; } }
+    for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { dlBurn(t, d, 'withdrawn'); downloadTokens.delete(t); break; } }
     auditAppend(apiKey, 'inbound_aborted', { hash: delm[1].slice(0,16)+'...' });
     log('info', 'blob_aborted', { hash: delm[1].slice(0,16) });
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -7779,7 +9427,22 @@ async function handleRelayRequest(req, res) {
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
   const outm = path.match(/^\/v2\/outbound\/([a-f0-9]{64})$/);
   if (outm && req.method === 'GET') {
-    const entry = blobStore.get(outm[1]);
+    let entry = blobStore.get(outm[1]);
+    // The same key coming back right after a download whose connection closed
+    // within DELIVERY_SETTLE_MS of the last byte: that download may have been
+    // broken off behind a proxy. It gets the blob once more (matrix API-35-K),
+    // and only once per blob: the download out of the hold is final (review
+    // #565, H1: the hold could be chained without end).
+    if (!entry) {
+      const held = outboundRetryHold.get(outm[1]);
+      if (held && held.key && held.key === apiKey && Date.now() < held.until) {
+        outboundRetryHold.delete(outm[1]);
+        clearTimeout(held.timer);
+        held.entry.views_remaining = (held.entry.views_remaining ?? 0) + 1;
+        if (Date.now() - held.entry.ts < held.entry.ttl) { blobPut(outm[1], held.entry); entry = held.entry; }
+        log('info', 'outbound_retry_after_close', { hash: outm[1].slice(0,16) });
+      }
+    }
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     // Per-key outbound rate limit (finding #12)
@@ -7816,11 +9479,9 @@ async function handleRelayRequest(req, res) {
     if (burned) {
       // Unlisted immediately so a concurrent reader cannot find it, but NOT
       // wiped: `blob` below is the buffer being served. Wiping here handed the
-      // downloader five megabytes of zeroes.
+      // downloader five megabytes of zeroes. It is only destroyed after the
+      // delivery (afterDelivery below); a broken download puts it back.
       blobDrop(outm[1], false);
-      res.on('finish', () => zeroBuffer(blob));
-      res.on('close',  () => zeroBuffer(blob));
-      incMetric('blobs_burned'); stats.burned++;
     }
     incMetric('bytes_out_total', blob.length);
     stats.outbound++; stats.bytes_out += blob.length;
@@ -7828,12 +9489,6 @@ async function handleRelayRequest(req, res) {
       { hash: outm[1].slice(0,16)+'...', bytes: blob.length, views_left: entry.views_remaining });
     log('info', burned ? 'blob_burned' : 'blob_served',
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
-    // ParaSend Pro download notification. Notify the transfer OWNER (the uploader),
-    // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
-    {
-      const _ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
-      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: mailLater });
-    }
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
@@ -7855,7 +9510,7 @@ async function handleRelayRequest(req, res) {
         retrieved_at:           Date.now(),
         sector:                 entry.sector || SECTOR,
         relay_id:               RELAY_SELF_URL || (SECTOR + '.paramant.app'),
-        tree_size_at_retrieval: ctWindow.size,
+        tree_size_at_retrieval: ctTree.size,
         inclusion_proof:        inclusionProof,
         burn_confirmed:         burned,
       };
@@ -7900,9 +9555,47 @@ async function handleRelayRequest(req, res) {
       if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
       else outHeaders['X-Paramant-Receipt-Deprecated'] = `removed 2026-12-01; GET /v2/transfers/${receiptId}/receipt`;
     }
+    outHeaders['X-Accel-Buffering'] = 'no';
     res.writeHead(200, outHeaders);
-    if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
-    return res.end(blob);
+    // A line broken before the last byte was written loses nothing (matrix
+    // API-24-K, API-35-K): the read only counts, and a burning read only
+    // destroys the blob, once the whole body was written. Socket buffers take
+    // a few MB, so for a blob under ~5 MB that is as a rule straight away. Until then the entry is unlisted, so a second
+    // reader gets 404 as before.
+    const outHash = outm[1];
+    const delivered = () => {
+      if (burned) { zeroBuffer(blob); incMetric('blobs_burned'); stats.burned++; }
+      // ParaSend Pro download notification. Notify the transfer OWNER (the
+      // uploader), whose key is on the blob entry, not the downloader.
+      _notifyDownloaded(entry, outHash, { via: 'api' });
+    };
+    afterDelivery(req, res, {
+      onDelivered: delivered,
+      onCleanCloseEarly: () => {
+        if (!burned || !apiKey || entry.retryHeld) return delivered();
+        entry.retryHeld = true;
+        const timer = setTimeout(() => {
+          const h = outboundRetryHold.get(outHash);
+          if (h && h.entry === entry) { outboundRetryHold.delete(outHash); delivered(); }
+        }, DELIVERY_SETTLE_MS);
+        if (timer.unref) timer.unref();
+        outboundRetryHold.set(outHash, { entry, key: apiKey, until: Date.now() + DELIVERY_SETTLE_MS, timer });
+      },
+      // Broken off before the last byte: the read does not count, but the
+      // blob is served at most DL_MAX_FETCHES times in all, as a /v2/dl link
+      // is (dlExhausted): the last broken read counts (review #565, #573).
+      onAborted: (why) => {
+        entry.aborts = (entry.aborts || 0) + 1;
+        if (entry.aborts >= DL_MAX_FETCHES) {
+          log('warn', 'outbound_aborted_counted', { hash: outHash.slice(0,16), why, aborts: entry.aborts });
+          return delivered();
+        }
+        entry.views_remaining = (entry.views_remaining ?? 0) + 1;
+        if (burned && Date.now() - entry.ts < entry.ttl && !blobStore.has(outHash)) blobPut(outHash, entry);
+        log('warn', 'outbound_aborted_before_delivery', { hash: outHash.slice(0,16), why, restored: burned });
+      },
+    });
+    return writeInPieces(res, blob);
   }
 
   // ── GET /v2/transfers/:receipt_id/receipt ─ the delivery receipt, by reference ─
@@ -7953,8 +9646,22 @@ async function handleRelayRequest(req, res) {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
-      const k = `${d.device_id}:${acctOf(apiKey)}`;
-      if (!webhooks.has(k)) webhooks.set(k, []);
+      if (typeof d.url !== 'string' || d.url.length > WEBHOOK_URL_MAX) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'url too long', max: WEBHOOK_URL_MAX })); }
+      if (String(d.device_id).length > WEBHOOK_DEVICE_ID_MAX) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'device_id too long', max: WEBHOOK_DEVICE_ID_MAX })); }
+      const _acct = acctOf(apiKey);
+      const k = `${d.device_id}:${_acct}`;
+      const _capReply = (code) => {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        return res.end(J(code === -1
+          ? { error: 'webhook_device_limit', max_devices: WEBHOOK_DEVICES_PER_ACCOUNT }
+          : { error: 'webhook_store_full' }));
+      };
+      // Every webhook is signed. Without a secret X-Paramant-Sig went out
+      // empty and the receiver could not tell our call from anyone's. One is
+      // made when the caller sends none, and handed back once, here.
+      const _given = d.secret == null ? '' : String(d.secret);
+      if (_given.length > 256) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'secret too long', max: 256 })); }
+      const _secret = _given || ('whsec_' + crypto.randomBytes(24).toString('hex'));
       // String(), want `|| ''` vangt alleen falsy. Een number, object of array
       // overleefde en kwam later in crypto.createHmac terecht, dat op een
       // niet-string gooit. Die throw stond een regel BUITEN de try in
@@ -7963,10 +9670,32 @@ async function handleRelayRequest(req, res) {
       // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
       // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
       // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
-      webhooks.get(k).push({ url: d.url, secret: String(d.secret == null ? '' : d.secret) });
+      const _entry = { url: d.url, secret: _secret };
+      if (redisClient && redisClient.isReady) {
+        let rr;
+        try {
+          rr = await redisClient.eval(WEBHOOK_REGISTER_LUA, {
+            keys: [_webhookAcctKey(_acct), WEBHOOK_ALL_KEY, _webhookRedisKey(k)],
+            arguments: [String(Date.now()), String(Date.now() + WEBHOOK_TTL_S * 1000), crypto.createHash('sha256').update(String(d.device_id)).digest('hex').slice(0, 32),
+              String(WEBHOOK_DEVICES_PER_ACCOUNT), String(WEBHOOK_TOTAL_MAX), JSON.stringify(_entry), String(WEBHOOK_PER_DEVICE), String(WEBHOOK_TTL_S)],
+          });
+        } catch (we) {
+          log('warn', 'webhook_persist_failed', { err: we.message });
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'webhook_store_unavailable' }));
+        }
+        if (Number(rr) < 0) return _capReply(Number(rr));
+      } else {
+        const memOk = _webhookMemAllowed(k, _acct);
+        if (memOk < 0) return _capReply(memOk);
+        if (!webhooks.has(k)) webhooks.set(k, []);
+        const _list = webhooks.get(k);
+        _list.push(_entry);
+        if (_list.length > WEBHOOK_PER_DEVICE) _list.splice(0, _list.length - WEBHOOK_PER_DEVICE);
+      }
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true }));
+      return res.end(J({ ok: true, events: ['blob_ready', 'blob_downloaded'], ...(_given ? {} : { secret: _secret }) }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -8009,7 +9738,7 @@ async function handleRelayRequest(req, res) {
     if (query.format === 'csv') {
         res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="paramant_audit.csv"' });
       return res.end('ts,event,hash,bytes,device,chain_hash\n' +
-        entries.map(e => `${e.ts},${e.event},${e.hash||''},${e.bytes||0},${e.device||''},${e.chain_hash}`).join('\n'));
+        entries.map(e => [e.ts, e.event, e.hash || '', e.bytes || 0, e.device || '', e.chain_hash].map(_csvAuditCell).join(',')).join('\n'));
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, count: entries.length, chain_valid: valid, entries }));
@@ -8049,7 +9778,8 @@ async function handleRelayRequest(req, res) {
       sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
       relayIdentity,
       canonicalJSON: parasign.canonicalJSON,
-      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app',
+      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
+      relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
     });
   }
 
@@ -8270,9 +10000,20 @@ async function handleRelayRequest(req, res) {
       // both pass a stale count — closes the prior check-before-await TOCTOU.
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
-      // Fix 13: validate plan against allowlist
-      const VALID_PLANS = new Set(['community', 'dev', 'pro', 'licensed', 'enterprise']);
-      const plan = VALID_PLANS.has(d.plan) ? d.plan : 'community';
+      // Fix 13: validate plan against allowlist. 'business' was missing, so a
+      // Business key made here was stored as community without a word (the
+      // update-plan route below has always had it). An unknown plan is now a
+      // 400, not a silent community: a downgrade nobody asked for is the worst
+      // way to be wrong about money. 'free' and 'trial' are what the CLI and the
+      // admin UI send for the free tier, so they are spelled out as community.
+      const VALID_PLANS = new Set(['community', 'dev', 'pro', 'business', 'licensed', 'enterprise']);
+      const PLAN_ALIASES = { free: 'community', trial: 'community' };
+      const askedPlan = d.plan == null || d.plan === '' ? 'community' : String(d.plan);
+      const plan = PLAN_ALIASES[askedPlan] || askedPlan;
+      if (!VALID_PLANS.has(plan)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'invalid_plan', valid: [...VALID_PLANS] }));
+      }
       const label = typeof d.label === 'string' ? d.label.slice(0, 128) : '';
       // L4: validate email format and length before storing/sending
       const rawEmail = (d.email || '').toString().trim();
@@ -8290,8 +10031,7 @@ async function handleRelayRequest(req, res) {
 
       // Per-account cap (and the self-host relay-total cap) — checked atomically
       // with the insert below.
-      const acctPlan = tiers.normalisePlan((accounts.get(account_id) && accounts.get(account_id).plan) || plan);
-      const acctCap = ACCOUNT_KEY_LIMIT[acctPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const { plan: acctPlan, cap: acctCap } = accountKeyCap(account_id, (accounts.get(account_id) && accounts.get(account_id).plan) || plan);
       const acctActive = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
       if (acctActive >= acctCap) {
         res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -8312,6 +10052,7 @@ async function handleRelayRequest(req, res) {
 
       const created = new Date().toISOString();
       apiKeys.set(newKey, { plan, label, email, active: true, account_id, is_primary, scope, created });
+      const accountWasNew = !accounts.has(account_id);
       if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan, email, primary_api_key: null, label });
       if (is_primary || !accounts.get(account_id).primary_api_key) accounts.get(account_id).primary_api_key = newKey;
       if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
@@ -8320,11 +10061,26 @@ async function handleRelayRequest(req, res) {
       apiKeys.get(newKey).kid = kid;
       kidIndex.set(kid, newKey);
 
-      _mutateUsersJson(ud => {
-        ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
-        ud.updated = new Date().toISOString();
-      }).then(() => log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true }))
-        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      // Awaited: a key that is not on disk is gone at the next restart, so the
+      // caller must not be told it exists. On failure the in-memory key is
+      // taken back and the answer says why.
+      try {
+        await _mutateUsersJson(ud => {
+          ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
+          ud.updated = new Date().toISOString();
+        });
+        log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true });
+      } catch (we) {
+        apiKeys.delete(newKey);
+        kidIndex.delete(kid);
+        const ak = accountKeys.get(account_id);
+        if (ak) { ak.delete(newKey); if (ak.size === 0) accountKeys.delete(account_id); }
+        if (accountWasNew) accounts.delete(account_id);
+        else if (accounts.get(account_id) && accounts.get(account_id).primary_api_key === newKey) accounts.get(account_id).primary_api_key = null;
+        log('error', 'key_persist_failed', { err: we.message, label, persisted: false });
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'key_not_persisted', detail: 'users.json could not be written; the key was not created.' }));
+      }
       applyKeyLimitEnforcement();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key: newKey, kid, account_id, plan, label }));
@@ -8362,6 +10118,8 @@ async function handleRelayRequest(req, res) {
       // floored it to free. The date is on the record; it just never left.
       paid_until_parasign: sign.paidUntil,
       paid_until_parasend: send.paidUntil,
+      terms_parasign: _runningTermsView(v, 'parasign'),
+      terms_parasend: _runningTermsView(v, 'parasend'),
       // Is there a collection standing behind this account. The account page
       // told every customer auto_renews:false because nothing on this
       // projection could say otherwise, and with BILLING_MODE set that is the
@@ -8770,6 +10528,12 @@ async function handleRelayRequest(req, res) {
         if (entitlements.hasRunningTerm(rec, g.product, g.tier)) continue;
         const running = entitlements.effectiveProductTier(rec, g.product);
         if (running.tier === entitlements.floorTierOf(g.product)) continue;
+        // An upgrade is self-service, as /pricing says ("upgrade when you
+        // outgrow"): the higher tier runs on top and the lower term is paused
+        // for exactly the span bought (webhook pauseLowerTerms), so no week is
+        // paid twice. Only a step DOWN next to a running higher tier still
+        // goes by mail.
+        if (entitlements.termRelation(g.product, g.tier, running.tier) === 'lower_running') continue;
         const until = running.paidUntil ? planExpiry.formatDate(running.paidUntil) : null;
         res.writeHead(409, { 'Content-Type': 'application/json' });
         return res.end(J({
@@ -8817,16 +10581,40 @@ async function handleRelayRequest(req, res) {
         log('warn', 'billing_customer_unverified', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
       }
       const customerId = cust.customerId;
+      // The buyer comes back in the language he bought in. The redirect was
+      // always /dashboard, the Dutch page, so a buyer from /en/pricing read
+      // "Betaling ontvangen" (betaaltest 05-10, row 6). Only 'en' changes it;
+      // anything else is the Dutch default, never a path from the request.
+      const _en = body.lang === 'en';
       const payment = await mollie.createPayment(mode, Object.assign({
         amount: { currency: order.currency, value: vatMod.chargeAmount(order, vatTerms) },
-        description: `Paramant ${billingCatalog.orderLabel(order)} (${order.interval})`,
-        redirectUrl: `${origin}/dashboard?billing=return`,
+        // In the buyer's language (acceptatie 3.1.1, betalen punt 5): a Dutch
+        // buyer read "Paramant Firm (ParaSign Pro and ParaSend Pro) (monthly)".
+        description: _en
+          ? `Paramant ${billingCatalog.orderLabelEn(order)} (${order.interval === 'yearly' ? 'yearly' : 'monthly'})`
+          : `Paramant ${billingCatalog.orderLabelNl(order)} (${order.interval === 'yearly' ? 'per jaar' : 'per maand'})`,
+        redirectUrl: `${origin}${_en ? '/en' : ''}/dashboard?billing=return`,
         webhookUrl: `${origin}/v2/billing/webhook`,
         // A reverse-charged sale adds its terms (lib/vat.metadataOf); a 21%
         // sale adds nothing, so its payload is what it always was.
         metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval, ...vatMod.metadataOf(vatTerms) },
       }, customerId ? { customerId, sequenceType: 'first' } : {}));
       const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
+      // Remember the checkout this account started last, so the dashboard it
+      // returns to can say what actually happened to it (GET
+      // /v2/billing/last-payment). Mollie's redirect carries no payment id,
+      // and without this the dashboard said "being confirmed" and "you get
+      // the plan by itself" after a cancelled or failed payment too
+      // (betaaltest 05-10, row 4). Best effort: a checkout never fails on it.
+      if (redisClient && redisClient.isReady) {
+        redisClient.set(_buyerLangKey(accountId), _en ? 'en' : 'nl').catch(() => { /* the invoice then falls back to Dutch */ });
+      }
+      if (payment && payment.id && redisClient && redisClient.isReady) {
+        redisClient.set(_lastCheckoutKey(accountId), J({
+          id: payment.id, product: order.product, plan: order.plan, interval: order.interval,
+          lang: _en ? 'en' : 'nl', at: new Date().toISOString(),
+        }), { EX: 7 * 86400 }).catch(() => { /* the dashboard then says it does not know */ });
+      }
       log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode, recurring: !!customerId, vat: vatTerms.treatment });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, payment_id: payment && payment.id, checkout_url: checkoutUrl, mode }));
@@ -8835,6 +10623,31 @@ async function handleRelayRequest(req, res) {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'checkout_failed' }));
     }
+  }
+
+  // ── GET /v2/billing/last-payment: what became of the last checkout ─────────
+  // The dashboard asks this when Mollie sends the buyer back. The status comes
+  // from Mollie itself, fetched now with our own key, for the payment this
+  // account started (the id is ours, stored at checkout, never taken from the
+  // request). Read-only: it grants nothing, which stays the webhook's job.
+  if (path === '/v2/billing/last-payment' && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    let last = null;
+    try { last = (redisClient && redisClient.isReady) ? JSON.parse(await redisClient.get(_lastCheckoutKey(accountId)) || 'null') : null; }
+    catch { last = null; }
+    if (!last || !last.id) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, payment: null })); }
+    let status = 'unknown';
+    try {
+      const p = await mollie.getPayment(mollie.billingStance().mode, last.id);
+      if (p && typeof p.status === 'string') status = p.status;
+    } catch (e) {
+      log('warn', 'billing_last_payment_fetch_failed', { account: String(accountId).slice(0, 12), err: e.message, status: e.status });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, payment: {
+      status, product: last.product, plan: last.plan, interval: last.interval, lang: last.lang, started_at: last.at,
+    } }));
   }
 
   // ── POST /v2/billing/webhook — Mollie payment status callback ────────────────
@@ -8913,6 +10726,11 @@ async function handleRelayRequest(req, res) {
       // the account record carries the payment id that bought its current
       // period, and that answer survives anything redis does.
       isProcessed: async (id) => {
+        // The ledger first: it holds EVERY payment id ever settled, on disk,
+        // and it is what stops a replay of an old tr_ after the redis marker
+        // is gone and paid_by_<product> has moved on to a newer payment.
+        const led = billingLedger.status(id);
+        if (led) return led;
         if (_rok()) {
           try { const v = await redisClient.get(_idemKey(id)); if (v) return v; } catch { /* fall through to disk */ }
         }
@@ -8921,8 +10739,29 @@ async function handleRelayRequest(req, res) {
         for (const p of entitlements.PRODUCTS) if (rec[_paidByField(p)] === id) return 'granted';
         return false;
       },
-      markProcessed: async (id, val) => {
+      periodOf: async (id) => { const r = billingLedger.get(id); return r && Array.isArray(r.grants) ? r.grants : null; },
+      // An upgrade pauses the lower terms of the same product (lib/billing):
+      // their end moves out by the span the higher tier just bought.
+      pauseLowerTerms: async (accountId, product, tier, spanMs) => {
+        if (!(spanMs > 0)) return [];
+        const rec = entitlementRecordOf(accountId);
+        const nowMs = Date.now();
+        const moved = [];
+        for (const t of entitlements.termsOf(rec, product)) {
+          if (t.until === null || t.tier === entitlements.floorTierOf(product)) continue;
+          if (entitlements.termRelation(product, t.tier, tier) !== 'higher_running') continue;
+          const end = new Date(t.until).getTime();
+          if (!(end > nowMs)) continue;
+          const r = setProductPlan(accountId, product, t.tier, new Date(end + spanMs), t.bundle || null);
+          if (r && r.ok) moved.push({ tier: t.tier, by: spanMs });
+        }
+        return moved;
+      },
+      markProcessed: async (id, val, extra) => {
         const md = payment.metadata || {};
+        // Durable, awaited, and first. A failure here is logged at error level
+        // by the ledger; the redis marker and paid_by below still apply.
+        try { await billingLedger.record(id, String(val), extra); } catch { /* logged in the ledger */ }
         // Persist first: this is the half that has to outlive a restart.
         // Every product this payment granted, so a Firm payment is remembered on
         // both halves. Reading only md.product would leave the parasend side
@@ -8937,7 +10776,9 @@ async function handleRelayRequest(req, res) {
           }
         }
         if (!_rok()) return;
-        try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ }
+        // No TTL any more: the 60-day expiry is what made an old payment
+        // grantable again. The ledger is the record; this is the fast path.
+        try { await redisClient.set(_idemKey(id), String(val)); } catch { /* best effort */ }
       },
     });
     // The collecting half. A grant only says what this payment bought; without
@@ -9114,7 +10955,7 @@ async function handleRelayRequest(req, res) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
     if (!redisClient || !redisClient.isReady) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     let body;
     try { body = JSON.parse((await readBody(req, 512)).toString() || '{}'); }
@@ -9130,7 +10971,7 @@ async function handleRelayRequest(req, res) {
       if (redisOutage503(e, res)) return;
       log('warn', 'coupon_claim_failed', { account: String(accountId).slice(0, 12), err: e.message });
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     if (!claim.ok) {
       // 409 for a code that exists and cannot be spent (run out, already used,
@@ -9140,7 +10981,7 @@ async function handleRelayRequest(req, res) {
       const status = claim.error === 'unknown' || claim.error === 'bad_code' ? 404 : 409;
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: claim.error });
       res.writeHead(status, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error) }));
+      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error), message_nl: coupon.messageForNl(claim.error) }));
     }
 
     // Rule 3 (lib/coupon.js): the gift is ADDED to a term that is still
@@ -9189,7 +11030,7 @@ async function handleRelayRequest(req, res) {
       await coupon.release(redisClient, claim.code, accountId);
       log('error', 'coupon_grant_failed', { account: String(accountId).slice(0, 12), code: claim.code, reason: failure });
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed }));
+      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed, message_nl: coupon.MESSAGES_NL.grant_failed }));
     }
     if (granted.length === 0) {
       // Nothing to add anywhere. The seat goes back, so the code is not spent
@@ -9198,7 +11039,7 @@ async function handleRelayRequest(req, res) {
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: 'nothing_to_add',
         kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') });
       res.writeHead(409, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept) }));
+      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept), message_nl: coupon.nothingToAddMessageNl(kept) }));
     }
 
     // The line on /account. Written after the term is really on the account, so
@@ -9209,6 +11050,7 @@ async function handleRelayRequest(req, res) {
     await billingHistory.recordGift(redisClient, accountId, {
       code: claim.code,
       label: coupon.historyLabel(claim.code, granted),
+      label_nl: coupon.historyLabelNl(claim.code, granted),
       grants: granted,
       redeemed_at: redeemedAt,
     });
@@ -9242,6 +11084,7 @@ async function handleRelayRequest(req, res) {
       // The sentence the page prints. Built here so the mail, the history line
       // and the page all name the same plans and the same dates.
       message: coupon.successMessage(granted, kept),
+      message_nl: coupon.successMessageNl(granted, kept),
     }));
   }
 
@@ -9559,7 +11402,7 @@ async function handleRelayRequest(req, res) {
       const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
       try { auditAppend(out.key, 'admin_parasign_key_minted', { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode, plan: out.plan }); } catch {}
       res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, plan_parasign: out.plan_parasign, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
     } catch(e) { if (keyCapReject(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
@@ -9627,7 +11470,7 @@ async function handleRelayRequest(req, res) {
       const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
         <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
         <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-          Your API key is ready to claim. The link below reveals it once and expires in 7 days. Save the key in your password manager the moment you see it — it is generated once and cannot be recovered.
+          Your API key is ready. The link below shows it once and works for 7 days. Save the key in your password manager as soon as you see it. It is made once and cannot be recovered.
         </div>
         <p style="color:#888;margin-bottom:24px">Plan: <strong style="color:#ededed">${escHtml((d.plan||'').toUpperCase())}</strong></p>
         <div style="margin-bottom:24px"><a href="${claimUrl}" style="display:inline-block;background:#ededed;color:#0c0c0c;text-decoration:none;padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600">Reveal my API key</a></div>
@@ -9640,7 +11483,7 @@ async function handleRelayRequest(req, res) {
       // whether their key is on its way.
       const resp = await mailer.stuur({
         from: 'PARAMANT <privacy@paramant.app>', to: d.email,
-        subject: 'Claim your PARAMANT API key', html,
+        subject: 'Your PARAMANT API key is ready', html,
       });
       if (resp.ok) {
         log('info', 'welcome_mail_sent', { email: maskEmail(d.email), provider: resp.provider, label: d.label });
@@ -9657,11 +11500,11 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/team/devices' && req.method === 'GET') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    const teamId = kd.team_id;
-    if (!teamId) { res.writeHead(200); return res.end(J({ team_id: null, devices: [], message: 'Losse sleutel, geen team' })); }
+    // The team IS the account (see /v2/team/add-device): every key of it.
+    const teamId = kd.account_id || apiKey;
     const devices = [];
     apiKeys.forEach((v, k) => {
-      if (v.team_id === teamId) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
+      if ((v.account_id || k) === teamId && v.active !== false) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
     });
     res.writeHead(200); return res.end(J({ team_id: teamId, devices, count: devices.length }));
   }
@@ -9689,11 +11532,21 @@ async function handleRelayRequest(req, res) {
   // teaches the loader about team_id, this must not be the shape that lands.
   // Bound to the PARENT account, scope inherited, capped, persisted, and 32
   // bytes like every other key in the file. key-mint-gate.test.js holds it here.
+  //
+  // MADE TO WORK, 2026-10-04 (SENDNAME-43). docs.html promises "add a device to
+  // the team (Firm or higher)" and there was no way to get a team at all. The
+  // team is now the ACCOUNT: a Firm-or-higher account adds a device key that
+  // belongs to that same account, shares its plan and its monthly buckets (the
+  // gates meter account_id), and counts against the account's key cap. No
+  // separate team object, nothing a loader can drop.
   if (path === '/v2/team/add-device' && req.method === 'POST') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    if (!kd.team_id) { res.writeHead(403); return res.end(J({ error: 'Geen team. Daarvoor is Pro nodig.' })); }
-    if (kd.plan === 'dev') { res.writeHead(403); return res.end(J({ error: 'Team keys vereisen Pro of Enterprise' })); }
+    if (!tierGate.isParasendProPlus(entitlementRecordOf(kd.account_id || apiKey) || kd)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'tier_upgrade_required', feature: 'team_devices', message: 'Apparaten aan het team toevoegen kan vanaf Firm.', message_en: 'Adding devices to the team requires Firm or higher.' }));
+    }
+    kd.team_id = kd.account_id || apiKey;
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.label) { res.writeHead(400); return res.end(J({ error: 'label verplicht' })); }
@@ -9701,8 +11554,7 @@ async function handleRelayRequest(req, res) {
       const account_id = kd.account_id || apiKey;
       const scope = keysTable.VALID_SCOPES.has(kd.scope) ? kd.scope : 'full';
       const email = kd.email || '';
-      const capPlan = tiers.normalisePlan(kd.plan);
-      const cap = ACCOUNT_KEY_LIMIT[capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const { plan: capPlan, cap } = accountKeyCap(account_id, kd.plan);
       const active = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
       if (active >= cap) {
         res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -9717,11 +11569,19 @@ async function handleRelayRequest(req, res) {
       const kid = keysTable.assignKid(kidIndex, newKey, log);
       apiKeys.get(newKey).kid = kid;
       kidIndex.set(kid, newKey);
-      _mutateUsersJson(ud => {
-        ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
-        ud.updated = new Date().toISOString();
-      }).then(() => log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true }))
-        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      try {
+        await _mutateUsersJson(ud => {
+          ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
+          ud.updated = new Date().toISOString();
+        });
+        log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true });
+      } catch (we) {
+        apiKeys.delete(newKey); kidIndex.delete(kid);
+        const ak = accountKeys.get(account_id); if (ak) ak.delete(newKey);
+        log('error', 'key_persist_failed', { err: we.message, label, persisted: false });
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'key_not_persisted' }));
+      }
       applyKeyLimitEnforcement();
       res.writeHead(201); return res.end(J({ ok: true, key: newKey, kid, account_id, label, team_id: kd.team_id }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -9835,6 +11695,10 @@ async function handleRelayRequest(req, res) {
         const _psign  = entitlements.getEntitlements(keyData).parasign;
         const _sLimit = _psign.quotas.signs_month;
         const _sGate  = await quota.gateSign(redisClient, keyData.account_id, _sLimit, log);
+        if (_sGate.unavailable) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable', message: 'Signatures cannot be counted right now. Nothing was signed; try again in a minute.' }));
+        }
         if (!_sGate.allowed) {
           // The tier that DECIDED, as on the transfer gate: the unified plan
           // does not move on a ParaSign purchase either, so reporting it here
@@ -9867,34 +11731,6 @@ async function handleRelayRequest(req, res) {
 
   // ── POST /v2/verify — ParaSign envelope verification (R017, public) ──────────
   // Stateless. The same checks run client-side; this is a convenience endpoint.
-  if (path === '/v2/verify' && req.method === 'POST') {
-    if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
-    try {
-      const d = JSON.parse((await readBody(req, 65536)).toString());
-      if (!d.envelope) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope required' })); }
-      const documentHashHex = d.document_hash ? d.document_hash.toString().trim().toLowerCase() : null;
-
-      const result = parasign.verifyEnvelope(
-        { documentHashHex, envelope: d.envelope },
-        { sigVerify: (sig, msg, pub) => { try { return registry.getSig(0x0002).verify(sig, msg, pub); } catch (e) { return false; } },
-          relayPub: relayIdentity.pk });
-
-      // The envelope signature can only be checked here if THIS relay notarised it.
-      if (d.envelope.notary && d.envelope.notary.relay_pk_hash && d.envelope.notary.relay_pk_hash !== relayIdentity.pk_hash) {
-        result.note = 'envelope was notarised by a different relay; verify its envelope_signature against notary.relay_pubkey_url';
-      }
-
-      const out = { valid: result.valid, errors: result.errors, verified_at: new Date().toISOString(),
-        signer_label: (d.envelope.signer && d.envelope.signer.label) || null };
-      if (result.note) out.note = result.note;
-      res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
-      return res.end(J(out));
-    } catch (e) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: e.message }));
-    }
-  }
-
   // ── Multi-party envelope endpoints (ParaSign Model 2) ───────────────────────
   // The relay only knows: doc hash (sha3-256), envelope id (unguessable),
   // party labels, and party signatures over (sha3_256(id||doc_hash||index)).
@@ -9918,10 +11754,47 @@ async function handleRelayRequest(req, res) {
     return _envStore._inst;
   }
 
+  // POST /v2/admin/envelopes/void-account -- withdraw every open envelope of an
+  // account (internal; admin plane calls it when a customer deletes his
+  // account). Before this a deleted account's envelopes stayed signable, the
+  // signatures were counted on the deactivated account, and "everyone signed"
+  // went to the erased address (sweep-acct finding 5).
+  if (path === '/v2/admin/envelopes/void-account' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    let d;
+    try { d = JSON.parse((await readBody(req, 1024)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    let accountId = typeof d.account_id === 'string' ? d.account_id : '';
+    if (!accountId && typeof d.key === 'string' && d.key) {
+      const kd = apiKeys.get(d.key);
+      accountId = (kd && kd.account_id) || d.key;
+    }
+    if (!accountId) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'account_id or key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelopes_unavailable' })); }
+    let voided = 0, done = 0;
+    try {
+      const ids = await store.listAccountEnvelopeIds(accountId, { limit: 100000 });
+      for (const id of ids) {
+        const out = await store.voidEnvelope(id, 'The sender deleted the account');
+        if (out.ok && out.code === 'void') voided++;
+        else if (out.code === 'already_complete') done++;
+      }
+      log('info', 'envelopes_voided_for_account', { account: accountId.slice(0, 12), voided, completed: done, total: ids.length });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, voided, completed: done, total: ids.length }));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'void_failed' }));
+    }
+  }
+
   // POST /v2/envelopes -- create a new envelope.
   if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
-    if (!(await envCreateRateOkShared(apiKey))) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
+    const _rl = await envCreateRateOkShared(apiKey);
+    if (!_rl.ok) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil((_rl.retryAfterMs || 3600_000) / 1000)) }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable (redis or crypto not ready)' })); }
     try {
@@ -9935,9 +11808,47 @@ async function handleRelayRequest(req, res) {
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
       // The plan travels with the request now: it decides how many names may go
-      // on one document. Read here rather than passed down from the quota block
-      // above, whose const lives in its own scope.
-      const _planForParties = (apiKeys.get(apiKey) || {}).plan;
+      // on one document. It used to be the key's unified `plan`, which a
+      // purchase never moves (a Mollie upgrade writes plan_parasign only), so a
+      // ParaSign Business buyer was held to the community twenty instead of
+      // thirty (tester report A9). It is the account's ParaSign entitlement now,
+      // parasignEntitlementOf, the same reading the signs gate makes. ParaSign
+      // calls its floor 'free', which tiers.normalisePlan reads as community.
+      const _psEnt = parasignEntitlementOf(acctOf(apiKey), apiKeys.get(apiKey));
+      const _planForParties = _psEnt.tier;
+      // THE SENDER PAYS FOR EVERY SIGNATURE ON IT, so he has to have room for
+      // all of them before the request goes out. Nothing was checked here: a
+      // free sender (2 a month) could send to twenty people, a Firm sender at
+      // 98 of 100 to five, and parties 3 to 5 then hit a refusal they could do
+      // nothing about (sweep-acct finding 7). Room = included - signed this
+      // month - still unsigned on his open requests.
+      const _sLimit = _psEnt.quotas.signs_month;
+      // After the party cap, which store.create enforces with its own message:
+      // a request that is too big for any plan says so, not "no room".
+      const _partyCap = Math.min(envelopeMod.MAX_PARTIES, tiers.tierLimitNum(_planForParties, 'max_parties') || envelopeMod.MAX_PARTIES);
+      if (Number.isFinite(_sLimit) && parties.length > 0 && parties.length <= _partyCap) {
+        let _used = 0, _pending = 0;
+        try {
+          const u = await quota.readUsage(redisClient, acctOf(apiKey));
+          _used = Number.isFinite(u.signs_this_month) ? u.signs_this_month : 0;
+          const open = await store.listAccountEnvelopes(acctOf(apiKey), { limit: 500 });
+          const _nowMs = Date.now();
+          for (const e of open) if (e && e.status !== 'complete' && e.status !== 'void' && !e.voided_at && !e.completed_at && !(e.expires_at && Date.parse(e.expires_at) < _nowMs)) _pending += Math.max(0, (e.party_count || 0) - (e.signed_count || 0));
+        } catch (qe) {
+          if (redisOutage503(qe, res)) return;
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable' }));
+        }
+        const _room = Math.max(0, _sLimit - _used - _pending);
+        if (parties.length > _room) {
+          log('info', 'envelope_quota_insufficient', { account: String(acctOf(apiKey)).slice(0, 12), parties: parties.length, room: _room, used: _used, pending: _pending, limit: _sLimit });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'sign_quota_insufficient', needed: parties.length, room: _room,
+            used: _used, pending: _pending, limit: _sLimit, plan: _psEnt.tier, reset_date: quota.nextResetDate(),
+            message: `This request needs ${parties.length} signature(s) and your plan has room for ${_room} this month (${_used} signed, ${_pending} still open on other requests, ${_sLimit} included).`,
+            message_nl: `Dit verzoek vraagt ${parties.length} handtekening(en) en uw plan heeft deze maand nog ruimte voor ${_room} (${_used} getekend, ${_pending} nog open op andere verzoeken, ${_sLimit} inbegrepen).` }));
+        }
+      }
       const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance, plan: _planForParties });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -9962,7 +11873,9 @@ async function handleRelayRequest(req, res) {
     try {
       const capsule = await readBody(req, maxCapsule);
       const capsuleSha256 = (req.headers['x-capsule-sha256'] || '').toString().trim().toLowerCase();
-      const out = await store.putDocumentCapsule(envDocumentMatch[1], acctOf(apiKey), capsule, capsuleSha256);
+      // Half of a split document key, never the key (see putDocumentCapsule).
+      const keyShare = (req.headers['x-document-key-share'] || '').toString().trim();
+      const out = await store.putDocumentCapsule(envDocumentMatch[1], acctOf(apiKey), capsule, capsuleSha256, keyShare);
       if (!out.ok) {
         const status = out.code === 'not_owner' ? 403 : out.code === 'hash_mismatch' ? 400 : out.code === 'expired' ? 410 : 404;
         res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -9987,7 +11900,7 @@ async function handleRelayRequest(req, res) {
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const token = inviteTokenFrom(req, query);
     const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
     try {
       const out = await store.getDocumentCapsule(envDocumentMatch[1], pi, token, verifiedEmailHash);
@@ -10001,7 +11914,10 @@ async function handleRelayRequest(req, res) {
         'Content-Length': out.capsule.length,
         'Cache-Control': 'private, no-store',
         'X-Capsule-Sha256': out.sha256,
+        ...(out.keyShare ? { 'X-Document-Key-Share': out.keyShare } : {}),
       });
+      // The verified recipient has the document: this is a real view.
+      store.markViewed(envDocumentMatch[1], pi).catch(() => {});
       return res.end(out.capsule);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -10009,11 +11925,59 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // GET /v2/envelopes/:id/owner-document and /owner-view -- the sending
+  // account's result page: its own ciphertext (no key share) and who signed
+  // where. Ownership is the durable account_id, as for /cancel and /receipt.
+  const envOwnerReadMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/(owner-document|owner-view)$/);
+  if (envOwnerReadMatch && req.method === 'GET') {
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      if (envOwnerReadMatch[2] === 'owner-view') {
+        const view = await store.getOwnerView(envOwnerReadMatch[1], acctOf(apiKey));
+        if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
+        return res.end(J({ ok: true, envelope: view }));
+      }
+      const out = await store.getOwnerDocumentCapsule(envOwnerReadMatch[1], acctOf(apiKey));
+      if (!out.ok) { res.writeHead(out.code === 'voided' ? 410 : 404, { 'Content-Type': 'application/json' }); return res.end(J({ error: out.code })); }
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': out.capsule.length, 'Cache-Control': 'private, no-store', 'X-Capsule-Sha256': out.sha256 });
+      return res.end(out.capsule);
+    } catch {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' }));
+    }
+  }
+
+  // POST /v2/envelopes/:id/decline -- a party refuses to sign. Internal-auth
+  // only (the admin proxy asserts the verified mailbox), plus the invite token.
+  const envDeclineMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/decline$/);
+  if (envDeclineMatch && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    if (!envSignRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString() || '{}');
+      const out = await store.declineParty(envDeclineMatch[1], parseInt(d.party_index, 10), (d.token || '').toString(), (d.verified_email_hash || '').toString());
+      if (!out.ok) {
+        const status = out.code === 'not_found' ? 404 : out.code === 'not_authorized' ? 403 : 409;
+        res.writeHead(status, { 'Content-Type': 'application/json' }); return res.end(J({ error: out.code }));
+      }
+      log('info', 'envelope_declined', { id: envDeclineMatch[1], party_index: out.party_index });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, status: 'void', idempotent: out.code === 'idem', declined_at: out.declined_at, party_index: out.party_index }));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_request' }));
+    }
+  }
+
   // GET /v2/envelopes/:id/owner-check -- narrow account-ownership proof for
   // authenticated services that send invitations. It reveals no envelope data.
   const envOwnerMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/owner-check$/);
   if (envOwnerMatch && req.method === 'GET') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     try {
@@ -10035,7 +11999,7 @@ async function handleRelayRequest(req, res) {
   // against the durable account_id before state or evidence is returned.
   const envCancelMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/cancel$/);
   if (envCancelMatch && req.method === 'POST') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     try {
@@ -10057,7 +12021,7 @@ async function handleRelayRequest(req, res) {
 
   const envReceiptMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/receipt$/);
   if (envReceiptMatch && req.method === 'GET') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     try {
@@ -10072,6 +12036,9 @@ async function handleRelayRequest(req, res) {
         env, meta: null, canonicalJSON: parasign.canonicalJSON,
         sigEngine: registry.getSig(0x0002), relayIdentity,
         publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+        // The same relay_id as GET /v1/envelopes/:id/receipt (review #565, M2):
+        // this relay's own URL, not paramant.app on a self-host.
+        relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
       });
       res.writeHead(200, {
         'Content-Type': 'application/json',
@@ -10093,7 +12060,7 @@ async function handleRelayRequest(req, res) {
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     const partyIndex = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const token = inviteTokenFrom(req, query);
     const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString();
     try {
       const party = await store.getForParty(envParticipantReceiptMatch[1], partyIndex, token);
@@ -10108,6 +12075,9 @@ async function handleRelayRequest(req, res) {
         env, meta: null, canonicalJSON: parasign.canonicalJSON,
         sigEngine: registry.getSig(0x0002), relayIdentity,
         publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+        // The same relay_id as GET /v1/envelopes/:id/receipt (review #565, M2):
+        // this relay's own URL, not paramant.app on a self-host.
+        relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
       });
       res.writeHead(200, {
         'Content-Type': 'application/json',
@@ -10146,7 +12116,7 @@ async function handleRelayRequest(req, res) {
       // (possibly v2) sign-message locally, and gives a passer-by nothing.
       if (query.p !== undefined) {
         const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
-        const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+        const token = inviteTokenFrom(req, query);
         const view = await store.getForParty(id, pi, token);
         if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -10157,6 +12127,7 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version, env.binding_mode) }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;   // a frozen store is a 503, not a 500 (sweep-chaos 10)
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'internal' }));
     }
@@ -10180,13 +12151,32 @@ async function handleRelayRequest(req, res) {
       // falsified record, not a cosmetic one.
       const gate = await store.getForParty(id, pi, (d.token || '').toString());
       if (!gate) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+      // "Bekeken" means the invited PERSON opened it (hertest T5-12). For an
+      // email-bound slot the link alone is anyone the mail reached: a scanner,
+      // a forwarded mail, an anonymous open before sign-in. Only a request the
+      // admin plane vouches for (X-Internal-Auth + the verified mailbox hash of
+      // this party) stamps the view. The anonymous page still gets a 200, so
+      // nothing breaks; it simply records nothing. The verified stamp is also
+      // set when that person fetches the document (GET .../document).
+      if ((gate.binding_mode || 'open') !== 'open') {
+        const vh = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
+        const verified = _internalOk() && /^[0-9a-f]{64}$/.test(vh)
+          && /^[0-9a-f]{64}$/.test(String((gate.party || {}).email_hash || ''))
+          && crypto.timingSafeEqual(Buffer.from(vh, 'hex'), Buffer.from(gate.party.email_hash, 'hex'));
+        if (!verified) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(J({ ok: true, recorded: false }));
+        }
+      }
       const ok = await store.markViewed(id, pi);
       if (!ok) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;
+      // Fixed text, never the internal error message (sweep-chaos 10).
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: e.message }));
+      return res.end(J({ error: 'view_failed' }));
     }
   }
 
@@ -10198,7 +12188,9 @@ async function handleRelayRequest(req, res) {
     const id = path.slice('/v2/envelopes/'.length, -'/sign'.length);
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
     try {
-      const d = JSON.parse((await readBody(req, 32768)).toString());
+      // 96 KiB: a signature and key (~9 KiB) plus at most 32 KiB of encrypted
+      // ink as base64url, with room to spare.
+      const d = JSON.parse((await readBody(req, 98304)).toString());
       const pi = parseInt(d.party_index, 10);
       const signerPub = (d.signer_public_key || '').toString();
       const sig = (d.signature || '').toString();
@@ -10282,8 +12274,31 @@ async function handleRelayRequest(req, res) {
       // increment happens AFTER, and ONLY for a genuinely NEW signature, so an
       // idempotent retry ('idem') never double-counts. Fail-open on redis trouble
       // or an unknown account: a signer is never blocked by infra.
-      const _signerPlan = (accounts.get(accountId) && accounts.get(accountId).plan)
-        || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
+      //
+      // WHOSE METER, 2026-10-04: THE SENDER PAYS. It was the signer's. So a
+      // paying Firm customer who invited a client made that client spend one of
+      // his own two free signatures, and at the third invitation that month the
+      // client hit "you have used your free signatures, Firm EUR 29 a month" on
+      // a contract he had not asked for (tester 5 finding 2, tester 2 A6). The
+      // envelope's owner chose to send it and holds the plan, so a signature on
+      // an envelope counts on the owner's month, within the owner's plan. The
+      // owner signing his own envelope (solo, or as one of the parties) counts
+      // exactly as before, because then owner and signer are one account. Only
+      // an envelope with no stored owner (written before create() recorded one)
+      // still meters the signer, the account resolved above.
+      // Compared through acctOf, so a key that belongs to the owner's account is
+      // the owner, and solo signing keeps metering the very id it metered before.
+      //
+      // A signer WITHOUT an account (open mode, no claimed account) is not the
+      // sender either. accountId fell back to the owner for him, so this used
+      // to read "same account", and he got monthly_sign_quota_reached with the
+      // sender's plan, limit and usage, while the sender heard nothing. Only a
+      // claimed account that IS the owner's is the sender signing.
+      const _senderSigns = !!claimedAccountId && !!ownerAccountId && acctOf(claimedAccountId) === acctOf(ownerAccountId);
+      const billedToSender = !!ownerAccountId && !_senderSigns;
+      const meterAccountId = billedToSender ? ownerAccountId : accountId;
+      const _signerPlan = (accounts.get(meterAccountId) && accounts.get(meterAccountId).plan)
+        || (apiKeys.get(meterAccountId) && apiKeys.get(meterAccountId).plan) || 'community';
       // Signs limit from ENTITLEMENTS (plan_parasign, legacy-plan fallback), the
       // per-product ParaSign tier -- never the product-blind tiers.js helpers.
       // Tier behaviour: every tier blocks AT its included quota.
@@ -10298,9 +12313,19 @@ async function handleRelayRequest(req, res) {
       // /v1 create gate so both paths can never diverge.
       // entitlementRecordOf merges the accounts summary with the per-product
       // plans on the account's keys; reading `accounts` alone hid paid upgrades.
-      const _signerRec = entitlementRecordOf(accountId) || { plan: _signerPlan };
-      const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
-      const _signIncluded = _signEnt.quotas.signs_month;
+      const _signEnt = parasignEntitlementOf(meterAccountId, { plan: _signerPlan });
+      let _signIncluded = _signEnt.quotas.signs_month;
+      // The sender's plan lapsed while this request was open: his signers are
+      // held to the tier he had when he sent it, which the create route checked
+      // had room for every party. Never lower than what he has now.
+      if (billedToSender) {
+        let _tierAtCreate = '';
+        try { _tierAtCreate = await store.senderTier(id); } catch { _tierAtCreate = ''; }
+        if (_tierAtCreate) {
+          const _thenLimit = entitlements.signsQuota({ plan_parasign: _tierAtCreate });
+          if (Number.isFinite(_signIncluded) && (!Number.isFinite(_thenLimit) || _thenLimit > _signIncluded)) _signIncluded = _thenLimit;
+        }
+      }
       let _signUsed = null;      // count this month, feeds the 200 quota field
       let _signReserved = false; // this request took a slot and owes a release if the signature does not land
       // No `accountId &&` here on purpose: the account is resolved above and an
@@ -10322,31 +12347,64 @@ async function handleRelayRequest(req, res) {
       // Lua enforces the same comparison, and quota-gate.test.js holds the two to
       // each other at the boundary so the /v1 create gate cannot drift from this
       // one.
+      // One hold per party slot, so a retry after a failed store write is not
+      // charged a second time (quota.GATE_SIGN_LUA).
+      const _holdKey = `paramant:quota:signhold:${id}:${pi}`;
       if (Number.isFinite(_signIncluded)) {
-        const _g = await quota.gateSign(redisClient, accountId, _signIncluded, log);
+        const _g = await quota.gateSign(redisClient, meterAccountId, _signIncluded, log, { holdKey: _holdKey });
+        if (_g.unavailable) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable', message: 'Signatures cannot be counted right now. Nothing was signed; try again in a minute.',
+            message_nl: 'Handtekeningen kunnen nu niet geteld worden. Er is niets ondertekend; probeer het over een minuut opnieuw.' }));
+        }
         if (!_g.allowed) {
-          log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used });
+          log('info', 'quota_sign_declined', { account: String(meterAccountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used, billed_to: billedToSender ? 'sender' : 'signer' });
           res.writeHead(402, { 'Content-Type': 'application/json' });
+          if (billedToSender) {
+            // The sender hears it too, once a day per envelope: the signer's
+            // page says "the sender has been told", and until now nobody told
+            // them (acceptance r2, 6). Fire-and-forget: the signer's answer
+            // never waits on a mail provider.
+            notifySenderQuota(id, meterAccountId).catch(() => {});
+            // The invitee did nothing wrong and has nothing to buy: it is the
+            // sender's month that is full. No upgrade pitch, no numbers from the
+            // sender's account, just what happened and who can fix it.
+            return res.end(J({ error: 'sender_sign_quota_reached', billed_to: 'sender',
+              message: 'De afzender van dit verzoek heeft zijn handtekeningen voor deze maand gebruikt. Vraag de afzender om zijn plan te verhogen of het verzoek volgende maand opnieuw te sturen.',
+              message_en: 'The sender of this request has used this month\'s signatures. Ask the sender to upgrade their plan or to send the request again next month.' }));
+          }
           return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month',
             plan: _signEnt.tier, limit: _signIncluded, used: _g.used,
             reset_date: quota.nextResetDate() }));
         }
-        _signReserved = _g.counted;
+        // A reference on a unit: counted it here, or rides the pending hold of
+        // an earlier request for this slot (quota.GATE_SIGN_LUA, review #555 H4).
+        _signReserved = _g.counted || _g.ref === true;
         if (Number.isFinite(_g.used)) _signUsed = _g.used;
       }
 
-      const out = await store.sign(id, pi, signerPub, sig, {
-        internalTrusted,
-        verifiedEmailHash,
-        inviteToken,
-        appearance: d.appearance,
-      });
+      let out;
+      try {
+        out = await store.sign(id, pi, signerPub, sig, {
+          internalTrusted,
+          verifiedEmailHash,
+          inviteToken,
+          appearance: d.appearance,
+          ink: d.ink,
+        });
+      } catch (se) {
+        // The store write failed (a redis outage mid-request). Give the unit
+        // back if redis lets us; if it does not, the hold on this slot makes
+        // the retry free instead of a second charge.
+        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
+        throw se;
+      }
       if (!out.ok) {
         // The slot was taken before the store had its say. The signature did not
         // land, so the month does not owe it.
-        if (_signReserved) await quota.releaseSign(redisClient, accountId, log);
+        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
         const code = out.code === 'not_found' ? 404
-          : (out.code === 'bad_signature' || out.code === 'invalid_appearance') ? 400
+          : (out.code === 'bad_signature' || out.code === 'invalid_appearance' || out.code === 'invalid_ink') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
           : (out.code === 'email_binding_required' || out.code === 'email_mismatch'
              || out.code === 'invite_token_required') ? 403
@@ -10361,11 +12419,15 @@ async function handleRelayRequest(req, res) {
       // left here is the retry case: an 'idem' answer means this signature was
       // already counted the first time round, and the slot this request reserved
       // has to go back or a client that retries pays twice for one signature.
+      // The release takes this request's reference off the slot's hold; the
+      // unit only goes back when no other request is still on it and nothing
+      // landed on it (review #555, H4).
       if (out.code !== 'new' && _signReserved) {
-        const _rel = await quota.releaseSign(redisClient, accountId, log);
+        const _rel = await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
         if (Number.isFinite(_rel.used)) _signUsed = _rel.used;
         _signReserved = false;
       }
+      if (out.code === 'new' && Number.isFinite(_signIncluded)) await quota.finalizeSign(redisClient, _holdKey, log);
       // A path that reserved a slot and neither released it nor signed would
       // leak a unit a month. There is no such path: every return between the
       // gate and here releases first, and the only remaining exits are this
@@ -10397,7 +12459,10 @@ async function handleRelayRequest(req, res) {
       // this month and what its tier includes. Omitted entirely when redis could
       // not be read (fail-open, the field is best-effort). There is always an
       // account by this point; a request without one never got here.
-      const _quotaField = (_signUsed != null && Number.isFinite(_signIncluded)) ? {
+      // Only the account that pays sees its own numbers: when the sender pays,
+      // the signer's 200 carries no quota field, so a sender's usage never
+      // leaks to the people he invites.
+      const _quotaField = (!billedToSender && _signUsed != null && Number.isFinite(_signIncluded)) ? {
         used: _signUsed,
         included: _signIncluded,
         reset_date: quota.nextResetDate(),
@@ -10513,6 +12578,9 @@ async function handleRelayRequest(req, res) {
         burn_confirmed: receiptObj.burn_confirmed,
         tree_size:      proof.tree_size,
         leaf_index:     proof.leaf_index,
+        // The log size the receipt itself names, as docs/api.md promises
+        // (P10 API-29-N). Signed inside the receipt; repeated here unchanged.
+        tree_size_at_retrieval: Number.isFinite(receiptObj.tree_size_at_retrieval) ? receiptObj.tree_size_at_retrieval : null,
       }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
@@ -10594,8 +12662,33 @@ let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by ch
 const ACCOUNT_KEY_LIMIT = Object.freeze({
   community: Math.min(5, Math.max(3, parseInt(process.env.ACCOUNT_KEY_LIMIT_COMMUNITY || '5', 10) || 5)),
   pro: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
+  // Business had no row and fell through to community's five.
+  business: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
   enterprise: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_ENTERPRISE || '1000', 10) || 1000),
 });
+
+// The plan the key cap follows: the HIGHEST of the legacy unified plan and the
+// account's paid ParaSign/ParaSend tiers. A purchase moves only the product
+// tiers (setProductPlan never touches `plan`), so a paying Firm account stayed
+// "community" here and was refused its fifth key (API-10-A).
+const _CAP_RANK = ['community', 'pro', 'business', 'enterprise'];
+function accountCapPlan(accountId, legacyPlan) {
+  const cands = [tiers.normalisePlan(legacyPlan || 'community')];
+  try {
+    const rec = accountId ? entitlementRecordOf(accountId) : null;
+    if (rec) {
+      for (const product of entitlements.PRODUCTS) {
+        const t = entitlements.effectiveProductTier(rec, product).tier;
+        cands.push(tiers.normalisePlan(t === 'free' ? 'community' : t));
+      }
+    }
+  } catch { /* the legacy plan alone */ }
+  return cands.reduce((a, b) => (_CAP_RANK.indexOf(b) > _CAP_RANK.indexOf(a) ? b : a), 'community');
+}
+function accountKeyCap(accountId, legacyPlan) {
+  const p = accountCapPlan(accountId, legacyPlan);
+  return { plan: p, cap: ACCOUNT_KEY_LIMIT[p] ?? ACCOUNT_KEY_LIMIT.community };
+}
 let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
 
 // ── Ed25519 base64url decoder ─────────────────────────────────────────────────
@@ -10692,7 +12785,7 @@ function checkLicense() {
 
 // ── Community Edition key-limit enforcement ───────────────────────────────────
 // Free self-hosters: max 5 active API keys. Keys 6+ receive 402 on every request.
-// Licensed (plk_*): no limit. Set PARAMANT_LICENSE=plk_... in .env to unlock.
+// Licensed (plk_*): no limit. Set PLK_KEY=plk_... in .env to unlock (docker-compose passes PLK_KEY).
 // ─────────────────────────────────────────────────────────────────────────────
 function applyKeyLimitEnforcement() {
   // Per-account cap (ACCOUNT_KEY_LIMIT) OR'd with the self-host relay-total cap
@@ -10701,6 +12794,7 @@ function applyKeyLimitEnforcement() {
   // on upgrade, mirroring the prior community-edition behaviour.
   const over = keysTable.computeOverLimit(apiKeys, accounts, accountKeys, {
     capForPlan: (p) => ACCOUNT_KEY_LIMIT[tiers.normalisePlan(p)] ?? ACCOUNT_KEY_LIMIT.community,
+    capForAccount: (accountId, p) => accountKeyCap(accountId, p).cap,
     licenseMaxKeys: LICENSE_MAX_KEYS,
     edition: EDITION,
   });
@@ -10722,6 +12816,13 @@ function applyKeyLimitEnforcement() {
 async function registerSelf() {
   if (!relayIdentity || !RELAY_SELF_URL) return;
   const target = RELAY_PRIMARY_URL || `http://localhost:${PORT}`;
+  // Same rule as broadcastSTH: a stack that is not the pinned fleet does not
+  // register itself with a production relay.
+  if (isParamantUrl(target) && !mayTalkToParamantFleet()) {
+    log('warn', 'relay_self_register_skipped', { target: String(target).slice(0, 60),
+      hint: 'Not a pinned Paramant relay: not registering with paramant.app. PARAMANT_FLEET_GOSSIP=1 overrides.' });
+    return;
+  }
   const timestamp = new Date().toISOString();
   const msg = Buffer.from(RELAY_SELF_URL + '|' + SECTOR + '|' + VERSION + '|' + timestamp, 'utf8');
   // API in @noble/post-quantum: sign(message, secretKey)
@@ -10770,7 +12871,28 @@ async function registerSelf() {
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+// Without RELAY_SELF_URL every signed tree head and receipt names
+// <sector>.paramant.app as relay_id, so a self-host's proofs claim a Paramant
+// host. Said at boot rather than discovered in a proof (SELF-19-C).
+if (!RELAY_SELF_URL) {
+  log('warn', 'relay_self_url_unset', {
+    relay_id: SECTOR + '.paramant.app',
+    hint: 'Set RELAY_SELF_URL (RELAY_SELF_URL_<SECTOR> in docker-compose.yml) to this relay\'s own public URL; '
+        + 'until then signed heads and receipts name a paramant.app host.',
+  });
+}
+// The same, for ParaSign links and receipts (P10 API-16-N). Without
+// PARASIGN_PUBLIC_ORIGIN they fall back to RELAY_SELF_URL, and only when that
+// is unset too to paramant.app: say which, once, at boot.
+if (!process.env.PARASIGN_PUBLIC_ORIGIN) {
+  log('warn', 'parasign_public_origin_unset', {
+    using: parasignFallbackOrigin(),
+    hint: 'Set PARASIGN_PUBLIC_ORIGIN to the site your signers open (https://your-host); '
+        + 'sign_url and the receipt\'s relay_pubkey_url are built from it.',
+  });
+}
 loadUsers();
+_initSetupToken();
 loadTrialKeys();
 checkLicense();
 loadOrCreateRelayIdentity();
@@ -10779,9 +12901,10 @@ loadPeerSths();
 // Generate a startup STH if the CT log has entries but no STH was persisted.
 // Covers the case where the STH file was missing or the relay restarted after
 // new CT entries were written without a corresponding STH flush.
-if (ctWindow.windowLength > 0 && sthLog.length === 0) {
-  const last = ctWindow.last();
-  produceSth(ctWindow.windowLength, last.tree_hash);
+// tree_size is the full tree, never the window length: that confusion is what
+// froze the head at 10 001 entries.
+if (ctTree.size > 0 && sthLog.length === 0) {
+  produceSth(ctTree.size, ctTree.root());
 }
 // Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
 setInterval(() => {
@@ -10877,6 +13000,21 @@ if (redisClient && RELAY_REDIS_URL) {
     }))
     .then(() => log('info', 'shared_grant_subscriber_ready', { channel: sharedGrants.CHANNEL }))
     .catch(e => log('warn', 'shared_grant_subscriber_failed', { err: e.message }));
+}
+
+// ── Billing ledger backfill ──────────────────────────────────────────────────
+// Every payment id this relay already knows as settled (paid_by_<product> on
+// the accounts, paramant:billing:done:* and paramant:billing:invoice:for:* in
+// redis) goes into the durable ledger once at boot, so an old tr_ id cannot be
+// granted again after its redis marker expires (review #555, M3). Idempotent, so every boot may run it.
+// BILLING_LEDGER_BACKFILL_DELAY_MS moves it, for a test.
+{
+  const _bfDelay = parseInt(process.env.BILLING_LEDGER_BACKFILL_DELAY_MS || '', 10);
+  setTimeout(() => {
+    const records = [...apiKeys.values(), ...accounts.values()];
+    backfillLedger(billingLedger, { redis: redisClient, records, products: entitlements.PRODUCTS, log })
+      .catch((e) => log('warn', 'billing_ledger_backfill_failed', { err: e.message }));
+  }, Number.isFinite(_bfDelay) ? _bfDelay : 5000).unref?.();
 }
 
 // ── The party worklist migration ─────────────────────────────────────────────
@@ -11016,7 +13154,7 @@ async function _flushAppendLogsOnExit() {
   _shuttingDown = true;                 // the drains stop; this is now the only writer
   _flushCtOnExit();                     // queue -> stream
   _flushSthOnExit();
-  const streams = [_ctStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
+  const streams = [_ctStream, _ctLeafStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
   if (streams.length === 0) return;
   let timer = null;
   const guard = new Promise((resolve) => {
@@ -11054,9 +13192,27 @@ async function emergencyZeroAndExit(reason, code = 0) {
 // Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C). A second
 // signal arriving while the first is still flushing means the caller wants out
 // now, so it exits without waiting rather than starting the flush over.
+// SIGTERM DRAINS FIRST (sweep-chaos 9). A restart used to exit at once: a
+// signature being submitted at that moment got 502 after its one-time
+// activation was already spent, and the retry said "already used". Now new
+// requests get 503 Retry-After and the ones in flight get up to
+// SHUTDOWN_DRAIN_MS (default 5 s) to finish; then the blobs are zeroed and the
+// process exits as before. A second signal exits at once.
+const SHUTDOWN_DRAIN_MS = Math.max(0, Math.min(parseInt(process.env.SHUTDOWN_DRAIN_MS || '5000', 10) || 0, 30000));
 function _onExitSignal(reason) {
-  if (_shuttingDown) { process.exit(0); return; }
-  emergencyZeroAndExit(reason);
+  if (_shuttingDown || _draining) { process.exit(0); return; }
+  if (!SHUTDOWN_DRAIN_MS || _inFlightRequests <= 0) { emergencyZeroAndExit(reason); return; }
+  _draining = true;
+  log('info', 'shutdown_draining', { in_flight: _inFlightRequests, max_ms: SHUTDOWN_DRAIN_MS });
+  try { server.close(); } catch {}
+  const until = Date.now() + SHUTDOWN_DRAIN_MS;
+  const tick = setInterval(() => {
+    if (_inFlightRequests <= 0 || Date.now() > until) {
+      clearInterval(tick);
+      if (_inFlightRequests > 0) log('warn', 'shutdown_drain_timeout', { in_flight: _inFlightRequests });
+      emergencyZeroAndExit(reason);
+    }
+  }, 25);
 }
 process.on('SIGTERM', () => _onExitSignal('SIGTERM'));
 process.on('SIGINT',  () => _onExitSignal('SIGINT'));

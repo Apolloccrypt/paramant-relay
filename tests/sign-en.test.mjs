@@ -82,12 +82,13 @@ async function pickJpeg(page) {
 const out = await openSign(false);
 await out.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
 ok('the English page says it is English', await out.evaluate(() => document.documentElement.lang) === 'en', 'lang');
+// Mick 05-10: taalronde
 ok('signed out, the bar speaks English',
-  /You are not signed in\. You can prepare a document here; signing or sending it needs a free Community account\./.test(await out.locator('#ds-signedout').innerText()),
+  /You are not signed in\. You can already prepare a document\. To sign or send it, you need a free Community account\./.test(await out.locator('#ds-signedout').innerText()),
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /en/sign afterwards',
-  JSON.stringify(barLinks) === JSON.stringify([['Sign in', '/auth/login?next=/en/sign'], ['Create account', '/signup?next=/en/sign']]),
+  JSON.stringify(barLinks) === JSON.stringify([['Sign in', '/en/auth/login?next=/en/sign'], ['Create account', '/en/signup?next=/en/sign']]),
   JSON.stringify(barLinks));
 await out.locator('.ds-mode-card[data-mode="invite"]').click();
 ok('the script labels the invite stepper in English',
@@ -107,9 +108,14 @@ ok('the send button asks for the session, in English',
 ok('the default subject is the English one',
   await out.locator('#ds-invite-subject').inputValue() === 'Signature requested',
   await out.locator('#ds-invite-subject').inputValue());
+// A request needs someone to go to: the button checks that before the sign-in
+// (test with a stranger, 13-10-2026), so fill one person in first.
+await out.locator('#ds-add-recipient').click();
+await out.locator('[data-field="label"]').nth(0).fill('Signer Demo');
+await out.locator('[data-field="email"]').nth(0).fill('demo@example.com');
 await out.locator('#ds-recipients-continue').click();
 await out.waitForURL(/\/auth\/login/, { timeout: 15000 }).catch(() => {});
-ok('pressing it comes back to the English page', /\/auth\/login\?next=(\/|%2F)en(\/|%2F)sign$/.test(out.url()), out.url());
+ok('pressing it comes back to the English page', /\/auth\/login\?next=(\/|%2F)en(\/|%2F)sign(%3Fherstel%3D1)?$/.test(out.url()), out.url());
 await out.close();
 
 const jpeg = await openSign(true);
@@ -118,7 +124,7 @@ await pickJpeg(jpeg);
 await jpeg.locator('#ds-doc-error:not([hidden])').waitFor({ timeout: 15000 });
 ok('a JPEG is refused in English',
   (await jpeg.locator('#ds-doc-error').innerText()).trim()
-    === 'This is a JPEG image, not a PDF. ParaSign signs PDF documents. Export or print your file to PDF first.',
+    === 'This is a JPEG image, not a PDF. ParaSign signs PDF only. Convert your file to PDF first: export it, or print it to PDF.',
   await jpeg.locator('#ds-doc-error').innerText());
 await jpeg.close();
 

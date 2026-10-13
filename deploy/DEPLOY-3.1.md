@@ -1,4 +1,4 @@
-# Deploy runbook: main (3.1.0) to production
+# Deploy runbook: main (3.1.3) to production
 
 > `deploy/deploy-3.1.sh` executes this runbook. One command from the NUC
 > (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
@@ -255,6 +255,17 @@ for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_S
 done
 ```
 
+NODE_ENV of the relay containers (`deploy-3.1.sh` step 1a2, again as 6k0 after
+the recreate and under `--verify-only`). From 3.1.2 a relay with NODE_ENV
+`test`, `development` or `dev`, or with `PARAMANT_FLEET_GOSSIP=0`, sends no tree
+heads to the fleet, so health would stop gossiping. The script stops on it:
+
+```bash
+for s in relay-main relay-health relay-finance relay-legal relay-iot; do
+  printf '%s NODE_ENV=%s\n' "$s" "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$(docker compose ps -q $s)" | sed -n 's/^NODE_ENV=//p')"
+done   # every line empty or production
+```
+
 ### Which commit do we expect here
 
 `41501bb` is where **this runbook** starts: the stand of 8 August, before any
@@ -495,6 +506,16 @@ tar czf /home/paramant/backups/docroot-pre-3.1-$TS.tgz -C /home/paramant app
 cp /etc/nginx/sites-enabled/paramant-public.conf /etc/nginx/backups/paramant-public.conf.pre-3.1-$TS
 ```
 
+The mirror of the other relays' tree heads (`deploy-3.1.sh` step 2c). 3.1.2
+moves heads that are not from a pinned key to `peer-sths/purged/` at its first
+start; it never deletes, but the copy is taken anyway, one tar per relay:
+
+```bash
+for s in relay-main relay-health relay-finance relay-legal relay-iot; do
+  docker cp "$(docker compose ps -q $s):/data/peer-sths" - > /home/paramant/backups/peer-sths-$s-pre-3.1-$TS.tar
+done
+```
+
 ### The nginx conf names are not the same on every server
 
 Step 2b backs up the nginx confs, and it needs their names. Those names differ
@@ -643,7 +664,7 @@ shape:
 `recurring:false` and `mode_source:inferred` are the brake. If it says
 `recurring:true`, `BILLING_MODE` is set somewhere: stop, find it, and do not
 continue until the line reads as above. `relay_started` must say
-`version:"3.1.0"`.
+`version:"3.1.3"`.
 
 Then the rest:
 
@@ -655,6 +676,36 @@ for c in health finance legal admin; do wait_healthy paramant-relay-$c || exit 1
 ```
 
 ## Step 5: frontend and nginx (server)
+
+### First: tag v3.1.3 on the merge commit
+
+`frontend/install.sh` is what `curl -fsSL https://paramant.app/install.sh | bash`
+runs, and since 3.1.1 it clones the release tag, now `v3.1.3` (`RELAY_VERSION` default; the same
+pin is in `install.sh` and `frontend/install-pi.sh`). The rsync below puts that
+installer live. Without the tag the one-line install stops at
+`git clone --branch v3.1.3` on every new machine. So the tag goes on the merge
+commit of the 3.1.3 PR on `main` **before** step 5, not afterwards in step 7:
+
+```bash
+# [admin], from a checkout of the repo
+git fetch origin main --tags
+C=<merge commit of the 3.1.3 PR on main>
+git merge-base --is-ancestor "$C" origin/main && echo "on main"
+git show "$C:package.json" | grep '"version": "3.1.3"'   # the tag is v plus this version
+git tag -a v3.1.3 -m "Release 3.1.3" "$C"
+git push origin v3.1.3
+git ls-remote --tags origin v3.1.3             # must print the tag before step 5
+```
+
+`deploy-3.1.sh` enforces this: before phase 2 (step `1z`, nothing written yet)
+and again right before phase 5 (step `5-pre`) it reads the tag the three
+installers pin, runs `git ls-remote --tags origin <tag>`, and stops when the tag
+is missing on origin or names another commit than the one it deploys. The stop
+line carries the exact `git tag -a ... && git push origin ...` to run.
+
+The tag push also starts `docker-publish.yml` (images `3.1.3`). If the server
+checkout is not on `$C` after step 3, stop: the tag would name a commit other
+than the one that is deployed.
 
 The docroot is a copy, not the checkout. Without `--delete`, on purpose:
 `dist/`, `paramant-mark.svg`, `developer.js` and the investor brief live only
@@ -854,6 +905,100 @@ Doing it by hand:
 nginx -T 2>/dev/null | grep -c 'limit_req_zone .* zone=relay_auth'   # must be 1, never 2
 ```
 
+### Step 5e: the whole site conf, not seven edits
+
+5c edits the server confs by anchor and never copied `deploy/nginx-paramant-live.conf`
+over them. Everything in that file that 5c did not name stayed in git. The
+prodtest of 2026-10-05 (after deploy TS 20261005-1557) measured the cost: the
+server `paramant.conf` differed from the repo by about 600 lines, and two of them
+were visible to every visitor:
+
+- every `/api/user/` route still sat on `relay_auth` (a login brake), so 12
+  parallel `/api/user/me` gave 6 x 429 and one `/account` load already got 429.
+  The `user_session` zone was bound but no location used it.
+- `/parashare?t=` and `/en/parashare?t=` (the add-in link) went to the login
+  page and lost the token, because the `$arg_t` redirect to `/get` was missing.
+
+Step 5e places the **whole** repo conf on the live slot (`paramant-live.conf`,
+else `paramant.conf`; `PARAMANT_NGINX_LIVE_SLOT` overrides), plus the
+security-headers snippet it includes (`/etc/nginx/snippets/paramant-security-headers.conf`).
+The public conf (slot 1) is not touched by 5e.
+
+1. **Render, locally.** `deploy/nginx-render.sh` fills in the two docroots
+   (`PARAMANT_DOCROOT`, `PARAMANT_LEGAL_DOCROOT`). With the production defaults
+   the output is the repo file byte for byte. The conf carries no certificate,
+   no `server_name` and no public listen: TLS ends in Caddy, so there is nothing
+   else per machine. The render comes from the commit phase 3 left the server
+   on (`PARAMANT_NGINX_REF` overrides), not from the NUC's working tree.
+2. **Gate, locally.** Before anything leaves the NUC: `/api/user/login` and
+   `/api/user/auth/webauthn/login/` on `relay_login`; `/api/user/auth/`, `setup/`,
+   `signup`, `account/totp/` and `account/backup-codes/` on `relay_auth`;
+   `/api/user/` on `user_session`; the `$arg_t` redirect on both `/parashare`s.
+3. **Server.** The conf and snippet travel base64 with their sha256 and are
+   checked on arrival. Every zone the conf uses must be bound in `nginx -T`
+   (otherwise FATAL, nothing written). Read-only, also before any write: if
+   another enabled conf (`paramant-public.conf`) proxies to `127.0.0.1:808[1-6]`,
+   5e prints those lines and stops, because the body limits of those blocks
+   would then meet real uploads. After comparing, `PARAMANT_NGINX_PUBLIC_808X_OK=1`
+   lets it go ahead. `:8086 /v2/` carries no `limit_req`, as on production: the
+   `api` zone (60/min) would cut a large upload off with 429. Then backups
+   (`/etc/nginx/backups/<name>.pre-nginx-sync-<TS>` and the snippet; a marker
+   `...absent-nginx-sync-<TS>` when there was no snippet), the diff printed in
+   full (`confdiff`, `snipdiff`), the write (through the symlink, `cat` not
+   `mv`), `nginx -t`, reload. A failing `nginx -t` or reload puts both files
+   back and reloads the old config. So does any command that fails after the
+   backups (a write on a full or read-only disk): an `ERR`/`EXIT` trap puts conf
+   and snippet back together, and only reloads when both are back on disk.
+4. **Loopback on the server**, straight at `127.0.0.1:8080` with
+   `Host: paramant.app`: the home page answers 200 and `/parashare?t=` answers
+   302 to `https://paramant.app/get?t=...`. A reload only signals nginx, so the
+   old workers answer for a moment (27 in 100 checks right after a reload); 5e
+   asks every 0.5 s for up to 10 s until the new conf answers, and judges
+   then. On a fault: back again.
+5. **From the NUC, through Caddy**: `/parashare?t=x` and `/en/parashare?t=x`
+   answer 302 to `/get?t=x` and `/en/get?t=x`, and 12 parallel
+   `/api/user/me` get no 429. On a fault: the backups go back and the run stops.
+
+What the server had that git did not, and is now in git (so nothing the
+server needs disappears with the copy): `absolute_redirect off` and
+`port_in_redirect off` on `:8080`, the `CT-BACKUP-DENY` location, the
+document-capsule location (`/api/user/envelopes/<id>/document`, 6m, which 5c
+used to insert), and HSTS out of the snippet (CT-DEDUP: Caddy sets it). What
+the server had dropped and git now drops too: the `:8090` block and the
+`/dicom/` gateway in front of it (H2: `paramant-ghost-pipe.fly.dev` no longer
+resolves, so it was a 502 that sent imaging data outside the EEA). The full
+table is in the prodtest evidence, `nginx/DRIFT.md`.
+
+#### Only the nginx conf: `--nginx-sync`
+
+```bash
+# what would change, nothing written, no ssh; diff against a copy of the server conf
+PARAMANT_NGINX_LIVE_COPY=/path/to/paramant.conf bash deploy/deploy-3.1.sh --dry-run --nginx-sync
+# the live diff, read-only
+bash scripts/check-prod-drift.sh
+# place it: steps 1 to 5 above and nothing else
+bash deploy/deploy-3.1.sh --nginx-sync
+```
+
+`--nginx-sync` runs 5e alone: no tags, no pull, no build, no recreate, no
+docroot. It renders from `DEPLOY_REF` (the conf should match the frontend that
+is live; set `PARAMANT_NGINX_REF` to the deployed commit when main has moved on).
+Its backups carry the run TS of that run, not a step-2 TS, so `--rollback`
+does not apply; the restore is
+
+```bash
+cp /etc/nginx/backups/paramant.conf.pre-nginx-sync-<TS> /etc/nginx/sites-enabled/paramant.conf
+cp /etc/nginx/backups/paramant-security-headers.conf.pre-nginx-sync-<TS> /etc/nginx/snippets/paramant-security-headers.conf
+nginx -t && systemctl reload nginx
+```
+
+`scripts/check-prod-drift.sh` now reads the site conf and the snippet as well
+and reports `nginx drift guard: OK` or the diff. Test lock:
+`tests/nginx-volledig-docker.test.mjs` boots the rendered conf in nginx:alpine
+behind a Caddy stand-in and holds the redirect, the 12 parallel calls and the
+strict doors; `tests/deploy-3.1-dryrun.test.sh` section 10 runs the real 5e
+block against stubs, every restore path included.
+
 ## Step 6: smoke tests
 
 In the order `deploy.sh` runs them, plus the two the 3.0.0 runbook used.
@@ -952,15 +1097,32 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://iot.paramant.app/v1/par
 curl -s -o /dev/null -w '%{http_code}\n' https://paramant.app/sign                                   # 200
 
 # 6f. the version the relay reports
-curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.0
+curl -s https://paramant.app/health | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version"))'   # 3.1.3
 
 # 6g. billing stance on every relay, once more, from the logs
 for c in main health finance legal iot; do printf '%-8s' $c; docker logs paramant-relay-$c 2>&1 | grep '"billing_config"' | tail -1 | grep -o '"recurring":[a-z]*'; done
+
+# 6l. the host hardening /dpa promises, read-only (deploy-3.1.sh step 6l)
+systemctl is-active auditd                       # active
+command -v aide; ls -l /var/lib/aide/aide.db* /var/log/aide/   # binary, database, a log at most 2 days old
+aa-status --enabled && aa-status | grep 'profiles are in enforce mode'   # at least 1
 ```
+
+Step 6l also runs under `--verify-only`. It writes one line per point to the
+deploy log and flags a miss when auditd is not active, AIDE is missing, has no
+database or last checked more than 2 days ago (`PARAMANT_AIDE_MAX_AGE_DAYS`),
+or AppArmor is not enabled with at least one profile in enforce mode. A miss is
+a WARN, in the log and again in the summary under "HOST NOT PROVEN", and the
+deploy goes on to write the deployed-head marker: 6l runs after everything is
+live, and the host state was never measured before this step existed, so a stop
+here only left the next run stuck in 1a (review-574 N1). `--host-strict` makes
+a miss a STOP (never a rollback: the containers are fine). /dpa therefore
+promises the check ("we check at every deploy whether ..."), not its outcome.
+Once the host is right, confirm with `--verify-only --host-strict`.
 
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without
-`3.1.0`, or a `billing_config` line with `recurring:true`. A
+`3.1.3`, or a `billing_config` line with `recurring:true`. A
 `post-deploy-verify.sh` exit 1 stops the script too, but it is a non-critical
 failure: read the list, fix it, do not roll back on it.
 
@@ -1029,8 +1191,19 @@ passing on an empty search.
    server against `127.0.0.1:3000`.
 3. **Drift guard** from the NUC: `scripts/check-prod-drift.sh origin/main` must
    print `OK`.
-4. Tag it: `git tag v3.1.0 <commit> && git push origin v3.1.0`, and put the live
-   date in `CHANGELOG.md`.
+4. Check the tag from step 5 names the commit that is live, and put the live
+   date in `CHANGELOG.md`. `v3.1.3` was set on the merge commit before the
+   frontend went out (step 5, "First: tag v3.1.3 on the merge commit"); here
+   it is compared with `/home/paramant/backups/deployed-head`:
+   ```bash
+   # [admin]
+   C=$(ssh <server> cat /home/paramant/backups/deployed-head)
+   [ "$(git rev-parse 'v3.1.3^{commit}')" = "$C" ] && echo "tag is live commit"
+   ```
+   Then check the installer and upgrade path once from a clean machine (matrix
+   SELF-01-A, SELF-12-A, SELF-13-A): `curl -fsSL https://paramant.app/install.sh | bash`
+   reaches "Stack healthy" on `v3.1.3`, and on a v3.1.2 install
+   `paramant upgrade` moves HEAD to the newest tag.
 5. Write the deploy down in the vault (`Sessies/2026-09/`), with the
    `billing_config` line as it was logged.
 
@@ -1133,7 +1306,8 @@ bash deploy/deploy-3.1.sh --rollback 20260902-1830
 ```
 
 That reads the manifest of step 2, retags the saved images, recreates the
-containers without rebuilding, restores `.env`, the nginx confs and the
+containers without rebuilding, restores `.env`, the nginx confs (and the
+security-headers snippet when step 5e replaced it in that run) and the
 docroot, and re-runs the smoke tests. The `.env` it restores is the copy from
 before step 1e (`.env-pre-seller-$TS`) when 1e wrote anything in that run, and
 the step 2b copy (`.env-pre-3.1-$TS`) otherwise; the output says which.

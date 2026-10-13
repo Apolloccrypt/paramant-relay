@@ -76,9 +76,9 @@ async function visibleText(page) {
 // Both languages: /get is Dutch, /en/get keeps the original English words.
 const LANGS = [
   { name: 'nl', pre: '', invalid: /ongeldig of onvolledig/i,
-    bad: /lijkt geen geldige link om iets te ontvangen/, foreign: /geen link van .*, dus hij wordt hier niet geopend/ },
+    bad: /Deze link herkennen we niet/, foreign: /komt niet van .*\. Daarom openen we hem hier niet/ },
   { name: 'en', pre: '/en', invalid: /invalid or incomplete/i,
-    bad: /does not look like a valid receive link/, foreign: /not a .* link/ },
+    bad: /We do not recognise this link/, foreign: /not from .*, so we do not open it here/ },
 ];
 
 for (const L of LANGS) {

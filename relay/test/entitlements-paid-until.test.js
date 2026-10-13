@@ -209,10 +209,17 @@ test('expiry on one product leaves the other alone at the gate', () => {
   const at = Date.parse('2026-10-01T00:00:00Z');
   const e = ent.getEntitlements({
     plan_parasend: 'pro', paid_until_parasend: '2026-09-01T00:00:00.000Z',
-    plan_parasign: 'business', paid_until_parasign: '2026-11-01T00:00:00.000Z',
+    plan_parasign: 'pro', paid_until_parasign: '2026-11-01T00:00:00.000Z',
   }, at);
   assert.strictEqual(e.parasend.tier, 'community');
-  assert.strictEqual(e.parasign.tier, 'business');
+  assert.strictEqual(e.parasign.tier, 'pro');
+  // Business is the one exception, by decision (05-10-2026): while ParaSign
+  // Business runs, ParaSend is at least Pro (entitlements.parasendFloorUnder),
+  // and the floor goes the day Business does.
+  const biz = { plan_parasend: 'pro', paid_until_parasend: '2026-09-01T00:00:00.000Z',
+    plan_parasign: 'business', paid_until_parasign: '2026-11-01T00:00:00.000Z' };
+  assert.strictEqual(ent.getEntitlements(biz, at).parasend.tier, 'pro');
+  assert.strictEqual(ent.getEntitlements(biz, Date.parse('2026-11-02T00:00:00Z')).parasend.tier, 'community');
 });
 
 test('the gate without a clock still answers, using now', () => {

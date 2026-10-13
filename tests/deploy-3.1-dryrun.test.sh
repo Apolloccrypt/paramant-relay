@@ -55,12 +55,12 @@ extract_seller_snippet() {
 }
 extract_remote() {
   local label="$1" line kind
-  line="$(grep -nE "^  remote(_nginx|_seller)? \"$label\"" "$SCRIPT" | head -1)"
+  line="$(grep -nE "^  remote(_nginx|_seller|_soft)? \"$label\"" "$SCRIPT" | head -1)"
   [ -n "$line" ] || return 1
   kind="$(printf '%s' "$line" | sed -E 's/^[0-9]+:[[:space:]]*([a-z_]+).*/\1/')"
   [ "$kind" = remote_nginx ] && extract_snippet
   [ "$kind" = remote_seller ] && extract_seller_snippet
-  sed -n "/^  remote\(_nginx\|_seller\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
+  sed -n "/^  remote\(_nginx\|_seller\|_soft\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
 }
 
 # resolve_conf_slots() is the function the script sends to the server. It is
@@ -240,7 +240,7 @@ check_has "$FULL" 'checkout_head = 41501bb'                      "falls back to 
 check_has "$FULL" 'services seen = 6'                            "asserts all six services were seen"
 check_has "$FULL" '"recurring":false'                            "asserts billing_config recurring:false"
 check_has "$FULL" '"mode_source":"inferred"'                     "asserts billing_config mode_source:inferred"
-check_has "$FULL" '"version":"3\.1\.0"'                          "asserts relay_started version 3.1.0"
+check_has "$FULL" '"version":"3\.1\.3"'                          "asserts relay_started version 3.1.3"
 check_has "$FULL" 'after manifest lines = 6'                     "asserts the manifest has six lines"
 check_has "$FULL" 'after tags for this TS = 6'                   "asserts six rollback IMAGES exist, not six lines of text"
 check_has "$FULL" 'after \.env backup bytes >= 1'                "asserts the .env backup has real bytes"
@@ -1883,10 +1883,10 @@ fi
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
 SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx|_seller)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "29" ]; then
-  pass "the scan walked all 29 remote blocks"
+if [ "$SCAN_BLOCKS" = "34" ]; then
+  pass "the scan walked all 34 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 29; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 34; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -2442,10 +2442,13 @@ fi
 # Every zone is per client IP. /help/iot-integration says so in those words and
 # tests/site-claims.test.mjs holds it there, so a key change here would make
 # the site lie.
+# No exception: user_session was keyed on the session cookie for a while, and
+# a cookie is the client's choice (review #555, H1).
 if [ -n "$SNIP_DEF" ] \
    && [ "$(grep -cE '^[[:space:]]*limit_req_zone[[:space:]]+\$binary_remote_addr' "$SNIPPET")" \
-      = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET")" ]; then
-  pass "every zone in the snippet is keyed on \$binary_remote_addr, so the limits stay per IP"
+      = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET" | awk '{print $1}')" ] \
+   && ! grep -vE '^[[:space:]]*#' "$SNIPPET" | grep -q '\$cookie_'; then
+  pass "every zone in the snippet is keyed per IP, none on a cookie"
 else
   fail "a zone in the snippet is keyed on something other than \$binary_remote_addr"
 fi
@@ -3483,6 +3486,464 @@ if git -C "$ROOT" check-ignore -q deploy/logs/ 2>/dev/null; then
   pass "deploy/logs/ is gitignored"
 else
   fail "deploy/logs/ is not gitignored; a deploy log would be committable"
+fi
+
+# ------------------------------------------------------- 10. phase 5e --
+echo ""
+echo "10. Phase 5e places the whole repo site conf, and goes back on any fault"
+# The 5c edits left about 600 lines of the repo conf out of production (prodtest
+# 2026-10-05: /api/user/ on relay_auth, /parashare?t= without its redirect).
+# 5e copies the rendered conf whole. Its remote block runs here for real
+# against a synthetic sites-enabled, with nginx, systemctl and curl stubbed.
+check_has "$FULL" '\[step\] 5e\. the whole site conf from the repo' "a full dry run reaches step 5e"
+check_has "$FULL" 'zone  /api/user/ +user_session' "5e gates on /api/user/ being on user_session before anything is sent"
+check_has "$FULL" 'zone  /api/user/login +relay_login' "5e gates on the login door staying on its strict zone"
+
+N5="$WORK/n5e"
+mkdir -p "$N5/bin" "$N5/available" "$N5/sites" "$N5/bk" "$N5/snippets"
+extract_remote "nginx full conf" > "$N5/5e.sh"
+if [ -s "$N5/5e.sh" ] && grep -q 'pre-nginx-sync-' "$N5/5e.sh"; then
+  pass "the 5e remote block could be extracted from the script"
+else
+  fail "could not extract the 5e remote block from the script"
+fi
+# nginx -t answers what NGINX_T says; curl answers per path what the test asks.
+cat > "$N5/bin/nginx" <<'STUB'
+#!/bin/sh
+[ "${1:-}" = "-T" ] && { cat "${NGINX_T_DUMP:-/dev/null}"; exit 0; }
+[ "${1:-}" = "-t" ] && [ -n "${NGINX_T_FAIL:-}" ] && { echo "nginx: [emerg] stub says no"; exit 1; }
+exit 0
+STUB
+cat > "$N5/bin/systemctl" <<'STUB'
+#!/bin/sh
+echo "systemctl $*" >> "${STUB_LOG:-/dev/null}"
+exit 0
+STUB
+cat > "$N5/bin/curl" <<'STUB'
+#!/bin/sh
+for a in "$@"; do last="$a"; done
+# CURL_STALE=n: the first n calls get the answer of the old workers, the way
+# they still answer for a moment after systemctl reload (review #569, B1).
+if [ -n "${CURL_STALE:-}" ]; then
+  c=$(( $(cat "$CURL_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$c" > "$CURL_COUNT"
+  if [ "$c" -le "$CURL_STALE" ]; then
+    case "$last" in */parashare*) printf '302 https://paramant.app/auth/login?next=/parashare' ;; *) printf '200 ' ;; esac
+    exit 0
+  fi
+fi
+case "$last" in
+  */parashare*) printf '%s' "${CURL_SHARE:-302 https://paramant.app/get?t=deploycheck5e}" ;;
+  *) printf '%s' "${CURL_HOME:-200 }" ;;
+esac
+STUB
+chmod +x "$N5/bin/nginx" "$N5/bin/systemctl" "$N5/bin/curl"
+bash "$ROOT/deploy/nginx-render.sh" > "$N5/rendered.conf"
+cp "$ROOT/deploy/nginx/snippets/paramant-security-headers.conf" "$N5/repo-snip.conf"
+printf 'server {\n    listen 127.0.0.1:8080;\n    location /api/user/ { limit_req zone=relay_auth burst=5; }\n}\n' > "$N5/old.conf"
+printf 'add_header X-Old "1" always;\n' > "$N5/old-snip.conf"
+
+run_5e() {   # ts -> output in OUT5E, rc in RC5E
+  cp "$N5/old.conf" "$N5/available/paramant.conf"
+  cp "$N5/old-snip.conf" "$N5/snippets/paramant-security-headers.conf"
+  ln -sfn "$N5/available/paramant.conf" "$N5/sites/paramant.conf"
+  OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+           WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" \
+           WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+           NGINX_T_DUMP="${NGINX_T_DUMP:-$ROOT/deploy/nginx/snippets/paramant-limit-req.conf}" \
+           PATH="$N5/bin:$PATH" bash "$N5/5e.sh" "$1" "$N5/sites" "$N5/bk" \
+           "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+}
+
+run_5e 20260101-0500
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/repo-snip.conf"; then
+  pass "5e writes the rendered repo conf and the snippet, through the symlink"
+else
+  fail "5e did not leave the repo conf and snippet in place (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -v 'diff ' | sed 's/^/        /' | head -15
+fi
+if [ -L "$N5/sites/paramant.conf" ]; then pass "the sites-enabled symlink is still a symlink"; else fail "5e replaced the symlink with a file"; fi
+if cmp -s "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0500" "$N5/old.conf" \
+   && cmp -s "$N5/bk/paramant-security-headers.conf.pre-nginx-sync-20260101-0500" "$N5/old-snip.conf"; then
+  pass "5e backs up the old conf and the old snippet under the run TS"
+else
+  fail "5e left no exact backup of the old conf and snippet"
+fi
+if grep -qE '^  confdiff [-+] +location /api/user/' <<< "$OUT5E" \
+   && grep -q '^reloaded nginx for the full conf$' <<< "$OUT5E"; then
+  pass "5e prints the diff before it writes, and reloads"
+else
+  fail "5e printed no diff or did not reload"
+fi
+
+NGINX_T_FAIL=1 run_5e 20260101-0501
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+   && grep -q '^FATAL nginx -t failed' <<< "$OUT5E"; then
+  pass "a failing nginx -t puts the old conf and snippet back and stops"
+else
+  fail "a failing nginx -t did not restore the old conf (rc $RC5E)"
+fi
+
+LB_TRIES=2 CURL_SHARE="302 https://paramant.app/auth/login?next=/parashare" run_5e 20260101-0502
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "/parashare?t= losing its token after the reload puts the old conf back"
+else
+  fail "a wrong /parashare answer did not restore the old conf (rc $RC5E)"
+fi
+
+LB_TRIES=2 CURL_HOME="502 " run_5e 20260101-0503
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf"; then
+  pass "a home page that no longer answers 200 puts the old conf back"
+else
+  fail "a broken home page did not restore the old conf (rc $RC5E)"
+fi
+
+# B1 (review #569): right after the reload the old workers still answer for a
+# moment. 5e waits for the new conf instead of rolling back on that.
+rm -f "$N5/curlcount"
+CURL_STALE=6 CURL_COUNT="$N5/curlcount" run_5e 20260101-0510
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && grep -q '^after loopback tries = 4$' <<< "$OUT5E" && ! grep -q '^FATAL' <<< "$OUT5E"; then
+  pass "a slow reload (old workers answer 3 rounds) is waited out, not rolled back"
+else
+  fail "a slow reload gave a false FATAL or a rollback (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -E '^(FATAL|after loopback)' | sed 's/^/        /' | head -6
+fi
+rm -f "$N5/curlcount"
+LB_TRIES=3 CURL_STALE=1000 CURL_COUNT="$N5/curlcount" run_5e 20260101-0511
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^after loopback tries = 3$' <<< "$OUT5E" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "an old answer that never goes away still rolls back, after the wait"
+else
+  fail "a lasting wrong answer after the wait did not roll back (rc $RC5E)"
+fi
+rm -f "$N5/curlcount"
+
+# B2 (review #569): a write that fails after the backups (disk full, read-only)
+# ends the block under set -e. The traps put conf and snippet back together.
+# A cat that writes half the conf and then fails, like a full disk.
+mkdir -p "$N5/halfbin"
+cat > "$N5/halfbin/cat" <<'STUB'
+#!/bin/sh
+case "${1:-}" in
+  */paramant-5e.*/conf) head -c 2000 "$1"; echo "cat: write error: No space left on device" >&2; exit 1 ;;
+esac
+exec /bin/cat "$@"
+STUB
+chmod +x "$N5/halfbin/cat"
+OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+         WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+         NGINX_T_DUMP="$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" \
+         PATH="$N5/halfbin:$N5/bin:$PATH" bash "$N5/5e.sh" 20260101-0512 "$N5/sites" "$N5/bk" \
+         "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+   && grep -q '^FATAL a command failed at line [0-9]* after the backups' <<< "$OUT5E" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "a half written conf (disk full) puts the old conf and the old snippet back together"
+else
+  fail "a write fault after the backups left a mixed state on disk (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -E '^(FATAL|restored)' | sed 's/^/        /' | head -6
+fi
+# The review's own case: the conf is read-only, the snippet is not.
+cp "$N5/old.conf" "$N5/old-ro.conf"
+run_5e_ro() {
+  cp "$N5/old-snip.conf" "$N5/snippets/paramant-security-headers.conf"
+  rm -f "$N5/available/paramant.conf"; cp "$N5/old.conf" "$N5/available/paramant.conf"; chmod 0444 "$N5/available/paramant.conf"
+  ln -sfn "$N5/available/paramant.conf" "$N5/sites/paramant.conf"
+  OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+           WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+           NGINX_T_DUMP="$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" \
+           PATH="$N5/bin:$PATH" bash "$N5/5e.sh" "$1" "$N5/sites" "$N5/bk" \
+           "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+  chmod 0644 "$N5/available/paramant.conf"
+}
+if [ "$(id -u)" -ne 0 ]; then
+  run_5e_ro 20260101-0513
+  if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+     && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+     && grep -q '^FATAL a command failed at line' <<< "$OUT5E"; then
+    pass "a read-only conf takes the already written snippet back with it"
+  else
+    fail "a read-only conf left the new snippet next to the old conf (rc $RC5E)"
+    printf '%s\n' "$OUT5E" | grep -E '^(FATAL|restored)' | sed 's/^/        /' | head -6
+  fi
+else
+  pass "read-only case skipped: root writes through 0444"
+fi
+
+# B3 (review #569): another enabled conf that proxies to 127.0.0.1:808[1-6]
+# stops 5e before a backup, read-only, unless someone accepted it.
+printf 'server {\n    # proxy_pass http://127.0.0.1:8086; (old, commented out)\n    location / { proxy_pass http://127.0.0.1:3002; }\n}\n' > "$N5/available/paramant-public.conf"
+ln -sfn "$N5/available/paramant-public.conf" "$N5/sites/paramant-public.conf"
+run_5e 20260101-0514
+if [ "$RC5E" -eq 0 ] && grep -q '^before public 808x hits = 0$' <<< "$OUT5E"; then
+  pass "a public conf that only mentions :8086 in a comment does not stop 5e"
+else
+  fail "a commented :8086 in the public conf stopped 5e (rc $RC5E)"
+fi
+printf 'server {\n    location /v2/ { proxy_pass http://127.0.0.1:8086; }\n}\n' > "$N5/available/paramant-public.conf"
+run_5e 20260101-0515
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^  public808x paramant-public.conf:2:' <<< "$OUT5E" \
+   && grep -q '^FATAL another enabled conf proxies to 127.0.0.1:808\[1-6\]' <<< "$OUT5E" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0515" ]; then
+  pass "a public conf that proxies to :8086 stops 5e before a backup or a write, with the line"
+else
+  fail "5e went ahead while the public conf proxies to :8086 (rc $RC5E)"
+fi
+PUBLIC_808X_OK=1 run_5e 20260101-0516
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && grep -q '^after public 808x = accepted' <<< "$OUT5E"; then
+  pass "PARAMANT_NGINX_PUBLIC_808X_OK=1 lets 5e go ahead after the comparison"
+else
+  fail "the 808x acceptance did not let 5e go ahead (rc $RC5E)"
+fi
+rm -f "$N5/sites/paramant-public.conf" "$N5/available/paramant-public.conf"
+if grep -qE '^ *location /v2/ \{' "$N5/rendered.conf" \
+   && ! awk '/listen 127.0.0.1:8086/ {s=1} s && /location \/v2\/ \{/ {l=1} l && /limit_req/ {f=1} l && /^    \}/ {exit} END {exit !f}' "$N5/rendered.conf"; then
+  pass ":8086 /v2/ has no limit_req, as on production (no 429 halfway an upload)"
+else
+  fail ":8086 /v2/ carries a limit_req that production does not have"
+fi
+
+# A zone the loaded config does not bind stops 5e before the first write.
+grep -v 'zone=relay_login' "$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" > "$N5/zones-no-login.conf"
+NGINX_T_DUMP="$N5/zones-no-login.conf" run_5e 20260101-0505
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^FATAL the repo conf limits on zone(s) the loaded config does not bind: relay_login' <<< "$OUT5E" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0505" ]; then
+  pass "a zone nginx does not bind (relay_login) stops 5e before a backup or a write"
+else
+  fail "5e went ahead with a zone the loaded config does not bind (rc $RC5E)"
+fi
+
+# A conf that arrives damaged is never written.
+cp "$N5/old.conf" "$N5/available/paramant.conf"
+OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+         WANT_CONF=0000 WANT_SNIP=0000 PATH="$N5/bin:$PATH" bash "$N5/5e.sh" 20260101-0504 "$N5/sites" "$N5/bk" \
+         "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0504" ]; then
+  pass "a checksum mismatch stops 5e before a backup or a write"
+else
+  fail "5e wrote a conf whose checksum did not match (rc $RC5E)"
+fi
+
+# --nginx-sync: phase 5e alone, and its dry run shows the diff against a copy.
+# Here-strings, not printf | grep -q: the output is long, grep -q stops reading
+# at the first match, and under pipefail the SIGPIPE to printf fails the check.
+NS="$(PARAMANT_NGINX_LIVE_COPY="$N5/old.conf" bash "$SCRIPT" --dry-run --nginx-sync 2>&1)"; NSRC=$?
+if [ "$NSRC" -eq 0 ] && grep -q '^PHASE 5e:' <<< "$NS" \
+   && ! grep -qE '^PHASE [0-46-8]' <<< "$NS"; then
+  pass "--dry-run --nginx-sync runs phase 5e and no other phase"
+else
+  fail "--dry-run --nginx-sync exited $NSRC or ran other phases"
+  printf '%s\n' "$NS" | grep -E '^PHASE|STOP' | sed 's/^/        /' | head -8
+fi
+if grep -qE '^  confdiff \+ +limit_req +zone=user_session' <<< "$NS" \
+   && grep -q 'would change against' <<< "$NS"; then
+  pass "the dry run shows the diff against PARAMANT_NGINX_LIVE_COPY without writing"
+else
+  fail "the dry run showed no diff against the server copy"
+fi
+if grep -qE '^  \| |[0-9a-f]{32,}' <<< "$NS"; then
+  fail "the --nginx-sync dry run made an ssh call or printed a long hex run"
+else
+  pass "the --nginx-sync dry run made no ssh call and printed no long hex run"
+fi
+for combo in "--nginx-sync --verify-only" "--nginx-sync --rollback 20260101-0000" "--nginx-sync --preflight-only"; do
+  # shellcheck disable=SC2086
+  if bash "$SCRIPT" --dry-run $combo >/dev/null 2>&1; then
+    fail "$combo was accepted; --nginx-sync is its own run"
+  else
+    pass "$combo is refused"
+  fi
+done
+
+# --------------------------------------------- 6l. host hardening (/dpa) --
+echo ""
+echo "6l-host. the host promises on /dpa are measured in --verify-only, per point, and a miss stops"
+VOH="$(cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only 2>&1)"
+grep -q '^\[step\] 6l\. host hardening that /dpa promises: auditd, AIDE, AppArmor (read-only)' <<< "$VOH" \
+  && pass "--verify-only reaches step 6l, the host check" || fail "--verify-only never reaches step 6l"
+grep -q '# host hardening$' <<< "$VOH" \
+  && pass "6l reads the host over the script's own ssh call" || fail "6l does not go through remote_soft"
+HH="$(mktemp -d)"
+if extract_remote "host hardening" > "$HH/6l.sh" && [ -s "$HH/6l.sh" ]; then
+  pass "the 6l remote block could be extracted"
+else
+  fail "the 6l remote block could not be extracted"
+fi
+grep -qE 'systemctl (start|stop|restart|enable|disable)|aide (--init|--update|--check|-i|-u|-C)|aa-(enforce|complain|disable)|apparmor_parser|> */(etc|var)' "$HH/6l.sh" \
+  && fail "6l changes something on the host; it must only read" \
+  || pass "6l starts, stops, writes and rebuilds nothing on the host"
+eval "$(sed -n '/^remote_field()/p' "$SCRIPT")"
+eval "$(sed -n '/^judge_host_hardening()/,/^}/p' "$SCRIPT")"
+# A host with every promise holding, and one with every promise broken.
+mkdir -p "$HH/good/bin" "$HH/good/db" "$HH/good/log" "$HH/bad/bin" "$HH/bad/db" "$HH/bad/log"
+cat > "$HH/good/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in is-active) echo active ;; show) echo "" ;; esac
+STUB
+cat > "$HH/good/bin/aa-status" <<'STUB'
+#!/usr/bin/env bash
+[ "${1:-}" = --enabled ] && exit 0
+echo "apparmor module is loaded."; echo "121 profiles are loaded."; echo "119 profiles are in enforce mode."
+STUB
+printf '#!/usr/bin/env bash\nexit 0\n' > "$HH/good/bin/aide"
+cat > "$HH/bad/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in is-active) echo inactive; exit 3 ;; show) echo "" ;; esac
+STUB
+printf '#!/usr/bin/env bash\nexit 1\n' > "$HH/bad/bin/aa-status"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$HH/bad/bin/aide"
+chmod +x "$HH"/good/bin/* "$HH"/bad/bin/*
+: > "$HH/good/db/aide.db"; : > "$HH/good/log/aide.log"
+: > "$HH/bad/db/aide.db"; : > "$HH/bad/log/aide.log"; touch -d '10 days ago' "$HH/bad/log/aide.log"
+echo N > "$HH/bad/aa-enabled"
+hh_ok() { printf '  OK    %s\n' "$*"; }
+GOOD="$(PATH="$HH/good/bin:/usr/bin:/bin" bash "$HH/6l.sh" "$HH/good/db" "$HH/good/log" "$HH/nonexistent" 2>&1)"
+BAD="$(PATH="$HH/bad/bin:/usr/bin:/bin" bash "$HH/6l.sh" "$HH/bad/db" "$HH/bad/log" "$HH/bad/aa-enabled" 2>&1)"
+for f in 'host auditd = active' 'host aide binary = yes' 'host aide db = yes' 'host aide last run age days = 0' \
+         'host apparmor enabled = yes' 'host apparmor enforce profiles = 119'; do
+  grep -qxF "$f" <<< "$GOOD" && pass "good host prints '$f'" || fail "good host does not print '$f' (got: $(tr '\n' '|' <<< "$GOOD"))"
+done
+for f in 'host auditd = inactive' 'host aide last run age days = 10' 'host apparmor enabled = no' 'host apparmor enforce profiles = unknown'; do
+  grep -qxF "$f" <<< "$BAD" && pass "broken host prints '$f'" || fail "broken host does not print '$f' (got: $(tr '\n' '|' <<< "$BAD"))"
+done
+if declare -F judge_host_hardening >/dev/null; then
+  ok() { hh_ok "$@"; }
+  REMOTE_OUT="$GOOD"; J1="$(judge_host_hardening 2)"; R1=$?
+  [ "$R1" -eq 0 ] && pass "a host that keeps all three promises passes 6l" || fail "a good host fails 6l with $R1"
+  [ "$(grep -c '^  OK    host: ' <<< "$J1")" -eq 3 ] && pass "6l logs one OK line per promise" || fail "6l did not log three OK lines: $J1"
+  REMOTE_OUT="$BAD"; J2="$(judge_host_hardening 2)"; R2=$?
+  [ "$R2" -eq 3 ] && pass "a host that breaks all three promises fails 6l three times" || fail "a broken host returned $R2, expected 3"
+  grep -q 'FAIL  host: auditd is inactive' <<< "$J2" && pass "6l names the auditd miss" || fail "6l does not name the auditd miss: $J2"
+  grep -q 'FAIL  host: the last AIDE check ran 10 days ago, more than 2' <<< "$J2" && pass "6l names the stale AIDE check" || fail "6l does not name the stale AIDE check: $J2"
+  grep -q 'FAIL  host: AppArmor is not enabled' <<< "$J2" && pass "6l names the AppArmor miss" || fail "6l does not name the AppArmor miss: $J2"
+  REMOTE_OUT="$(sed 's/^host aide binary = yes/host aide binary = no/' <<< "$GOOD")"; judge_host_hardening 2 >/dev/null; R3=$?
+  [ "$R3" -eq 1 ] && pass "a host without aide fails 6l on that point alone" || fail "a host without aide returned $R3, expected 1"
+  unset -f ok
+else
+  fail "judge_host_hardening could not be extracted"
+fi
+grep -q 'judge_host_hardening "$HOST_AIDE_MAX_AGE_DAYS" || host_fails=$?' "$SCRIPT" \
+  && grep -q 'host promises on /dpa do not hold' "$SCRIPT" \
+  && pass "phase 6 reports a broken host promise" \
+  || fail "phase 6 does not report a broken host promise"
+# review-574 N1: a miss is a WARN that still lets phase 7 write the marker;
+# --host-strict turns it into a STOP.
+hasF() { if grep -qF -- "$1" "$SCRIPT"; then pass "$2"; else fail "$2 (missing: $1)"; fi; }
+hasF 'warn "6l host NOT PROVEN: $host_msg"' "a host miss is a WARN in the log and the summary"
+hasF '[ "$HOST_STRICT" -eq 1 ] && die "$host_msg (--host-strict)"' "--host-strict makes a host miss a STOP"
+hasF 'HOST NOT PROVEN (step 6l, a warning, not a stop):' "the end summary repeats an unproven host"
+if grep -qF '|| die "$host_fails of the three host promises' "$SCRIPT"; then
+  fail "a host miss without --host-strict still dies before phase 7"
+else pass "a host miss without --host-strict no longer dies before phase 7"; fi
+( cd "$ROOT" && bash "$SCRIPT" --host-strict --preflight-only >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--host-strict with --preflight-only exits 2" || fail "--host-strict was accepted with --preflight-only"
+( cd "$ROOT" && bash "$SCRIPT" --host-strict --rollback 20260101-0000 >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--host-strict with --rollback exits 2" || fail "--host-strict was accepted with --rollback"
+VOS="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only --host-strict 2>&1 )"
+grep -q '^\[step\] 6l\. host hardening' <<< "$VOS" \
+  && pass "--dry-run --verify-only --host-strict reaches 6l" || fail "--host-strict breaks --verify-only"
+rm -rf "$HH"
+
+# ------------------------------------- release tag gate before phase 5 (N2) --
+echo ""
+echo "N2. the tag the installers pin must exist on origin and name the deploy commit"
+eval "$(sed -n '/^release_tag_verdict()/,/^}/p' "$SCRIPT")"
+if declare -F release_tag_verdict >/dev/null && declare -F sha_eq >/dev/null; then
+  S1=1111111aaaaaaaabbbbbbbbccccccccdddddddd; S2=2222222aaaaaaaabbbbbbbbccccccccdddddddd
+  T="$(release_tag_verdict v3.1.1 "$S1" "$S1")" && grep -q '^OK tag v3.1.1' <<< "$T" \
+    && pass "a tag on the deploy commit passes" || fail "a correct tag did not pass: $T"
+  T="$(release_tag_verdict v3.1.1 "" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && grep -q "STOP tag v3.1.1 does not exist on origin" <<< "$T" \
+    && grep -qF "git tag -a v3.1.1 $S1 -m \"Release 3.1.1\" && git push origin v3.1.1" <<< "$T" \
+    && pass "a missing tag stops with the exact tag command" || fail "a missing tag: rc $R, $T"
+  T="$(release_tag_verdict v3.1.1 "$S2" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && grep -q "points at 2222222" <<< "$T" \
+    && pass "a tag on another commit stops" || fail "a tag on another commit: rc $R, $T"
+  T="$(release_tag_verdict "" "" "$S1")"; R=$?
+  [ "$R" -ne 0 ] && pass "installers that disagree on the tag stop" || fail "disagreeing installers passed"
+else
+  fail "release_tag_verdict could not be extracted"
+fi
+grep -q '^release_tag_gate "5-pre"$' "$SCRIPT" && grep -B1 '^phase_5$' "$SCRIPT" | grep -q 'release_tag_gate "5-pre"' \
+  && pass "the tag gate runs right before phase 5" || fail "the tag gate does not run right before phase 5"
+grep -B1 '^phase_2$' "$SCRIPT" | grep -q 'release_tag_gate "1z"' \
+  && pass "the tag gate also runs before phase 2 writes anything" || fail "the tag gate does not run before phase 2"
+grep -q "git ls-remote --tags origin \"refs/tags/\$tag\"" "$SCRIPT" \
+  && pass "the gate asks origin, not the local tag list" || fail "the gate does not use git ls-remote on origin"
+
+# ------------------------- #576: relay NODE_ENV gate and peer-sths backup --
+echo ""
+echo "#576. NODE_ENV of the relays is read before the gossip gate can go silent, and /data/peer-sths is backed up before phase 4"
+eval "$(sed -n '/^node_env_verdict()/,/^}/p' "$SCRIPT")"
+if declare -F node_env_verdict >/dev/null; then
+  OKIN=$'nodeenv relay-main unset\nfleetgossip relay-main unset\nnodeenv relay-health production\nfleetgossip relay-health unset\nnodeenv relay-legal unset\nfleetgossip relay-legal 1'
+  T="$(printf '%s\n' "$OKIN" | node_env_verdict)" && grep -q '^OK NODE_ENV of 3 relay' <<< "$T" \
+    && pass "empty or production NODE_ENV passes" || fail "a clean fleet did not pass: $T"
+  T="$(printf '%s\nnodeenv relay-iot test\nfleetgossip relay-iot unset\n' "$OKIN" | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && grep -q 'STOP relay-iot=NODE_ENV:test' <<< "$T" && grep -q 'gossip of health.paramant.app goes silent' <<< "$T" \
+    && pass "NODE_ENV=test stops with the reason" || fail "NODE_ENV=test: rc $R, $T"
+  T="$(printf 'nodeenv relay-health Development\nfleetgossip relay-health unset\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "NODE_ENV=Development stops (case does not matter)" || fail "Development passed: $T"
+  T="$(printf 'nodeenv relay-health unset\nfleetgossip relay-health 0\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && grep -q 'PARAMANT_FLEET_GOSSIP:0' <<< "$T" && pass "PARAMANT_FLEET_GOSSIP=0 stops" || fail "gossip=0 passed: $T"
+  T="$(printf 'nodeenv relay-health MISSING\nnodeenv relay-main unset\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "a relay without a container stops" || fail "a missing container passed: $T"
+  T="$(printf 'nothing here\n' | node_env_verdict)"; R=$?
+  [ "$R" -ne 0 ] && pass "no NODE_ENV lines at all stops (not proven is not green)" || fail "empty output passed: $T"
+else
+  fail "node_env_verdict could not be extracted"
+fi
+grep -q '^\[step\] 1a2\. NODE_ENV of the relay containers' "$FULL" \
+  && pass "phase 1 reads the NODE_ENV of the relays (step 1a2)" || fail "step 1a2 is not in the full dry run"
+grep -q '^\[step\] 2c\. back up the peer STH mirror' "$FULL" \
+  && pass "phase 2 backs up /data/peer-sths (step 2c)" || fail "step 2c is not in the full dry run"
+grep -q '^\[step\] 6k0\. NODE_ENV of the relay containers' "$FULL" \
+  && pass "phase 6 reads NODE_ENV again after the recreate (step 6k0)" || fail "step 6k0 is not in the full dry run"
+VO576="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only 2>&1 )"
+grep -q '^\[step\] 6k0\. NODE_ENV' <<< "$VO576" && pass "--verify-only also reads NODE_ENV" || fail "--verify-only skips the NODE_ENV check"
+PO576="$( cd "$ROOT" && bash "$SCRIPT" --dry-run --preflight-only 2>&1 )"
+grep -q '^\[step\] 1a2\. NODE_ENV' <<< "$PO576" && pass "--preflight-only also reads NODE_ENV" || fail "--preflight-only skips the NODE_ENV check"
+L2=$(grep -n '^\[step\] 2c\.' "$FULL" | head -1 | cut -d: -f1); L4=$(grep -n '^PHASE 4:' "$FULL" | head -1 | cut -d: -f1)
+[ -n "$L2" ] && [ -n "$L4" ] && [ "$L2" -lt "$L4" ] && pass "the peer-sths backup runs before phase 4" || fail "the peer-sths backup does not run before phase 4"
+
+# Run the 2c block itself against a fake docker: five relays and admin, one
+# relay without a mirror directory.
+P2C="$WORK/p2c"
+mkdir -p "$P2C/bk" "$P2C/fakebin" "$P2C/compose" "$P2C/src/peer-sths"
+printf '{"x":1}\n' > "$P2C/src/peer-sths/$(printf 'a%.0s' $(seq 64)).jsonl"
+cat > "$P2C/fakebin/docker" <<FAKE
+#!/usr/bin/env bash
+case "\$1" in
+  compose) [ "\$2" = ps ] && echo "cid-\$4" ;;
+  inspect) [ "\${*: -1}" = cid-relay-iot ] && echo "PEER_STH_DIR=/data/nowhere"; echo "PATH=/usr/bin" ;;
+  cp) case "\$2" in cid-relay-iot:*) exit 1 ;; esac; tar cf - -C "$P2C/src" peer-sths ;;
+  exec) exit 1 ;;
+esac
+FAKE
+chmod +x "$P2C/fakebin/docker"
+extract_remote "peer sths backup" > "$P2C/2c.sh"
+if [ -s "$P2C/2c.sh" ]; then
+  OUT2C="$(cd "$P2C/compose" && PATH="$P2C/fakebin:$PATH" bash "$P2C/2c.sh" "$P2C/compose" T576 "$P2C/bk" "relay-main relay-health relay-finance relay-legal relay-iot admin" 2>&1)"; R=$?
+  [ "$R" -eq 0 ] && grep -q '^after peer sths backups = 5$' <<< "$OUT2C" && grep -q '^relay services = 5$' <<< "$OUT2C" \
+    && pass "2c makes one backup per relay and counts five" || fail "2c: rc $R, $OUT2C"
+  grep -q 'peersths relay-iot /data/nowhere absent' <<< "$OUT2C" \
+    && pass "2c reads PEER_STH_DIR from the container and accepts an absent directory" || fail "2c PEER_STH_DIR: $OUT2C"
+  [ "$(ls "$P2C/bk" | grep -c '^peer-sths-relay-.*-pre-3.1-T576.tar$')" = 4 ] \
+    && tar tf "$P2C/bk/peer-sths-relay-health-pre-3.1-T576.tar" | grep -q '\.jsonl$' \
+    && pass "2c leaves a real tar with the mirror files per relay" || fail "2c tars: $(ls "$P2C/bk")"
+  ! grep -q 'peersths admin' <<< "$OUT2C" && pass "2c skips admin" || fail "2c touched admin"
+  head -1 "$P2C/2c.sh" | grep -q 'set -euo pipefail' && pass "2c runs under set -euo pipefail" || fail "2c lacks set -euo pipefail"
+else
+  fail "could not extract the 'peer sths backup' block"
 fi
 
 # ------------------------------------------------------------------- result --

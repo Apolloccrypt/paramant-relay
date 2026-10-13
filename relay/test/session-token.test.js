@@ -568,13 +568,13 @@ test('revoking a key with no tokens is a no-op, not an error', async () => {
 
 // ── 8. The ceiling on live tokens per account ────────────────────────────────
 
-test('an account can hold twenty live tokens, and the twenty-first is refused', async () => {
+test('an account can hold its cap of live tokens (200, an office), and one more is refused', async () => {
   // A ceiling, not a rate limit. The page mints one per load and one per
   // refresh, so twenty is far above honest use; what it stops is a signed-in
   // session being run as a credential factory, each token good for fifteen
   // minutes on five routes.
   const r = fakeRedis();
-  assert.strictEqual(st.MAX_LIVE_PER_ACCOUNT, 20);
+  assert.strictEqual(st.MAX_LIVE_PER_ACCOUNT, 200, 'twenty was too few for one office on one account');
   const minted = [];
   for (let i = 0; i < st.MAX_LIVE_PER_ACCOUNT; i += 1) {
     const out = await st.mint(r, 'pgp_owner_demo');
@@ -583,7 +583,7 @@ test('an account can hold twenty live tokens, and the twenty-first is refused', 
   }
   const over = await st.mint(r, 'pgp_owner_demo');
   assert.strictEqual(over.capped, true, 'the twenty-first must be refused');
-  assert.strictEqual(over.cap, 20);
+  assert.strictEqual(over.cap, 200);
   assert.strictEqual(over.token, undefined, 'a refused mint hands out no token');
   // The tokens already minted keep working: a cap is not a revocation.
   assert.ok(await st.resolve(r, minted[0], OWNERS));
@@ -603,11 +603,12 @@ test('the cap is per account, and it counts LIVE tokens, not names left in the i
   const idx = st.ownerKey('pgp_owner_demo');
   const names = [...r.sets.get(idx)];
   for (const n of names.slice(0, 5)) await r.del(st.tokenKey(n));   // redis expiry, by hand
-  assert.strictEqual(r.sets.get(idx).size, 20, 'the index still names all twenty');
+  const CAP = st.MAX_LIVE_PER_ACCOUNT;
+  assert.strictEqual(r.sets.get(idx).size, CAP, 'the index still names every one');
 
   const out = await st.mint(r, 'pgp_owner_demo');
-  assert.ok(out.token, 'with five of the twenty expired there is room, and the mint must succeed');
-  assert.strictEqual(r.sets.get(idx).size, 16, 'and the dead names are gone from the index: 20 - 5 + 1');
+  assert.ok(out.token, 'with five of them expired there is room, and the mint must succeed');
+  assert.strictEqual(r.sets.get(idx).size, CAP - 5 + 1, 'and the dead names are gone from the index: cap - 5 + 1');
   did();
 });
 

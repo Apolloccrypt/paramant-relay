@@ -1,0 +1,77 @@
+'use strict';
+// POST /v2/verify without an API key (hertest 2026-10-04, T3-12).
+//
+// /verify and /parasign promise that a signature can be checked "offline and
+// without an account". For old v1/v2 envelopes the notary signature can only be
+// checked by the relay, and POST /v2/verify answered a keyless caller 401
+// "Invalid API key". The route is a pure function of the posted bytes (it stores
+// nothing and reads no account), so it is public now, rate-limited per address.
+// Run: node --test relay/test/route-verify-public.test.js
+
+const { test, before, after } = require('node:test');
+const assert = require('assert');
+const { boot, killAll } = require('./_relay-server');
+const { requireEngine, summary } = require('./_requires');
+
+let srv = null;
+let checks = 0;
+
+before(async () => {
+  if (!requireEngine()) return;
+  srv = await boot({ tag: 'verify-public', users: { api_keys: [] } });
+});
+after(async () => { await killAll(); summary('route-verify-public', checks); });
+
+test('a keyless caller gets a verdict, not a 401', async () => {
+  if (!srv) return;
+  const r = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '10.7.0.1' }, body: { envelope: { version: 'paramant-sign-v1' } } });
+  assert.notStrictEqual(r.status, 401, `still asks for a key: ${r.text}`);
+  assert.ok(r.status === 422 || r.status === 400 || r.status === 200, `${r.status} ${r.text}`);
+  assert.ok(!/Invalid API key/.test(r.text));
+  checks++;
+});
+
+test('the public route is rate-limited per address', async () => {
+  if (!srv) return;
+  let last = 0;
+  for (let i = 0; i < 25; i++) {
+    const r = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '10.7.0.9' }, body: { envelope: {} } });
+    last = r.status;
+    if (last === 429) break;
+  }
+  assert.strictEqual(last, 429, 'twenty-five keyless verifications a minute from one address must hit the limit');
+  checks++;
+});
+
+test('other keyless POSTs stay closed', async () => {
+  if (!srv) return;
+  const r = await srv.post('/v2/envelopes', { headers: { 'X-Real-IP': '10.7.0.2' }, body: { doc_hash: 'a'.repeat(64), parties: [{ label: 'A' }] } });
+  assert.strictEqual(r.status, 401);
+  checks++;
+});
+
+test('a broken body gets a fixed error code, never internal error text', async () => {
+  if (!srv) return;
+  const r = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '10.7.0.3', 'Content-Type': 'application/json' }, body: '{"envelope": ' });
+  assert.strictEqual(r.status, 400, r.text);
+  assert.deepStrictEqual(JSON.parse(r.text), { error: 'invalid_json' });
+  // 30k levels of nesting used to come back as "Maximum call stack size exceeded".
+  const deep = '{"envelope":' + '['.repeat(30000) + ']'.repeat(30000) + '}';
+  const r2 = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '10.7.0.4', 'Content-Type': 'application/json' }, body: deep });
+  assert.ok(!/Maximum call stack|Unexpected token|in JSON at position/i.test(r2.text), r2.text.slice(0, 200));
+  checks++;
+});
+
+test('IPv6 is limited per /64, not per address (review r2 (e))', async () => {
+  if (!srv) return;
+  let last = 0;
+  for (let i = 1; i <= 25; i++) {
+    const r = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '2001:db8:7:9::' + i.toString(16) }, body: { envelope: {} } });
+    last = r.status;
+    if (last === 429) break;
+  }
+  assert.strictEqual(last, 429, 'twenty-five addresses from one /64 share one budget');
+  const other = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '2001:db8:7:a::1' }, body: { envelope: {} } });
+  assert.notStrictEqual(other.status, 429, 'another /64 has its own budget');
+  checks++;
+});

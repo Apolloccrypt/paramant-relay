@@ -59,6 +59,13 @@ confirm through a separate channel before sending anything sensitive.
 | Firewall | UFW/nftables, default deny |
 | Login banners | Configured |
 
+This table is the state on that date, not a standing claim. What is checked
+continuously is narrower: every deploy, including `deploy/deploy-3.1.sh
+--verify-only`, reads the production host in step 6l and fails when auditd is
+not active, AIDE is missing or its daily check is more than 2 days old, or
+AppArmor is not enabled with profiles in enforce mode. /dpa promises those
+three points and no more.
+
 ### 2026-04-11 — R. Zwarts (verification review)
 
 14 findings, all resolved in commit `e6f216d`.
@@ -102,7 +109,8 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 |---|----------|--------|
 | 1–3 | Critical | Fixed |
 | 4 | Critical | In progress: plaintext filename in relay RAM |
-| 5–9 | High | Fixed |
+| 5, 7–9 | High | Fixed |
+| 6 | High | In progress: key zeroization is CPython-only and does not warn yet |
 | 10–15 | Medium | Fixed (13: accepted — documented) |
 | 16–20 | Low | Fixed |
 
@@ -113,6 +121,7 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 | # | Severity | Finding | ETA |
 |---|----------|---------|-----|
 | 4 | Critical | Plaintext filename stored in relay RAM | v2.4.6 |
+| 6 | High | `_zero()` is CPython-only and gives no warning where it cannot wipe | open |
 | 14 | Medium | CT Merkle tree non-RFC-6962 compliant | v2.5.0 |
 
 ---
@@ -787,10 +796,17 @@ rate limit verification, email template security review.
 Before Mission 4, tamper-evidence depended on trusting Paramant's own servers:
 > "Trust Paramant's servers"
 
-After Mission 4, the trust model is:
+The aim was:
 > "Trust that **at least one relay operator is honest**"
 
-This is the same trust model as RFC 6962 Certificate Transparency. Any relay operator running `paramant-verify-peers` becomes an independent auditor.
+Measured on 2026-10-06, that is not where it stands. All five relays are run by
+one operator, the heads are kept only on Paramant's own servers, and there is no
+outside witness yet. The mathematics is the same as RFC 6962 Certificate
+Transparency (Merkle tree, inclusion and consistency proofs, signed heads); the
+trust model is not, because CT relies on many independent logs and monitors.
+What a customer can verify today is that the tree Paramant shows them is
+append-only and contains their entry. Whether everyone is shown the same tree
+needs a witness outside Paramant: see `docs/ontwerp-ct-witness.md`.
 
 ### Signed Tree Heads (STH)
 
@@ -818,10 +834,19 @@ POST /v2/sth/ingest
 Body: { relay_id, sha3_root, timestamp, tree_size, version, signature, public_key, relay_pk_hash }
 ```
 
-- Receiver verifies ML-DSA-65 signature before storing
-- Invalid signatures are logged and rejected (HTTP 400)
-- Valid STHs are stored in `data/peer-sths/{relay_pk_hash}.jsonl`
-- Non-blocking, best-effort — peer failures do not affect the local relay
+- Receiver verifies the ML-DSA-65 signature before storing; invalid signatures are rejected (HTTP 400)
+- The key must be pinned to the `relay_id` (`relay/lib/fleet-pins.js`, the same five keys as
+  `frontend/js/relay-trust-anchors.js`, plus `PEER_STH_PINS` for other fleets). A pinned name
+  with another key, a pinned key under another name, or an unpinned paramant.app name is
+  refused (HTTP 403). An unpinned peer gets HTTP 202 and is never published.
+- Only pinned peers are stored in `data/peer-sths/{relay_pk_hash}.jsonl`. At startup, heads that
+  do not fit their pin are moved to `data/peer-sths/purged/` and logged as `peer_sth_purged`.
+- `received_at` is rounded to the hour, like every public time in the log.
+- A relay only gossips to paramant.app hosts when it is itself a pinned Paramant relay and not
+  running as test or development (`PARAMANT_FLEET_GOSSIP` overrides). Until 3.1.2 local test
+  stacks sent their heads to production, because docker-compose.yml defaults
+  `RELAY_SELF_URL_*` to the production names.
+- Non-blocking, best-effort: peer failures do not affect the local relay
 
 ### Cross-relay verification endpoints
 
@@ -857,19 +882,24 @@ If a relay later claims a different root for a published timestamp, any subscrib
 # Install
 npm install -g @noble/post-quantum  # required for ML-DSA-65
 
-# Verify all peer STHs are consistent
-paramant-verify-peers --relay https://health.paramant.app
+# Check the five production relays (read-only, GET only)
+paramant-verify-peers --fleet
 
-# Exit 0 = all consistent (or 0 peers)
+# Exit 0 = consistent (warnings about unpinned peers allowed)
 # Exit 1 = inconsistency detected
+# Exit 3 = a relay or peer did not answer, no verdict
 ```
 
 The tool:
-1. Fetches the peer STH mirror from the local relay
-2. Verifies ML-DSA-65 signatures on each peer's latest STH
-3. Cross-checks by fetching the STH directly from the peer relay
-4. Checks for tree_size rollbacks (append-only violation)
-5. Reports inconsistencies with full details
+1. Checks each relay's own head under its pinned key, and that it does not report `forked`
+2. Reports mirrored peers that are not pinned to their name as pollution (warning, not failure)
+3. Verifies every mirrored head of a pinned peer under the pinned key
+4. Fails when one tree size appears with two roots (split view)
+5. Asks the peer for RFC 9162 consistency proofs from the mirrored heads to its current head,
+   verified in the script itself, and fails when one does not hold or the tree went backwards
+
+It runs daily against production in `.github/workflows/ct-peers-monitor.yml`. This is still
+Paramant checking Paramant; it is not an independent auditor.
 
 ---
 
@@ -897,14 +927,13 @@ Additional fixes applied 2026-04-13:
 `/dpa` promises, in the article 28 agreement customers sign electronically:
 "TLS 1.3 minimum on all relay endpoints". Every nginx config in this repository
 allowed TLS 1.2 as well, and `deploy/nginx/addin.paramant.app.conf` named no
-protocols at all and so inherited whatever the host default was. All nine
+protocols at all and so inherited whatever the host default was. All eight
 TLS-terminating server blocks now carry `ssl_protocols TLSv1.3;`:
 
 | File | Server blocks |
 |------|---------------|
 | `deploy/nginx-paramant-public.conf` | 6 (paramant.app + the five sector relays) |
 | `deploy/nginx-selfhost.conf` | 1 |
-| `nginx-selfhost.conf` | 1 |
 | `deploy/nginx/addin.paramant.app.conf` | 1 (was inheriting the default) |
 
 `deploy/nginx-paramant-live.conf` is not in that list and does not terminate
