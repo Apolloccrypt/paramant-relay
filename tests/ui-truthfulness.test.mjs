@@ -1267,12 +1267,21 @@ assert.match(read('frontend/dpa.html'), /<td>Mollie B\.V\.<\/td><td>Nederland \(
 console.log('ui-truthfulness: the homepage argues the Dutch case with facts it can source');
 
 // Proof 2. The three /about sentences the signing claim rests on.
+// 13 October 2026: /about is a story in plain words now and does not use the
+// internal name "relay"; it says "our servers" for the same machine. The claim
+// is unchanged, so /about keeps the same three sentences with that one word
+// swapped, and /parasign keeps them as they were.
+const ABOUT_SIGNING = {
+  'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.':
+    'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches our servers.',
+};
 for (const claim of [
   'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.',
   'Every signature is entered into a public, append-only log.',
   'A signed document verifies without contacting us.',
 ]) {
-  assert.ok(aboutVisible.includes(claim), `about.html lost the signing claim: ${claim}`);
+  const onAbout = ABOUT_SIGNING[claim] || claim;
+  assert.ok(aboutVisible.includes(onAbout), `about.html lost the signing claim: ${onAbout}`);
   assert.ok(parasignEn.includes(claim), `en/parasign.html lost the signing claim: ${claim}`);
 }
 // /parasign carries the same three in Dutch, in the wording /about and
@@ -1343,7 +1352,10 @@ assert.ok(parasend.includes('Het Community-plan is gratis en blijft gratis. De z
 // before the product pages existed and neither may be softened or moved into
 // small print.
 const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).';
-assert.ok(aboutVisible.includes(SES), 'about.html lost the SES scope note');
+// /about says it without the product name (13 October 2026), with the same
+// two levels in the same words.
+assert.ok(aboutVisible.includes('a signature made with Paramant is a Simple Electronic Signature (SES). It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).'),
+  'about.html lost the SES scope note');
 // /parasign says it in Dutch, with the same two levels named in the same words.
 const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).';
 assert.ok(parasign.includes(SES_NL), 'parasign.html must carry the SES scope note, not a softer version');
@@ -1520,7 +1532,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 
   // Proof 2 of the guide: the key stays with the signer and the proof outlives
   // us. These three sentences are what /security now points at as evidence.
-  assert.match(about, /ML-DSA-65 \(FIPS 204\), generated in your browser\. The private key never reaches the relay\./,
+  assert.match(about, /ML-DSA-65 \(FIPS 204\), generated in your browser\. The private key never reaches our servers\./,
     'about.html must keep the private-key sentence');
   assert.match(about, /Every signature is entered into a public, append-only log\./,
     'about.html must keep the transparency-log sentence');
@@ -1601,14 +1613,19 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // the markup before the first section heading, not a screen and a half down.
   const aboveFold = (html) => html.slice(0, html.indexOf('<!-- WHAT PARAMANT IS -->') + 1 || html.length);
   const aboutHero = aboveFold(about);
-  assert.match(aboutHero, /Sign and send documents so that only you and the person you send them to can read them/,
-    'about.html must open in plain language, before the word post-quantum');
-  assert.match(aboutHero, /For small offices that sign and send confidential papers/,
+  // 13 October 2026: /about opens as a story. The plain-language opening and
+  // the line that says who it is for are the subtitle and the founder's first
+  // paragraph, both before the word post-quantum.
+  assert.match(aboutHero, /Secure file transfer and signing, for practices and offices\./,
     'about.html must say who it is for in the hero');
+  assert.match(aboutHero, /a way to get a document signed and send a file/,
+    'about.html must open in plain language, before the word post-quantum');
+  assert.doesNotMatch(aboutHero, /post-quantum/i,
+    'about.html must not reach for post-quantum before it has said what the product does');
   assert.match(aboutHero, /Mick Beer/, 'about.html must name the founder in the hero');
   assert.match(aboutHero, /Privacy and security researcher, founder of Paramantis Solutions B\.V\./,
     'about.html must carry the founder title in the hero');
-  assert.match(aboutHero, /href="\/en\/pricing" class="btn btn-primary"/,
+  assert.match(aboutHero, /<a class="about-next" href="\/en\/pricing">/,
     'about.html must offer a next step in the hero');
   // Nobody can promise ten years. The lede used to end on "the cryptography is
   // post-quantum, which is the proof that it still holds up in ten years", which
@@ -1628,9 +1645,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
     'about.html must not hang the jurisdiction claim off the founder paragraph');
 
   // The section number must not land under the H1 on a phone, where it reads as
-  // a stray "00".
-  assert.match(about, /#main-content \.sec-head \.num\{display:none\}/,
-    'about.html must hide the section number in the mobile hero override');
+  // a stray "00". Since 13 October 2026 /about has no numbered sections at all.
+  assert.doesNotMatch(about, /<span class="num">/,
+    'about.html is one reading column without section numbers');
 
   // /security: the first screen. The buttons used to sit at roughly y=11400 on a
   // 390px phone, fourteen screens down, and the page never said who was behind
