@@ -1339,7 +1339,9 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en
 // Sentence three of the founder paragraph. It was the one claim on these pages
 // with no source on main; #332 put it on /about, so it is now quoted rather
 // than composed, and it is pinned to both ends of the quote.
-const GIVE_BACK = 'The Community plan is his way of giving something back to society; the business plans pay for it.';
+// 13 October 2026: /about is told by Mick in the first person, so the
+// sentence says "my" there. The promise itself is unchanged.
+const GIVE_BACK = 'The Community plan is my way of giving something back to society; the business plans pay for it.';
 assert.ok(aboutVisible.includes(GIVE_BACK), 'about.html lost the give-back sentence the product pages quote');
 // Mick, 4 September: parasend states the same promise without the person, since
 // "his" has nothing to point at once the name is gone.
@@ -1354,7 +1356,9 @@ assert.ok(parasend.includes('Het Community-plan is gratis en blijft gratis. De z
 const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).';
 // /about says it without the product name (13 October 2026), with the same
 // two levels in the same words.
-assert.ok(aboutVisible.includes('a signature made with Paramant is a Simple Electronic Signature (SES). It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).'),
+// A qualified signature is not a notarial deed, so /about names the level
+// it is not by its own name.
+assert.ok(aboutVisible.includes('a signature made with Paramant is a Simple Electronic Signature (SES). It is not a qualified signature (QES) under eIDAS.'),
   'about.html lost the SES scope note');
 // /parasign says it in Dutch, with the same two levels named in the same words.
 const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).';
@@ -1548,7 +1552,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // onto a second one.
   assert.match(about, /Simple Electronic Signature \(SES\)/,
     'about.html must state that a ParaSign signature is a Simple Electronic Signature');
-  assert.match(about, /not a notarised legal signature under eIDAS or any qualified-trust regime \(QES\)/,
+  assert.match(about, /It is not a qualified signature \(QES\) under eIDAS\./,
     'about.html must state what the signature is not');
   assert.doesNotMatch(securityRaw, /Simple Electronic Signature|advanced \(AES\)/,
     'security.html must not carry a second, competing eIDAS level while /about and /pricing disagree');
@@ -1641,7 +1645,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // The give-back sentence, in the exact words the messaging guide fixes for it
   // (section 5, sentence three of the founder paragraph). It is the split the
   // whole site is built on, and it is quoted, not paraphrased.
-  assert.match(about, /The Community plan is his way of giving something back to society; the business plans pay for it\./,
+  assert.match(about, /The Community plan is my way of giving something back to society; the business plans pay for it\./,
     'about.html must carry the give-back sentence in the words docs/brand/messaging.md fixes');
   // The earlier draft explained the free plan with a jurisdiction claim ("should
   // not depend on a US subscription"). The guide forbids that beside his name:
