@@ -30,15 +30,20 @@ const os = require('os');
 const fs = require('fs');
 const { bootHealthyRelay, killSpawnedRelays } = require('./_boot-relay');
 const { sealedVoor, nieuwToken, b64url } = require('./_sealed');
+const { SUBJECTS_NL } = require('../lib/transfer-notify');
 
 const KEY = 'pgp_sends_aanval_een';
 const KEY2 = 'pgp_sends_aanval_twee';
 let BASE = null;
+let RELAY = null;
 let usersFile;
 
 // Elke mail die de relay zou versturen, in volgorde. dryrun bezorgt niets en
 // logt de tekst, dus dit is letterlijk wat de ontvanger gelezen zou hebben.
 const post = [];
+
+// Hash-prefixen uit blob_stored, voor de slagboom hieronder.
+const opgeslagen = new Set();
 
 function sha256hex(b) { return crypto.createHash('sha256').update(b).digest('hex'); }
 
@@ -72,6 +77,40 @@ async function stuur(body, sleutel) {
   return { status: r.status, body: json || tekst.slice(0, 200) };
 }
 
+// DE SLAGBOOM. De maillog loopt niet gelijk met de HTTP-antwoorden, en dat is
+// geen kwestie van even wachten. De relay schrijft zijn log naar een pijp, en
+// Node schrijft naar een pijp asynchroon: zit die vol omdat deze testrunner
+// even geen CPU krijgt, dan wacht de regel in de relay terwijl het antwoord
+// over de socket al vertrokken is. Op een volle CI-runner (crypto suite, PR
+// #581, 07-10) kwam zo de "staat klaar"-melding van een blokupload pas binnen
+// NA post.length = 0, en telde de sealed-test twee mails waar er een uitging.
+// Lokaal onder belasting (64 parallel, CPU vol): 8 van 600 runs rood, in beide richtingen (een
+// verlate melding erbij, of de uitnodiging zelf nog niet binnen na 250 ms).
+//
+// Een vaste wachttijd is dus nooit genoeg. Wat wel klopt: de pijp is FIFO.
+// Upload een vers blok en wacht tot ZIJN blob_stored-regel binnen is; alles
+// wat de relay daarvoor logde, ook elke mail van het verzoek ervoor, staat dan
+// in `post`. De eigen "staat klaar"-melding van dat blok kan daarna nog
+// binnendruppelen; die gaat naar de afzender zelf, en de controles hieronder
+// kijken per adres.
+async function slagboom() {
+  const h = (await blok(KEY)).slice(0, 16);
+  const tot = Date.now() + 15000;
+  while (!opgeslagen.has(h)) {
+    if (Date.now() > tot) {
+      throw new Error('slagboom: blob_stored ' + h + ' kwam niet binnen in 15 s. Het blok werd wel '
+        + 'aangenomen, dus een ander proces beantwoordde het verzoek'
+        + (RELAY && RELAY.exited ? ' en de relay van deze suite is gestopt:\n' + RELAY.output() : ''));
+    }
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
+// De mails aan een adres, in volgorde.
+function mailsAan(adres) {
+  return post.filter((m) => Array.isArray(m.to) && m.to.includes(adres));
+}
+
 // De hele ophaalreis van een ontvanger: code vragen, code uit de maillog vissen,
 // bestand ophalen. Geeft de status en de X-Paramant-headers terug.
 async function ophalen(token) {
@@ -80,8 +119,9 @@ async function ophalen(token) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'code' }),
   });
-  await new Promise((r) => setTimeout(r, 250));   // de log loopt iets achter
-  const m = /Uw controlecode is (\d{6})/.exec((post[post.length - 1] || {}).text || '');
+  await slagboom();                               // de log loopt achter, zie boven
+  const codemail = post.filter((x) => /Uw controlecode is \d{6}/.test(x.text || '')).pop();
+  const m = /Uw controlecode is (\d{6})/.exec((codemail || {}).text || '');
   if (!m) return { stap1: p1.status, code: null, stap2: null };
   const p2 = await fetch(BASE + '/v2/pickup/' + token, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -95,10 +135,11 @@ async function ophalen(token) {
   return { stap1: p1.status, code: m[1], stap2: { status: p2.status, kop, ...uit } };
 }
 
-// De laatste mail die de relay verstuurde.
-async function laatsteMail() {
-  await new Promise((r) => setTimeout(r, 250));
-  return post[post.length - 1] || {};
+// De laatste mail aan `adres`. Per adres en niet "de laatste regel": na de
+// slagboom kan de eigen uploadmelding van de afzender er nog achteraan komen.
+async function laatsteMail(adres) {
+  await slagboom();
+  return mailsAan(adres).pop() || {};
 }
 
 before(async () => {
@@ -122,11 +163,16 @@ before(async () => {
     ] }),
   }, {
     onLine: (line) => {
+      if (line.includes('"blob_stored"')) {
+        try { opgeslagen.add(JSON.parse(line).hash); } catch (_) { /* geen JSON-regel */ }
+        return;
+      }
       if (!line.includes('mail_dryrun')) return;
       try { post.push(JSON.parse(line)); } catch (_) { /* geen JSON-regel */ }
     },
   });
   BASE = relay.base;
+  RELAY = relay;
 });
 
 after(() => {
@@ -156,7 +202,7 @@ test('gat 1: een bestandsnaam met regeleinden zet de eigen tekst van de afzender
   const r = await stuur({ hashes: [h], recipients: [adres],
                           sealed: sealedVoor([adres]), filename: vuil, ttl_ms: 3600000 });
   assert.equal(r.status, 201, 'de verzending zelf hoort te lukken: ' + JSON.stringify(r.body));
-  const mail = await laatsteMail();
+  const mail = await laatsteMail(adres);
   const tekst = mail.text || '';
 
   assert.ok(!/paramant-support\.example/.test(tekst),
@@ -177,7 +223,7 @@ test('gat 1b: een nulbyte in de bestandsnaam komt ongewijzigd in de mailtekst', 
   const r = await stuur({ hashes: [h], recipients: [adres], sealed: sealedVoor([adres]),
                           filename: 'a\u0000b.pdf' });
   assert.equal(r.status, 201, JSON.stringify(r.body));
-  const mail = await laatsteMail();
+  const mail = await laatsteMail(adres);
   assert.ok(!(mail.text || '').includes('\u0000'),
     'er staat een nulbyte in de tekst van de mail');
 });
@@ -194,7 +240,7 @@ test('houdt stand: een meegestuurde bestandsnaam komt nergens terecht', async ()
   post.length = 0;
   const r = await stuur({ hashes: [h], recipients: [adres], sealed: s, filename: naam, ttl_ms: 3600000 });
   assert.equal(r.status, 201, JSON.stringify(r.body));
-  const uitnodiging = await laatsteMail();
+  const uitnodiging = await laatsteMail(adres);
   assert.ok(!JSON.stringify(uitnodiging).includes('ZZgeheimeNaamQ3'), 'de naam staat in de uitnodiging');
   const o = await ophalen(s[adres].token);
   assert.ok(o.code, 'er kwam een codemail');
@@ -330,12 +376,24 @@ test('houdt stand: sealed', async () => {
   // sealed met meer adressen dan recipients: alleen de ontvangers krijgen post.
   const h5 = await blok(KEY);
   const extra = ['s6@extern.test', 's7@extern.test', 's8@extern.test'];
+  // Eerst alles van hiervoor binnen, dan pas tellen (zie slagboom).
+  await slagboom();
   post.length = 0;
   const over = await stuur({ hashes: [h5], recipients: [extra[0]], sealed: sealedVoor(extra) });
-  await new Promise((r) => setTimeout(r, 250));
+  await slagboom();
   assert.equal(over.status, 201);
   assert.equal(over.body.recipients, 1, 'het gepadde deel van sealed telt niet mee');
-  assert.equal(post.length, 1, 'en er gaat precies een mail uit');
+  // Precies een mail naar buiten, en die gaat naar de ene ontvanger. Wat de
+  // relay verder logt in dit venster is de "staat klaar"-melding van een
+  // blokupload aan de afzender zelf; die hoort bij het blok, niet bij sealed.
+  const afzender = 'anna@zorggroep.test';
+  const eigenMelding = (m) => Array.isArray(m.to) && m.to.length === 1 && m.to[0] === afzender
+    && String(m.subject || '').startsWith(SUBJECTS_NL.upload);
+  const naarBuiten = post.filter((m) => !eigenMelding(m));
+  assert.deepEqual(naarBuiten.map((m) => m.to), [[extra[0]]],
+    'en er gaat precies een mail uit, naar de ontvanger: ' + JSON.stringify(post.map((m) => [m.to, m.subject])));
+  assert.equal(mailsAan(extra[1]).length + mailsAan(extra[2]).length, 0,
+    'het gepadde deel van sealed krijgt geen post');
 
   // Andersom: een ontvanger zonder wikkeling wordt geweigerd in plaats van
   // uitgenodigd voor bytes die hij niet kan openen.
