@@ -102,7 +102,7 @@ async function context(label, state) {
     const complete = state.status === 'complete';
     return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ envelope: {
       id: ENV_ID, doc_hash: fx.docHash, original_filename: 'contract.pdf', recipe_version: 5,
-      created_at: '2026-10-04T12:00:00.000Z', expires_at: '2026-11-03T12:00:00.000Z', sign_expires_at: '2026-10-11T12:00:00.000Z',
+      created_at: new Date(Date.now() - 864e5).toISOString(), expires_at: new Date(Date.now() + 29 * 864e5).toISOString(), sign_expires_at: new Date(Date.now() + 6 * 864e5).toISOString(),
       status: complete ? 'complete' : 'sent', signed_count: complete ? 2 : 1, party_count: 2,
       parties: [{ index: 0, label: 'Afzender Demo', status: 'signed' }, { index: 1, label: 'Signer Demo', status: complete ? 'signed' : 'pending' }],
     } }) });

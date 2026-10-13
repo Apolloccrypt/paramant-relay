@@ -20,7 +20,7 @@ import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
 import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, paraafInset } from '/js/paraaf-place.js?v=5';
 import { requestsForParties, pageListText } from '/js/cosign-layout.js?v=5';
-import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=4';
+import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=5';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=4';
 import { sealPut } from '/js/account-seal.js?v=1';
@@ -4867,7 +4867,15 @@ function wireNav() {
     // Signed out: this button is the sign-in, and nothing below it should run.
     // Whatever was typed here is lost by the navigation; applySessionToSendButton
     // has already said so on screen, above the button.
+    // Check what was typed first (test with a stranger, 13-10-2026): an empty
+    // name or address went straight to the sign-in, and came back as a
+    // request that could not be sent.
     if ($('ds-recipients-continue').dataset.signInFirst === '1') {
+      commitRecipientsFromDom();
+      commitInviteDeliveryFromDom();
+      const sErr = validateRecipients();
+      if (sErr) { showRecipientsHint(sErr, true); return; }
+      if (state.signingMode === 'invite' && state.recipients.length === 0) { showRecipientsHint(L('Voeg minstens één persoon toe om dit naar te sturen.', 'Add at least one person to send this to.'), true); return; }
       signInKeepingWork();
       return;
     }
@@ -4925,7 +4933,10 @@ function renderRecipients() {
     const empty = document.createElement('div');
     empty.className = 'ds-recipient-empty';
     empty.innerHTML = (state.signingMode === 'invite')
-      ? L('Voeg de mensen toe die dit document moeten tekenen. Ieder krijgt een eigen link om te tekenen.', 'Add the people who need to sign this document. Each one gets their own link to sign.')
+      // One sentence says who to add: the line above the list (.ds-sub). This
+      // spot only says the list is empty and how to fill it; it used to repeat
+      // that line in other words (test with a stranger, 13-10-2026).
+      ? L('Nog niemand toegevoegd. Klik op <strong>+ Ontvanger toevoegen</strong>.', 'Nobody added yet. Click <strong>+ Add recipient</strong>.')
       : L('Nog geen medeondertekenaars. Klik op <strong>+ Ontvanger toevoegen</strong> om iemand uit te nodigen, of op <strong>Verder</strong> om alleen zelf te tekenen.', 'No co-signers yet. Click <strong>+ Add recipient</strong> to invite someone, or <strong>Continue</strong> to sign just for yourself.');
     list.appendChild(empty);
     return;
@@ -5103,6 +5114,8 @@ async function offerDraftAfterSignIn() {
   if (!draft) return;
   const q = new URLSearchParams(location.search);
   if (q.get('herstel') === '1') { await restoreDraft(draft); return; }
+  // Made before the sign-in: only the road back puts it back (sign-draft.js).
+  if (draft.anon) return;
   // Not straight back from the sign-in: ask, once, on the first screen.
   const host = $('step-mode');
   if (!host || host.hidden) return;

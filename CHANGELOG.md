@@ -9,7 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [3.1.3] - unreleased
+## [3.1.3] - 2026-10-07
 
 Tagged `v3.1.3` on the merge commit before the frontend rollout
 (`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
@@ -21,7 +21,7 @@ Tagged `v3.1.3` on the merge commit before the frontend rollout
 - `deploy/de-server.json` no longer lists the 3.1.1 version gap, production
   runs 3.1.2 (PR #578).
 
-## [3.1.2] - unreleased
+## [3.1.2] - 2026-10-06
 
 Tagged `v3.1.2` on the merge commit before the frontend rollout
 (`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
@@ -51,7 +51,7 @@ current tree, and a customer can check a receipt with `scripts/klant-controle.py
   or `PARAMANT_FLEET_GOSSIP=0` (steps 1a2 and 6k0), because from 3.1.2 such a
   relay does not gossip to the fleet.
 
-## [3.1.1] - unreleased
+## [3.1.1] - 2026-10-06
 
 Tagged `v3.1.1` on the merge commit before the frontend rollout
 (`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.

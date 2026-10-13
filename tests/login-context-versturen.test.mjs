@@ -47,8 +47,8 @@ async function open(route, next) {
 }
 
 const CASES = [
-  ['/auth/login', '/parashare', /Om te versturen heeft u een gratis account nodig/, /Gratis account maken/, '/signup?next=/parashare'],
-  ['/en/auth/login', '/en/parashare', /To send a file you need a free account/, /Create a free account/, '/en/signup?next=/en/parashare'],
+  ['/auth/login', '/parashare', /Om te versturen heeft u een gratis account nodig/, /Gratis account maken/, '/signup?next=%2Fparashare'],
+  ['/en/auth/login', '/en/parashare', /To send a file you need a free account/, /Create a free account/, '/en/signup?next=%2Fen%2Fparashare'],
 ];
 
 for (const [route, next, sentence, button, href] of CASES) {

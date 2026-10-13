@@ -151,6 +151,13 @@ for (const [mode, label] of [['alone', 'Inloggen om te ondertekenen'], ['cosign'
   ok(`${mode}: nothing on the route needs a session`,
     calls.length === 0, calls.join(', ') || 'none');
 
+  // An invitation needs someone to go to; the button checks that before the
+  // sign-in (test with a stranger, 13-10-2026).
+  if (mode === 'invite') {
+    await page.locator('#ds-add-recipient').click();
+    await page.locator('[data-field="label"]').nth(0).fill('Signer Demo');
+    await page.locator('[data-field="email"]').nth(0).fill('demo@example.com');
+  }
   await page.locator(button).click();
   await page.waitForURL(/\/auth\/login\?next=(%2F|\/)sign(%3Fherstel%3D1)?$/, { timeout: 15000 }).catch(() => {});
   ok(`${mode}: pressing it goes to the sign-in and back to /sign`,

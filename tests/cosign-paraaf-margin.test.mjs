@@ -60,7 +60,7 @@ await page.route('https://health.paramant.app/v2/envelopes/**', (route) => {
   if (url.pathname.endsWith('/view')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ envelope: {
     id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'paraaf-demo.pdf', recipe_version: 5,
-    created_at: '2026-10-04T12:00:00.000Z', expires_at: '2026-11-03T12:00:00.000Z',
+    created_at: '2026-10-04T12:00:00.000Z', expires_at: new Date(Date.now() + 29 * 864e5).toISOString(),
     status: 'sent', signed_count: 0, party_count: 1, parties: [{ index: 0, label: 'Sandeep G. Prasad', status: 'pending' }],
   } }) });
 });
