@@ -32,52 +32,6 @@
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
-<style>
-.about-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
-.about-band:first-of-type{border-top:none}
-.about-band h2{font-size:var(--text-2xl);letter-spacing:-.02em;margin-bottom:var(--space-2)}
-.about-band .mono-eyebrow{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)}
-.about-lede{font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
-.about-band p{font-size:var(--text-base);color:var(--ink);line-height:1.8;max-width:680px;margin-top:var(--space-4)}
-.about-band p a:not(.btn){color:var(--cobalt)}
-.about-band p strong{color:var(--navy)}
-.check-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-5)}
-.check-card{background:var(--bone);padding:var(--space-5) var(--space-5)}
-.check-card .k{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);font-weight:700}
-.check-card p{margin-top:var(--space-2);font-size:var(--text-sm);color:var(--ink);line-height:1.65;max-width:none}
-.check-card a{color:var(--cobalt)}
-.scope-note{border-left:3px solid var(--lime);background:var(--bone);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);padding:var(--space-4) var(--space-5);margin-top:var(--space-5);max-width:680px}
-.scope-note p{margin-top:0}
-.person-card{border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone);padding:var(--space-6);margin-top:var(--space-5);max-width:680px}
-.person-card p{margin-top:0}
-.person-card p + p{margin-top:var(--space-4)}
-.person-name{font-size:var(--text-xl);font-weight:600;color:var(--navy);letter-spacing:-.02em}
-.person-title{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--cobalt);margin-top:var(--space-2);margin-bottom:var(--space-4)}
-.split-head{font-size:var(--text-md);font-weight:600;color:var(--navy);margin-top:var(--space-6)}
-.split-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-4)}
-.split-card{background:var(--bone);padding:var(--space-5)}
-.split-card .k{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);font-weight:700}
-.split-card p{margin-top:var(--space-3);font-size:var(--text-sm);color:var(--ink);line-height:1.65;max-width:none}
-.split-note{font-size:var(--text-sm);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
-.about-cta{margin-top:var(--space-5)}
-.about-byline{border-left:3px solid var(--cobalt);padding-left:var(--space-4);margin-top:var(--space-5);max-width:680px}
-.about-byline .n{font-size:var(--text-md);font-weight:600;color:var(--navy);letter-spacing:-.02em}
-.about-byline .t{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--cobalt);margin-top:4px}
-.about-for{font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
-.hero-cta{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-top:var(--space-5)}
-@media(max-width:640px){
-.check-grid{grid-template-columns:1fr}
-.split-grid{grid-template-columns:1fr}
-/* Mobile first: the page name comes before the section number, and the hero
-   starts near the top of the screen instead of a third of the way down. */
-#main-content{padding-top:var(--space-5) !important}
-#main-content .sec-head{grid-template-columns:1fr;column-gap:0;row-gap:var(--space-2);align-items:start;padding-bottom:var(--space-3);margin-bottom:var(--space-4)}
-#main-content .sec-head h1{order:1}
-#main-content .sec-head .num{display:none}
-#main-content .sec-head .mono-eyebrow{order:3}
-.about-lede{margin-top:var(--space-3)}
-}
-</style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
   "@context": "https://schema.org",
@@ -151,6 +105,29 @@
   ]
 }
 </script>
+<style>
+/* De over-pagina als verhaal: een leeskolom, gewone alinea's, een paar
+   tussenkoppen. Kleuren komen uit de thematokens, dus licht en donker volgen
+   vanzelf. */
+.story{max-width:640px;margin:0 auto;padding:var(--space-10) 16px var(--space-12, 96px)}
+.story h1{font-size:clamp(2rem,6vw,2.75rem);line-height:1.15;letter-spacing:-.02em;color:var(--navy);margin:0}
+.story .about-sub{font-style:italic;font-size:var(--text-md);color:var(--ink-dim);line-height:1.6;margin:var(--space-3) 0 0}
+.story h2{font-size:var(--text-xl, 1.375rem);line-height:1.3;letter-spacing:-.01em;color:var(--navy);margin:var(--space-10) 0 0}
+.story p{font-size:1.0625rem;line-height:1.8;color:var(--ink);margin:var(--space-4) 0 0}
+.story a{color:var(--cobalt);text-decoration:underline;text-underline-offset:2px}
+.story code{font-family:var(--mono);font-size:.92em}
+.about-person{display:flex;align-items:center;gap:var(--space-4);margin-top:var(--space-6)}
+.portrait{flex:0 0 auto;width:72px;height:72px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px var(--ink-hair)}
+.portrait img{display:block;width:100%;height:100%;object-fit:cover}
+.about-byline .n{font-size:var(--text-md);font-weight:600;color:var(--navy)}
+.about-byline .t{font-size:var(--text-sm, .875rem);color:var(--ink-dim);line-height:1.45;margin-top:2px}
+.about-tech{margin-top:var(--space-4)}
+.about-tech summary{cursor:pointer;color:var(--cobalt);min-height:44px;display:flex;align-items:center}
+.about-tech p{margin-top:var(--space-2)}
+.lang-switch{max-width:780px;margin:0 auto;padding:24px 16px;font-size:14px}
+.lang-switch a{color:var(--ink)}
+@media (max-width:640px){.story{padding-top:var(--space-6)}.story h2{margin-top:var(--space-8)}}
+</style>
 <script src="/js/theme.js?v=6"></script>
 </head>
 <body>
@@ -192,109 +169,47 @@
   <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/about" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/about" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
-<main>
-
-<!-- HERO -->
-<section style="padding:var(--space-10) 0 var(--space-6)" id="main-content" tabindex="-1">
-  <div class="container-md">
-    <div class="sec-head">
-      <span class="num">00</span>
-      <h1 class="paramant-h2">About Paramant</h1>
-      <span class="mono-eyebrow">Company, mission, and how to check us</span>
-    </div>
-    <p class="about-lede">Sign and send documents so that only you and the person you send them to can read them, and so that anyone can check later that the document is genuine and unchanged. Our servers are in Germany, under EU law.</p>
-    <p class="about-for">For small offices that sign and send confidential papers, and for the person who has to check a supplier before it goes near client files.</p>
+<main id="main-content" tabindex="-1">
+<article class="story">
+  <h1>About Paramant</h1>
+  <p class="about-sub">With Paramant you send documents and get them signed, as a practice or an office.</p>
+  <div class="about-person">
+    <picture class="portrait">
+      <source srcset="/assets/mick/mick-beer-240.webp" type="image/webp">
+      <img src="/assets/mick/mick-beer-240.jpg" width="112" height="112" alt="Mick Beer" loading="eager" decoding="async">
+    </picture>
     <div class="about-byline">
       <div class="n">Mick Beer</div>
       <div class="t">Privacy and security researcher, founder of Paramantis Solutions B.V.</div>
     </div>
-    <div class="hero-cta">
-      <a href="/en/pricing" class="btn btn-primary">See pricing &rarr;</a>
-      <a href="/en/security" class="btn btn-secondary">See the evidence &rarr;</a>
-    </div>
   </div>
-</section>
 
-<!-- WHAT PARAMANT IS -->
-<section class="about-band">
-  <div class="container-md">
-    <span class="mono-eyebrow">01 / Mission</span>
-    <h2 style="margin-top:var(--space-2)">What Paramant is</h2>
-    <p>Two products on one post-quantum core. <strong>ParaSend</strong> encrypts files in your browser or SDK before they ever leave your device; the relay only holds fixed-size ciphertext in RAM and destroys it after its last read. <strong>ParaSign</strong> signs documents with ML-DSA-65 (FIPS 204) and records every signature in a public transparency log.</p>
-    <p>The design goals stay constant: privacy first, post-quantum by default, and EU-sovereign infrastructure with no US parent and no US CLOUD Act exposure. We do not ask you to trust us. We aim to make that trust unnecessary.</p>
-  </div>
-</section>
+  <p class="about-intro">I research how personal data leaks from the apps and clouds people trust. My articles and tools are on <a href="https://mickbeer.com" rel="noopener">mickbeer.com</a>.</p>
+  <p>Paramant is what I would want a small firm to have: a way to get a document signed and send a file, with client files that stay in Europe and proof you can check without us. Think of a patient file that has to reach a colleague, or a court document that has to come back signed. What it costs is on the <a class="about-next" href="/en/pricing">pricing page</a>.</p>
 
-<!-- BEHIND PARAMANT -->
-<section class="about-band">
-  <div class="container-md">
-    <span class="mono-eyebrow">02 / Who is behind Paramant</span>
-    <h2 style="margin-top:var(--space-2)">Behind Paramant</h2>
-    <div class="person-card">
-      <div class="person-name">Mick Beer</div>
-      <div class="person-title">Privacy and security researcher, founder of Paramantis Solutions B.V.</div>
-      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher. Paramantis Solutions B.V. is the contracting and responsible party. The founder is where the work comes from, not the service itself.</p>
-      <p>The Community plan is his way of giving something back to society; the business plans pay for it. That is the whole arrangement, and it is why the Community plan is not a trial and has no end date.</p>
-      <p>That background shapes the choices: post-quantum signatures (ML-DSA-65), a public transparency log, offline-verifiable documents, and source code you can inspect yourself. You do not have to take our word for it: you can check it yourself. The code is source-available and the transparency log is public: the product stands apart from the person and stays checkable.</p>
-    </div>
+  <!-- WHAT PARAMANT IS -->
+  <h2>How it works</h2>
+  <p>You pick a file and your browser encrypts it before it leaves your computer. Our server keeps only that encrypted copy, in memory and never on a disk. After the last pickup it is deleted.</p>
+  <p>Getting a document signed happens in the browser too. The key you sign with is made on your own device and never reaches our servers. Every signature is entered into a public, append-only log. A signed document verifies without contacting us. You can check one on the <a href="/en/verify">verify page</a>.</p>
+  <p>Legally, a signature made with Paramant is a Simple Electronic Signature (SES). It is not a qualified signature (QES) under eIDAS.</p>
 
-    <div class="split-head">Free for everyone, paid for organisations</div>
-    <div class="split-grid">
-      <div class="split-card free">
-        <div class="k">Free for everyone</div>
-        <p><strong>ParaSign Community.</strong> &euro;0, forever. 2 signatures a month, unlimited receiving, full post-quantum crypto, public verification log. No card required.</p>
-        <p><strong>ParaSend Community.</strong> &euro;0, forever. AES-256-GCM with a browser-generated key, 1 hour link expiry, burn on first read. No card required.</p>
-      </div>
-      <div class="split-card paid">
-        <div class="k">For organisations</div>
-        <p><strong>Firm</strong> is one plan and one payment for both products: 100 signatures a month and API access on ParaSign, plus 500 transfers a month, 24 hour link expiry, up to 10 reads per link through the API, up to 50 registered devices, send history and webhooks on ParaSend.</p>
-        <p>Above Firm the plans stay per product. <strong>ParaSign Business</strong> adds named support and an exportable audit log. <strong>ParaSign Enterprise</strong> adds a dedicated relay instance, an SLA and a self-hosting licence. <strong>ParaSend Enterprise</strong> adds a dedicated relay and an SLA of 99.95%.</p>
-      </div>
-    </div>
-    <p class="split-note">Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</p>
-    <p class="about-cta"><a href="/en/pricing" class="btn btn-primary">See pricing &rarr;</a></p>
-  </div>
-</section>
+  <h2>What it costs</h2>
+  <p>The Community plan costs &euro;0, forever. It gives you 2 signatures a month and 50 transfers a month, with one recipient per send. No card required, and no trial that runs out. The Community plan is my way of giving something back to society; the business plans pay for it.</p>
+  <p>Firm is 29 euro a month excl. VAT. It gives you 100 signatures a month and 500 transfers a month, up to 30 recipients per send. Every plan gets the same encryption and the same public log. Need more? Email me: <a href="mailto:privacy@paramant.app?subject=Need%20more">privacy@paramant.app</a></p>
 
-<!-- HOW YOU CAN CHECK US -->
-<section class="about-band">
-  <div class="container-md">
-    <span class="mono-eyebrow">03 / Technology &amp; transparency</span>
-    <h2 style="margin-top:var(--space-2)">How you can check us</h2>
-    <p>Every claim on this site is meant to be checkable, not taken on faith. Four things make that possible:</p>
-    <div class="check-grid">
-      <div class="check-card">
-        <div class="k">Post-quantum signatures</div>
-        <p>ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.</p>
-      </div>
-      <div class="check-card">
-        <div class="k">Public transparency log</div>
-        <p>Every signature is entered into a public, append-only log. Inspect it on the <a href="/en/ct-log">CT Log</a>.</p>
-      </div>
-      <div class="check-card">
-        <div class="k">Offline-verifiable documents</div>
-        <p>A signed document verifies without contacting us. Check one on the <a href="/en/verify">verify page</a>.</p>
-      </div>
-      <div class="check-card">
-        <div class="k">Source-available code</div>
-        <p>The relay is source-available. Read it on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a> and run it yourself.</p>
-      </div>
-    </div>
-    <div class="scope-note">
-      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a qualified signature (QES) under eIDAS. We state exactly what it is and what it is not.</p>
-    </div>
-  </div>
-</section>
+  <h2>Under the hood</h2>
+  <p>The servers are in Germany, under EU law. When you hand a file over directly, Paramant uses a hybrid post-quantum key exchange: a new method built to withstand the quantum computers of the future, together with a proven classical one. Signatures are fully post-quantum. The source code is public on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>, and the details are on the <a href="/en/security">security page</a>.</p>
+  <details class="about-tech">
+    <summary>The names of the algorithms</summary>
+    <p>Signing uses ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches our servers. A direct hand-over uses ML-KEM-768 together with ECDH P-256, then AES-256-GCM. A plain link uses AES-256-GCM with a key that sits only in the link itself.</p>
+  </details>
 
-<!-- RESPONSIBLE DISCLOSURE -->
-<section class="about-band">
-  <div class="container-md">
-    <span class="mono-eyebrow">04 / Responsible disclosure</span>
-    <h2 style="margin-top:var(--space-2)">Found a security issue?</h2>
-    <p>We publish a machine-readable <a href="/.well-known/security.txt">security.txt</a> (RFC 9116) and a full <a href="/en/security#responsible-disclosure">disclosure policy</a>. Reports reach us at <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, in Dutch or English.</p>
-  </div>
-</section>
+  <h2>Who is responsible</h2>
+  <p>Paramant is a product of Paramantis Solutions B.V. in Harderwijk, the Netherlands, KvK 42115132, founded by Mick Beer, privacy and security researcher. Paramantis Solutions B.V. is the contracting and responsible party. Its parent is Paramantis Digital B.V., also a Dutch company (KvK 42114664).</p>
 
+  <h2>Contact</h2>
+  <p>A question, or something on this site that is not right? Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, in Dutch or English. Security issues go to the same address. How that works is in our <a href="/en/security#responsible-disclosure">disclosure policy</a> and in <a href="/.well-known/security.txt">security.txt</a>.</p>
+</article>
 </main>
 <footer>
   <div class="container-lg">

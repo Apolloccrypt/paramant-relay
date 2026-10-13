@@ -264,8 +264,10 @@ const PAGES = [
       { name: 'the place for his photo', css: '.about-person .portrait' },
       { name: 'the name of the person behind it', css: '.about-byline .n', text: 'Mick Beer' },
       { name: 'his title', css: '.about-byline .t', text: 'Privacy- en securityonderzoeker' },
-      { name: 'the first line about his research', css: '.about-research li', text: 'persoonsgegevens weglekken' },
-      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/pricing' },
+      { name: 'the first line about his research', css: 'p.about-intro', text: 'persoonsgegevens weglekken' },
+      // 13 October 2026: /about reads as a story, so the next step is a link
+      // in the founder's second paragraph instead of a button row.
+      { name: 'the first action', css: 'a.about-next', href: '/pricing' },
     ],
   },
   {
@@ -275,8 +277,8 @@ const PAGES = [
     claims: [
       { name: 'the name of the person behind it', css: '.about-byline .n', text: 'Mick Beer' },
       { name: 'his title', css: '.about-byline .t', text: 'Privacy and security researcher' },
-      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/pricing' },
-      { name: 'the second action', css: '.hero-cta a.btn-secondary', href: '/security' },
+      { name: 'the first line about his research', css: 'p.about-intro', text: 'personal data leaks' },
+      { name: 'the first action', css: 'a.about-next', href: '/pricing' },
     ],
   },
   {

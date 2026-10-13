@@ -1269,12 +1269,21 @@ assert.match(read('frontend/dpa.html'), /<td>Mollie B\.V\.<\/td><td>Nederland \(
 console.log('ui-truthfulness: the homepage argues the Dutch case with facts it can source');
 
 // Proof 2. The three /about sentences the signing claim rests on.
+// 13 October 2026: /about is a story in plain words now and does not use the
+// internal name "relay"; it says "our servers" for the same machine. The claim
+// is unchanged, so /about keeps the same three sentences with that one word
+// swapped, and /parasign keeps them as they were.
+const ABOUT_SIGNING = {
+  'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.':
+    'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches our servers.',
+};
 for (const claim of [
   'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.',
   'Every signature is entered into a public, append-only log.',
   'A signed document verifies without contacting us.',
 ]) {
-  assert.ok(aboutVisible.includes(claim), `about.html lost the signing claim: ${claim}`);
+  const onAbout = ABOUT_SIGNING[claim] || claim;
+  assert.ok(aboutVisible.includes(onAbout), `about.html lost the signing claim: ${onAbout}`);
   assert.ok(parasignEn.includes(claim), `en/parasign.html lost the signing claim: ${claim}`);
 }
 // /parasign carries the same three in Dutch, in the wording /about and
@@ -1332,7 +1341,9 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en
 // Sentence three of the founder paragraph. It was the one claim on these pages
 // with no source on main; #332 put it on /about, so it is now quoted rather
 // than composed, and it is pinned to both ends of the quote.
-const GIVE_BACK = 'The Community plan is his way of giving something back to society; the business plans pay for it.';
+// 13 October 2026: /about is told by Mick in the first person, so the
+// sentence says "my" there. The promise itself is unchanged.
+const GIVE_BACK = 'The Community plan is my way of giving something back to society; the business plans pay for it.';
 assert.ok(aboutVisible.includes(GIVE_BACK), 'about.html lost the give-back sentence the product pages quote');
 // Mick, 4 September: parasend states the same promise without the person, since
 // "his" has nothing to point at once the name is gone.
@@ -1345,7 +1356,12 @@ assert.ok(parasend.includes('Het Community-plan is gratis en blijft gratis. De z
 // before the product pages existed and neither may be softened or moved into
 // small print.
 const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a qualified signature (QES) under eIDAS.';
-assert.ok(aboutVisible.includes(SES), 'about.html lost the SES scope note');
+// /about says it without the product name (13 October 2026), with the same
+// two levels in the same words.
+// A qualified signature is not a notarial deed, so /about names the level
+// it is not by its own name.
+assert.ok(aboutVisible.includes('a signature made with Paramant is a Simple Electronic Signature (SES). It is not a qualified signature (QES) under eIDAS.'),
+  'about.html lost the SES scope note');
 // /parasign says it in Dutch, with the same two levels named in the same words.
 const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen gekwalificeerde elektronische handtekening (QES) onder eIDAS.';
 assert.ok(parasign.includes(SES_NL), 'parasign.html must carry the SES scope note, not a softer version');
@@ -1522,7 +1538,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 
   // Proof 2 of the guide: the key stays with the signer and the proof outlives
   // us. These three sentences are what /security now points at as evidence.
-  assert.match(about, /ML-DSA-65 \(FIPS 204\), generated in your browser\. The private key never reaches the relay\./,
+  assert.match(about, /ML-DSA-65 \(FIPS 204\), generated in your browser\. The private key never reaches our servers\./,
     'about.html must keep the private-key sentence');
   assert.match(about, /Every signature is entered into a public, append-only log\./,
     'about.html must keep the transparency-log sentence');
@@ -1538,7 +1554,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // onto a second one.
   assert.match(about, /Simple Electronic Signature \(SES\)/,
     'about.html must state that a ParaSign signature is a Simple Electronic Signature');
-  assert.match(about, /not a qualified signature \(QES\) under eIDAS/,
+  assert.match(about, /It is not a qualified signature \(QES\) under eIDAS\./,
     'about.html must state what the signature is not');
   assert.doesNotMatch(securityRaw, /Simple Electronic Signature|advanced \(AES\)/,
     'security.html must not carry a second, competing eIDAS level while /about and /pricing disagree');
@@ -1603,14 +1619,24 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // the markup before the first section heading, not a screen and a half down.
   const aboveFold = (html) => html.slice(0, html.indexOf('<!-- WHAT PARAMANT IS -->') + 1 || html.length);
   const aboutHero = aboveFold(about);
-  assert.match(aboutHero, /Sign and send documents so that only you and the person you send them to can read them/,
-    'about.html must open in plain language, before the word post-quantum');
-  assert.match(aboutHero, /For small offices that sign and send confidential papers/,
+  // 13 October 2026: /about opens as a story. The plain-language opening and
+  // the line that says who it is for are the subtitle and the founder's first
+  // paragraph, both before the word post-quantum.
+  // The subtitle is a plain sentence, not the homepage title: that title
+  // ("Veilig versturen en laten tekenen, voor praktijken en kantoren") is the
+  // line copy/homepage-mens drops as AI language, so it cannot be the source.
+  // The words follow the old /about lede ("Met Paramant verstuurt u documenten
+  // en laat u ze tekenen").
+  assert.match(aboutHero, /With Paramant you send documents and get them signed, as a practice or an office\./,
     'about.html must say who it is for in the hero');
+  assert.match(aboutHero, /a way to get a document signed and send a file/,
+    'about.html must open in plain language, before the word post-quantum');
+  assert.doesNotMatch(aboutHero, /post-quantum/i,
+    'about.html must not reach for post-quantum before it has said what the product does');
   assert.match(aboutHero, /Mick Beer/, 'about.html must name the founder in the hero');
   assert.match(aboutHero, /Privacy and security researcher, founder of Paramantis Solutions B\.V\./,
     'about.html must carry the founder title in the hero');
-  assert.match(aboutHero, /href="\/en\/pricing" class="btn btn-primary"/,
+  assert.match(aboutHero, /<a class="about-next" href="\/en\/pricing">/,
     'about.html must offer a next step in the hero');
   // Nobody can promise ten years. The lede used to end on "the cryptography is
   // post-quantum, which is the proof that it still holds up in ten years", which
@@ -1621,7 +1647,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // The give-back sentence, in the exact words the messaging guide fixes for it
   // (section 5, sentence three of the founder paragraph). It is the split the
   // whole site is built on, and it is quoted, not paraphrased.
-  assert.match(about, /The Community plan is his way of giving something back to society; the business plans pay for it\./,
+  assert.match(about, /The Community plan is my way of giving something back to society; the business plans pay for it\./,
     'about.html must carry the give-back sentence in the words docs/brand/messaging.md fixes');
   // The earlier draft explained the free plan with a jurisdiction claim ("should
   // not depend on a US subscription"). The guide forbids that beside his name:
@@ -1630,9 +1656,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
     'about.html must not hang the jurisdiction claim off the founder paragraph');
 
   // The section number must not land under the H1 on a phone, where it reads as
-  // a stray "00".
-  assert.match(about, /#main-content \.sec-head \.num\{display:none\}/,
-    'about.html must hide the section number in the mobile hero override');
+  // a stray "00". Since 13 October 2026 /about has no numbered sections at all.
+  assert.doesNotMatch(about, /<span class="num">/,
+    'about.html is one reading column without section numbers');
 
   // /security: the first screen. The buttons used to sit at roughly y=11400 on a
   // 390px phone, fourteen screens down, and the page never said who was behind

@@ -880,37 +880,33 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
     assert.ok(m, `pricing.html no longer states ${what}`);
     return m[1].trim();
   };
+  // 13 October 2026: /about is a story with one paragraph per plan, not a
+  // copy of the tier grid. It names Community and Firm, the two plans most
+  // readers choose between, and every number it does state is lifted from the
+  // /pricing card that sells it. The plans above Firm live on /pricing only.
+  const firmPrice = phrase(send.Firm, /<div class="tier-price">&euro;(\d+)</, 'the Firm price');
   const facts = [
-    [phrase(sign.Community, /<li>(\d+ signatures? (?:a|per) month)<\/li>/, 'the ParaSign Community signature allowance'), 'ParaSign Community'],
-    [phrase(send.Community, /<li>(\d+ hour link expiry)<\/li>/, 'the ParaSend Community link expiry'), 'ParaSend Community'],
-    [phrase(send.Firm, /<li>(\d+ hour link expiry)<\/li>/, 'the Firm link expiry'), 'Firm'],
-    // Captured with the API qualifier, so /about has to repeat that too: the
-    // read count is a benefit of the API route, not of the plan on its own.
-    [phrase(send.Firm, /<li>(Up to \d+ reads per link through the API)<\/li>/, 'the Firm read limit'), 'Firm'],
-    [phrase(send.Firm, /<li>(Up to \d+ registered devices)<\/li>/, 'the Firm device limit'), 'Firm'],
-    [phrase(send.Enterprise, /<li>SLA ([\d.]+%),/, 'the ParaSend Enterprise SLA'), 'ParaSend Enterprise'],
+    [phrase(sign.Community, /<li>(\d+ signatures? (?:a|per) month)<\/li>/, 'the ParaSign Community signature allowance'), 'Community'],
+    [phrase(send.Community, /<li>(\d+ transfers? a month)<\/li>/, 'the ParaSend Community transfer allowance'), 'Community'],
+    [phrase(send.Community, /<li>(One recipient per send)<\/li>/, 'the Community recipient limit'), 'Community'],
+    [phrase(sign.Firm, /<li>(\d+ signatures a month)[;<]/, 'the Firm signature allowance'), 'Firm'],
+    [phrase(send.Firm, /<li>(\d+ transfers a month)<\/li>/, 'the Firm transfer allowance'), 'Firm'],
+    [phrase(send.Firm, /<li>(Up to \d+ recipients per send),/, 'the Firm recipient ceiling'), 'Firm'],
+    [`${firmPrice} euro a month excl. VAT`, 'Firm'],
   ];
   for (const [expected, tier] of facts) {
     assert.ok(about.toLowerCase().includes(expected.toLowerCase()),
       `about: the ${tier} line must say "${expected}", because that is what pricing.html sells`);
   }
 
-  // Free means free, in the same two words on both pages.
+  // Free means free, in the same words on both pages.
   assert.match(sign.Community, /<div class="tier-price">&euro;0<\/div>/);
   assert.match(send.Community, /<div class="tier-price">&euro;0<\/div>/);
-  assert.ok((about.match(/&euro;0, forever/g) || []).length >= 2,
-    'about: both free tiers must be named as costing &euro;0, forever');
+  assert.ok(about.includes('&euro;0, forever'), 'about: the free plan must be named as costing &euro;0, forever');
   assert.match(about, /No card required/,
     'about: the free tier must say no card is required, as pricing.html does');
-
-  // And the paid tiers are named the way /pricing names them, so a reader can
-  // find the card the sentence is about.
-  // Firm replaced the two Pro plans on 6 September 2026: one payment, both
-  // products, so there is one name for it and not two.
-  for (const name of ['ParaSign Community', 'ParaSend Community',
-                      'Firm', 'ParaSign Business', 'ParaSign Enterprise',
-                      'ParaSend Enterprise']) {
-    assert.ok(about.includes(name), `about: the tier block must name ${name} the way /pricing does`);
+  for (const name of ['Community', 'Firm']) {
+    assert.ok(about.includes(name), `about: the plan paragraph must name ${name} the way /pricing does`);
   }
   // Scoped to /about in the first version of this check, which is exactly how
   // security.html kept "ParaSign Free and ParaSend Free cost &euro;0" through a
@@ -3617,7 +3613,9 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   says('index', `Voor uw kantoor: ${excl} euro per maand, excl. btw.`);
   says('pricing', `Voor uw kantoor: ${excl} euro per maand.`);
   says('about', `Voor uw kantoor: ${excl} euro per maand`);
-  for (const slug of ['index', 'about']) says(slug, 'Meer nodig? Mail Mick: privacy@paramant.app');
+  says('index', 'Meer nodig? Mail Mick: privacy@paramant.app');
+  // /about is told by Mick himself since 13 October 2026, so it says "mij".
+  says('about', 'Meer nodig? Mail mij: privacy@paramant.app');
   // /pricing since 05-10-2026: who the line is for, and the same address.
   says('pricing', 'Grotere organisatie? Dan is er Business, op aanvraag: 1.000 handtekeningen per maand, een vaste contactpersoon en een audittrail die u kunt exporteren, voor €299 per maand excl. btw. Neem contact op: privacy@paramant.app');
   const lim = (tier, dim) => tiers.tierLimit(tier, dim);
@@ -3723,19 +3721,21 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   // 6. /about: Mick visible. His own portrait (the one on mickbeer.com), sized
   // and named, and only research lines with a source.
   const about = page('about');
-  const hero = about.slice(about.indexOf('<main'), about.indexOf('class="about-band"', about.indexOf('<main')));
+  const hero = about.slice(about.indexOf('<main'), about.indexOf('<!-- WHAT PARAMANT IS -->', about.indexOf('<main')));
+  assert.ok(hero.length > 0, 'about: the first screen ends at the WHAT PARAMANT IS marker');
   assert.match(hero, /<picture class="portrait">[\s\S]*?<img src="\/assets\/mick\/mick-beer-240\.jpg" width="112" height="112" alt="Mick Beer"/,
     'about: Mick\'s own portrait, with its size set so the page does not jump, and his name as alt text');
   for (const f of ['frontend/assets/mick/mick-beer-240.jpg', 'frontend/assets/mick/mick-beer-240.webp']) {
     assert.ok(fs.existsSync(path.join(ROOT, f)), `about: ${f} must exist`);
   }
   says('about', 'Mick Beer Privacy- en securityonderzoeker, oprichter van Paramantis Solutions B.V.');
-  const research = [...(hero.match(/<ul class="about-research">([\s\S]*?)<\/ul>/) || [, ''])[1].matchAll(/<li>([\s\S]*?)<\/li>/g)]
-    .map((m) => m[1].replace(/<[^>]+>/g, '').trim());
-  assert.deepEqual(research, [
-    'Mick onderzoekt hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen.',
-    'Zijn artikelen en tools staan op mickbeer.com.',
-  ], 'about: the research lines are the two with a source, and no more');
+  // Since 13 October 2026 the research line opens Mick's own story, in the
+  // first person, word for word as in the letter on the homepage, and the
+  // second sentence names the site where the work is.
+  const intro = ((hero.match(/<p class="about-intro">([\s\S]*?)<\/p>/) || [, ''])[1]).replace(/<[^>]+>/g, '').trim();
+  assert.equal(intro,
+    'Ik onderzoek hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen. Mijn artikelen en tools staan op mickbeer.com.',
+    'about: the research lines are the two with a source, and no more');
   assert.ok(flat('index').includes('Ik onderzoek hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen.'),
     'about: the first research line is sourced from the letter on the homepage; the letter must still say it');
   assert.match(hero, /<a href="https:\/\/mickbeer\.com"/, 'about: the second line links the site it names');
