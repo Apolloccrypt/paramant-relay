@@ -201,3 +201,16 @@ test('VREEMDE-06: /send, /en/send, /login en /en/login leiden naar een echte pag
     assert.doesNotMatch(txt, /try_files \/send\.html/, `${conf}: /send serveert nog een bestand dat niet bestaat`);
   }
 });
+
+// Test met een vreemde, 13-10-2026: de stap Ontvangers zei twee keer bijna
+// hetzelfde ("Voeg iedereen toe die moet tekenen" boven de lijst, "Voeg de
+// mensen toe die dit document moeten tekenen" in de lege lijst). Eén zin zegt
+// wie erbij hoort; de lege lijst zegt alleen hoe u hem vult.
+test('VREEMDE-09: de stap Ontvangers zegt maar een keer wie u toevoegt', () => {
+  const flow = rd('frontend/sign-flow.js');
+  for (const zin of [/Voeg de mensen toe die dit document/, /Add the people who need to sign this document/]) {
+    assert.doesNotMatch(flow, zin, 'de lege lijst herhaalt de zin boven de lijst');
+  }
+  assert.match(flow, /Voeg iedereen toe die moet tekenen\./);
+  assert.match(flow, /Nog niemand toegevoegd\. Klik op <strong>\+ Ontvanger toevoegen<\/strong>\./);
+});

@@ -4933,7 +4933,10 @@ function renderRecipients() {
     const empty = document.createElement('div');
     empty.className = 'ds-recipient-empty';
     empty.innerHTML = (state.signingMode === 'invite')
-      ? L('Voeg de mensen toe die dit document moeten tekenen. Ieder krijgt een eigen link om te tekenen.', 'Add the people who need to sign this document. Each one gets their own link to sign.')
+      // One sentence says who to add: the line above the list (.ds-sub). This
+      // spot only says the list is empty and how to fill it; it used to repeat
+      // that line in other words (test with a stranger, 13-10-2026).
+      ? L('Nog niemand toegevoegd. Klik op <strong>+ Ontvanger toevoegen</strong>.', 'Nobody added yet. Click <strong>+ Add recipient</strong>.')
       : L('Nog geen medeondertekenaars. Klik op <strong>+ Ontvanger toevoegen</strong> om iemand uit te nodigen, of op <strong>Verder</strong> om alleen zelf te tekenen.', 'No co-signers yet. Click <strong>+ Add recipient</strong> to invite someone, or <strong>Continue</strong> to sign just for yourself.');
     list.appendChild(empty);
     return;
