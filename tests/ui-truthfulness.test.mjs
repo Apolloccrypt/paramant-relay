@@ -1342,10 +1342,10 @@ assert.ok(parasend.includes('Het Community-plan is gratis en blijft gratis. De z
 // The limits, stated in the same voice as the promises. Both already shipped
 // before the product pages existed and neither may be softened or moved into
 // small print.
-const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).';
+const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a qualified signature (QES) under eIDAS.';
 assert.ok(aboutVisible.includes(SES), 'about.html lost the SES scope note');
 // /parasign says it in Dutch, with the same two levels named in the same words.
-const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).';
+const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen gekwalificeerde elektronische handtekening (QES) onder eIDAS.';
 assert.ok(parasign.includes(SES_NL), 'parasign.html must carry the SES scope note, not a softer version');
 assert.ok(parasignEn.includes(SES), 'en/parasign.html must carry the SES scope note, not a softer version');
 // Where it sits is part of the claim. The note has to land in the hero section,
@@ -1536,7 +1536,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // onto a second one.
   assert.match(about, /Simple Electronic Signature \(SES\)/,
     'about.html must state that a ParaSign signature is a Simple Electronic Signature');
-  assert.match(about, /not a notarised legal signature under eIDAS or any qualified-trust regime \(QES\)/,
+  assert.match(about, /not a qualified signature \(QES\) under eIDAS/,
     'about.html must state what the signature is not');
   assert.doesNotMatch(securityRaw, /Simple Electronic Signature|advanced \(AES\)/,
     'security.html must not carry a second, competing eIDAS level while /about and /pricing disagree');
