@@ -214,3 +214,23 @@ test('VREEMDE-09: de stap Ontvangers zegt maar een keer wie u toevoegt', () => {
   assert.match(flow, /Voeg iedereen toe die moet tekenen\./);
   assert.match(flow, /Nog niemand toegevoegd\. Klik op <strong>\+ Ontvanger toevoegen<\/strong>\./);
 });
+
+// Test met een vreemde, 13-10-2026: "Probeer het zelf" op de home gaat naar
+// /sign?mode=invite, waar u alles klaarzet en pas bij versturen hoort dat dat
+// een account vraagt. Elke plek met die knop zegt het nu vooraf, en de
+// dialoog zei "voor het tekenen", terwijl een uitnodiging verstuurd wordt.
+test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versturen een gratis account vraagt', () => {
+  const cases = [
+    ['index', '/sign?mode=invite', /versturen doet u met een gratis account/, /Voor het versturen maakt u een gratis account/],
+    ['en/index', '/en/sign?mode=invite', /sending needs a free one/, /To send it, you create a free one/],
+  ];
+  for (const [slug, href, hero, stage] of cases) {
+    const html = pg(slug);
+    const head = /<header class="wp-demo-hero">([\s\S]*?)<\/header>/.exec(html);
+    assert.ok(head && head[1].includes(`href="${href}"`), `${slug}: de knop in de kop wijst niet meer naar ${href}`);
+    assert.match(strip(head[1]), hero, `${slug}: de kop belooft proberen zonder te zeggen dat versturen een account vraagt`);
+    const ends = [...html.matchAll(/<div class="wp-end">([\s\S]*?)<\/div>/g)].map((m) => m[1]).filter((b) => b.includes(`href="${href}"`));
+    assert.ok(ends.length >= 1, `${slug}: geen dialoog met ${href}`);
+    for (const b of ends) assert.match(strip(b), stage, `${slug}: de dialoog zegt niet dat versturen een account vraagt`);
+  }
+});
