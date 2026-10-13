@@ -74,7 +74,8 @@
 .wp-demo-h span { font-weight: 400; color: var(--wp-ink-2); }
 .wp-demo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 16px 4px; }
 .wp-demo-hi { margin: 0; font: 600 clamp(19px, 2vw, 24px)/1.2 var(--sans, system-ui, sans-serif); letter-spacing: -.02em; color: var(--wp-ink); }
-.wp-demo-tag { display: inline-block; margin-left: 6px; padding: 2px 7px; border: 1px dashed var(--wp-line-2); border-radius: 3px; font: 500 11px/1.4 var(--mono, ui-monospace, monospace); letter-spacing: .08em; text-transform: uppercase; color: var(--wp-ink-3); vertical-align: 4px; }
+/* The one mark that this is a demo (13-10-2026): small, quiet, said once. */
+.wp-demo-tag { font: 400 13px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); }
 .wp-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--wp-ink-3); padding: 6px 12px; border: 1px solid var(--wp-line-2); border-radius: 999px; background: var(--wp-paper); white-space: nowrap; }
 .wp-plan::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--wp-ok); }
 .wp-plan strong { color: var(--wp-ink); font-weight: 600; }
@@ -85,19 +86,22 @@
    way /dashboard carries its title and plan. */
 .wp-demo-top { margin-top: 0; }
 .wp-appnav { display: none; margin: 0 0 0 auto; padding: 0; list-style: none; gap: 2px; }
+/* the bar only carries the app menu, which a phone does not show */
+@media (max-width: 979px) { .wp-demo-top .wp-demo-bar { display: none; } }
 .wp-appnav li { padding: 6px 10px; border-radius: 6px; font: 500 13.5px/1.2 var(--sans, system-ui, sans-serif); color: var(--wp-ink-3); }
 .wp-appnav li.on { color: var(--wp-ink); background: var(--line-ghost, rgba(12,27,42,.06)); font-weight: 600; }
 @media (min-width: 980px) { .wp-appnav { display: flex; } }
 .wp-demo-hero { display: grid; gap: 16px; padding: 20px 16px 18px; border-bottom: 1px solid var(--wp-line); background: var(--wp-paper); }
 .wp-demo .wp-demo-hero h1 { margin: 0; max-width: 30ch; font: 650 clamp(22px, 1.6vw + 14px, 36px)/1.14 var(--sans, system-ui, sans-serif); letter-spacing: -.022em; color: var(--wp-ink); text-wrap: balance; }
-.wp-demo .wp-demo-hero .hero-note { margin: 10px 0 0; max-width: none; font-size: 15px; line-height: 1.5; color: var(--wp-ink-2); }
+.wp-demo .wp-demo-hero .hero-line { margin: 12px 0 0; max-width: 52ch; font-size: 17px; line-height: 1.5; color: var(--wp-ink-2); }
+.wp-demo .wp-demo-hero .hero-note { margin: 0; max-width: none; font-size: 13.5px; line-height: 1.5; color: var(--wp-ink-3); }
 .wp-demo-hero .hero-note b { color: var(--wp-ink); }
 .wp-demo .wp-demo-hero .home-actions { margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 @media (max-width: 420px) { .wp-demo-hero .home-actions .hp-btn { flex: 1 1 0; padding: 0 12px; } }
 @media (min-width: 900px) {
-  .wp-demo-hero { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 28px; padding: 28px 24px 24px; }
-  .wp-demo-head, .wp-tiles { padding-left: 24px; padding-right: 24px; }
-  .wp-tiles { padding-bottom: 24px; }
+  .wp-demo-hero { grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 28px; row-gap: 14px; padding: 28px 24px 24px; }
+  .wp-demo-hero .hero-note { grid-column: 1 / -1; }
+  .wp-demo-head { padding-left: 24px; padding-right: 24px; }
 }
 /* On arrival the rows fill in to where they stand and the status lands after:
    the first thing the demo says is "this is how far each document is". */
@@ -112,33 +116,43 @@
   .wp-demo-top .wp-tile .dh-progress i, .wp-demo-top .wp-tile .dh-status { animation: none !important; }
 }
 
-.wp-tiles { display: grid; gap: 12px; padding: 12px 16px 16px; }
-@media (min-width: 900px) { .wp-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* 13-10-2026: one list, the way /dashboard lists documents, not three cards
+   with a caption each. */
+.wp-tiles { display: grid; gap: 0; margin: 8px 16px 16px; border: 1px solid var(--wp-line); border-radius: 8px; background: var(--wp-paper); overflow: hidden; }
 
 /* A tile is the dashboard's register card with one row in it, and the whole
    card is the control. It lifts and its arrow moves on hover, because that is
    the answer to "can I press this". */
 .wp-tile {
-  position: relative; display: flex; flex-direction: column; min-width: 0;
-  margin: 0; padding: 16px 16px 14px; text-decoration: none; color: inherit;
-  border: 1px solid var(--wp-line); border-radius: 10px; background: var(--wp-paper);
-  box-shadow: 0 1px 2px rgba(12,27,42,.04);
-  transition: transform .18s var(--wp-ease), border-color .18s var(--wp-ease), box-shadow .18s var(--wp-ease);
+  position: relative; display: block; min-width: 0;
+  margin: 0; padding: 0; text-decoration: none; color: inherit;
+  background: var(--wp-paper);
+  transition: background-color .18s var(--wp-ease);
   -webkit-tap-highlight-color: transparent;
 }
-.wp-tile:hover { transform: translateY(-2px); border-color: var(--wp-accent); box-shadow: 0 14px 30px -20px rgba(29,78,216,.45); }
-.wp-tile:active { transform: translateY(0); }
-.wp-tile:focus-visible { outline: 3px solid var(--accent-ring, rgba(29,78,216,.32)); outline-offset: 2px; }
+.wp-tile + .wp-tile { border-top: 1px solid var(--wp-line); }
+.wp-tile:hover { background: var(--line-ghost, rgba(12,27,42,.035)); }
+.wp-tile:focus-visible { outline: 3px solid var(--accent-ring, rgba(29,78,216,.32)); outline-offset: -3px; }
 .wp-tile-k { font: 600 11px/1.2 var(--mono, ui-monospace, monospace); letter-spacing: .14em; text-transform: uppercase; color: var(--wp-ink-3); }
 .wp-tile-t { margin: 6px 0 10px; font: 600 16px/1.3 var(--sans, system-ui, sans-serif); color: var(--wp-ink); letter-spacing: -.01em; }
-.wp-tile .wp-row { display: block; border: 1px solid var(--wp-line); border-radius: 6px; background: var(--surface-sunk, var(--wp-paper)); }
+.wp-tile .wp-row { display: block; padding: 14px 16px; border: 0; background: transparent; }
 .wp-tile .wp-row:hover { background: transparent; }
 .wp-tile .dh-document-open, .wp-tile .dh-send-open {
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; cursor: inherit;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name status" "prog prog"; align-items: start; gap: 10px 12px; padding: 0; cursor: inherit;
 }
-.wp-tile .dh-document-name strong, .wp-tile .dh-send-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14.5px/1.35 var(--sans, system-ui, sans-serif); color: var(--wp-ink); }
-.wp-tile .dh-document-name > span, .wp-tile .dh-send-name > span { display: block; margin-top: 3px; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .04em; color: var(--wp-ink-3); }
-.wp-tile .dh-document-progress > span:first-child, .wp-tile .dh-send-progress > span:first-child { display: block; margin-bottom: 6px; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .04em; color: var(--wp-ink-2); }
+.wp-tile .dh-document-name, .wp-tile .dh-send-name { grid-area: name; min-width: 0; }
+.wp-tile .dh-document-progress, .wp-tile .dh-send-progress { grid-area: prog; }
+.wp-tile .dh-status { grid-area: status; }
+@media (min-width: 900px) {
+  .wp-tiles { margin: 8px 24px 24px; }
+  .wp-tile .wp-row { padding: 16px 20px; }
+  .wp-tile .dh-document-open, .wp-tile .dh-send-open { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 150px; grid-template-areas: "name prog status"; align-items: center; gap: 24px; }
+  .wp-tiles .wp-tile .dh-status { justify-self: end; }
+}
+.wp-row-next { display: block; margin-top: 8px; font: 400 13.5px/1.4 var(--sans, system-ui, sans-serif); color: var(--wp-ink-2); }
+.wp-tile .dh-document-name strong, .wp-tile .dh-send-name strong { display: block; overflow-wrap: anywhere; font: 600 14.5px/1.35 var(--sans, system-ui, sans-serif); color: var(--wp-ink); }
+.wp-tile .dh-document-name > span, .wp-tile .dh-send-name > span { display: block; margin-top: 3px; font-size: 13px; color: var(--wp-ink-3); }
+.wp-tile .dh-document-progress > span:first-child, .wp-tile .dh-send-progress > span:first-child { display: block; margin-bottom: 6px; font-size: 13px; color: var(--wp-ink-2); }
 .wp-tile .dh-progress { display: block; width: 100%; height: 3px; background: var(--wp-line); overflow: hidden; }
 .wp-tile .dh-progress i { display: block; height: 100%; background: var(--wp-accent); }
 .wp-tile .dh-status { justify-self: start; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; font: 600 12px/1.35 var(--sans, system-ui, sans-serif); white-space: nowrap; }
@@ -232,7 +246,7 @@
 }
 
 /* the demo, small screens: one label is enough */
-@media (max-width: 640px) { .wp-demo-tag { display: none; } .wp-demo-head { padding-top: 14px; } .wp-demo-h { font-size: 14px; } }
+@media (max-width: 640px) { .wp-demo-head { padding-top: 14px; } }
 
 /* the technique, folded: the same disclosure everywhere */
 .wp-fold { margin: 16px 0 0; border-top: 1px solid var(--wp-line); }

@@ -3654,11 +3654,14 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
 
   // 3. The title line, word for word, inside the demo dashboard (Mick, 5
   // October 2026: no hero above the dashboard; the title says what it is for).
-  assert.match(homeOut, /<div class="wp-demo wp-demo-top"[\s\S]*?<h1 id="home-h1">Veilig versturen en laten tekenen, voor praktijken en kantoren\.<\/h1>/,
+  // 13 October 2026, Mick on the iPhone: "Text en voorbeeld is te letterlijk,
+  // typisch ai". The feature list in the title became one plain line, and the
+  // free plan's name left the hero; the price sits small under the buttons.
+  assert.match(homeOut, /<div class="wp-demo wp-demo-top"[\s\S]*?<h1 id="home-h1">Dossiers veilig versturen en contracten laten tekenen\.<\/h1>/,
     'index: the title line sits inside the demo dashboard');
   assert.match(homeOut, /^<div class="home-state" data-home="out">\s*(?:<!--[\s\S]*?-->\s*)?<div class="wp-demo wp-demo-top"/,
     'index: the demo dashboard is the first thing signed out, with no hero above it');
-  says('index', 'Gratis met het Community-plan. Voor uw kantoor: 29 euro per maand, excl. btw.');
+  says('index', 'Versturen doet u met een gratis account. Voor uw kantoor: 29 euro per maand, excl. btw.');
 
   // 4. Two product names outward. The Dutch bar names Versturen and
   // Ondertekenen, apply-nav.py and nav-auth.js carry the same list, and no nav
