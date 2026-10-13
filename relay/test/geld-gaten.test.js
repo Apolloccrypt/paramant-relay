@@ -96,7 +96,7 @@ async function verstuur(sleutel, adressen, opt) {
   const u = await upload(sleutel, (opt && opt.bytes), (opt && opt.meta));
   if (u.uploadFout) return { fase: 'upload', ...u.uploadFout };
   const sealed = await verzegel(u.geheim, (opt && opt.sealedVoor) || adressen);
-  return { fase: 'send', ...(await sends(sleutel, u.hashes, adressen, sealed)) };
+  return { fase: 'send', sealed, ...(await sends(sleutel, u.hashes, adressen, sealed)) };
 }
 
 const adres = (n, tag) => Array.from({ length: n }, (_, i) => `p${i}-${tag}@extern.test`);
@@ -301,7 +301,7 @@ test('gat 7: heruitnodigen kost GEEN zitplaats op de uurrem', async () => {
       const x = await fetch(BASE + '/v2/user/sends/reinvite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Internal-Auth': INTERN },
-        body: JSON.stringify({ user_id: 'acct_firm', send_id: sendId, email }),
+        body: JSON.stringify({ user_id: 'acct_firm', send_id: sendId, email, token: r.sealed[email].token }),
       });
       antwoorden.push({ email, status: x.status, body: await x.json().catch(() => ({})) });
     }

@@ -26,8 +26,8 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=32">
-<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -151,7 +151,7 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
 </div>
 
 <nav id="nav"></nav>
-<script src="/nav.js?v=16"></script>
+<script src="/nav.js?v=17"></script>
 
 <main id="main-content">
   <section class="page-hero">
@@ -186,9 +186,80 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
       <li>Outlook-invoegtoepassing (<code>addin.paramant.app</code>): de basis van de broncode staat</li>
       <li>Openbare vermelding in de Chrome Web Store</li>
       <li>Teamaccounts en SSO</li>
-      <li>WebAuthn / passkey als tweede factor</li>
       <li>Voorbeeldvenster voor e-mails in het beheerpaneel, met verzendacties per gebruiker</li>
-      <li>Openbare statuspagina</li>
+    </ul>
+  </section>
+
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.1.3</h2>
+      <span class="release-date">7 oktober 2026</span>
+    </div>
+    <p class="release-summary">De voorbeelden op de voorpagina zijn rustig en echt: geen badge, geen stempels en geen getekende nep-schermen, maar per voorbeeld één kop, één zin en één knop. De installer kloont de tag v3.1.3. De volledige lijst staat in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+  </section>
+
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.1.2</h2>
+      <span class="release-date">6 oktober 2026</span>
+    </div>
+    <p class="release-summary">Het openbare transparantielog zegt de waarheid over zichzelf: de spiegel van andere relays bevat alleen boomtoppen van gepinde sleutels, de 39 vermeldingen uit april 2026 krijgen bewijs en boomhash uit de huidige boom, en een klant kan een ontvangstbewijs zelf controleren. De installer kloont de tag v3.1.2. De volledige lijst staat in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+  </section>
+
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.1.1</h2>
+      <span class="release-date">6 oktober 2026</span>
+    </div>
+    <p class="release-summary">Herstelronde na 3.1.0: wat een koper rond betalen leest klopt met wat hij krijgt, de uitrol toetst de hostbeveiliging die /dpa belooft, en de installer kloont de tag v3.1.1. De volledige lijst staat in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+  </section>
+
+  <!-- ── 3.1.0 en 3.0.0: samengevat uit CHANGELOG.md in de repository ── -->
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.1.0</h2>
+      <span class="release-date">draait in productie, nog niet getagd</span>
+    </div>
+    <p class="release-summary">ParaSign als product, beveiligingsbevindingen opgelost en betalen via Mollie. De volledige lijst staat in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+    <h3><span class="badge badge-security">Beveiliging</span></h3>
+    <ul>
+      <li>API-sleutels komen via een eenmalige ophaallink in plaats van leesbaar in een e-mail</li>
+      <li>Het openbare transparantielog publiceert geen apparaat-kenmerken meer</li>
+      <li>Ondertekenen vraagt een verse stap-omhoog-bevestiging, en de handtekeningen van de notaris zijn domeingescheiden (v2); oude v1-bewijzen blijven controleerbaar</li>
+      <li><code>script-src 'unsafe-inline'</code> is weg uit het beheerpaneel en de openbare site</li>
+    </ul>
+    <h3><span class="badge badge-added">Toegevoegd</span></h3>
+    <ul>
+      <li>ParaSign: ondertekenen in de browser op <a href="/sign">/sign</a>, de pdf-editor, ondertekenen met meerdere partijen en de ontwikkelaars-API <code>/v1</code></li>
+      <li>Inloggen en ondertekenen met een passkey</li>
+      <li>De openbare statuspagina op <a href="/status">/status</a></li>
+      <li>Een productcontrole die elk uur een echt bestand door de echte relay stuurt</li>
+    </ul>
+    <h3><span class="badge badge-changed">Gewijzigd</span></h3>
+    <ul>
+      <li>De relay heet source-available (BUSL-1.1), niet open source</li>
+      <li>De navigatie noemt wat we verkopen: zeven onderdelen in plaats van veertig</li>
+    </ul>
+    <h3><span class="badge badge-fixed">Verwijderd</span></h3>
+    <ul>
+      <li>De Android-app, ParamantOS en ParaID</li>
+    </ul>
+  </section>
+
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.0.0</h2>
+      <span class="release-date">27 mei 2026</span>
+    </div>
+    <p class="release-summary">Eén versienummer voor het hele project, en de post-quantum bouwstenen in een eigen bibliotheek.</p>
+    <h3><span class="badge badge-changed">Gewijzigd</span></h3>
+    <ul>
+      <li>ML-KEM-768 draait op de Rust-bibliotheek <code>@paramant/core</code> in plaats van op <code>@noble/post-quantum</code>; wire format en gedrag voor clients blijven gelijk</li>
+      <li>Eén versie overal: <code>package.json</code>, <code>/health</code>, de site en de installatie zeggen 3.0.0</li>
+    </ul>
+    <h3><span class="badge badge-fixed">Opgelost</span></h3>
+    <ul>
+      <li>Inloggen na het aanmaken van een sleutel werkt weer; <code>users.json</code> wordt atomair geschreven</li>
     </ul>
   </section>
 
@@ -317,7 +388,7 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
   </div>
 </footer>
 
-<script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/nav.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

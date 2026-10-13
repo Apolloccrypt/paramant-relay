@@ -58,7 +58,10 @@ function fleetFromCompose() {
   const yml = fs.readFileSync(path.join(REPO, 'docker-compose.yml'), 'utf8');
   const hosts = [];
   for (const m of yml.matchAll(/^\s*RELAY_SELF_URL:\s*["']?([^"'\s]+)["']?\s*$/gm)) {
-    hosts.push(hostOfRelayId(m[1]));
+    // "${RELAY_SELF_URL_HEALTH:-https://health.paramant.app}": a self-host sets
+    // its own in .env; the fleet is what the default names.
+    const v = m[1].replace(/^\$\{[A-Z0-9_]+:-(.*)\}$/, '$1');
+    hosts.push(hostOfRelayId(v));
   }
   return [...new Set(hosts)];
 }
@@ -288,14 +291,15 @@ test('a receipt from a relay we do not know is unknown, not forged', async () =>
   // The whole point: an unknown sender and a forgery are different findings.
   assert.doesNotMatch(text, /Do not trust this receipt/,
     'a receipt from an unrecognised relay was called a forgery');
-  assert.match(text, /This page does not know this relay/);
+  // Mick 05-10: taalronde (relay heet op de pagina nu server)
+  assert.match(text, /This page does not know this server/);
   assert.match(text, /relay\.someone-else\.example/,
     'the visitor must be told which relay it is that we do not know');
-  assert.match(text, /The signature was not checked, because this page does not know this relay/);
+  assert.match(text, /The signature was not checked, because this page does not know this server/);
 
   // Nothing that did get checked may be quietly dropped.
   assert.match(text, /The receipt is about this file and no other/);
-  assert.match(text, /It really is in the public transparency log/);
+  assert.match(text, /The proof of inclusion holds: the relay signed at the time that this entry was in its transparency log/);
   await context.close();
 });
 
@@ -353,9 +357,10 @@ test('NL: /verify kiest de sleutel van de eigen relay en noemt een onbekende rel
   await page.waitForSelector('#rv-result .ps-banner');
   const text = await page.textContent('#rv-result');
   assert.doesNotMatch(text, /Vertrouw dit ontvangstbewijs niet/, 'a receipt from an unrecognised relay was called a forgery');
-  assert.match(text, /Deze pagina kent deze relay niet/);
+  // Mick 05-10: taalronde (relay heet op de pagina nu server)
+  assert.match(text, /Deze pagina kent deze server niet/);
   assert.match(text, /relay\.someone-else\.example/);
-  assert.match(text, /De handtekening is niet gecontroleerd, omdat deze pagina deze relay niet kent/);
+  assert.match(text, /De handtekening is niet gecontroleerd, omdat deze pagina deze server niet kent/);
   assert.match(text, /Het ontvangstbewijs gaat over dit bestand en geen ander/);
   await context.close();
 });

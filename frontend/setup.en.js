@@ -73,16 +73,16 @@ function validateStep(n) {
   }
   if (n === 2) {
     if (c.domain && !DOMAIN_RE.test(c.domain.toLowerCase())) {
-      return 'That domain looks invalid. Use e.g. relay.your-org.com, or leave it blank for localhost mode.';
+      return 'That domain does not look valid. Use for example relay.your-org.com, or leave it blank for localhost mode.';
     }
     return null; // empty domain = localhost mode, allowed
   }
   if (n === 3) {
-    return EMAIL_RE.test(c.adminEmail) ? null : 'A valid admin email is required.';
+    return EMAIL_RE.test(c.adminEmail) ? null : 'Enter a valid admin email address.';
   }
   if (n === 4) {
     if (c.firstUserEmail && !EMAIL_RE.test(c.firstUserEmail)) {
-      return 'First-user email is invalid. Leave it blank to skip creating a user now.';
+      return 'The first user email is not valid. Leave it blank if you do not want to create a user yet.';
     }
     return null; // first user is optional
   }
@@ -120,7 +120,7 @@ function dnsPreflight() {
         out.textContent = 'DNS OK: ' + domain + ' -> ' + (d.addresses || []).join(', ');
         out.style.color = '#0a7';
       } else {
-        out.textContent = 'DNS not resolving yet for ' + domain + '. You can still continue and configure DNS later.';
+        out.textContent = 'DNS for ' + domain + ' does not work yet. You can continue and set up DNS later.';
         out.style.color = '#a60';
       }
     })
@@ -195,7 +195,7 @@ function renderDone(res) {
   if (!body) { return; }
   var b = (res && res.body) || {};
   var html = '<p>Your relay is configured and your admin key is ready. ' +
-    '<strong>Copy it now</strong> -- it is shown only once.</p>';
+    '<strong>Copy it now</strong>. It is shown only once.</p>';
   if (b.admin_api_key) {
     html += '<p style="font-family:monospace;background:#f5f7fa;border:1px solid #e0e0e0;padding:10px;word-break:break-all">' +
       esc(b.admin_api_key) + '</p>' +
@@ -232,9 +232,19 @@ function applyConfig() {
   var applyBtn = $('#apply');
   if (status) { status.style.color = ''; status.textContent = 'Configuring...'; }
   if (applyBtn) { applyBtn.disabled = true; }
+  // The relay no longer accepts an anonymous apply (relay.js /v2/setup/apply):
+  // the operator proves ownership with the one-time setup token.
+  var tokenInput = $('#setup-token');
+  var setupToken = tokenInput ? String(tokenInput.value || '').trim() : '';
+  if (!setupToken) {
+    if (applyBtn) { applyBtn.disabled = false; }
+    if (status) { status.style.color = '#b00020'; status.textContent = 'Fill in the setup code first. The relay writes it on start to the file setup-token next to users.json.'; }
+    if (tokenInput) { tokenInput.focus(); }
+    return Promise.resolve();
+  }
   return fetch('/v2/setup/apply', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Setup-Token': setupToken },
     body: JSON.stringify(state.config)
   })
     .then(function (r) {
@@ -243,6 +253,7 @@ function applyConfig() {
     })
     .then(function (res) {
       if (res.ok) {
+        if (status) { status.textContent = ''; }
         goToStep('done');
         renderDone(res);
         return;
@@ -255,16 +266,20 @@ function applyConfig() {
           ((res.body && res.body.error) ? res.body.error : 'Check the relay logs: docker compose logs relay');
       } else {
         // 4xx: validation -- show message and let the user correct an earlier step.
+        if (res.status === 401 && res.body && res.body.error === 'setup_token_required') {
+          status.textContent = 'The setup code is not right. Copy it again from the file setup-token next to users.json.';
+          return;
+        }
         status.textContent = (res.body && res.body.error)
           ? res.body.error
-          : ('Please review your input (HTTP ' + res.status + ').');
+          : ('Check your input (HTTP ' + res.status + ').');
       }
     })
     .catch(function () {
       if (applyBtn) { applyBtn.disabled = false; }
       if (status) {
         status.style.color = '#b00020';
-        status.textContent = 'Could not reach the relay. Your configuration is shown above; you can apply it manually for now.';
+        status.textContent = 'Could not reach the relay. Your configuration is shown above. You can apply it by hand for now.';
       }
     });
 }
@@ -287,7 +302,16 @@ function wire() {
     });
   });
   var domainInput = $('[name="domain"]', stepEl(2));
-  if (domainInput) { domainInput.addEventListener('blur', dnsPreflight); }
+  // While typing, not on blur: the blur came between mousedown and mouseup on
+  // Next, the DNS line changed height, the button moved away and the first
+  // click was lost (matrix ACCT-42). #dns-status also keeps its height.
+  var dnsTimer = null;
+  if (domainInput) {
+    domainInput.addEventListener('input', function () {
+      clearTimeout(dnsTimer);
+      dnsTimer = setTimeout(dnsPreflight, 600);
+    });
+  }
   var applyBtn = $('#apply');
   if (applyBtn) { applyBtn.addEventListener('click', applyConfig); }
   goToStep(1);

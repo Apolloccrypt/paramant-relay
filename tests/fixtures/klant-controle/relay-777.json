@@ -1,0 +1,62 @@
+{
+ "bron": "relay.paramant.app, opgehaald 2026-10-06 01:49 UTC (paramant-bewijs/ct-onderzoek-2026-10-06/raw/na-3.1.1/relay); bewijzen herberekend met relay/lib/ct-tree.js over alle 1523 bladen",
+ "index": 777,
+ "log_entry": {
+  "index": 777,
+  "type": "transfer",
+  "leaf_hash": "cea4038a64d9ec46a54ab62dd278814a8b3d63c3ff699f65ea5dd42dcd9cb7c1",
+  "tree_hash": "d5da77968a64911638333adc00af0c807f85d9aae06badbbbff108902d70e472",
+  "ts": "2026-08-23T20:00:00.000Z"
+ },
+ "proof": {
+  "ok": true,
+  "index": 777,
+  "leaf_hash": "cea4038a64d9ec46a54ab62dd278814a8b3d63c3ff699f65ea5dd42dcd9cb7c1",
+  "tree_hash": "d5da77968a64911638333adc00af0c807f85d9aae06badbbbff108902d70e472",
+  "tree_size": 778,
+  "proof": [
+   {
+    "hash": "d1fdaebb9f148c84c9dd966598541ede028a7f1d42261da291a7cf52e948258a",
+    "position": "left"
+   },
+   {
+    "hash": "02cacfe0cd97fcfc6a0d9927aa06a8e72617a6cb0710e1549c4656cf4c79fcb4",
+    "position": "left"
+   },
+   {
+    "hash": "51f70e4eed1fb21139e31a935f4f3a38ad69ce00240ea3c21f1a19453a87499d",
+    "position": "left"
+   },
+   {
+    "hash": "8576071309ce7ec20b4daf5b666e2ad6b6ed28d7fae23465365b89b70b2041cf",
+    "position": "left"
+   }
+  ]
+ },
+ "consistency": {
+  "ok": true,
+  "from": 778,
+  "to": 1523,
+  "proof": [
+   "f956ec4af386a508f9995e65fe5d3d6e3c134c9a6c2f1b153fa264dc448e0b3b",
+   "7065e6e734cc796c01fdc95add9b9e7b3ece1f970d59bcd284cddc0256550be3",
+   "51f4ee6a15b1947ab258caa5dd2cd81a861a12f83193ce5656583257350c7de6",
+   "02cacfe0cd97fcfc6a0d9927aa06a8e72617a6cb0710e1549c4656cf4c79fcb4",
+   "2bf0b0768a1ad98f5ceab9ea2660feeee87248b3ba1adeeaf0c6eaa7b90f13b5",
+   "e0118bd123a65292e4e87de1158c7f2a14f541070b0330902f4cb5d40a3a7ca1",
+   "0cc21927135c5c9a3a72ea21cc0b44b1fa09ec6329a01ca1673992361d7cc690",
+   "495f82b7117eb5063db626e7ad3530fb3c8d1e3362cf7f05deb59a3b32515b40",
+   "51f70e4eed1fb21139e31a935f4f3a38ad69ce00240ea3c21f1a19453a87499d",
+   "8576071309ce7ec20b4daf5b666e2ad6b6ed28d7fae23465365b89b70b2041cf",
+   "f8a01a135cf2e73d9065cfd58d52760a820a7bcc32213a5c4034fbcca04947ff"
+  ]
+ },
+ "sth": {
+  "relay_id": "https://relay.paramant.app",
+  "sha3_root": "ebdf36f565726c7bd21e3a069eed67454b6b35af3d9585ddafb5ed6a4233c1af",
+  "timestamp": 1791248400000,
+  "tree_size": 1523,
+  "version": 1,
+  "signature": "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"
+ }
+}

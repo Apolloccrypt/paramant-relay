@@ -63,45 +63,53 @@ const fouten = [];
 page.on('pageerror', (e) => fouten.push(String(e).slice(0, 160)));
 
 await page.goto(`${ORIGIN}/parashare`);
-await page.waitForSelector('#ps-mode-live', { timeout: 15000 });
+await page.waitForSelector('#ps-mode-group', { timeout: 15000 });
 await page.waitForTimeout(600);   // de pagina doet werk bij het laden
 
 // ── 1. DE BUG DIE HIER ZAT ─────────────────────────────────────────────────
+// Sinds 24 september 2026 opent de pagina op "Naar één persoon" met een
+// gewone link; de live overdracht is het vinkje Extra veilig. De les van toen
+// blijft: een lijstveld mag alleen open staan als de gekozen verzending die
+// lijst ook echt gebruikt.
 const kaartZichtbaarBijLaden = await page.isVisible('#recipients-input');
-ok('bij het laden staat de ontvangerskaart NIET open in de live-stand',
+ok('bij het laden staat het lijstveld NIET open: de keuze is één persoon',
    !kaartZichtbaarBijLaden,
-   kaartZichtbaarBijLaden ? 'het veld staat open terwijl de stand live is: twintig adressen '
-     + 'invullen en op verzenden drukken levert dan niemand post op' : '');
+   kaartZichtbaarBijLaden ? 'het lijstveld staat open bij één persoon' : '');
+ok('en "Naar één persoon" staat aangevinkt',
+   (await page.getAttribute('#ps-mode-link', 'aria-checked')) === 'true');
 
-ok('en de live-kaart staat aangevinkt',
-   (await page.getAttribute('#ps-mode-live', 'aria-checked')) === 'true');
-
-// ── 2. De andere stand toont het veld wel ──────────────────────────────────
-await page.click('#ps-mode-link');
+await page.check('#ps-extra-safe');
 await page.waitForTimeout(200);
-ok('na het kiezen van "ze openen het later" verschijnt het ontvangersveld',
+ok('met Extra veilig staat er geen adresveld: de ontvanger zit achter het scherm',
+   !(await page.isVisible('#recipient-one')) && !(await page.isVisible('#recipients-input')));
+await page.uncheck('#ps-extra-safe');
+
+// ── 2. Naar meerdere mensen toont het veld wel ─────────────────────────────
+await page.click('#ps-mode-group');
+await page.waitForTimeout(200);
+ok('na het kiezen van "Naar meerdere mensen" verschijnt het ontvangersveld',
    await page.isVisible('#recipients-input'));
 ok('en die kaart is nu de aangevinkte',
-   (await page.getAttribute('#ps-mode-link', 'aria-checked')) === 'true');
+   (await page.getAttribute('#ps-mode-group', 'aria-checked')) === 'true');
 
 // ── 3. De teller die meetelt terwijl je typt ───────────────────────────────
 const twintig = Array.from({ length: 20 }, (_, i) => `partner${i}@extern.test`).join('\n');
 await page.fill('#recipients-input', twintig);
 await page.waitForTimeout(300);
-const status = await page.textContent('#recipients-status');
+const status = await page.textContent('#ps-count');
 ok('de teller noemt het aantal dat er staat', /20/.test(status || ''), status);
 
 // Dubbelen horen niet dubbel te tellen.
 await page.fill('#recipients-input', 'anna@x.org\nanna@x.org\nANNA@X.ORG\nbob@x.org');
 await page.waitForTimeout(300);
-const status2 = await page.textContent('#recipients-status');
+const status2 = await page.textContent('#ps-count');
 ok('en telt dezelfde persoon in drie schrijfwijzen als een',
    /\b2\b/.test(status2 || ''), status2);
 
-// ── 4. Terug naar live: het veld gaat weer dicht ───────────────────────────
-await page.click('#ps-mode-live');
+// ── 4. Terug naar één persoon: het lijstveld gaat weer dicht ───────────────
+await page.click('#ps-mode-link');
 await page.waitForTimeout(200);
-ok('terug in de live-stand is het ontvangersveld weer weg',
+ok('terug bij één persoon is het lijstveld weer weg',
    !(await page.isVisible('#recipients-input')));
 
 // ── 5. Wat een mens op het eerste scherm ziet ──────────────────────────────

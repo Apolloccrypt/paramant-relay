@@ -78,7 +78,7 @@ function validateStep(n) {
     return null; // empty domain = localhost mode, allowed
   }
   if (n === 3) {
-    return EMAIL_RE.test(c.adminEmail) ? null : 'Een geldig e-mailadres van de beheerder is verplicht.';
+    return EMAIL_RE.test(c.adminEmail) ? null : 'Vul een geldig e-mailadres van de beheerder in.';
   }
   if (n === 4) {
     if (c.firstUserEmail && !EMAIL_RE.test(c.firstUserEmail)) {
@@ -232,9 +232,19 @@ function applyConfig() {
   var applyBtn = $('#apply');
   if (status) { status.style.color = ''; status.textContent = 'Bezig met instellen...'; }
   if (applyBtn) { applyBtn.disabled = true; }
+  // The relay no longer accepts an anonymous apply (relay.js /v2/setup/apply):
+  // the operator proves ownership with the one-time setup token.
+  var tokenInput = $('#setup-token');
+  var setupToken = tokenInput ? String(tokenInput.value || '').trim() : '';
+  if (!setupToken) {
+    if (applyBtn) { applyBtn.disabled = false; }
+    if (status) { status.style.color = '#b00020'; status.textContent = 'Vul eerst de installatiecode in. De relay zet die bij de start in het bestand setup-token naast users.json.'; }
+    if (tokenInput) { tokenInput.focus(); }
+    return Promise.resolve();
+  }
   return fetch('/v2/setup/apply', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Setup-Token': setupToken },
     body: JSON.stringify(state.config)
   })
     .then(function (r) {
@@ -243,6 +253,7 @@ function applyConfig() {
     })
     .then(function (res) {
       if (res.ok) {
+        if (status) { status.textContent = ''; }
         goToStep('done');
         renderDone(res);
         return;
@@ -255,6 +266,10 @@ function applyConfig() {
           ((res.body && res.body.error) ? res.body.error : 'Bekijk de logs van de relay: docker compose logs relay');
       } else {
         // 4xx: validation -- show message and let the user correct an earlier step.
+        if (res.status === 401 && res.body && res.body.error === 'setup_token_required') {
+          status.textContent = 'De installatiecode klopt niet. Kopieer hem opnieuw uit het bestand setup-token naast users.json.';
+          return;
+        }
         status.textContent = (res.body && res.body.error)
           ? res.body.error
           : ('Controleer uw invoer (HTTP ' + res.status + ').');
@@ -287,7 +302,16 @@ function wire() {
     });
   });
   var domainInput = $('[name="domain"]', stepEl(2));
-  if (domainInput) { domainInput.addEventListener('blur', dnsPreflight); }
+  // While typing, not on blur: the blur came between mousedown and mouseup on
+  // Next, the DNS line changed height, the button moved away and the first
+  // click was lost (matrix ACCT-42). #dns-status also keeps its height.
+  var dnsTimer = null;
+  if (domainInput) {
+    domainInput.addEventListener('input', function () {
+      clearTimeout(dnsTimer);
+      dnsTimer = setTimeout(dnsPreflight, 600);
+    });
+  }
   var applyBtn = $('#apply');
   if (applyBtn) { applyBtn.addEventListener('click', applyConfig); }
   goToStep(1);

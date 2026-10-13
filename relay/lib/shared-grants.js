@@ -139,18 +139,25 @@ function grantOf(rec) {
 // Returns { ok } and never throws: a grant that was written locally must not be
 // undone by a redis that is having a bad minute. The caller logs the failure and
 // the periodic reseed on the writing container picks it up again.
-async function publish(redis, accountId, rec) {
+//
+// opts.replace marks the row as a REPLACEMENT (replaced_at): a reversal that
+// shortened a term. Every other container copies such a row as it is instead
+// of merging it, because a merge keeps the longer term. replaced_at is only
+// ever written, never cleared, so a later ordinary publish cannot hide it from
+// a container that has not applied it yet.
+async function publish(redis, accountId, rec, opts) {
   if (!redis || !accountId) return { ok: false, error: 'no_redis' };
   const grant = grantOf(rec);
   const key = grantKey(accountId);
   try {
     const now = new Date().toISOString();
     const row = { updated_at: now, revoked_at: grant ? '' : now };
+    if (opts && opts.replace) row.replaced_at = now;
     for (const f of FIELDS) row[f] = (grant && grant[f] !== undefined) ? grant[f] : '';
     await redis.hSet(key, row);
     await redis.sAdd(ACCOUNT_SET, String(accountId));
     await redis.publish(CHANNEL, String(accountId));
-    return { ok: true, grant };
+    return { ok: true, grant, replacedAt: row.replaced_at || null };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -174,7 +181,7 @@ async function readRow(redis, accountId) {
   try {
     const h = await redis.hGetAll(grantKey(accountId));
     if (!h || Object.keys(h).length === 0) return null;
-    return { exists: true, grant: grantOf(h), revokedAt: h.revoked_at || null, updatedAt: h.updated_at || null };
+    return { exists: true, grant: grantOf(h), revokedAt: h.revoked_at || null, updatedAt: h.updated_at || null, replacedAt: h.replaced_at || null };
   } catch {
     return null;
   }
@@ -192,7 +199,7 @@ async function readAll(redis) {
   const out = [];
   for (const accountId of ids) {
     const row = await readRow(redis, accountId);
-    if (row) out.push({ accountId, grant: row.grant, revokedAt: row.revokedAt });
+    if (row) out.push({ accountId, grant: row.grant, revokedAt: row.revokedAt, replacedAt: row.replacedAt });
   }
   return out;
 }

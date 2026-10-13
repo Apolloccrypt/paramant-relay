@@ -21,7 +21,13 @@ their browser.
 
 - The encrypted file, as fixed-size 5 MB ciphertext blocks. The relay cannot read it.
 - A random per-file identifier used only to count a multi-part transfer as one transfer.
-- Your API key, in the request header, to authorise the upload.
+- Your API key, in the request header, to authorise the upload. Signed in with e-mail and
+  authenticator code instead, the integration sends a ParaSend session token that lives
+  fifteen minutes and works only for transfers; the account session itself is the
+  paramant.app sign-in cookie.
+
+A self-hosted relay you set in the extension options receives the same, and nothing goes to
+Paramant: the receiver then opens the link on your relay.
 
 The relay does not receive the file's plaintext, the filename, or the decryption key. The
 decryption key is placed in the link's URL fragment, which browsers do not transmit to

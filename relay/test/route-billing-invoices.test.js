@@ -278,7 +278,7 @@ test('a credit note is listed, downloadable, and still only the owner its own', 
   const text = pdf.buf.toString('latin1');
   assert.ok(text.includes(note.number), 'the document carries its own number');
   assert.ok(text.includes(paid.number), 'and the number of the invoice it credits');
-  assert.ok(text.includes('-603.79'), 'with a negative total');
+  assert.ok(text.includes('-603,79'), 'with a negative total (a Dutch document: no language on file)');
 
   const stolen = await srv.get(row.pdf_url, asB);
   assert.strictEqual(stolen.status, 404, 'the neighbour still gets nothing');

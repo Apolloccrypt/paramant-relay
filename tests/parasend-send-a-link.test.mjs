@@ -108,24 +108,21 @@ const MAAND = '(januari|februari|maart|april|mei|juni|juli|augustus|september|ok
 const LANGS = [
   {
     tag: 'en', sendPath: '/en/parashare', getPrefix: '/en', markupFile: 'en/parashare.html',
-    ttl: [/1 hour on Community/, /24 hours on Firm/, /7 days on Enterprise/],
-    wiped: /wiped after the first download/,
-    planInMarkup: /on Community|on Firm|on Pro|on Enterprise/,
-    notOnline: /does not have to be online/,
-    until: new RegExp('until \\d{1,2} ' + MONTH + ' \\d{4}, \\d{2}:\\d{2} UTC'),
+    limit: /A link stays open for up to 24 hours\./,
+    planInMarkup: /\d+ (hours?|days?) on (Community|Firm|Pro|Enterprise)|up to \d+ (hours?|days?)/,
+    // Local time with the zone named, as the mail says it (hertest r2 T4-L4).
+    until: new RegExp('until \\d{1,2} ' + MONTH + ' \\d{4} at \\d{2}:\\d{2}( \\([^)]+\\))?'),
     worksOnce: /Works once/, waiting: /Waiting for the receiver/,
     noReceipt: /no signed delivery receipt/i,
     gone: /permanently destroyed/i,
-    burned: /already been downloaded and burned/i, singleUse: /single-use/i,
+    burned: /already been downloaded and deleted/i, singleUse: /works only once/i,
   },
   {
     tag: 'nl', sendPath: '/parashare', getPrefix: '', markupFile: 'parashare.html',
-    ttl: [/1 uur bij Community/, /24 uur bij Firm/, /7 dagen bij Enterprise/],
-    wiped: /na de eerste download gewist/,
-    planInMarkup: /on Community|on Firm|on Pro|on Enterprise|bij Community|bij Firm|bij Pro|bij Enterprise/,
-    notOnline: /hoeft niet online te zijn/,
+    limit: /Een link blijft maximaal 24 uur open\./,
+    planInMarkup: /\d+ (uur|dagen) bij (Community|Firm|Pro|Enterprise)|maximaal \d+ (uur|dagen)/,
     // The Dutch page writes the month in Dutch: format-date.js reads <html lang>.
-    until: new RegExp('tot \\d{1,2} ' + MAAND + ' \\d{4}, \\d{2}:\\d{2} UTC'),
+    until: new RegExp('tot \\d{1,2} ' + MAAND + ' \\d{4} om \\d{2}:\\d{2}( \\([^)]+\\))?'),
     worksOnce: /Werkt één keer/, waiting: /Wacht op de ontvanger/,
     noReceipt: /geen ondertekend ontvangstbewijs/i,
     gone: /voorgoed vernietigd/i,
@@ -142,45 +139,29 @@ await sender.goto(`${ORIGIN}${L.sendPath}`, { waitUntil: 'domcontentloaded' });
 // The chooser is on the page before anything is picked, which is the whole
 // complaint this feature answers: the buyer must not have to reach step 2 to
 // find out which stands exist.
-ok(L.tag + ': ' + 'the chooser offers both stands above step 1',
-  await sender.locator('#ps-mode-live').isVisible() && await sender.locator('#ps-mode-link').isVisible());
-ok(L.tag + ': ' + 'the live stand is the one selected on arrival',
-  await sender.locator('#ps-mode-live').getAttribute('aria-checked') === 'true');
+ok(L.tag + ': ' + 'the chooser offers both choices above step 1',
+  await sender.locator('#ps-mode-link').isVisible() && await sender.locator('#ps-mode-group').isVisible());
+// Since 24 September 2026 the link is the default: "To one person", with
+// Extra safe (the live hand-over) unticked.
+ok(L.tag + ': ' + '"To one person" is the choice selected on arrival, as a link',
+  await sender.locator('#ps-mode-link').getAttribute('aria-checked') === 'true'
+  && !(await sender.isChecked('#ps-extra-safe')));
 
-// The times in the Send-a-link sentence come from the plan API, not from the
-// markup. The stub answered with the tiers.js rows; the page must have written
-// them in. A page that still shows the plan-free fallback sentence here is a
-// page that would show a stale hour after a tier change.
-await sender.waitForFunction(() => /Community/.test(document.getElementById('ps-mode-link-ttl').textContent), null, { timeout: 15000 });
-const ttlSentence = await sender.locator('#ps-mode-link-ttl').textContent();
-// 24 hours belongs to the tiers.js row 'pro', and the sentence says "on Firm".
-// Both halves are deliberate. The served table is keyed by ENTITLEMENT TIER;
-// the sentence names the PLAN a reader can buy, and since 6 September 2026 the
-// plan that grants that row is Firm. Writing "24 hours on Pro" here would hang
-// a real number on a plan that is on no price table, which is the same untruth
-// site-claims block 40 sweeps the static pages for. What a buyer needs to know
-// is what he gets for his money, and 24 hours is what Firm gives him: the same
-// figure the Firm card prints on /pricing as "24 hour link expiry".
-ok(L.tag + ': ' + 'the chooser names the per-plan link lifetimes from the plan API',
-  L.ttl.every((re) => re.test(ttlSentence)),
-  ttlSentence);
-ok(L.tag + ': ' + 'the chooser says the file is wiped after the first download',
-  L.wiped.test(ttlSentence), ttlSentence);
+// The expiry in the limit line comes from the plan API, not from the markup.
+// The stub answered with link_ttl_ms for a Firm account (the tiers.js 'pro'
+// row, 24 hours); the page must have written that in. Until the answer
+// arrives the line is hidden rather than guessed.
+await sender.waitForSelector('#ps-plan:not([hidden])', { timeout: 15000 });
+const limitLine = await sender.locator('#ps-limit').textContent();
+ok(L.tag + ': ' + 'the limit line names the expiry this plan really gets, from the plan API',
+  L.limit.test(limitLine), limitLine);
 // No hour written into the markup a visitor sees. Developer comments are
-// stripped first: this checks the page, not the file, and the comment above the
-// chooser explains the rule by quoting it.
+// stripped first: this checks the page, not the file.
 const markup = fs.readFileSync(path.join(ROOT, L.markupFile), 'utf8').replace(/<!--[\s\S]*?-->/g, ' ');
-ok(L.tag + ': ' + 'no per-plan link lifetime is hardcoded in the chooser markup',
+ok(L.tag + ': ' + 'no per-plan link lifetime is hardcoded in the markup',
   !L.planInMarkup.test(markup),
   'the times must come from tiers.js through the plan API, never from the page');
-
-await sender.locator('#ps-mode-link').click();
-ok(L.tag + ': ' + 'choosing Send a link switches the stand',
-  await sender.locator('#ps-mode-link').getAttribute('aria-checked') === 'true'
-  && await sender.locator('#ps-mode-live').getAttribute('aria-checked') === 'false');
-ok(L.tag + ': ' + 'the live-handshake promise is withdrawn on the Send-a-link stand',
-  L.notOnline.test(await sender.locator('#ps-live-note').textContent()));
-ok(L.tag + ': ' + 'the live stepper is hidden on the Send-a-link stand',
+ok(L.tag + ': ' + 'the live stepper is hidden on the link',
   !(await sender.locator('#ps-stepper').isVisible()));
 
 await sender.locator('#file-input').setInputFiles({
@@ -244,7 +225,9 @@ ok(L.tag + ': ' + 'a copy button sits on the row', await sender.locator('#ps-lin
 const receiverCtx = await browser.newContext({ acceptDownloads: true });
 const receiver = await receiverCtx.newPage();
 let dlServed = 0;
-await receiver.route('https://health.paramant.app/v2/dl/**/get', async (route) => {
+// A regex, not a glob: the page asks .../get?claim=<id>, and a glob is matched
+// against the whole URL, query included.
+await receiver.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/, async (route) => {
   dlServed++;
   if (dlServed > 1) {
     return route.fulfill({ status: 410, contentType: 'text/html', body: '<h1>burned</h1>' });
@@ -252,9 +235,21 @@ await receiver.route('https://health.paramant.app/v2/dl/**/get', async (route) =
   await route.fulfill({ status: 200, contentType: 'application/octet-stream', body: sentBytes });
 });
 
+// Since 2026-10-04 /get asks /info first, fetches only after the receiver
+// presses the button, and confirms the download afterwards (ack). A mail
+// scanner that opens the link therefore spends nothing.
+let acked = 0;
+await receiver.route('https://health.paramant.app/v2/dl/**/info', (route) => route.fulfill({
+  status: 200, contentType: 'application/json',
+  body: JSON.stringify({ ok: true, enc_meta: null, file_size: sentBytes.length, ttl_left_s: 3600, used: false }) }));
+await receiver.route(/https:\/\/health\.paramant\.app\/v2\/dl\/.*\/ack$/, (route) => { acked++;
+  return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"burned":true}' }); });
 const receiveUrl = ORIGIN + L.getPrefix + shownLink.slice(shownLink.indexOf('/get'));
 const downloadPromise = receiver.waitForEvent('download', { timeout: 30000 });
 await receiver.goto(receiveUrl, { waitUntil: 'domcontentloaded' });
+await receiver.waitForSelector('#step-ready.active #ready-btn:not([disabled])', { timeout: 15000 });
+ok(L.tag + ': ' + 'nothing is fetched before the receiver presses the button', dlServed === 0);
+await receiver.click('#ready-btn');
 const download = await downloadPromise;
 const saved = path.join(process.env.TMPDIR || '/tmp', 'parasend-link-' + process.pid + '.bin');
 await download.saveAs(saved);
@@ -262,6 +257,7 @@ const back = fs.readFileSync(saved);
 fs.unlinkSync(saved);
 
 ok(L.tag + ': ' + 'the receiver needs no account: the link opens straight onto the file', dlServed === 1);
+ok(L.tag + ': ' + 'the page confirms the download once it has the file', acked === 1, 'acks: ' + acked);
 ok(L.tag + ': ' + 'the saved file has the sender\'s name back', download.suggestedFilename() === FILE_NAME, download.suggestedFilename());
 ok(L.tag + ': ' + 'the file comes back byte for byte', Buffer.compare(back, Buffer.from(PAYLOAD_BYTES)) === 0,
   `got ${back.length} bytes, sent ${PAYLOAD_BYTES.length}`);
@@ -272,8 +268,10 @@ ok(L.tag + ': ' + 'the receiver is told the relay copy is gone',
 
 // ── The second open ──────────────────────────────────────────────────────────
 const second = await receiverCtx.newPage();
-await second.route('https://health.paramant.app/v2/dl/**/get', (route) =>
+await second.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/, (route) =>
   route.fulfill({ status: 410, contentType: 'text/html', body: '<h1>burned</h1>' }));
+await second.route('https://health.paramant.app/v2/dl/**/info', (route) => route.fulfill({ status: 404,
+  contentType: 'application/json', body: '{"ok":false,"reason":"downloaded"}' }));
 await second.goto(receiveUrl, { waitUntil: 'domcontentloaded' });
 await second.waitForSelector('#step-burned.active', { timeout: 15000 });
 const burned = (await second.locator('#step-burned').textContent()).replace(/\s+/g, ' ');

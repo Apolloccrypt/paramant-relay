@@ -69,7 +69,8 @@ function payment(id, value = '603.79') {
   return {
     id, status: 'paid', method: 'ideal',
     amount: { value, currency: 'EUR' },
-    metadata: { accountId: 'acct_demo', product: 'parasign', plan: 'pro', interval: 'yearly' },
+    // An English buyer: the document assertions below read the English words.
+    metadata: { accountId: 'acct_demo', product: 'parasign', plan: 'pro', interval: 'yearly', lang: 'en' },
   };
 }
 
@@ -296,6 +297,58 @@ test('the PDF carries every field Wet OB art. 35a requires', async () => {
   for (const label of ['Invoice', 'Invoice date', 'Invoice number', 'Billed to', 'Subtotal excl. VAT', 'Total']) {
     assert.ok(text.includes(label), `the document is labelled: ${label}`);
   }
+  did();
+});
+
+// Acceptatie 3.1.1, betalen punt 5: the document, its line and its words
+// follow the language the buyer bought in. A Dutch buyer got "Invoice" and
+// "yearly plan". The record keeps the English line for the exports.
+test('a buyer who bought in Dutch gets a Dutch document; without a language the default is Dutch', async () => {
+  const redis = fakeRedis();
+  const p = payment('tr_nl');
+  delete p.metadata.lang;
+  const out = await issue(redis, p);
+  assert.strictEqual(out.record.lang, 'nl');
+  assert.strictEqual(out.record.description, 'Paramant ParaSign Pro, yearly plan', 'the record line stays for the exports');
+  assert.strictEqual(out.record.description_nl, 'Paramant Firm voor ondertekenen, per jaar');
+  const text = invoicePdf.render(out.record, { buyerHint: invoice.BUYER_HINT }).toString('latin1');
+  for (const label of ['Factuur', 'Factuurdatum', 'Factuurnummer', 'Gefactureerd aan', 'Subtotaal excl. btw', 'Totaal', 'Volledig betaald']) {
+    assert.ok(text.includes(label), `the Dutch document is labelled: ${label}`);
+  }
+  assert.ok(text.includes('Paramant Firm voor ondertekenen, per jaar'), 'the Dutch line');
+  assert.ok(text.includes('EUR 603,79'), 'Dutch money');
+  assert.ok(!/\(Invoice\) Tj|yearly plan|Paid in full/.test(text), 'no English words on it');
+  const en = payment('tr_en');
+  const outEn = await issue(redis, en);
+  assert.strictEqual(outEn.record.lang, 'en');
+  assert.ok(invoicePdf.render(outEn.record, { buyerHint: invoice.BUYER_HINT }).toString('latin1').includes('Invoice date'));
+  // A record from before the field existed keeps the English it was issued in.
+  const old = Object.assign({}, outEn.record); delete old.lang; delete old.description_nl;
+  assert.ok(invoicePdf.render(old, { buyerHint: invoice.BUYER_HINT }).toString('latin1').includes('Paid in full'));
+  did();
+});
+
+// Acceptatie 3.1.1 ronde 2, P5: the English mail and invoice named the plan
+// "Firm (ParaSign Pro and ParaSend Pro)" while Mollie and /en/pricing said
+// "Firm (sending and signing)". The English line now uses the Mollie name, and
+// what the bundle supplied stays on the invoice right under it.
+test('an English Firm invoice names the plan as Mollie does and still states the supply', async () => {
+  const redis = fakeRedis();
+  const p = payment('tr_en_firm', '35.09');
+  p.metadata = { accountId: 'acct_demo', product: 'firm', plan: 'firm', interval: 'monthly', lang: 'en' };
+  const order = orderOf(p);
+  assert.ok(!order.error, order.error);
+  const out = await issue(redis, p);
+  assert.strictEqual(out.record.description_en, 'Paramant Firm (sending and signing), monthly plan');
+  assert.strictEqual(`Paramant ${catalog.orderLabelEn(order)} (monthly)`, 'Paramant Firm (sending and signing) (monthly)', 'the Mollie name');
+  assert.strictEqual(out.record.supply_en, 'ParaSign Pro and ParaSend Pro');
+  assert.strictEqual(out.record.description, 'Paramant Firm (ParaSign Pro and ParaSend Pro), monthly plan', 'the record line stays for the exports');
+  const text = invoicePdf.render(out.record, { buyerHint: invoice.BUYER_HINT }).toString('latin1');
+  assert.ok(text.includes('Paramant Firm \\(sending and signing\\), monthly plan') || text.includes('Paramant Firm (sending and signing), monthly plan'), 'the Mollie name on the invoice');
+  assert.ok(/Supplied: ParaSign Pro and ParaSend Pro/.test(text), 'the supply stays on the invoice');
+  // The Dutch document of the same plan is unchanged: no supply line in English.
+  const nlText = invoicePdf.render(Object.assign({}, out.record, { lang: 'nl' }), { buyerHint: invoice.BUYER_HINT }).toString('latin1');
+  assert.ok(!/Supplied:/.test(nlText));
   did();
 });
 

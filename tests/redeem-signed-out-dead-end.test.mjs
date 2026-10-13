@@ -137,7 +137,7 @@ async function messageAfterSubmit(page) {
   await page.click('#rd-submit');
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-redeem-message]');
-    return el && el.textContent && !/Checking your code|Uw code wordt gecontroleerd/.test(el.textContent);
+    return el && el.textContent && !/Checking your code|We controleren uw code/.test(el.textContent);
   }, null, { timeout: 15000 });
   return (await page.textContent('[data-redeem-message]')).trim();
 }

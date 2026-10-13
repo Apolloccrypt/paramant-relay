@@ -178,7 +178,7 @@
 
   document.addEventListener('paramant:plan-changed', function (ev) {
     forget();
-    showDone(ev && ev.detail ? ev.detail.message : '');
+    showDone(ev && ev.detail ? (ev.detail.message_nl || ev.detail.message) : '');
   });
 
   /* ---- wiring ----------------------------------------------------------- */

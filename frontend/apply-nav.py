@@ -9,11 +9,11 @@ NEW_NAV = '''\
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/parasend" class="nav-link">Send</a></li>
+    <li><a href="/parasign" class="nav-link">Sign</a></li>
     <li><a href="/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -37,11 +37,11 @@ NEW_NAV = '''\
 # is how a signed-in phone ended up with no route to support at all.
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Sign in</a>
@@ -161,7 +161,11 @@ def to_english_links(block):
     def swap(m):
         path, frag = m.group(1), m.group(2) or ''
         rel = 'index.html' if path == '/' else path.lstrip('/') + '.html'
-        if os.path.exists(os.path.join(frontend, 'en', rel)):
+        # /help is a folder (help/index.html), not help.html: without the
+        # second test the English drawer kept sending Help to the Dutch page
+        # (fase 2 SITE-03-F*).
+        if (os.path.exists(os.path.join(frontend, 'en', rel)) or
+                os.path.exists(os.path.join(frontend, 'en', path.strip('/'), 'index.html'))):
             return 'href="' + ('/en' if path == '/' else '/en' + path) + frag + '"'
         return m.group(0)
     return re.sub(r'href="(/[^"#?]*)(#[^"]*)?"', swap, block)
@@ -306,10 +310,10 @@ LEGAL_STRIP_NL = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=32">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=28">'
-NAV_JS    = '<script src="/nav.js?v=16" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=12" defer></script>'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=33">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=29">'
+NAV_JS    = '<script src="/nav.js?v=17" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=22" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -355,6 +359,46 @@ def inject_legal_strip(html, strip=None):
         # page, so append it rather than skip the page.
         return html.rstrip() + '\n' + strip + '\n'
     return html[:body_close] + strip + '\n' + html[body_close:]
+
+
+# The line to the same page in the other language ("This page in English").
+# It used to be a loose <p> with an inline style between the page and the
+# footer, which on a zoomed desktop read as a stray link under the layout
+# (2026-09-24). It belongs to the footer: the last item of the legal strip, or
+# a line in the brand column of the site footer under the licence. The link
+# itself is the page's own (some pages keep an id that their script rewrites),
+# so the generator lifts it out wherever it stands and puts it back in the
+# footer, which keeps the stamp idempotent: on the next run it is lifted out
+# of the footer and put back in the same place.
+LANG_LINE_RE = re.compile(
+    r'\n*[ \t]*<(p|span) class="lang-switch"[^>]*>\s*'
+    r'(?:<span class="legal-sep"[^>]*>[^<]*</span>)?\s*(<a\b[^>]*>[^<]*</a>)\s*</\1>')
+FOOTER_LICENCE = 'BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>'
+
+
+def take_lang_line(html):
+    m = LANG_LINE_RE.search(html)
+    if not m:
+        return html, None
+    link = re.sub(r'\s+style="[^"]*"', '', m.group(2))
+    return html[:m.start()] + html[m.end():], link
+
+
+def place_lang_line(html, link):
+    if not link:
+        return html
+    strip = re.search(r'<footer class="legal-strip">.*?(?=\n</footer>)', html, flags=re.DOTALL)
+    if strip:
+        piece = f'<span class="lang-switch"><span class="legal-sep">&middot;</span>{link}</span>'
+        return html[:strip.end()] + piece + html[strip.end():]
+    footer = re.search(r'<footer>.*?</footer>', html, flags=re.DOTALL)
+    if footer and FOOTER_LICENCE in footer.group(0):
+        i = html.index(FOOTER_LICENCE, footer.start()) + len(FOOTER_LICENCE)
+        return html[:i] + f'\n        <p class="lang-switch">{link}</p>' + html[i:]
+    # No footer the generator knows: the end of the page content.
+    at = re.search(r'<footer\b', html)
+    i = at.start() if at else html.rfind('</body>')
+    return html[:i] + f'<p class="lang-switch">{link}</p>\n' + html[i:]
 
 
 def inject_main(html):
@@ -529,10 +573,12 @@ def process(fpath):
     assert mobile.endswith('</div>')
     mobile = (mobile[:-len('</div>')] + '  <span class="nav-prefs">' + lang_switch(rel, 'span', english)
               + theme_switch(english) + '</span>\n</div>')
+    content, lang_link = take_lang_line(content)
     updated = re.sub(r'<nav class="nav">.*?</nav>', lambda m: nav, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated, mobile)
     updated = re.sub(r'<footer>.*?</footer>', lambda m: footer, updated, flags=re.DOTALL)
     updated = inject_legal_strip(updated, strip)
+    updated = place_lang_line(updated, lang_link)
     updated = re.sub(r'(<a href="#main-content" class="skip-link">)[^<]*(</a>)',
                      lambda m: m.group(1) + ('Skip to main content' if english else 'Naar de inhoud') + m.group(2),
                      updated, count=1)

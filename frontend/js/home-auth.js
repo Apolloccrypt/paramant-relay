@@ -565,24 +565,76 @@
     });
   }
 
-  fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (data) {
-      if (!data || !data.authenticated) return;
+  // A busy relay (429) or a hiccup (5xx) is not "signed out": ask again a
+  // couple of times before deciding (fase 1 SITE-02-K).
+  function verifySession(attempt) {
+    return fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' })
+      .then(function (r) {
+        if ((r.status === 429 || r.status >= 500) && attempt < 2) {
+          var wait = Math.min(5, Number(r.headers.get('Retry-After')) || (attempt + 1));
+          return new Promise(function (res) { setTimeout(res, wait * 1000); })
+            .then(function () { return verifySession(attempt + 1); });
+        }
+        if (r.status === 429 || r.status >= 500) {
+          return { unknown: true, wait: Number(r.headers.get('Retry-After')) || 0 };
+        }
+        return r.ok ? r.json() : null;
+      });
+  }
 
-      // Personalise with the email local-part if we have it (textContent, so
-      // no markup injection). Falls back to a plain "Your documents." otherwise.
+  // A busy relay that KEEPS answering 429 used to drop a signed-in customer
+  // back on the signed-out pitch ("Create account"), which is wrong for him
+  // (fase 2 SITE-02-K). nav-auth.js keeps paramant.local.owner in this browser
+  // from sign-in until sign-out. When it is there, this browser was signed in
+  // and nobody signed out: show the workbench with one honest line that the
+  // check is still pending, and keep asking. A visitor without that mark keeps
+  // the pitch, which is right for him either way.
+  var notice = inn.querySelector('[data-home-notice]');
+  function signedInHere() {
+    try { return !!localStorage.getItem('paramant.local.owner'); } catch (e) { return false; }
+  }
+  function showIn(data) {
+    if (notice) notice.hidden = !data.unknown;
+    if (!data.unknown) {
+      // Personalise only with the name the customer gave himself (the label
+      // from signup), via textContent. The local-part of the address used to
+      // stand here, which greeted a firm as "Your documents, info." or
+      // "Uw documenten, afzender." (acceptatie 3.1.1, taal 41). No name, no
+      // greeting: a plain "Your documents."
       var nameEl = inn.querySelector('[data-home-name]');
-      if (nameEl && data.email) {
-        var at = String(data.email).indexOf('@');
-        var local = at > 0 ? String(data.email).slice(0, at) : String(data.email);
-        if (local) nameEl.textContent = ', ' + local;
+      if (nameEl) {
+        getJSON('/api/user/me').then(function (me) {
+          var label = me && typeof me.label === 'string' ? me.label.trim() : '';
+          if (label && label.indexOf('@') === -1 && label.length <= 60) nameEl.textContent = ', ' + label;
+        });
       }
-
-      out.hidden = true;
-      inn.hidden = false;
-      document.documentElement.setAttribute('data-session', 'in');
-      load();
-    })
+    }
+    out.hidden = true;
+    inn.hidden = false;
+    document.documentElement.setAttribute('data-session', 'in');
+    if (!data.unknown) load();
+  }
+  function showOut() {
+    if (notice) notice.hidden = true;
+    inn.hidden = true;
+    out.hidden = false;
+    document.documentElement.removeAttribute('data-session');
+  }
+  function decide(data) {
+    if (data && data.unknown) {
+      if (!signedInHere()) return;
+      showIn(data);
+      var wait = Math.min(30, Math.max(5, data.wait || 0));
+      setTimeout(function () { verifySession(2).then(decide).catch(function () {}); }, wait * 1000);
+      return;
+    }
+    if (!data || !data.authenticated) {
+      if (!inn.hidden) showOut();
+      return;
+    }
+    showIn(data);
+  }
+  verifySession(0)
+    .then(decide)
     .catch(function () { /* stay on the logged-out pitch */ });
 })();

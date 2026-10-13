@@ -12,8 +12,8 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/design-system.css?v=32">
-<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 /* Same compact phone rhythm as /auth/backup: existing tokens only,
@@ -24,7 +24,7 @@
 }
 </style>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=10">
+<link rel="stylesheet" href="/app-2026.css?v=12">
 <script src="/js/theme.js?v=6"></script>
 </head>
 <body>
@@ -72,9 +72,7 @@
   <div class="eyebrow"><span class="bar"></span>authenticator-app</div>
   <h1>Stel uw <em>authenticator-app</em> opnieuw in.</h1>
   <p class="lede mt-3">
-    Vul het e-mailadres van uw account in. Hoort het bij een account, dan sturen wij
-    een link die het verzoek bevestigt. Een tweede mail bevat daarna de link waarmee u
-    een nieuwe authenticator-app koppelt.
+    Vul het e-mailadres van uw account in en een van uw back-upcodes. Klopt dat, dan krijgt u eerst een mail om het verzoek te bevestigen. Een tweede mail brengt de link om een nieuwe authenticator-app te koppelen. Toegang tot uw mailbox alleen is niet genoeg. Geen back-upcode meer? Dan herstelt alleen support uw toegang. Mail daarvoor vanaf het adres van uw account naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.
   </p>
 </section>
 
@@ -83,8 +81,11 @@
     <label for="email">E-mailadres</label>
     <input type="email" id="email" name="email" required autocomplete="username" autofocus>
 
+    <label for="backup-code" class="mt-3">Back-upcode</label>
+    <input type="text" id="backup-code" name="backup_code" required autocomplete="one-time-code" placeholder="XXXX-XXXX-XXXX" spellcheck="false" autocapitalize="characters">
+
     <button type="submit" class="btn btn-primary mt-3" id="submit-btn">
-      Resetlink versturen
+      Verzoek versturen
     </button>
 
     <div id="error" class="error" role="alert" aria-live="assertive"></div>
@@ -95,7 +96,7 @@
   <div id="success" class="success" style="display:none"></div>
 
   <p class="footer-text mt-4">
-    Nog een back-upcode? <a href="/auth/backup">Gebruik die liever</a><br>
+    Nog een back-upcode over? <a href="/auth/backup">Log daar dan mee in</a><br>
     Terug naar <a href="/auth/login">inloggen</a>
   </p>
 
@@ -107,12 +108,11 @@
 </main>
 
 <script src="/js/pow-captcha.js?v=1"></script>
-<script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
-<script src="/js/auth-request-reset.js?v=3"></script>
-<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/auth/request-reset" hreflang="en" lang="en">This page in English</a></p>
+<script src="/nav.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
+<script src="/js/auth-request-reset.js?v=5"></script>
 <footer class="legal-strip">
-  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/en/auth/request-reset" hreflang="en" lang="en">This page in English</a></span>
 </footer>
 </body>
 </html>

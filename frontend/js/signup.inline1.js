@@ -29,11 +29,20 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     else if (e && e.kind === 'http') {
       if (e.status === 400 && e.err && e.err.error === 'invalid_email') errorDiv.textContent = nlEn('Dit e-mailadres lijkt niet te kloppen. Controleer het en probeer het opnieuw.', 'This email address does not look right. Check it and try again.');
       else if (e.status === 403) errorDiv.textContent = nlEn('De controle lukte niet. Vernieuw de pagina en probeer het opnieuw.', 'Verification failed. Please refresh and try again.');
-      else if (e.status === 409) errorDiv.innerHTML = nlEn('Er is al een account met dit e-mailadres. <a href="/auth/login">Inloggen</a>.', 'An account with this email already exists. <a href="/auth/login">Sign in</a>.');
+      else if (e.status === 409) {
+        // The sign-in keeps the way back this page was given (?next=), and the
+        // English page signs in on the English login.
+        const nx = new URLSearchParams(location.search).get('next') || '';
+        const a = document.createElement('a');
+        a.href = nlEn('/auth/login', '/en/auth/login') + (/^\/(?![\/\\])[^\s\\]*$/.test(nx) ? '?next=' + encodeURIComponent(nx) : '');
+        a.textContent = nlEn('Inloggen', 'Sign in');
+        errorDiv.textContent = nlEn('Er is al een account met dit e-mailadres. ', 'An account with this email already exists. ');
+        errorDiv.append(a, '.');
+      }
       else if (e.status === 422) errorDiv.textContent = nlEn('Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat u blijvend leest.', 'We cannot use this email address for an account. Please use an address you will keep reading.');
       else if (e.status === 429) errorDiv.textContent = nlEn('Te veel pogingen. Probeer het later opnieuw.', 'Too many attempts. Please try again later.');
       else errorDiv.textContent = (e.err && e.err.message) || nlEn('Er ging iets mis. Probeer het opnieuw.', 'Something went wrong. Please try again.');
-    } else { errorDiv.textContent = nlEn('Geen verbinding. Controleer uw internetverbinding.', 'Network error. Please check your connection.'); }
+    } else { errorDiv.textContent = nlEn('Geen verbinding. Controleer uw internetverbinding.', 'No connection. Check your internet connection.'); }
     errorDiv.classList.add('visible');
   }
 
@@ -49,6 +58,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       await doSignup(email, label, n => { submitBtn.textContent = nlEn('Bezig met controleren… (', 'Verifying… (') + (n / 1000).toFixed(0) + 'k)'; });
       document.getElementById('step2-email').textContent = email;
       form.style.display = 'none';
+      // One step on screen at a time. The heading of step 1 ("stap 1 van 5")
+      // stayed above "stap 2 van 5" after sending (test with a stranger,
+      // 13-10-2026), so the page showed two steps as current.
+      const step1 = document.getElementById('step1');
+      if (step1) step1.hidden = true;
       step2.hidden = false;
       step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e2) {

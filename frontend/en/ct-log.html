@@ -17,8 +17,8 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=32">
-<link rel="stylesheet" href="/nav.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <meta property="og:title" content="Certificate transparency log | Paramant">
 <meta property="og:description" content="Key registrations, transfers and relay announcements in one tamper-evident Merkle tree. Anyone can check that an entry is in the log without seeing its contents.">
@@ -69,6 +69,9 @@ body { min-height:100vh; }
 .verify-result { margin-top:10px; font-size:var(--text-sm); display:none; padding:14px 16px; }
 .verify-result.found { border:1px solid var(--ink-hair); color:var(--ink); }
 .verify-result.notfound { border:1px solid var(--ink-ghost); color:var(--ink-dim); }
+.verify-result.listed { border:1px dashed var(--ink-ghost); color:var(--ink-dim); }
+.verify-result .verify-steps { margin:10px 0 6px; padding-left:0; list-style:none; line-height:1.7; }
+.verify-result .verify-why { display:block; margin-top:6px; color:var(--ink-dim); font-size:var(--text-xs); }
 .verify-result pre { margin-top:10px; color:var(--ink-dim); font-size:var(--text-xs); white-space:pre-wrap; word-break:break-all; line-height:1.7; }
 
 .search-bar { display:flex; gap:0; margin:0 40px 28px; }
@@ -87,10 +90,10 @@ body { min-height:100vh; }
 .tf.active { border-color:var(--ink); color:var(--ink); }
 
 .table-wrap { margin:0 40px 40px; border:1px solid var(--ink-hair); }
-.table-head { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
+.table-head { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
 .table-head span { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
 
-.entry { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:14px 16px;
+.entry { display:grid; grid-template-columns:52px 1fr 1fr 150px; gap:0; padding:14px 16px;
   border-top:1px solid var(--ink-ghost); cursor:pointer; transition:background .1s; }
 .entry:hover { background:var(--ink-ghost); }
 .entry .idx { font-size:var(--text-xs); color:var(--ink-dim); }
@@ -145,8 +148,7 @@ body { min-height:100vh; }
   .relay-table-wrap { margin:0 20px 40px; }
   .table-wrap { margin:0 20px 40px; }
   .table-head, .entry { grid-template-columns:40px 1fr 130px; }
-  .table-head span:nth-child(3), .table-head span:nth-child(4),
-  .entry > *:nth-child(3), .entry > *:nth-child(4) { display:none; }
+  .table-head span:nth-child(3), .entry > *:nth-child(3) { display:none; }
   .relay-table-head, .relay-row { grid-template-columns:1fr 80px 70px; }
   .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
 }
@@ -295,15 +297,15 @@ body { min-height:100vh; }
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -316,15 +318,15 @@ body { min-height:100vh; }
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ct-log" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ct-log" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
@@ -332,7 +334,7 @@ body { min-height:100vh; }
 <div class="hero">
   <div class="tag">Public audit log</div>
   <h1>Certificate <span>transparency</span></h1>
-  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload, the way HTTPS certificate transparency logs work.</p>
+  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload. The mathematics is the same as in the certificate transparency logs of HTTPS (RFC 6962): a Merkle tree with signed tree heads. The difference is who is watching. HTTPS has several independent logs and monitors; here there is one operator, Paramant, and no independent keeper of the tree heads yet.</p>
 </div>
 
 <div class="tabs">
@@ -398,7 +400,13 @@ body { min-height:100vh; }
     <strong>Persistent log: survives relay restarts</strong>
     <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
     and reloaded on startup. No payload content is ever stored: only cryptographic hashes.
-    The log resets only when the relay volume is deleted.</span>
+    In April 2026 the log did restart, during tests:
+    the tree of <code>health.paramant.app</code> was started again. 39 entries from that time
+    (positions 1 to 34 and 42 to 46) have a stored proof that does not fit the current tree.
+    For five of them (42 to 46) it is proven that this proof comes from the restarted tree; for the other 34
+    that is likely, but not proven. The list below and the inclusion proof use the current tree for all 39
+    and show the old value separately. For every later entry the stored tree head does fit the current tree
+    (independently recomputed on 6 October 2026). Apart from that the log restarts only when the relay volume is deleted.</span>
   </div>
 </div>
 
@@ -437,7 +445,7 @@ body { min-height:100vh; }
 <div class="verify-section">
   <h2>Verify a hash</h2>
   <div class="verify-bar">
-    <input id="verify-input" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." data-input="clearVerify">
+    <input id="verify-input" placeholder="Paste a leaf_hash or tree_hash to check whether it is in the log" data-input="clearVerify">
     <button data-click="verifyHash">VERIFY</button>
   </div>
   <div class="verify-result" id="verify-result"></div>
@@ -459,7 +467,6 @@ body { min-height:100vh; }
     <span>#</span>
     <span>Leaf hash</span>
     <span>Tree hash</span>
-    <span>Device hash</span>
     <span>Timestamp</span>
   </div>
   <div id="entries"><div class="loading">Loading log…</div></div>
@@ -489,7 +496,7 @@ body { min-height:100vh; }
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.en.js?v=1" defer></script>
+<script src="/js/ct-log.page.en.js?v=3" defer></script>
 </main>
 <footer>
   <div class="container-lg">
@@ -521,7 +528,7 @@ body { min-height:100vh; }
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/nav.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

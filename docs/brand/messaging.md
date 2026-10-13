@@ -328,7 +328,7 @@ page is for.
   /pricing.
 - **Order below:** (1) the split, both halves named as in section 3, with one
   button to /pricing; (2) what an office actually does: sign it yourself,
-  co-sign with a routing order, send a file that disappears after one read;
+  co-sign with initials on every page, send a file that disappears after one read;
   (3) Mick, name and title and the one reason, link to /about; (4) the proof
   block: EU location, key stays on your device, public transparency log,
   offline verification, no third-party requests, source-available, plus the SES

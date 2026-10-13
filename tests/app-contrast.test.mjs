@@ -177,6 +177,11 @@ const SCREENS = [
   { name:'/signup',    url:'/signup',    ready:'main' },
   { name:'/account',   url:'/account',   ready:'#state-account:not(.hidden)' },
   { name:'/auth/login', url:'/auth/login', ready:'form' },
+  // The notice after a SHA-1 login is hidden until a login succeeds, so the
+  // pass above never saw it. Its button was blue on blue for months
+  // (.auth-note a outranked .btn-primary). Unhide it and measure it.
+  { name:'/auth/login (sha1 notice)', url:'/auth/login', ready:'form', reveal:['#sha1-notice'] },
+  { name:'/en/auth/login (sha1 notice)', url:'/en/auth/login.html', ready:'form', reveal:['#sha1-notice'] },
   { name:'/auth/setup', url:'/auth/setup', ready:'main' },
   { name:'/auth/backup', url:'/auth/backup', ready:'main' },
   { name:'/auth/request-reset', url:'/auth/request-reset', ready:'main' },
@@ -215,6 +220,7 @@ test('every app screen keeps its text above AA in light and dark, at 390 and 144
         await stub(page, { signedIn: screen.signedIn !== false });
         await page.goto(ORIGIN + screen.url, { waitUntil:'domcontentloaded' });
         try { await page.locator(screen.ready).first().waitFor({ timeout:6000 }); } catch { /* audit what rendered */ }
+        if (screen.reveal) await page.evaluate((sels) => { for (const sel of sels) for (const el of document.querySelectorAll(sel)) el.hidden = false; }, screen.reveal);
         await page.waitForTimeout(250);
         const result = await page.evaluate(AUDIT);
         pairs += result.pairs;

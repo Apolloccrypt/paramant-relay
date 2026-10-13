@@ -136,9 +136,12 @@ sudo systemctl enable --now paramant-dicom
 ```bash
 paramant-receiver.py \
   --key pgp_xxx \
+  --secret "$PARAMANT_TRANSFER_SECRET" \
   --sector health \
   --forward http://pacs.hospital.nl:11112/api/dicom
 ```
+
+`--secret` is the 32-byte transfer secret the sender printed once (or set it as `PARAMANT_TRANSFER_SECRET`). Without it the receiver does not start, and a wrong secret is an error, never silent plaintext.
 
 The receiver:
 1. Polls the relay for new blobs addressed to your key
@@ -150,6 +153,7 @@ For DICOM DIMSE instead of STOW-RS:
 ```bash
 paramant-receiver.py \
   --key pgp_xxx \
+  --secret "$PARAMANT_TRANSFER_SECRET" \
   --sector health \
   --forward-dcm pacs.hospital.nl:11112 \
   --forward-aet DESTINATION_AET

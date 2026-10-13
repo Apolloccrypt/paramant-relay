@@ -182,6 +182,26 @@ test('gat 1b: een nulbyte in de bestandsnaam komt ongewijzigd in de mailtekst', 
     'er staat een nulbyte in de tekst van de mail');
 });
 
+// Security review ronde 2 (f): de server neemt de bestandsnaam niet meer aan.
+// De webapp stuurt hem niet, maar een oude client of een API-gebruiker kon hem
+// nog naar de mailer en de opslag lekken. Nu: niet in de uitnodiging, niet in de
+// codemail, niet in de kop bij het ophalen.
+test('houdt stand: een meegestuurde bestandsnaam komt nergens terecht', async () => {
+  const h = await blok(KEY);
+  const adres = 'naamloos@extern.test';
+  const naam = 'ZZgeheimeNaamQ3-rapport.pdf';
+  const s = sealedVoor([adres]);
+  post.length = 0;
+  const r = await stuur({ hashes: [h], recipients: [adres], sealed: s, filename: naam, ttl_ms: 3600000 });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const uitnodiging = await laatsteMail();
+  assert.ok(!JSON.stringify(uitnodiging).includes('ZZgeheimeNaamQ3'), 'de naam staat in de uitnodiging');
+  const o = await ophalen(s[adres].token);
+  assert.ok(o.code, 'er kwam een codemail');
+  assert.ok(!JSON.stringify(post).includes('ZZgeheimeNaamQ3'), 'de naam staat in de codemail');
+  assert.ok(!JSON.stringify(o.stap2 && o.stap2.kop).includes('ZZgeheimeNaamQ3'), 'de naam staat in de kop bij het ophalen');
+});
+
 // ═══ GAT 2 ═══════════════════════════════════════════════════════════════════
 // Een bestandsnaam met een losse surrogate kost de ontvanger zijn enige
 // ophaalbeurt, en het bestand is daarna weg.
@@ -459,19 +479,20 @@ test('houdt stand: de bestandsnaam kan de ophaalheaders niet breken', async () =
   assert.equal(o.stap2.bytes, 512);
   const kop = o.stap2.kop['x-paramant-filename'];
   assert.ok(!/[\r\n]/.test(kop), 'er zit een regeleinde in de header: ' + JSON.stringify(kop));
-  assert.ok(kop.includes('%0D%0A'), 'het regeleinde hoort gecodeerd mee te reizen');
+  // Sinds review ronde 2 (f) neemt de server de naam helemaal niet meer aan.
+  assert.equal(kop, 'file', 'de naam van de client komt niet in de header');
   assert.equal(o.stap2.kop['x-evil'], undefined, 'er is geen extra header ontstaan');
 });
 
-test('houdt stand: een lange bestandsnaam wordt afgekapt, niet doorgegeven', async () => {
+test('houdt stand: een lange bestandsnaam wordt niet doorgegeven', async () => {
   const h = await blok(KEY);
   const adres = 'lang@extern.test';
   const s = sealedVoor([adres]);
   await stuur({ hashes: [h], recipients: [adres], sealed: s, filename: 'L'.repeat(10000) });
   const o = await ophalen(s[adres].token);
   assert.equal(o.stap2.status, 200);
-  assert.equal(o.stap2.kop['x-paramant-filename'].length, 200,
-    'send.js kapt de naam op 200 tekens af voor hij wordt opgeslagen');
+  // Sinds review ronde 2 (f): de naam wordt helemaal niet opgeslagen.
+  assert.equal(o.stap2.kop['x-paramant-filename'], 'file');
 });
 
 test('houdt stand: een tweede account kan geen token van de eerste overnemen', async () => {
@@ -497,5 +518,7 @@ test('houdt stand: een tweede account kan geen token van de eerste overnemen', a
   // En de eerste ontvanger krijgt nog steeds zijn eigen bestand.
   const o = await ophalen(s[adres].token);
   assert.equal(o.stap2.status, 200);
-  assert.equal(o.stap2.kop['x-paramant-filename'], 'echt.pdf');
+  // De sleutel van de eerste verzending, niet die van de aanvaller (de naam
+  // telt sinds review ronde 2 (f) niet meer: die neemt de server niet aan).
+  assert.equal(o.stap2.kop['x-paramant-key'], s[adres].wrapped_key);
 });

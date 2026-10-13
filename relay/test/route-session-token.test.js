@@ -115,6 +115,10 @@ const CHECK_KEY_COMMUNITY = {
   link_ttl_ms_by_plan: {
     community: 3_600_000, pro: 86_400_000, business: 604_800_000, enterprise: 604_800_000,
   },
+  // The recipient ceiling, the same tiers.js max_recipients rows that
+  // POST /v2/sends/precheck holds a list to. As public as the hours above.
+  max_recipients: 1,
+  max_recipients_by_plan: { community: 1, pro: 30, business: 30, enterprise: 30 },
 };
 
 // A fresh blob every time: the store is keyed on the sha256 and rejects a
@@ -693,7 +697,8 @@ test('an account is held to twenty live tokens, and the twenty-first is a 429', 
       { key: CAP_KEY, plan: 'community', active: true, email: 'cap@example.test', account_id: `acct_cap_${SUFFIX}` },
       { key: OWNER, plan: 'community', active: true, email: 'owner@example.test', account_id: OWNER_ACCT },
     ] },
-    env: { INTERNAL_AUTH_TOKEN: INTERNAL, REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS },
+    // The default is 200 (one office); twenty here keeps the walk short.
+    env: { INTERNAL_AUTH_TOKEN: INTERNAL, REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS, SESSION_TOKEN_MAX_LIVE: '20' },
   });
   t.after(async () => {
     await capSrv.stop();

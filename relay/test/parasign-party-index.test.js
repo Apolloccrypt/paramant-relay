@@ -189,7 +189,10 @@ async function main() {
     const second = await store.backfillPartyIndex({});
     const after = await rc.zRangeWithScores(store._partyIndexKey(A_HASH), 0, -1);
     assert.deepStrictEqual(after, before, 'a second run changes no member and no score');
-    assert.strictEqual(second.scanned >= first.scanned, true, 'the second run still scanned the keyspace');
+    // At least our own record: other suites share this redis and add or drop
+    // env:* keys between the two runs, so comparing the two counts was a
+    // race (red one run in two with the full route set alongside it).
+    assert.strictEqual(second.scanned >= 1, true, 'the second run still scanned the keyspace');
     ok('the backfill is idempotent: a second run leaves the index byte for byte alone');
 
     // The one thing a re-run must never do is undo a signature's effect.

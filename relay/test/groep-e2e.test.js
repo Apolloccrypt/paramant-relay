@@ -130,6 +130,10 @@ test('een bestand van 12 MB naar 25 mensen, en er komt er een ophalen', async ()
   assert.equal(vr.status, 201, 'de verzending werd geweigerd: ' + JSON.stringify(vj));
   assert.equal(vj.recipients, 25, 'vijfentwintig mensen op een Firm-account');
   assert.equal(vj.invited, 25, 'en vijfentwintig uitnodigingen die de deur uit gingen');
+  // Hertest L6: deze relay draait met MAIL_PROVIDER=dryrun en bezorgt niets.
+  // Het antwoord zegt dat, zodat de pagina niet "verstuurd naar 25 van 25" meldt.
+  assert.equal(vj.delivered, 0, 'dryrun bezorgt niets');
+  assert.equal(vj.mail_test_mode, true, 'en het antwoord zegt dat het een testmodus is');
   assert.equal(vj.size, ct.length, 'de blokken zijn tot precies het bestand samengevoegd');
 
   // ── 5. Wat er in de bus valt ────────────────────────────────────────────

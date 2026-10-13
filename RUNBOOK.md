@@ -86,6 +86,17 @@ bash deploy/ops/backup-full-state.sh --recipients    # expect "recipients: 2" or
 1. Only from **[admin]**. Read `deploy/DEPLOY-3.1.md` once before the first deploy.
 2. `main` is green in CI for the commit you deploy. Nothing gets merged while a deploy runs: the script expects one HEAD from start to finish.
 3. Preflight, read-only: `bash deploy/deploy-3.1.sh --preflight-only`
+   Mail carrier, **[server]**: the production `.env` must carry `MAIL_PROVIDER`
+   explicitly, `MAIL_PROVIDER=mailjet` as in `deploy/.env.example`. Left empty,
+   the relay takes the first carrier whose keys are present and lettermint heads
+   that list, so filling in `LETTERMINT_API_TOKEN` would switch carrier without
+   anyone deciding it. Check first that `MAILJET_API_KEY` and
+   `MAILJET_SECRET_KEY` are in that same `.env` (`grep -c '^MAILJET_' .env`
+   gives 2; names only, never print the values). A pinned carrier without keys
+   delivers nothing. Are they missing, then pin the carrier whose keys are there
+   and that `deploy/partners.json` lists as `actief`, and fix partners.json in
+   the same change. After the deploy the boot log's mail diagnosis must say that
+   provider with `gereed` true.
 4. Start detached, so a dropped connection does not kill it halfway:
    `setsid nohup bash deploy/deploy-3.1.sh > deploy-$(date +%Y%m%d-%H%M).log 2>&1 < /dev/null &`
 5. Follow it with `tail -f deploy-*.log`. Phase 2 prints a `TS`; write it down.
@@ -289,28 +300,44 @@ preparation") or `uitgefaseerd` (gone, with the date in `tot`).
    variables that part is skipped with a message; CI has no key, so it skips
    there too. A skip is not a pass.
 
-### Example: mail from Resend to Lettermint
+### Switching mail from Resend to Lettermint
 
-Lettermint is a Dutch transactional mail provider (lettermint.co). The code
-does not know it yet, so this switch starts in the code:
+Lettermint B.V. (Zwolle, the Netherlands, KvK 99337711) is wired into
+`relay/lib/mail.js` as `lettermint` and heads the preference list
+(`lettermint, mailjet, scaleway, resend`). It sits in `partners.json` as
+`in-code-niet-actief` until the steps below are done. With `MAIL_PROVIDER`
+empty, **putting the token in the production `.env` is the switch**, so do the
+DNS part of step 1 first.
 
-1. Add a `lettermint` sender to `relay/lib/mail.js` (`PROVIDERS`, the key
-   names, the request), with its tests. Add its key to `docker-compose.yml`.
-   Add a party `lettermint` to `partners.json` with status
-   `in-code-niet-actief`, `code_keuze` pointing at `relay/lib/mail.js`, and
-   remove it from `overwogen`. The test now fails until that is consistent.
-2. After the contract: the key into the production `.env`, and `MAIL_PROVIDER`
-   stays empty so the code picks the carrier whose keys are present, or set it
-   to `lettermint` explicitly.
-3. `partners.json`: `lettermint` to `actief` with `sinds`; `resend` to
-   `uitgefaseerd` with `tot`, and while `RESEND_API_KEY` is still on the server
-   list it under `dode_resten` with an `opruimen_voor` date. The test goes red
-   on that date if the key is still there.
-4. The site: the Resend line out of `/privacy` and `/dpa` (both languages),
-   Lettermint in with its legal name and country, and every sentence the test
-   flags ("gaat nu nog via Resend Inc. in de Verenigde Staten" and its English
-   twin on home, /security, /press, /rules, /parasend, /parasign, /help).
-5. Remove `RESEND_API_KEY` from the server, then its `dode_resten` line.
+1. **[server]** Back up `/opt/paramant-relay/.env`, then add
+   `LETTERMINT_API_TOKEN=lm_...` (the project token). Leave `MAIL_PROVIDER`
+   empty, or set it to `lettermint`. Optional: `LETTERMINT_ROUTE=<slug>` if the
+   project has more than one route. Before this, add Lettermint's SPF include
+   and DKIM records for the sending domain in DNS and confirm they resolve;
+   with DMARC on quarantine an unsigned sender lands in spam.
+2. **[server]** Deploy (`deploy/deploy-3.1.sh`). At boot the relay logs its
+   mail diagnosis: `provider` must read `lettermint`, `gereed` true.
+3. **[server]** Test mail through the same code path:
+
+   ```bash
+   # token read from a file, never on the command line
+   node scripts/mail-proef.mjs you@example.org /path/to/lettermint.token
+   ```
+
+   Expect HTTP 202 and a `message_id`, and check the mail actually arrived
+   (headers: DKIM pass for the Paramant domain).
+4. **[repo]** `deploy/partners.json`: `lettermint` to `actief` with `sinds`;
+   `resend` either to `uitgefaseerd` with `tot` (its key under `dode_resten`
+   with `opruimen_voor` while `RESEND_API_KEY` is still on the server), or kept
+   `actief` as fallback with `MAIL_FALLBACK_PROVIDER=resend` in the prod
+   `.env`. Then `cp deploy/partners.json frontend/partners.json` and run
+   `node --test tests/partners.test.mjs`: it names every page (/privacy, /dpa,
+   home, /security, ...) that still says Resend or omits Lettermint. The site
+   follows the test.
+5. **[DNS]** Once Resend is gone (no key, no fallback): remove
+   `include:amazonses.com` from the SPF record of the sending domain
+   (amazonses.com is Resend's carrier), then `RESEND_API_KEY` from the server
+   and its `dode_resten` line.
 
 ### Naming a non-active party on the site
 
@@ -411,3 +438,27 @@ add it under `handmatig` in the right category with `reden`, `datum` and
 
 A new outside source also goes into `deploy/partners.json` as a party with
 role `blocklist-bron` (section 7); the test checks that.
+
+## 9. Relay identity key rotation
+
+Every relay signs receipts and multi-party proofs with its own ML-DSA-65 identity key (`RELAY_IDENTITY_FILE` on its own volume). `/verify` checks those signatures offline against the keys pinned in `frontend/js/relay-trust-anchors.js`. A relay that signs with a key that is not pinned makes every new proof it counter-signs show red. A proof signed before a rotation must keep verifying for years.
+
+The same key signs the relay's tree heads, and the other relays mirror those heads only from the key pinned for its name (`relay/lib/fleet-pins.js`, `PARAMANT_FLEET`). A rotation done in the wrong order has two effects there: the rotated relay's new heads are refused by the fleet and it stops gossiping itself (an ERROR `gossip_to_paramant_fleet_skipped` every hour, `fleet_gossip` in the admin `/health`), and once its old key is no longer pinned at all, every relay moves the mirror of the old key to `peer-sths/purged/` at the next start. A retired pin prevents the second: the heads the old key sent stay mirrored, new heads under it are refused (403, `retired_key`).
+
+The rule: the old key is retired and the new key pinned in ONE commit, in both files, and that release goes out together with the switch. Never delete a pin. So the new key has to exist before it is used.
+
+1. Read the current key of the relay, over TLS: `curl -s https://<host>/v2/pubkey`. It must equal the pin for that host. If it does not, stop: the relay already rotated (or lost its volume), go to step 6.
+2. Make the next key on the relay's own volume, without touching the running key:
+   `docker compose exec relay-<sector> node lib/relay-identity-next.js /data/relay-identity.next.json`
+   It refuses to overwrite a file, writes mode 600, and prints only the public key and its fingerprint (SHA3-256 of the decoded key). Run `deploy/ops/backup-full-state.sh` afterwards, so the escrow has the next key too.
+3. One commit on a branch:
+   - `frontend/js/relay-trust-anchors.js`: move the entry for that host from `RELAY_TRUST_ANCHORS` to `RETIRED_RELAY_ANCHORS`, unchanged, plus `retired_at: 'JJJJ-MM-DD'`; add the new key (from step 2) to `RELAY_TRUST_ANCHORS`;
+   - `relay/lib/fleet-pins.js`: the new fingerprint in `PARAMANT_FLEET`, the old one in `RETIRED_PARAMANT_FLEET` with the same `retired_at`.
+   `tests/fleet-pins-match-anchors.test.mjs` fails when the two files disagree, `tests/relay-anchors-check.test.mjs` when a fingerprint is not the hash of its key.
+4. Right before the deploy of that release, switch the files on the volume. The running relay keeps the key it loaded; the recreate in phase 4 starts it with the new key and the new pins at the same moment:
+   `docker compose exec relay-<sector> sh -c 'mv /data/relay-identity.json /data/relay-identity.retired-JJJJ-MM-DD.json && mv /data/relay-identity.next.json /data/relay-identity.json'`
+   Keep the retired file (and the escrow copy): it is the only proof that key was ours. If the deploy stops before phase 4 and the relay restarts on the old release, it signs with a key the old release does not pin: switch the two files back.
+5. Deploy (`deploy/deploy-3.1.sh`). Old proofs keep verifying through the retired anchor; the old key's mirror stays on every relay, marked `"retired": true` in `/v2/sth/peers`.
+6. Unplanned rotation (volume lost): there is no next key, so the relay starts with a fresh one. If the lost key was pinned, step 3 still applies (the pin is the old key; the new one is `curl -s https://<host>/v2/pubkey`). Until that release is out, the relay's heads reach nobody and it logs the hourly ERROR: keep that window short.
+7. A self-hosted fleet does the same with `PEER_STH_PINS` (new key) and `PEER_STH_RETIRED_PINS` (old key) in `.env` on every relay.
+8. Check: `node deploy/check-relay-anchors.mjs` must end with "every relay serves its pinned key". `deploy/deploy-3.1.sh` runs the same check in phase 6 (step 6k), also under `--verify-only`, and stops the deploy when a relay serves a key that is not the current pin. CI runs `tests/relay-anchors-check.test.mjs`, which holds the pin file consistent (every fingerprint is the SHA3-256 of its own key, a retired entry has `retired_at` and is not also pinned) but cannot reach the relays. Also: the admin `/health` of the rotated relay shows `"fleet_gossip":{"on":true,...}` (health is the one that gossips), and `/v2/sth/peers` on another relay lists the new key after its next append.

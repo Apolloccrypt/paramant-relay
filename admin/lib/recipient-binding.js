@@ -38,6 +38,17 @@ function buildRecipientParties(recipients) {
     if (!RECIPIENT_EMAIL_RE.test(email)) {
       return { error: 'recipient_email_required' };  // no dead-end envelopes
     }
+    // The spot the sender asked THIS party to sign at, if any. A request, never
+    // signed; shape and coordinates are the relay's to validate. Only the size
+    // is bounded here, with the same 4096-byte ceiling as a signed appearance.
+    const requested = r.requested_appearance;
+    if (requested !== undefined && requested !== null) {
+      let size = 0;
+      try { size = Buffer.byteLength(JSON.stringify(requested), 'utf8'); } catch { return { error: 'invalid_requested_appearance' }; }
+      if (size > 4096 || typeof requested !== 'object' || Array.isArray(requested)) return { error: 'invalid_requested_appearance' };
+      parties.push({ label, email, requested_appearance: requested });
+      continue;
+    }
     parties.push({ label, email });
   }
   return { parties };

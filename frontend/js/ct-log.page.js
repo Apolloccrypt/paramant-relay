@@ -116,7 +116,6 @@ function render() {
       : 'n/a';
     var leaf   = trunc(e.leaf_hash   || e.hash || '');
     var tree   = trunc(e.tree_hash   || e.merkle_root || '');
-    var device = trunc(e.device_hash || e.pubkey_hash  || '');
     var proofHtml = '';
     if (e.proof && e.proof.length) {
       proofHtml = '<div class="drow"><span class="dkey">Merkle-bewijs</span>'
@@ -128,14 +127,13 @@ function render() {
       + '<div class="idx">'+esc(String(idx))+'</div>'
       + '<div class="hash leaf">'+esc(leaf)+'</div>'
       + '<div class="hash">'+esc(tree)+'</div>'
-      + '<div class="hash">'+esc(device)+'</div>'
       + '<div class="ts">'+esc(time)+'</div>'
       + '</div>'
       + '<div class="entry-detail" id="d-'+gi+'">'
       + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+esc(e.type)+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Leaf-hash</span><span class="dval">'+esc(e.leaf_hash||'n/a')+'</span></div>'
       + '<div class="drow"><span class="dkey">Tree-hash</span><span class="dval">'+esc(e.tree_hash||'n/a')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Apparaat-hash</span><span class="dval">'+esc(e.device_hash||'n/a')+'</span></div>'
+      + (e.from_earlier_tree ? '<div class="drow"><span class="dkey">Opgeslagen tree-hash (uit een eerdere boom)</span><span class="dval">'+esc(e.stored_tree_hash||'n/a')+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+esc(String(idx))+'</span></div>'
       + '<div class="drow"><span class="dkey">Tijdstip</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : 'n/a')+'</span></div>'
       + proofHtml
@@ -159,7 +157,7 @@ function filterEntries() {
     : allEntries;
   filtered = q ? base.filter(function(e) {
     return (e.leaf_hash||'').includes(q) || (e.tree_hash||'').includes(q)
-        || (e.device_hash||'').includes(q) || String(e.index||'').includes(q);
+        || String(e.index||'').includes(q);
   }) : base;
   page = 0;
   render();
@@ -184,38 +182,71 @@ function clearVerify() {
   document.getElementById('verify-result').style.display = 'none';
 }
 
+// The verdict box. A row in the list is only what the relay sent; "verified"
+// is said only after js/ct-log-verify.js has checked the pinned key, the signed
+// tree head and the inclusion proof in this browser (see that file for why).
+var VT = {
+  key: {t: 'Sleutel van de relay is de sleutel die deze site vastzet', n: 'Geen vastgezette sleutel voor deze relay; niet gecontroleerd', f: 'Sleutel klopt niet'},
+  sth: {t: 'Ondertekende boomstand (STH) klopt onder die sleutel', n: 'Ondertekende boomstand kon niet worden opgehaald', f: 'Handtekening over de boomstand klopt niet'},
+  inclusion: {t: 'Inclusiebewijs leidt van deze vermelding naar de ondertekende wortel', n: 'Inclusiebewijs kon niet worden opgehaald', f: 'Inclusiebewijs klopt niet'},
+  consistency: {t: 'Boom is een uitbreiding van de stand die deze browser eerder zag', n: 'Geen eerdere boomstand in deze browser, dus groei niet gecontroleerd. Bij een volgend bezoek wel.', f: 'Boom is geen uitbreiding van de stand die deze browser eerder zag'}
+};
+var verifyRun = 0;
+
 function verifyHash() {
   var q = document.getElementById('verify-input').value.trim().toLowerCase();
   var el = document.getElementById('verify-result');
   if (!q || q.length < 8) { el.style.display='none'; return; }
 
   var match = allEntries.find(function(e) {
-    return (e.leaf_hash||'').startsWith(q) || (e.device_hash||'').startsWith(q)
-        || (e.tree_hash||'').startsWith(q);
+    return (e.leaf_hash||'').startsWith(q) || (e.tree_hash||'').startsWith(q);
   });
 
   el.style.display = 'block';
+  el.removeAttribute('data-verdict');
   if (!match) {
     el.className = 'verify-result notfound';
     el.innerHTML = '<strong>✗ Niet gevonden in het log</strong><br>'
-      + '<span style="color:#999;font-size:11px">Deze hash komt niet voor in het deel van het log dat nu is geladen. '
-      + 'Is het log onlangs opnieuw begonnen, dan zijn oudere vermeldingen mogelijk niet meer aanwezig.</span>';
+      + '<span class="verify-why">Deze hash komt niet voor in het deel van het log dat nu is geladen (de laatste duizend vermeldingen).</span>';
     return;
   }
 
-  el.className = 'verify-result found';
-  var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
-             : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
-  el.innerHTML = '<strong>✓ Geverifieerd: gevonden op index ' + esc(String(match.index)) + '</strong>'
-    + '<pre>'
-    + 'Gevonden veld : ' + esc(field) + '\n'
-    + 'Index         : ' + esc(String(match.index)) + '\n'
+  var isLeaf = (match.leaf_hash||'').startsWith(q);
+  var idx = String(match.index);
+  var details = '<pre>'
+    + 'Gevonden veld : ' + esc(isLeaf ? 'leaf_hash' : 'tree_hash') + '\n'
+    + 'Index         : ' + esc(idx) + '\n'
     + 'Leaf-hash     : ' + esc(match.leaf_hash||'n/a') + '\n'
     + 'Tree-hash     : ' + esc(match.tree_hash||'n/a') + '\n'
-    + 'Apparaat-hash : ' + esc(match.device_hash||'n/a') + '\n'
-    + 'Tijdstip      : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a') + '\n'
-    + (match.proof && match.proof.length ? 'Merkle-bewijs : ' + esc(match.proof.join(' → ')) : '')
+    + 'Tijdstip      : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a')
     + '</pre>';
+  el.className = 'verify-result listed';
+  var run = ++verifyRun;
+  if (!isLeaf) {
+    el.setAttribute('data-verdict', 'unchecked');
+    el.innerHTML = '<strong>' + esc('Gevonden in de lijst op index {i}, niet cryptografisch bevestigd'.replace('{i}', idx)) + '</strong><br><span class="verify-why">Dit is een tree-hash. Alleen een leaf-hash wordt hier tegen de ondertekende boom gecontroleerd.</span>' + details;
+    return;
+  }
+  el.innerHTML = '<strong>' + esc('Gevonden in de lijst op index {i}. Cryptografische controle loopt…'.replace('{i}', idx)) + '</strong>' + details;
+  import('/js/ct-log-verify.js?v=1').then(function(m) {
+    return m.verifyEntry({ relay: RELAY, index: match.index, leafHash: match.leaf_hash });
+  }).then(function(res) {
+    if (run !== verifyRun) return;
+    var head = res.verdict === 'verified' ? '✓ Geverifieerd: index {i} staat in de door deze relay ondertekende boom'
+      : res.verdict === 'failed' ? '✗ Controle mislukt: het antwoord van de relay klopt niet' : 'Gevonden in de lijst op index {i}, niet cryptografisch bevestigd';
+    el.className = 'verify-result ' + (res.verdict === 'verified' ? 'found' : res.verdict === 'failed' ? 'notfound' : 'listed');
+    var list = '<ul class="verify-steps">' + res.steps.map(function(s) {
+      var k = s.ok === true ? 't' : s.ok === false ? 'f' : 'n';
+      return '<li data-step="' + esc(s.id) + '" data-ok="' + k + '">' + (k === 't' ? '✓ ' : k === 'f' ? '✗ ' : '– ') + esc(VT[s.id][k]) + '</li>';
+    }).join('') + '</ul>';
+    el.innerHTML = '<strong>' + esc(head.replace('{i}', idx)) + '</strong>' + list
+      + '<span class="verify-why">Wat dit niet bewijst: dat anderen dezelfde boom zien. Er is nog geen onafhankelijke bewaarder van de boomstanden.</span>' + details;
+    el.setAttribute('data-verdict', res.verdict);
+  }).catch(function() {
+    if (run !== verifyRun) return;
+    el.innerHTML = '<strong>' + esc('Gevonden in de lijst op index {i}, niet cryptografisch bevestigd'.replace('{i}', idx)) + '</strong>' + details;
+    el.setAttribute('data-verdict', 'unchecked');
+  });
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────

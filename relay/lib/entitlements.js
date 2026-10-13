@@ -464,6 +464,10 @@ function applyProductTier(rec, product, tier, paidUntil, bundle, opts) {
       if (!own) terms.push({ tier: norm, until: u, bundle: bundle ? String(bundle) : null });
       else {
         if (own.until !== null && (u === null || u > own.until)) own.until = u;
+        // A dated write only ever lengthens, except when the caller is taking
+        // back a period that was paid for and then reversed (a chargeback on
+        // one month of several): then it sets the end it is given.
+        else if (opts && opts.shorten && u !== null && (own.until === null || u < own.until)) own.until = u;
         if (bundle !== undefined) own.bundle = bundle ? String(bundle) : null;
       }
     } else {
@@ -641,6 +645,17 @@ const PARASIGN = Object.freeze(Object.fromEntries(
   PARASIGN_TIERS.map((t) => [t, _parasignEntitlement(t)]),
 ));
 
+// Business is more than Firm (besluit 05-10-2026): while ParaSign Business
+// runs, ParaSend is at least Pro. A Business payment writes that ParaSend term
+// itself (billing-catalog BUNDLES.business); this rule is the floor under it,
+// for every account that bought or was given Business before the payment did,
+// so no Business customer is ever held to one recipient and one hour again.
+// It only ever raises, and it ends the moment the Business term ends.
+function parasendFloorUnder(parasignTier, parasendTier) {
+  if (parasignTier === 'business' && tierRank('parasend', parasendTier) < tierRank('parasend', 'pro')) return 'pro';
+  return parasendTier;
+}
+
 // getEntitlements(account) -> { parasend: <entitlement>, parasign: <entitlement> }
 //
 // `account` is any record carrying plan info. Accepted shapes, in order:
@@ -670,7 +685,7 @@ function getEntitlements(account, now) {
   const psTier = effectiveProductTier({ plan_parasend: psStored, [PRODUCT_PAID_UNTIL_FIELD.parasend]: acct[PRODUCT_PAID_UNTIL_FIELD.parasend], [PRODUCT_TERMS_FIELD.parasend]: acct[PRODUCT_TERMS_FIELD.parasend] }, 'parasend', now).tier;
   const pgTier = effectiveProductTier({ plan_parasign: pgStored, [PRODUCT_PAID_UNTIL_FIELD.parasign]: acct[PRODUCT_PAID_UNTIL_FIELD.parasign], [PRODUCT_TERMS_FIELD.parasign]: acct[PRODUCT_TERMS_FIELD.parasign] }, 'parasign', now).tier;
   return {
-    parasend: PARASEND[psTier],
+    parasend: PARASEND[parasendFloorUnder(pgTier, psTier)],
     parasign: PARASIGN[pgTier],
   };
 }
@@ -782,6 +797,7 @@ module.exports = {
   PARASIGN_TIERS,
   ENTERPRISE_MONTHLY_CEILING,
   derivePlanParasend,
+  parasendFloorUnder,
   derivePlanParasign,
   normaliseParasendTier,
   normaliseParasignTier,
@@ -800,6 +816,7 @@ module.exports = {
   currentTermOf,
   finalTermOf,
   termRelation,
+  tierRank,
   termRelationOf,
   getEntitlements,
   mergeAccountRecord,
