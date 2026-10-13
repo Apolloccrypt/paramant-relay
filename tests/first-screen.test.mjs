@@ -174,7 +174,7 @@ const PAGES = [
       // 13 October 2026 (Mick: "te letterlijk, typisch ai"): the yellow badge
       // and the sentence explaining the demo are gone; the title is one plain
       // line with one line under it, and the price and the account sit small.
-      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Voor wat niet zomaar per mail kan' },
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Dossiers veilig versturen en contracten laten tekenen' },
       { name: 'what the code does, in one line', css: '[data-home="out"] .wp-demo-top p.hero-line', text: 'versleuteld' },
       { name: 'the account and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'gratis account', also: ['Voor uw kantoor: 29 euro per maand'] },
       { name: 'the primary action, Account maken', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/signup', text: 'Account maken' },
@@ -186,7 +186,7 @@ const PAGES = [
   {
     slug: '/en',
     claims: [
-      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: "For what shouldn't just go by email" },
+      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Send case files safely and get contracts signed' },
       { name: 'what the code does, in one line', css: '[data-home="out"] .wp-demo-top p.hero-line', text: 'encrypted' },
       // The split the whole homepage argues from. It has to be readable as a
       // split, so both halves are checked in one line: free tier named, paid

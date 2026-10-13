@@ -3659,7 +3659,7 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   // 13 October 2026, Mick on the iPhone: "Text en voorbeeld is te letterlijk,
   // typisch ai". The feature list in the title became one plain line, and the
   // free plan's name left the hero; the price sits small under the buttons.
-  assert.match(homeOut, /<div class="wp-demo wp-demo-top"[\s\S]*?<h1 id="home-h1">Voor wat niet zomaar per mail kan\.<\/h1>/,
+  assert.match(homeOut, /<div class="wp-demo wp-demo-top"[\s\S]*?<h1 id="home-h1">Dossiers veilig versturen en contracten laten tekenen\.<\/h1>/,
     'index: the title line sits inside the demo dashboard');
   assert.match(homeOut, /^<div class="home-state" data-home="out">\s*(?:<!--[\s\S]*?-->\s*)?<div class="wp-demo wp-demo-top"/,
     'index: the demo dashboard is the first thing signed out, with no hero above it');

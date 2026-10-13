@@ -235,3 +235,22 @@ test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versture
     for (const b of ends) assert.match(strip(b), stage, `${slug}: de dialoog zegt niet dat versturen een account vraagt`);
   }
 });
+
+// Review op #588, 13-10-2026: de voorbeeldrijen op de home toonden "gisteren
+// 16:42", een vorm die /dashboard nooit toont. Een document toont
+// paramantDate.day ("12 oktober 2026"), een verzending paramantDate.localMoment
+// ("13 oktober 2026 om 09:12 (CEST)"), zie js/dashboard.js en js/format-date.js.
+test('HOME-DATUM: de voorbeeldrijen op de home gebruiken de datumnotatie van het dashboard', () => {
+  const cases = [
+    ['index', 'Gemaakt', 'Verstuurd', '[a-z]+', 'om'],
+    ['en/index', 'Created', 'Sent', '[A-Z][a-z]+', 'at'],
+  ];
+  for (const [slug, made, sent, month, at] of cases) {
+    const html = pg(slug);
+    const docs = [...html.matchAll(/<span class="dh-document-name"><strong>[^<]+<\/strong><span>([^<]+)<\/span>/g)].map((m) => m[1]);
+    const sends = [...html.matchAll(/<span class="dh-send-name"><strong>[^<]+<\/strong><span>([^<]+)<\/span>/g)].map((m) => m[1]);
+    assert.ok(docs.length >= 1 && sends.length >= 1, `${slug}: geen voorbeeldrijen gevonden`);
+    for (const d of docs) assert.match(d, new RegExp(`^${made} \\d{1,2} ${month} \\d{4}$`), `${slug}: "${d}" is niet de dagnotatie van het dashboard`);
+    for (const d of sends) assert.match(d, new RegExp(`^${sent} \\d{1,2} ${month} \\d{4} ${at} \\d{2}:\\d{2} \\([A-Z]+\\)$`), `${slug}: "${d}" is niet de tijdnotatie van het dashboard`);
+  }
+});
