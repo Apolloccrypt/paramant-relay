@@ -149,6 +149,25 @@ const guard = {};
   await ctx.close();
 }
 
+// ── The sign-in itself: a next with a tab in it. The URL parser drops tabs
+// and newlines, so /<tab>/evil.example passed the old "one leading slash"
+// check and landed on //evil.example after a good sign-in (review PR 586).
+const tabNext = {};
+{
+  const { ctx, page } = await stranger();
+  await page.route('**/api/user/login', (r) => json(r, 200, { ok: true }));
+  await page.route('http://evil.example/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: 'evil' }));
+  await page.route('**/dashboard', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: 'dashboard' }));
+  await page.goto(`${ORIGIN}/auth/login?next=${encodeURIComponent('/\t/evil.example/x')}`, { waitUntil: 'load' });
+  tabNext.signupLinks = await page.evaluate(() => [...document.querySelectorAll('a')].map((a) => a.getAttribute('href')).filter((h) => /^\/signup/.test(h || '')));
+  await page.locator('#email').fill('demo@example.com');
+  await page.locator('#show-code-btn').click();
+  await page.locator('#totp').fill('123456');
+  await Promise.all([page.waitForURL((u) => !u.pathname.startsWith('/auth/login'), { timeout: 10000 }).catch(() => {}), page.locator('#submit-btn').click()]);
+  tabNext.landed = page.url();
+  await ctx.close();
+}
+
 test('1: uitgelogd op /pricing leidt Kies Firm naar een gratis account, met het plan in de weg terug', () => {
   assert.equal(nl.afterBuy, '/signup?next=' + encodeURIComponent('/pricing?koop=firm.firm.monthly'));
   assert.match(nl.note, /Eerst maakt u een gratis account\. Daarna rekent u af/);
@@ -183,6 +202,12 @@ test('2: alleen een pad op deze site wordt bewaard, nooit een open redirect', ()
   assert.equal(guard.noteShown, false);
   assert.equal(guard.stored, null);
   assert.deepEqual(guard.unit, [null, null, null, null, null, '/pricing?koop=firm.firm.monthly', '/sign?herstel=1']);
+});
+
+test('2: een next met een tab of newline is geen pad op deze site, ook niet bij het inloggen', () => {
+  for (const h of tabNext.signupLinks) assert.doesNotMatch(h, /evil/, 'de onveilige next gaat niet mee naar Account maken');
+  assert.equal(new URL(tabNext.landed).host, new URL(ORIGIN).host, 'na het inloggen op deze site, niet op ' + tabNext.landed);
+  assert.equal(new URL(tabNext.landed).pathname, '/dashboard');
 });
 
 test('5: na verzenden staat alleen de actuele stap op het scherm', () => {

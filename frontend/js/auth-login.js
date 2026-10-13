@@ -24,8 +24,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   }
   // Honour both the nginx gate's ?next= and legacy ?return= links. Local paths
   // only (leading single slash, no // or /\) so it can't become an open redirect.
+  // No whitespace, control character or backslash anywhere either: the URL
+  // parser drops a tab or newline, so ?next=/%09/evil.example became
+  // //evil.example after the sign-in (review PR 586, 13-10-2026).
   const _rv = params.get('next') || params.get('return') || nlEn('/dashboard', '/en/dashboard');
-  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
+  const returnUrl = /^\/(?![\/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(_rv) ? _rv : nlEn('/dashboard', '/en/dashboard');
   const hasNext = returnUrl === _rv && !!(params.get('next') || params.get('return'));
 
   // No account yet: "Account maken" on this page keeps the way back
