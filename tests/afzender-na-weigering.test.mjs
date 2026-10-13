@@ -36,7 +36,7 @@ after(async () => { await browser.close(); server.close(); });
 const ENV_ID = 'env_declined_owner_view_0001';
 const envelope = {
   id: ENV_ID, doc_hash: 'ab'.repeat(32), original_filename: 'huurcontract.pdf', status: 'void', void_reason: 'declined',
-  binding_mode: 'email', recipe_version: 5, created_at: '2026-10-01T10:00:00Z', expires_at: '2026-10-31T10:00:00Z',
+  binding_mode: 'email', recipe_version: 5, created_at: '2026-10-01T10:00:00Z', expires_at: new Date(Date.now() + 18 * 864e5).toISOString(),
   voided_at: '2026-10-02T09:00:00Z', party_count: 2, signed_count: 0,
   parties: [
     { index: 0, label: 'Pieter Partner', status: 'declined', signed_at: null, declined_at: '2026-10-02T09:00:00Z' },

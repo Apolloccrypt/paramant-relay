@@ -51,7 +51,7 @@ export async function stubSign(page, overrides = {}) {
   await page.route('**/api/user/envelopes', async (route) => {
     const b = route.request().postDataJSON();
     const n = (b.recipients || []).length + 1;
-    await j(route, { ok: true, envelope: { id: ENV_ID, party_count: n, binding_mode: 'email', expires_at: '2026-10-20T12:00:00.000Z',
+    await j(route, { ok: true, envelope: { id: ENV_ID, party_count: n, binding_mode: 'email', expires_at: new Date(Date.now() + 7 * 864e5).toISOString(),
       party_links: Array.from({ length: n }, (_, party_index) => ({ party_index, sign_path: `/co-sign?env=${ENV_ID}&p=${party_index}&t=${TOKEN}`, invite_token: TOKEN })) } });
   });
   await page.route('**/api/user/sign/activation', (r) => overrides.activation ? overrides.activation(r, j) : j(r, { activation_id: 'act_demo_0001', email_hash: 'b'.repeat(64), recipe_version: 4 }));

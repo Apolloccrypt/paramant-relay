@@ -59,7 +59,7 @@ async function soloSign({ noWebAuthn, passkeys, download }) {
   await page.route('**/api/user/account/webauthn/credentials', (r) => json(r, 200, { passkeys: passkeys || [], total: (passkeys || []).length }));
   await page.route('**/api/user/account/signing-key/step-up/options', (r) => json(r, 409, { error: 'no_passkey' }));
   await page.route('**/api/user/account/signing-key', (r) => r.request().method() === 'POST' ? json(r, 200, { ok: true, totp_algorithm: 'sha256' }) : json(r, 200, { keys: [] }));
-  await page.route('**/api/user/envelopes', (r) => json(r, 200, { ok: true, envelope: { id: 'env_demo_sleutelpadenxyz', party_count: 2, expires_at: '2026-11-01T00:00:00.000Z',
+  await page.route('**/api/user/envelopes', (r) => json(r, 200, { ok: true, envelope: { id: 'env_demo_sleutelpadenxyz', party_count: 2, expires_at: new Date(Date.now() + 29 * 864e5).toISOString(),
     party_links: [0, 1].map((i) => ({ party_index: i, sign_path: '/co-sign?env=env_demo_sleutelpadenxyz&p=' + i + '&t=GEHEIMTOKEN' + i, invite_token: 'GEHEIMTOKEN' + i })) } }));
   await page.route('**/api/user/sign/activation', (r) => json(r, 200, { activation_id: 'act_demo_0001', email_hash: 'b'.repeat(64), recipe_version: 4 }));
   await page.route('**/api/user/sign/submit', (r) => json(r, 200, { ok: true, signed_count: 1, party_count: 1, status: 'complete' }));
@@ -168,7 +168,7 @@ test('/co-sign noemt een niet-gekoppelde sleutel bij naam en biedt opnieuw koppe
   await page.route('https://health.paramant.app/v2/envelopes/**', (route) => {
     if (new URL(route.request().url()).pathname.endsWith('/view')) return json(route, 200, { ok: true });
     return json(route, 200, { envelope: { id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'o.pdf', recipe_version: 5,
-      created_at: '2026-10-04T12:00:00.000Z', expires_at: '2026-11-03T12:00:00.000Z', status: 'sent', signed_count: 0, party_count: 1,
+      created_at: '2026-10-04T12:00:00.000Z', expires_at: new Date(Date.now() + 29 * 864e5).toISOString(), status: 'sent', signed_count: 0, party_count: 1,
       parties: [{ index: 0, label: 'Pieter', status: 'pending' }] } });
   });
   await page.route(`**/api/user/envelopes/${ENV_ID}/document*`, (r) => r.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(fixture.capsule) }));
