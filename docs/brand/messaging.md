@@ -215,8 +215,12 @@ Two limits belong beside the proofs, not in small print. Both already ship.
 From /about, word for word, and it does not change:
 
 > A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65
-> cryptographic attestation produced in your browser. It is not a notarised
-> legal signature under eIDAS or any qualified-trust regime (QES).
+> cryptographic attestation produced in your browser. It is not a qualified
+> signature (QES) under eIDAS.
+
+(13 October 2026: the sentence used to say "notarised legal signature". A
+qualified signature is not a notarial deed, so the level is now named by its
+own eIDAS name.)
 
 From the /pricing FAQ:
 
