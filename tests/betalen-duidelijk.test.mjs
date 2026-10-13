@@ -188,16 +188,18 @@ for (const [lang, prefix] of [['nl', ''], ['en', '/en']]) {
 }
 
 // ── row 6: the English buyer stays English through the whole checkout ───────
-for (const [lang, from, login] of [['en', '/en/pricing', '/en/auth/login'], ['nl', '/pricing', '/auth/login']]) {
+// Since 13-10-2026 signed out goes to the free account, not the sign-in: a
+// stranger has no account yet. The way back names the chosen plan.
+for (const [lang, from, login] of [['en', '/en/pricing', '/en/signup'], ['nl', '/pricing', '/signup']]) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   await page.route('**/api/**', (route) => json(route, {}));
   await page.route('**/api/user/app/token', (route) => json(route, { error: 'unauthorized' }, 401));
   await page.goto(ORIGIN + from, { waitUntil: 'domcontentloaded' });
   await page.click('a[data-billing-product="firm"][data-billing-interval="monthly"] >> nth=0');
-  await page.waitForURL((u) => u.pathname.includes('/auth/login'), { timeout: 10000 }).catch(() => {});
+  await page.waitForURL((u) => u.pathname.includes('/signup'), { timeout: 10000 }).catch(() => {});
   const u = new URL(page.url());
-  ok(`${lang} pricing, signed out: the sign-in page in the same language`, u.pathname === login, page.url());
-  ok(`${lang} pricing, signed out: and straight back to the same pricing page`, u.searchParams.get('next') === from, page.url());
+  ok(`${lang} pricing, signed out: the signup page in the same language`, u.pathname === login, page.url());
+  ok(`${lang} pricing, signed out: and back to the same pricing page with the plan`, u.searchParams.get('next') === from + '?koop=firm.firm.monthly', page.url());
   await page.close();
 
   // Signed in: the checkout tells the relay which dashboard to come back to.

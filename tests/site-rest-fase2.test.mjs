@@ -182,3 +182,55 @@ test('SITE-49-A: every numbered block comment in site-claims.test.mjs is its reg
     assert.equal(Number(heads[heads.length - 1][1]), Number(n), `"${title}" sits under block ${heads[heads.length - 1][1]}, register row ${n}`);
   }
 });
+
+// Test met een vreemde, 13-10-2026 (prod bb9b7192): /en/send, /login en
+// /en/login waren 404, en /send serveerde ingelogd /send.html, dat niet
+// bestaat. Elk kort adres wijst nu naar de echte pagina, in beide confs die
+// deploy/deploy-3.1.sh kent, en de pagina waar het naar wijst bestaat.
+test('VREEMDE-06: /send, /en/send, /login en /en/login leiden naar een echte pagina', () => {
+  const want = { '/send': '/parashare', '/en/send': '/en/parashare', '/login': '/auth/login', '/en/login': '/en/auth/login' };
+  for (const conf of ['deploy/nginx-paramant-live.conf', 'deploy/nginx-paramant-public.conf']) {
+    const txt = rd(conf).replace(/#.*$/gm, '');
+    for (const [from, to] of Object.entries(want)) {
+      const esc = from.replace(/\//g, '\\/');
+      const m = new RegExp(`location = ${esc}\\s*\\{([^}]*)\\}`).exec(txt);
+      assert.ok(m, `${conf}: geen location voor ${from}`);
+      assert.match(m[1], new RegExp(`return 302 https://\\$host${to.replace(/\//g, '\\/')}\\$is_args\\$args;`), `${conf}: ${from} wijst niet naar ${to}`);
+      assert.ok(exists(`frontend${to}.html`), `${to} bestaat niet als pagina`);
+    }
+    assert.doesNotMatch(txt, /try_files \/send\.html/, `${conf}: /send serveert nog een bestand dat niet bestaat`);
+  }
+});
+
+// Test met een vreemde, 13-10-2026: de stap Ontvangers zei twee keer bijna
+// hetzelfde ("Voeg iedereen toe die moet tekenen" boven de lijst, "Voeg de
+// mensen toe die dit document moeten tekenen" in de lege lijst). Eén zin zegt
+// wie erbij hoort; de lege lijst zegt alleen hoe u hem vult.
+test('VREEMDE-09: de stap Ontvangers zegt maar een keer wie u toevoegt', () => {
+  const flow = rd('frontend/sign-flow.js');
+  for (const zin of [/Voeg de mensen toe die dit document/, /Add the people who need to sign this document/]) {
+    assert.doesNotMatch(flow, zin, 'de lege lijst herhaalt de zin boven de lijst');
+  }
+  assert.match(flow, /Voeg iedereen toe die moet tekenen\./);
+  assert.match(flow, /Nog niemand toegevoegd\. Klik op <strong>\+ Ontvanger toevoegen<\/strong>\./);
+});
+
+// Test met een vreemde, 13-10-2026: "Probeer het zelf" op de home gaat naar
+// /sign?mode=invite, waar u alles klaarzet en pas bij versturen hoort dat dat
+// een account vraagt. Elke plek met die knop zegt het nu vooraf, en de
+// dialoog zei "voor het tekenen", terwijl een uitnodiging verstuurd wordt.
+test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versturen een gratis account vraagt', () => {
+  const cases = [
+    ['index', '/sign?mode=invite', /versturen doet u met een gratis account/, /Voor het versturen maakt u een gratis account/],
+    ['en/index', '/en/sign?mode=invite', /sending needs a free one/, /To send it, you create a free one/],
+  ];
+  for (const [slug, href, hero, stage] of cases) {
+    const html = pg(slug);
+    const head = /<header class="wp-demo-hero">([\s\S]*?)<\/header>/.exec(html);
+    assert.ok(head && head[1].includes(`href="${href}"`), `${slug}: de knop in de kop wijst niet meer naar ${href}`);
+    assert.match(strip(head[1]), hero, `${slug}: de kop belooft proberen zonder te zeggen dat versturen een account vraagt`);
+    const ends = [...html.matchAll(/<div class="wp-end">([\s\S]*?)<\/div>/g)].map((m) => m[1]).filter((b) => b.includes(`href="${href}"`));
+    assert.ok(ends.length >= 1, `${slug}: geen dialoog met ${href}`);
+    for (const b of ends) assert.match(strip(b), stage, `${slug}: de dialoog zegt niet dat versturen een account vraagt`);
+  }
+});

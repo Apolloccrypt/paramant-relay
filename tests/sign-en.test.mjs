@@ -108,6 +108,11 @@ ok('the send button asks for the session, in English',
 ok('the default subject is the English one',
   await out.locator('#ds-invite-subject').inputValue() === 'Signature requested',
   await out.locator('#ds-invite-subject').inputValue());
+// A request needs someone to go to: the button checks that before the sign-in
+// (test with a stranger, 13-10-2026), so fill one person in first.
+await out.locator('#ds-add-recipient').click();
+await out.locator('[data-field="label"]').nth(0).fill('Signer Demo');
+await out.locator('[data-field="email"]').nth(0).fill('demo@example.com');
 await out.locator('#ds-recipients-continue').click();
 await out.waitForURL(/\/auth\/login/, { timeout: 15000 }).catch(() => {});
 ok('pressing it comes back to the English page', /\/auth\/login\?next=(\/|%2F)en(\/|%2F)sign(%3Fherstel%3D1)?$/.test(out.url()), out.url());

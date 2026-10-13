@@ -85,7 +85,7 @@ async function openCosign({ bytes, fragment = 'auto', account = 200, envelope = 
     if (url.pathname.endsWith('/view')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ envelope: {
       id: ENV_ID, doc_hash: fx.docHash, original_filename: 'contract.pdf', recipe_version: 5,
-      created_at: '2026-10-04T12:00:00.000Z', expires_at: '2026-11-03T12:00:00.000Z', sign_expires_at: '2026-10-11T12:00:00.000Z',
+      created_at: new Date(Date.now() - 864e5).toISOString(), expires_at: new Date(Date.now() + 29 * 864e5).toISOString(), sign_expires_at: new Date(Date.now() + 6 * 864e5).toISOString(),
       status: 'sent', signed_count: 1, party_count: 2,
       parties: [{ index: 0, label: 'Afzender Zelf (you)', status: 'signed' }, { index: 1, label: 'Ayşe Yılmaz', status: 'pending' }],
       ...envelope,
