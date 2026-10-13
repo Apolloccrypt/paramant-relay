@@ -455,7 +455,6 @@ function verifyV3Client(docHashHex) {
   // this is not the signed file" in red instead of "forged".
   let sigOk = false;
   const checks = [];
-  if (docHashHex && signedHash && !docMismatch) checks.push({ key: 'match', tech: DOC_HASH.name });
   if (errors.length === 0 || (docMismatch && errors.length === 1)) {
     try {
       const msg = buildDocSignMessage(
@@ -470,6 +469,9 @@ function verifyV3Client(docHashHex) {
       const ok = ml_dsa65.verify(fromB64(env.signer_public_key), msg, fromB64(env.signature || ''));
       if (!ok) errors.push(t('signerInvalid')); else {
         sigOk = true;
+        // "The signed document" only once a signature is known to hold: a hash
+        // that matches a forged proof is not a signed document.
+        if (docHashHex && signedHash && !docMismatch) checks.push({ key: 'match', tech: DOC_HASH.name });
         checks.push({ key: 'sigOk', tech: dsaName(env.signer_public_key, env.signature) });
       }
     } catch { errors.push(t('signerError')); }
@@ -497,7 +499,6 @@ function verifyMultiClient(docHashHex) {
   const parties = Array.isArray(env.parties) ? env.parties : [];
   if (!parties.length) errors.push(t('missingParties'));
   const checks = [];
-  if (env.document_hash && !docMismatch) checks.push({ key: 'match', tech: DOC_HASH.name });
   let partiesOk = 0;
   const partyNames = new Set();
   parties.forEach((party, pos) => {
@@ -522,6 +523,9 @@ function verifyMultiClient(docHashHex) {
   // Every party verified, and the row names the set only when they all used one.
   if (parties.length && partiesOk === parties.length) {
     const one = partyNames.size === 1 ? [...partyNames][0] : null;
+    // Same rule as v3: the file is "the signed document" only when every
+    // signature on it held.
+    if (env.document_hash && !docMismatch) checks.push({ key: 'match', tech: DOC_HASH.name });
     checks.push(parties.length === 1 ? { key: 'sigOk', tech: one } : { key: 'sigsOk', tech: one, n: parties.length });
   }
   // The notary counter-signature is checked against a relay key this site

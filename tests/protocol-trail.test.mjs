@@ -438,4 +438,40 @@ test('/verify: another file has no match row; a broken signature has no signatur
   const sig = Buffer.from(proof.psign.signature, 'base64'); sig[10] ^= 0xff;
   const broken = await check('', { file: proof.source, psign: { ...proof.psign, signature: sig.toString('base64') } });
   assert.equal(row(broken, 'sigOk'), undefined, JSON.stringify(broken));
+  // The file still hashes to what the forged proof says, but nothing signed it:
+  // no "this is the signed document" under a red verdict.
+  assert.equal(row(broken, 'match'), undefined, JSON.stringify(broken));
+});
+
+// ── The relay side of the log row: ct_index comes from the append itself ──
+// The /sign row "logboek #n" is only as true as the number the relay hands
+// back. EnvelopeStore.sign returns the index of the envelope_sign entry it
+// just wrote, and nothing when no entry was written (idempotent retry, or an
+// append that failed). Real store, stubbed redis: only the Lua outcome is fed.
+test('relay: ct_index is the leaf of this signature, and absent when nothing was appended', async () => {
+  const { default: envMod } = await import('../relay/envelope.js');
+  const { EnvelopeStore } = envMod;
+  const hash = { doc_hash: 'ab'.repeat(32), party_count: '1', status: 'pending', binding_mode: 'open',
+    recipe_version: '5', p0_invite_token: 'tok_demo_protocol_trail_0000', created_at: new Date().toISOString() };
+  const store = (outcome, ctAppend) => new EnvelopeStore({
+    isReady: true,
+    hGetAll: async () => ({ ...hash }),
+    scriptLoad: async () => 'sha',
+    evalSha: async () => [outcome, '1', '1', 'complete'],
+    zRem: async () => 0,
+  }, { sigVerify: () => true, ctAppend });
+  const args = ['env_demo', 0, Buffer.alloc(1952, 1).toString('base64'), Buffer.alloc(3309, 2).toString('base64'),
+    { inviteToken: hash.p0_invite_token, appearance: { version: 1, fields: [] } }];
+  const seen = [];
+  const fresh = await store('new', (kind) => { seen.push(kind); return { index: seen.length === 1 ? 41 : 42 }; }).sign(...args);
+  assert.equal(fresh.ok, true, JSON.stringify(fresh));
+  assert.equal(fresh.ct_index, 41, 'the index of the envelope_sign entry, not of envelope_complete');
+  assert.deepEqual(seen, ['envelope_sign', 'envelope_complete']);
+  const idem = await store('idem', () => ({ index: 99 })).sign(...args);
+  assert.equal('ct_index' in idem, false, 'a retry appended nothing, so it names no leaf');
+  const failed = await store('new', () => { throw new Error('ct down'); }).sign(...args);
+  assert.equal(failed.ok, true);
+  assert.equal('ct_index' in failed, false, 'a failed append names no leaf');
+  const none = await store('new', () => null).sign(...args);
+  assert.equal('ct_index' in none, false, 'no entry written, no leaf named');
 });
