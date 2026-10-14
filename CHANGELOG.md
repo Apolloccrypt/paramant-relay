@@ -9,6 +9,43 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.4] - unreleased
+
+Tagged `v3.1.4` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+`v3.1.3` stays where it is; a published tag is not moved.
+
+### Added
+- While sending, receiving, signing and verifying, a short list under the
+  progress shows each step with the protocol that did the work (TLS, AES-256-GCM,
+  ML-KEM-768 with P-256, ML-DSA, the log index). Every name is measured during
+  the run; what cannot be measured gets no name. Caddy sets `X-Paramant-Tls`
+  per request (PR #590).
+- A footer link to paramantis.nl for advice and measurements, NL and EN
+  (PR #537).
+
+### Changed
+- A visitor without an account gets from pricing, sign-up and `/sign` to the
+  end on their own: a buy button leads to a free account and back to the chosen
+  plan, `/signup` passes `next` on (only a path on this site), a `/sign` draft
+  comes back after signing in, recipients are checked before sign-in, and
+  `/send`, `/en/send`, `/login` and `/en/login` redirect to the real page
+  (PR #586).
+- The home page heading, example and questions are rewritten in plain language
+  (PR #588).
+- The about page reads as a story, NL and EN (PR #589).
+- The level a signature does not reach is called a qualified electronic
+  signature (QES) under eIDAS, not a notarial signature (PR #592).
+- Admin and relay images on node:24-alpine3.24 digest `ebfe2f9`, in lockstep;
+  three docker actions in CI updated (PR #538, #587).
+
+### Fixed
+- The post-deploy smoke test fails on any server error, not only on the one
+  status code it listed, and checks the admin store behind the captcha
+  (PR #471).
+- Tests: expiry dates in fixtures are relative to now, and timing flakes in
+  `/sign`, sends and the 320px menu are gone (PR #581, #582, #587).
+
 ## [3.1.3] - 2026-10-07
 
 Tagged `v3.1.3` on the merge commit before the frontend rollout
