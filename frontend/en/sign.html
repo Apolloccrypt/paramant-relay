@@ -52,6 +52,43 @@
 .ds-headlink{margin:14px 0 0;font-size:13px}
 .ds-headlink a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .ds-anon-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 0}
+/* Function first (15-10): the page opens on the tool, not on a brochure.
+   What and why sit in small tips that open in place, one sentence each. */
+.ds-head{margin-bottom:22px}
+.ds-title{font-size:clamp(26px,4vw,38px);margin-bottom:8px}
+.ds-lede{font-size:15px;line-height:1.55}
+.ds-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0 0;padding:0;list-style:none}
+.ds-chips>li{margin:0}
+.ds-head .ds-facts{margin:0;display:contents}
+.ds-head .ds-facts li{display:inline-block!important}
+.ds-head .ds-facts li,.ds-tip>summary{font-family:inherit;font-size:12.5px;letter-spacing:0;line-height:1.3;color:var(--ink-2);border:1px solid var(--line-2);border-radius:999px;background:var(--surface);padding:7px 12px;min-height:32px;display:inline-flex;align-items:center;gap:6px}
+.ds-head .ds-facts li b{text-transform:none;letter-spacing:0;font-weight:600}
+.ds-tip{position:relative;display:inline-block}
+.ds-tip>summary{list-style:none;cursor:pointer;user-select:none}
+.ds-tip>summary::-webkit-details-marker{display:none}
+.ds-tip>summary::before{content:"i";display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;border:1px solid currentColor;font-size:10px;font-weight:700;font-style:italic;font-family:Georgia,serif;opacity:.8}
+.ds-tip>summary:hover,.ds-tip[open]>summary{border-color:var(--accent);color:var(--ink-1)}
+.ds-tip>summary:focus-visible{outline:none;box-shadow:var(--ring)}
+.ds-tip-body{position:absolute;z-index:30;top:calc(100% + 10px);left:0;width:max-content;max-width:min(320px,calc(100vw - 32px));margin:0;padding:12px 14px;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);color:var(--ink-2);font-size:13px;line-height:1.55;box-shadow:0 12px 32px rgba(0,0,0,.28);animation:ds-tip-in .16s ease-out}
+.ds-tip-body::before{content:"";position:absolute;top:-6px;left:18px;width:10px;height:10px;background:inherit;border-left:1px solid var(--line-2);border-top:1px solid var(--line-2);transform:rotate(45deg)}
+.ds-tip-body a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.ds-step .ds-tip-body.ds-sub{margin:0;max-width:min(320px,calc(100vw - 32px));font-size:13px}
+@keyframes ds-tip-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.ds-tip-body{animation:none}}
+@media(pointer:coarse){.ds-tip>summary{min-height:var(--tap)}.ds-headlink a{display:inline-flex;align-items:center;min-height:var(--tap)}}
+.ds-headlink{margin:0;font-size:12.5px}
+.ds-step .ds-dropzone{border:1.5px dashed var(--line-2);border-radius:18px;padding:36px 20px}
+.ds-step .ds-dropzone:hover,.ds-step .ds-dropzone.drag{border-color:var(--accent)}
+.ds-drop-icon{display:inline-grid;place-items:center;width:52px;height:52px;margin:0 auto 12px;border-radius:50%;background:var(--accent-soft);color:var(--accent)}
+.ds-drop-icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ds-step .ds-dropzone p.small{font-family:inherit;font-size:13px;letter-spacing:0}
+.ds-step .ds-dropzone p.big{font-size:17px}
+.ds-doc-tips{margin-top:12px}
+.ds-signedout{border-left-width:1px;border-radius:14px;margin:20px 0}
+.ds-signedout-actions .btn{border-radius:999px}
+.ds-anon{margin-top:4px}
+.ds-anon .ds-chips{margin:0}
+@media(max-width:640px){.ds-tip{display:block}.ds-chips>li{max-width:100%}.ds-tip-body{position:static;width:auto;max-width:none;margin-top:8px}.ds-step .ds-tip-body.ds-sub{max-width:none}.ds-tip-body::before{display:none}}
 .ds-service-note{margin:0 0 16px;padding:10px 14px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);font-size:13px;line-height:1.6;color:var(--ink-2)}
 /* Not signed in. This belongs to the whole flow, not to one step: #step-anon
    is a .ds-step, so setActive() hides it the second a workflow is chosen, and a
@@ -63,17 +100,19 @@
 .ds-signedout-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0}
 .ds-signedout-actions .btn{font-size:13px;padding:8px 14px}
 /* The hero is the pitch for a visitor who has not started yet. From the step
-   after the document is chosen it is only in the way: at 390px it held the
+   where the document is chosen it is only in the way (15-10: function first;
+   before, only from the step after it): at 390px it held the
    whole uploaded PDF below the fold. sign-flow.js stamps the active step on
    <body>, so this is a CSS collapse to a single line, no script in the page. */
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head{margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-kicker,
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-lede,
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-facts,
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-headlink{display:none}
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head{margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-kicker,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-lede,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-facts,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-chips,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-headlink{display:none}
 /* After step 1 the title is a one-line reminder. On a wide font (DejaVu on
    the CI runner) it wrapped to two lines and pushed page 1 below the fold. */
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-title{font-size:15px;font-weight:600;line-height:1.4;letter-spacing:0;margin:0;max-width:none;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-title{font-size:15px;font-weight:600;line-height:1.4;letter-spacing:0;margin:0;max-width:none;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* On a phone the document itself comes into view on the Place step: the
    explanations that repeat the hint go, and sign-flow.js scrolls the step to
    the top. Measured on an iPhone 13 (hertest r2 T5-12c): only the top 36 px of
@@ -598,20 +637,13 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <main id="main-content" role="main">
 <div class="ds-wrap">
   <header class="ds-head">
-    <p class="ds-kicker">ParaSign · secure document workflow</p>
     <h1 class="ds-title">Get an important document signed.</h1>
-    <p class="ds-lede">Sign it yourself, sign together or send it to others. Every signature comes with proof anyone can check.</p>
-    <ul class="ds-facts">
-      <li id="ds-plan-fact"><b>Free forever</b> &middot; 2 signatures a month, no card</li>
+    <p class="ds-lede">Yourself, together or by others. With proof anyone can check.</p>
+    <ul class="ds-chips">
+      <li><ul class="ds-facts"><li id="ds-plan-fact"><b>Free forever</b> &middot; 2 signatures a month, no card</li></ul></li>
+      <li><details class="ds-tip"><summary>Why is this safe?</summary><p class="ds-tip-body">Your signing key is made on your device and never reaches our servers. The servers are in Germany, under EU law.</p></details></li>
+      <li class="ds-headlink"><a href="/en/parasign">About ParaSign and pricing &rarr;</a></li>
     </ul>
-    <details class="wp-fold ds-facts-fold">
-      <summary>Why your document stays safe</summary>
-      <ul class="ds-facts wp-fold-body">
-      <li><b>Your signing key stays here</b> &middot; it is made on your device and never reaches our servers</li>
-      <li><b>EU jurisdiction</b> &middot; servers in Germany, under EU law</li>
-      </ul>
-    </details>
-    <p class="ds-headlink"><a href="/en/parasign">What ParaSign is, and what organisations pay &rarr;</a></p>
   </header>
 
   <!-- The session probe could not answer. NOT the same event as "you are not
@@ -620,20 +652,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        "your account is gone". One sentence, the shared one from
        js/error-message.js, so both products apologise in the same words. -->
   <p class="ds-service-note" id="ds-service-note" role="status" hidden></p>
-
-  <!-- No session, said once and said for every step. Revealed by sign-flow.js
-       only after /api/user/session/verify has answered, so it never flashes at
-       a signed-in customer, and never dismissible: the requirement does not go
-       away by being closed. Both links carry ?next=/sign, which auth-login.js
-       honours on the way back; signup still finishes through the emailed
-       verification link and does not carry it yet. -->
-  <div class="ds-signedout" id="ds-signedout" role="status" hidden>
-    <p class="ds-signedout-text">You are not signed in. You can already prepare a document. To sign or send it, you need a free Community account.</p>
-    <p class="ds-signedout-actions">
-      <a class="btn btn-secondary" href="/en/auth/login?next=/en/sign">Sign in</a>
-      <a class="btn btn-primary" href="/en/signup?next=/en/sign">Create account</a>
-    </p>
-  </div>
 
   <ol class="ds-stepper" id="ds-stepper" aria-label="Signing progress" hidden>
     <li data-step="doc" class="active">Document</li>
@@ -651,37 +669,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        what was being sent. -->
   <p class="ds-doc-meta" id="ds-doc-meta" hidden><span class="ds-doc-meta-label">File</span><span class="ds-doc-meta-name" id="ds-doc-meta-name"></span><span class="ds-doc-meta-size" id="ds-doc-meta-size"></span></p>
 
-  <!-- No session: say what this needs BEFORE a document is picked.
-       The page used to be behind an nginx auth_request, so a visitor never got
-       here at all; he got /auth/login and, measurably, stopped. Serving the page
-       and then failing at the last step with "please sign in" would only move
-       the dead end to a worse place: after he has already chosen a file. So the
-       honest version states the requirement up front, next to what the product
-       actually does. Hidden by default and revealed by sign-flow.js only when
-       /api/user/check answers 401, so a signed-in user never sees it. -->
-  <section class="ds-step ds-anon" id="step-anon" hidden>
-    <!-- The requirement is said once, in the bar above (#ds-signedout). -->
-    <h2>What you can do without an account</h2>
-    <details class="wp-fold">
-      <summary>Why an account?</summary>
-      <p class="ds-sub">
-        Your document goes nowhere. The file and your private key stay in this browser.
-        Our server only sees a fingerprint of the file. You sign with a key that belongs to
-        the passkey on your device, and that key first has to be tied to an account.
-      </p>
-    </details>
-    <p class="ds-sub">
-      Open a signing request someone sent you. You then see
-      which file it is and who has signed. The document itself only opens once you sign in with the address
-      the invitation went to. No account yet? Create a free one on that address. Then the document opens
-      and you sign. <a href="/en/verify">Checking a signed document</a> works without an account too.
-    </p>
-    <!-- No buttons here: the bar above (#ds-signedout) already carries
-         "Sign in" and "Create account" (acceptance 3.1.1, 18). -->
-    <p class="ds-sub ds-anon-foot">
-      A Community account gives you 2 signatures a month. Initials on every page do not count separately. <a href="/en/pricing">See what Firm adds</a>.
-    </p>
-  </section>
 
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
@@ -708,13 +695,49 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 1: pick document -->
   <section class="ds-step" id="step-doc" hidden>
     <h2>Pick the document you want to sign</h2>
-    <p class="ds-sub">ParaSign signs PDF files. Pick a PDF and place your signature stamp on any page. The file stays in this browser.</p>
     <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" aria-label="Pick or drop a file">
-      <p class="big">Drop a file here, or click to choose</p>
-      <p class="small">Stays in your browser. Nothing is uploaded yet.</p>
+      <span class="ds-drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 17v-6"/><path d="m9 14 3-3 3 3"/></svg></span>
+      <p class="big">Choose a PDF</p>
+      <p class="small">or drop it here. Nothing is uploaded yet.</p>
       <input type="file" id="ds-doc-input" accept="application/pdf,.pdf" hidden>
     </div>
     <p class="ds-doc-error" id="ds-doc-error" role="alert" hidden></p>
+    <div class="ds-doc-tips"><details class="ds-tip"><summary>PDF only, stays in your browser</summary><p class="ds-sub ds-tip-body">ParaSign signs PDF files. Pick a PDF and place your signature stamp on any page. The file stays in this browser.</p></details></div>
+  </section>
+  <!-- Under the tool on the first two screens, above it on the later ones:
+       function first, and still said on every step.
+       No session, said once and said for every step. Revealed by sign-flow.js
+       only after /api/user/session/verify has answered, so it never flashes at
+       a signed-in customer, and never dismissible: the requirement does not go
+       away by being closed. Both links carry ?next=/sign, which auth-login.js
+       honours on the way back; signup still finishes through the emailed
+       verification link and does not carry it yet. -->
+  <div class="ds-signedout" id="ds-signedout" role="status" hidden>
+    <p class="ds-signedout-text">You are not signed in. You can already prepare a document. To sign or send it, you need a free Community account.</p>
+    <p class="ds-signedout-actions">
+      <a class="btn btn-secondary" href="/en/auth/login?next=/en/sign">Sign in</a>
+      <a class="btn btn-primary" href="/en/signup?next=/en/sign">Create account</a>
+    </p>
+  </div>
+
+  <!-- No session: say what this needs BEFORE a document is picked.
+       The page used to be behind an nginx auth_request, so a visitor never got
+       here at all; he got /auth/login and, measurably, stopped. Serving the page
+       and then failing at the last step with "please sign in" would only move
+       the dead end to a worse place: after he has already chosen a file. So the
+       honest version states the requirement up front, next to what the product
+       actually does. Hidden by default and revealed by sign-flow.js only when
+       /api/user/check answers 401, so a signed-in user never sees it. -->
+  <!-- Function first (15-10): this used to stand above the tool as a heading
+       and three paragraphs. It is now three tips that open in place, under
+       the tool, and only on the first screen (applySignedOut). -->
+  <section class="ds-step ds-anon" id="step-anon" aria-label="What works without an account" hidden>
+    <ul class="ds-chips">
+      <li><details class="ds-tip"><summary>Why an account?</summary><p class="ds-tip-body">Your document goes nowhere. The file and your private key stay in this browser. Our server only sees a fingerprint of the file. You sign with a key that belongs to the passkey on your device, and that key first has to be tied to an account.</p></details></li>
+      <li><details class="ds-tip"><summary>Received a request?</summary><p class="ds-tip-body">Without an account you can open a signing request someone sent you. You then see which file it is and who has signed. The document itself only opens once you sign in with the address the invitation went to. No account yet? Create a free one on that address.</p></details></li>
+      <li><details class="ds-tip"><summary>What counts as a signature?</summary><p class="ds-tip-body">A Community account gives you 2 signatures a month. Initials on every page do not count separately. <a href="/en/pricing">See what Firm adds</a>.</p></details></li>
+      <li class="ds-headlink"><a href="/en/verify">Check a signed document</a></li>
+    </ul>
   </section>
 
   <!-- Step 2 (PDF): place stamp -->
@@ -1087,6 +1110,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/quota-upgrade.js?v=10" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/protocol-trail.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=81"></script>
+<script type="module" src="/sign-flow.js?v=82"></script>
 </body>
 </html>
