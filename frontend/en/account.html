@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Your account · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=34">
+<link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
 <meta property="og:title" content="Your account · Paramant">
 <meta property="og:description" content="Your account · Paramant">
 <meta property="og:url" content="https://paramant.app/en/account">
@@ -33,15 +33,15 @@
 .acct-plan-band { padding: 18px 20px; margin: 0 0 20px; }
 .acct-plan-lede { margin: 0 0 10px; font-size: 15px; line-height: 1.62; }
 .acct-plan-adds { margin: 0 0 14px; font-size: 13px; line-height: 1.62; }
-.acct-plan-kicker { margin: 0 0 10px; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+.acct-plan-kicker { margin: 0 0 10px; font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
 .nav-help {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -60,13 +60,13 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -80,16 +80,16 @@
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -99,7 +99,7 @@
 main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); }
 main.acct .btn { width: auto; }
 .acct-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); }
-.acct-hero h1 { font-family: var(--sans); font-size: clamp(26px, 3.4vw, 38px); font-weight: 600; letter-spacing: -.028em; color: var(--ink-1); margin: 0; line-height: 1.08; }
+.acct-hero h1 { font-family: var(--sans); font-size: clamp(26px, 3.4vw, 38px); font-weight: 600; letter-spacing: var(--track-display); color: var(--ink-1); margin: 0; line-height: 1.08; }
 .acct-hero h1 em { font-style: normal; color: var(--accent); }
 .acct-session { font-family: var(--sans); font-size: 13px; line-height: 1.6; color: var(--ink-2); margin-top: 10px; }
 .acct-plan { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); padding: 7px 14px; border: 1px solid var(--line-2); border-radius: var(--r-pill); background: var(--surface); white-space: nowrap; }
@@ -108,8 +108,8 @@ main.acct .btn { width: auto; }
 
 .acct-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); box-shadow: var(--sh-1); padding: var(--space-5); margin-bottom: var(--space-4); }
 .acct-card.danger { border-color: var(--sig-stop-line); box-shadow: none; }
-.acct-kicker { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
-.acct-card > h2 { font-family: var(--sans); font-size: 19px; font-weight: 600; letter-spacing: -.018em; color: var(--ink-1); margin: 0 0 5px; }
+.acct-kicker { font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.acct-card > h2 { font-family: var(--sans); font-size: 19px; font-weight: 600; letter-spacing: var(--track-heading); color: var(--ink-1); margin: 0 0 5px; }
 .acct-lead { font-family: var(--sans); font-size: 14px; line-height: 1.62; color: var(--ink-2); margin: 0 0 var(--space-4); max-width: 62ch; }
 .acct-block h3 { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink-1); margin: 0 0 6px; }
 .acct-block p { font-family: var(--sans); font-size: 13px; line-height: 1.6; color: var(--ink-2); margin: 0 0 12px; }
@@ -154,7 +154,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 @media (max-width: 680px) { .acct-grid2 { grid-template-columns: 1fr; gap: var(--space-4); } main.acct { padding: var(--space-5) var(--space-3) var(--space-6); } }
 </style>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=12">
+<link rel="stylesheet" href="/app-2026.css?v=13">
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
@@ -302,7 +302,7 @@ main.acct input::placeholder { color: var(--ink-3); }
       <h3>Registered keys</h3>
       <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
-      <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:6px">
+      <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:var(--r-2)">
         <p class="small" style="margin:0 0 8px">Enter the 6-digit code from your authenticator app. That revokes this key.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="text" id="revoke-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" style="max-width:140px">
@@ -452,13 +452,13 @@ main.acct input::placeholder { color: var(--ink-3); }
          account is entitled; a free account gets 403 and sees nothing. The key
          is shown once and never stored here. -->
     <div id="parasign-api-block" hidden>
-      <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">ParaSign API keys</h3>
+      <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">ParaSign API keys</h3>
       <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">With your plan you can sign from your own software through the ParaSign API. You see a key only once, here. Lost it? Make a new one. <a href="/en/docs#parasign-api" style="color:var(--cobalt)">Read the documentation</a>.</p>
       <div id="parasign-api-list" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading&hellip;</div>
       <div class="acct-actions">
         <button id="parasign-api-new" class="btn btn-secondary btn-small">Create a key</button>
       </div>
-      <p id="parasign-api-fresh" hidden style="font-size:var(--text-sm);word-break:break-all;background:var(--surface-2);padding:var(--space-3);border-radius:6px;margin-top:var(--space-3)"></p>
+      <p id="parasign-api-fresh" hidden style="font-size:var(--text-sm);word-break:break-all;background:var(--surface-2);padding:var(--space-3);border-radius:var(--r-2);margin-top:var(--space-3)"></p>
       <p id="parasign-api-msg" role="status" hidden style="font-size:var(--text-sm);color:var(--ink-dim)"></p>
     </div>
 
@@ -467,13 +467,13 @@ main.acct input::placeholder { color: var(--ink-3); }
          Mollie confirms the money, and every refund or chargeback gets a credit
          note with its own number that refers back to it. The list is read-only
          here: a document is never edited after it is issued. -->
-    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Invoices and credit notes</h3>
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Invoices and credit notes</h3>
     <div id="billing-invoices" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading invoices&hellip;</div>
 
     <hr class="acct-divider">
     <!-- What goes in the "Billed to" block. All three optional: without them a
          document is still issued to the email address on this account. -->
-    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Company details for invoices</h3>
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Company details for invoices</h3>
     <p class="acct-note" style="font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-3)">
       Optional. What you fill in here goes on every new invoice. Invoices already issued stay as they are.
     </p>
@@ -497,7 +497,7 @@ main.acct input::placeholder { color: var(--ink-3); }
     </form>
 
     <hr class="acct-divider">
-    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Billing history</h3>
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Billing history</h3>
     <!-- Payments, credit notes, the terms that ended and any plan change, in one
          list, newest first. Derived from the documents themselves, so it can
          never disagree with them. -->

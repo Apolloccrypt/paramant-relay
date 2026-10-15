@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>API documentation and self-hosting guide | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -23,24 +23,24 @@
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/docs">
 
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=34">
+<link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
 a{color:var(--ink);text-decoration:none}
 .layout{display:flex;min-height:calc(100vh - 52px)}
 .sidebar{width:224px;flex-shrink:0;padding:28px 16px 40px;border-right:1px solid var(--ink-hair);position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
 .sidebar::-webkit-scrollbar{width:3px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{background:var(--ink-hair)}
-.sidebar h3{font-size:10px;color:var(--ink-dim);letter-spacing:.12em;text-transform:uppercase;margin:22px 0 6px;padding:6px 0 4px 10px;font-family:var(--mono);border-left:2px solid var(--ochre)}
+.sidebar h3{font-size:10px;color:var(--ink-dim);letter-spacing:var(--track-label);text-transform:uppercase;margin:22px 0 6px;padding:6px 0 4px 10px;font-family:var(--sans);border-left:2px solid var(--ochre)}
 .sidebar h3:first-child{margin-top:0}
 .sidebar a{display:block;font-size:12px;color:var(--ink-dim);padding:3px 8px 3px 10px;line-height:1.8;transition:color .12s,background .12s,border-left-color .12s;border-left:2px solid transparent}
-.sidebar a:hover{color:var(--ink);background:rgba(29, 78, 216, 0.08);border-left-color:var(--ochre)}
-.sidebar a.active{color:var(--ink);font-weight:500;background:rgba(29, 78, 216, 0.06);border-left-color:var(--ochre)}
+.sidebar a:hover{color:var(--ink);background:rgba(var(--accent-rgb), 0.08);border-left-color:var(--ochre)}
+.sidebar a.active{color:var(--ink);font-weight:500;background:rgba(var(--accent-rgb), 0.06);border-left-color:var(--ochre)}
 .content{flex:1;min-width:0;padding:52px 72px 80px;max-width:840px}
-.content h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.content h1{font-size:26px;font-weight:700;letter-spacing:var(--track-heading);margin-bottom:8px}
 .subtitle{font-size:14px;color:var(--ink-dim);margin-bottom:52px;line-height:1.8}
-.content h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin:56px 0 18px;padding-top:56px;border-top:2px solid var(--ochre)}
+.content h2{font-size:12px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink);margin:56px 0 18px;padding-top:56px;border-top:2px solid var(--ochre)}
 .content h2:first-of-type{border-top:none;padding-top:0;margin-top:0}
 .content h3{font-size:13px;font-weight:600;color:var(--ink);margin:28px 0 10px}
 .content p{font-size:13px;color:var(--ink-dim);line-height:1.85;margin-bottom:14px}
@@ -48,27 +48,27 @@ a{color:var(--ink);text-decoration:none}
 .content ul{margin:10px 0 18px 0;padding-left:0;list-style:none}
 .content ul li{font-size:13px;color:var(--ink-dim);padding:3px 0 3px 16px;position:relative}
 .content ul li::before{content:'·';position:absolute;left:4px;color:var(--ink-dim)}
-code{background:rgba(29, 78, 216, 0.14);border:none;padding:2px 7px;font-size:12px;color:var(--ink);font-family:var(--mono)}
+code{background:rgba(var(--accent-rgb), 0.14);border:none;padding:2px 7px;font-size:12px;color:var(--ink);font-family:var(--mono)}
 pre{background:var(--black-hair);border:1px solid var(--ink-hair);padding:20px 24px;margin:14px 0 22px;overflow-x:auto;font-size:12px;color:var(--ink-dim);line-height:1.9;font-family:var(--mono)}
 pre .cm{color:var(--ink-dim)}.pre .kw{color:var(--cobalt)}.pre .st{color:var(--ink-dim)}
 .cb{background:var(--black-hair);border:1px solid var(--ink-hair);overflow:hidden;margin:14px 0 22px}
 .cb-header{padding:8px 16px;border-bottom:none;background:var(--bone-2);display:flex;align-items:center;gap:6px}
 .cb-dots{display:flex;gap:5px}.cb-dot{width:7px;height:7px;background:var(--ochre)}
-.cb-lang{margin-left:auto;font-size:10px;color:var(--lime);font-family:var(--mono);letter-spacing:.08em;font-weight:600;text-transform:uppercase}
+.cb-lang{margin-left:auto;font-size:10px;color:var(--lime);font-family:var(--sans);letter-spacing:var(--track-label);font-weight:600;text-transform:uppercase}
 .cb pre{margin:0;border:none;background:transparent;padding:18px 24px}
 table{width:100%;border-collapse:collapse;margin:14px 0 26px;font-size:12px}
-th{text-align:left;font-size:10px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;padding:9px 14px;border-bottom:1px solid var(--ink-hair);font-family:var(--mono)}
+th{text-align:left;font-size:10px;color:var(--ink-dim);letter-spacing:var(--track-label);text-transform:uppercase;padding:9px 14px;border-bottom:1px solid var(--ink-hair);font-family:var(--sans)}
 td{padding:9px 14px;border-bottom:1px solid var(--ink-hair);color:var(--ink-dim);vertical-align:top;line-height:1.75}
 td:first-child{font-family:var(--mono);color:var(--ink);white-space:nowrap}
 tr:last-child td{border-bottom:none}
-.method{display:inline-block;padding:2px 8px;font-size:10px;font-weight:700;font-family:var(--mono);letter-spacing:.04em}
+.method{display:inline-block;padding:2px 8px;font-size:10px;font-weight:700;font-family:var(--mono);letter-spacing:var(--track-label)}
 .get{background:var(--ink-ghost);color:var(--ink);border:1px solid var(--ink-hair)}
 .post{background:var(--black-hair);color:var(--ink-dim);border:1px solid var(--ink-hair)}
-.badge{display:inline-block;padding:2px 8px;border:1px solid var(--ink-hair);font-size:11px;color:var(--ink-dim);margin-right:4px;font-family:var(--mono)}
+.badge{display:inline-block;padding:2px 8px;border:1px solid var(--ink-hair);font-size:11px;color:var(--ink-dim);margin-right:4px;font-family: var(--sans)}
 .callout{border:none;border-left:4px solid var(--ochre);background:var(--bone-2);padding:14px 18px;margin:16px 0 22px}
 .callout.warn{border-left-color:var(--brick);background:rgba(196, 96, 79, .12)}
 .callout p{margin:0;color:var(--ink);font-size:12.5px;line-height:1.75}
-.callout.warn p{color:var(--ink)}.callout-label{display:inline-block;background:var(--ochre);color: var(--on-ochre);padding:2px 8px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}.callout.warn .callout-label{background:var(--brick);color:var(--bone-on-navy)}
+.callout.warn p{color:var(--ink)}.callout-label{display:inline-block;background:var(--ochre);color: var(--on-ochre);padding:2px 8px;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;margin-bottom:8px}.callout.warn .callout-label{background:var(--brick);color:var(--bone-on-navy)}
 .step-row{display:flex;gap:16px;align-items:flex-start;margin:8px 0}
 .step-num{width:28px;height:28px;background:var(--ochre);border:none;font-size:13px;font-family:var(--mono);font-weight:700;color: var(--on-ochre);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .step-body{flex:1}
@@ -77,25 +77,25 @@ tr:last-child td{border-bottom:none}
 .faq-item:last-child{border-bottom:none}
 .faq-q{font-size:13px;font-weight:500;color:var(--ink);margin-bottom:8px}
 .faq-a{font-size:13px;color:var(--ink-dim);line-height:1.8}
-.sector-badge{display:inline-block;font-size:10px;font-family:var(--mono);color:var(--ink);background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:2px 7px;margin-right:6px}
+.sector-badge{display:inline-block;font-size:10px;font-family: var(--sans);color:var(--ink);background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:2px 7px;margin-right:6px}
 @media(max-width:900px){.sidebar{display:none}.content{padding:32px 24px 60px}.content table{display:block;overflow-x:auto;max-width:100%}}
 
 /* docs-hero */
 .docs-hero{background:linear-gradient(180deg,var(--card) 0%,rgba(var(--tint), 0.04) 100%);border-bottom:1px solid rgba(var(--tint), 0.08);padding:36px 24px 28px;margin-bottom:0}
 .docs-hero-inner{max-width:840px;margin:0 auto;padding:0 72px}
-.docs-hero .eyebrow{display:inline-block;background:var(--ochre);color: var(--on-ochre);padding:2px 10px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px}
-.docs-hero h1{font-size:32px;font-weight:700;color:var(--ink);margin:0 0 10px;line-height:1.15;letter-spacing:-.02em}
+.docs-hero .eyebrow{display:inline-block;background:var(--ochre);color: var(--on-ochre);padding:2px 10px;font-family:var(--sans);font-size:10px;letter-spacing:var(--track-label);text-transform:uppercase;margin-bottom:10px}
+.docs-hero h1{font-size:32px;font-weight:700;color:var(--ink);margin:0 0 10px;line-height:1.15;letter-spacing:var(--track-heading)}
 .docs-hero .lede{font-size:13px;line-height:1.75;color:var(--ink-2);margin:0 0 14px;max-width:640px}
-.docs-hero-cta{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--cobalt);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px;padding:4px 0}
+.docs-hero-cta{display:inline-block;font-family: var(--sans);font-size:12px;color:var(--cobalt);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px;padding:4px 0}
 .docs-hero .docs-buyer{font-size:13px;line-height:1.7;color:var(--ink);margin:0 0 12px;max-width:640px;padding-left:10px;border-left:2px solid var(--ochre)}
 .docs-hero .docs-buyer a{color:var(--cobalt);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px}
 .docs-hero .lede a{color:var(--cobalt);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px}
 .docs-hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:4px}
-.docs-hero-btn{display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;line-height:1;padding:12px 20px;border:1px solid var(--ochre);border-radius:2px;text-decoration:none;transition:background .12s,color .12s,border-color .12s}
+.docs-hero-btn{display:inline-flex;align-items:center;justify-content:center;font-family: var(--sans);font-size:12px;line-height:1;padding:12px 20px;border:1px solid var(--ochre);border-radius:var(--r-1);text-decoration:none;transition:background .12s,color .12s,border-color .12s}
 .docs-hero-btn-primary{background:var(--ochre);color: var(--on-ochre)}
 .docs-hero-btn-primary:hover{background:var(--bone-2);border-color:var(--line-2);color:var(--ink)}
 .docs-hero-btn-secondary{background:var(--card);color:var(--cobalt)}
-.docs-hero-btn-secondary:hover{background:rgba(29, 78, 216, 0.07);color:var(--ink)}
+.docs-hero-btn-secondary:hover{background:rgba(var(--accent-rgb), 0.07);color:var(--ink)}
 .docs-hero-actions .docs-hero-cta{margin-left:6px}
 @media(max-width:640px){.docs-hero-btn{flex:1 1 100%}.docs-hero-actions .docs-hero-cta{margin-left:0;width:100%}}
 .docs-hero-cta:hover{color:var(--ink)}
@@ -107,9 +107,9 @@ tr:last-child td{border-bottom:none}
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -128,13 +128,13 @@ tr:last-child td{border-bottom:none}
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -148,16 +148,16 @@ tr:last-child td{border-bottom:none}
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -1137,7 +1137,7 @@ python3 deploy/paramant-admin.py sync</pre>
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
         <div class="footer-col-label">Company</div>

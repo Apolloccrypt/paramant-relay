@@ -5,7 +5,7 @@
 <!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
      before every module and deferred script that signals or awaits. -->
 <script src="/js/ready.js?v=1"></script>
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Co-sign this document · Paramant</title>
 <!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
@@ -33,48 +33,49 @@
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/co-sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
-<link rel="stylesheet" href="/werkplek.css?v=3">
+<link rel="stylesheet" href="/design-system.css?v=34">
+<link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
+<link rel="stylesheet" href="/werkplek.css?v=4">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
 main{max-width:640px;margin:0 auto;padding:60px 24px}
-h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bottom:8px}
 .sub{font-size:13px;color:var(--ink-dim);margin-bottom:24px;line-height:1.7}
 .card{background:var(--bone);border:1px solid var(--ink-hair);margin-bottom:16px}
 .card-head{padding:12px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
-.card-head-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
+.card-head-title{font-family:var(--sans);font-size:11px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim)}
 .card-body{padding:18px}
 .dot{width:6px;height:6px;background:var(--lime);border:1px solid var(--navy)}
 .dot.amber{background:var(--ochre)}
 .dot.red{background:rgba(196, 96, 79, 1)}
 .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:12px;line-height:1.6}
-.kv dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding-top:1px}
-.kv dd{font-family:var(--mono);font-size:11px;color:var(--ink);word-break:break-all}
+.kv dt{font-family:var(--sans);font-size:10px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);padding-top:1px}
+.kv dd{font-family:var(--sans);font-size:11px;color:var(--ink);word-break:break-all}
+.kv dd#env-id,.kv dd#env-hash{font-family:var(--mono)}
 .party-row{display:grid;grid-template-columns:32px 1fr auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--ink-hair);font-size:12px;align-items:center}
 .party-row:last-child{border-bottom:0}
-.party-row.me{background:rgba(29, 78, 216, 0.08);margin:0 -8px;padding-left:8px;padding-right:8px}
-.party-idx{font-family:var(--mono);font-size:10px;color:var(--ink-dim);text-align:center}
+.party-row.me{background:rgba(var(--accent-rgb), 0.08);margin:0 -8px;padding-left:8px;padding-right:8px}
+.party-idx{font-family:var(--sans);font-size:10px;color:var(--ink-dim);text-align:center}
 .party-label{font-weight:600}
-.party-status{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.party-status{font-family:var(--sans);font-size:10px;letter-spacing:var(--track-label);text-transform:uppercase}
 .party-status.signed{color:var(--cobalt)}
 .party-status.pending{color:#888}
 .party-status.viewed{color:var(--warn-ink)}
 .field{margin-bottom:14px}
-.label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
-.input,.select,.file-cta{width:100%;padding:10px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:12px}
+.label{display:block;font-family:var(--sans);font-size:10px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.input,.select,.file-cta{width:100%;padding:10px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--sans);font-size:12px}
 .file-cta{display:inline-block;text-align:center;cursor:pointer;border-style:dashed}
 .file-cta:hover{border-color:var(--cobalt);color:var(--cobalt)}
-.btn{display:inline-block;width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-decoration:none;text-align:center}
+.btn{display:inline-block;width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:var(--track-wide);cursor:pointer;text-decoration:none;text-align:center}
+.btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
 .btn:hover{opacity:.85}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
 /* A long button label wraps inside the button on a phone instead of running
    135px past it (retest T2-B4). */
 .btn{white-space:normal;overflow-wrap:anywhere;line-height:1.35}
-.btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
 .banner{padding:10px 14px;font-size:12px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:14px;line-height:1.5}
 .banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(var(--tint), 0.04)}
 .banner.err{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1);background:rgba(196, 96, 79, 0.06)}
@@ -84,8 +85,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    card and there is nothing left to read. The band keeps its meaning and takes
    the system's warning ink. */
 .disclaimer{background:var(--card);border:1px solid var(--ochre);padding:10px 14px;font-size:12px;color:var(--warn-ink);margin-bottom:14px;line-height:1.5}
-.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:var(--warn-ink)}
-.tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px}
+.disclaimer strong{display:block;font-size:11px;letter-spacing:var(--track-label);text-transform:uppercase;margin-bottom:4px;color:var(--warn-ink)}
+.tag{display:inline-block;font-family:var(--sans);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px}
 .tag.green{border-color:var(--cobalt);color:var(--cobalt)}
 .tag.red{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1)}
 .step{display:none;animation:fadeIn .2s ease}
@@ -100,10 +101,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .doc-preview{margin:12px -50px 0;border:1px solid var(--ink-hair);border-left:0;border-right:0;background:var(--card);max-height:72vh;overflow:auto;padding:10px 8px}
 .doc-page{position:relative;width:100%;margin:0 auto 12px;max-width:100%}
 /* The signature sheet after the last page (readable copy only). */
-.doc-page.sheet-page{background:#FFFFFF;border:1px solid var(--ink-hair)}
-.sheet-page .sheet-head{position:absolute;left:7%;top:5%;right:7%;font:600 14px/1.3 var(--sans);color:#0C1B2A}
+.doc-page.sheet-page{background:var(--page-bg);border:1px solid var(--ink-hair)}
+.sheet-page .sheet-head{position:absolute;left:7%;top:5%;right:7%;font:600 14px/1.3 var(--sans);color:var(--page-fg)}
 .doc-page:last-child{margin-bottom:0}
-.doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#FFFFFF}
+.doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:var(--page-bg)}
 .doc-page.appearance-page{position:relative;cursor:crosshair}
 .appearance-layer{position:absolute;inset:0;pointer-events:auto;cursor:crosshair}
 /* ── The document layer ──
@@ -115,17 +116,17 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    are fixed on purpose, they are the one place on this page where a token is
    deliberately not used, and scripts/ui-contrast-sweep.mjs has them on its
    known list for that reason and no other. */
-.appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid #1D4ED8;background:rgba(255,255,255,.94);color:#0C1B2A;padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(0, 0, 0, .16);pointer-events:auto}
-.appearance-field.date{border-color:#5C6A78;font-family:var(--mono);font-weight:500}
+.appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid var(--page-accent);background:rgba(255,255,255,.94);color:var(--page-fg);padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:var(--sh-2);pointer-events:auto}
+.appearance-field.date{border-color:var(--page-fg-2);font-family:var(--mono);font-weight:500}
 /* The box the SENDER asked for, before the signer has touched it. It must not
    look like a signature that already exists: no name, no date, no delete
    control, a dashed outline and its own words. It becomes a real placed field
    the moment the signer chooses Place my signature. */
-.appearance-field.requested{border:2px dashed #1D4ED8;background:rgba(29,78,216,.06);box-shadow:none;color:#1D4ED8;font-weight:600;justify-content:center;text-align:center;pointer-events:none}
+.appearance-field.requested{border:2px dashed var(--page-accent);background:rgba(29, 78, 216, .06);box-shadow:none;color:var(--page-accent);font-weight:600;justify-content:center;text-align:center;pointer-events:none}
 .appearance-field.over-text{border-color:#B42318;outline:2px solid #B42318;outline-offset:1px}
 .appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
 .appearance-field.has-remove{padding-right:26px}
-.appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:#1D4ED8;color:#FFFFFF;font:700 13px/1 var(--sans);cursor:pointer}
+.appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:var(--page-accent);color:var(--page-bg);font:700 13px/1 var(--sans);cursor:pointer}
 .appearance-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .appearance-tools .btn{width:auto;min-width:120px}
 /* 44px: a finger, not a mouse. These were 34-36px, under every touch-target
@@ -149,26 +150,26 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    marks have none. Sizes follow the box (container units), so a mark scales
    with the page exactly like the PDF it previews. Fixed colours on purpose,
    see the document-layer note above. */
-.appearance-field{container-type:size;background:transparent;box-shadow:none;border:0;padding:0;flex-direction:column;align-items:stretch;justify-content:flex-end;color:#0C1B2A}
-.appearance-field.mine{outline:1.5px dashed #1D4ED8;outline-offset:1px;background:rgba(29,78,216,.035)}
+.appearance-field{container-type:size;background:transparent;box-shadow:none;border:0;padding:0;flex-direction:column;align-items:stretch;justify-content:flex-end;color:var(--page-fg)}
+.appearance-field.mine{outline:1.5px dashed var(--page-accent);outline-offset:1px;background:rgba(29, 78, 216, .035)}
 .appearance-field.prior{background:transparent;border:0;outline:0}
-.appearance-field .ink{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;font-family:"Times New Roman",Times,serif;font-style:italic;font-weight:400;font-size:min(42cqh,calc(190cqw / var(--len, 12)));line-height:1;color:#1D4ED8;white-space:nowrap;overflow:hidden}
+.appearance-field .ink{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;font-family:"Times New Roman",Times,serif;font-style:italic;font-weight:400;font-size:min(42cqh,calc(190cqw / var(--len, 12)));line-height:1;color:var(--page-accent);white-space:nowrap;overflow:hidden}
 .appearance-field .ink svg{width:100%;height:100%;display:block}
-.appearance-field .cap{flex:0 0 auto;border-top:1px solid rgba(12,27,42,.55);font-family:var(--sans);font-weight:500;font-size:max(6px,15cqh);line-height:1.25;color:#0C1B2A;padding-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.appearance-field.paraaf .ink{font-size:min(62cqh,calc(170cqw / var(--len, 6)));border-bottom:1px solid rgba(29,78,216,.5)}
+.appearance-field .cap{flex:0 0 auto;border-top:1px solid rgba(var(--tint), .55);font-family:var(--sans);font-weight:500;font-size:max(6px,15cqh);line-height:1.25;color:var(--page-fg);padding-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appearance-field.paraaf .ink{font-size:min(62cqh,calc(170cqw / var(--len, 6)));border-bottom:1px solid rgba(29, 78, 216, .5)}
 .appearance-field.date{border:0;font-family:var(--mono);font-weight:500;justify-content:center}
 .appearance-field.date .lbl{font-size:max(7px,55cqh)}
-.appearance-field.requested{border:2px dashed #1D4ED8;outline:0;background:rgba(29,78,216,.06);color:#1D4ED8;font-family:var(--sans);font-weight:600;line-height:1.15;justify-content:center;align-items:center;text-align:center;padding:2px 4px}
+.appearance-field.requested{border:2px dashed var(--page-accent);outline:0;background:rgba(29, 78, 216, .06);color:var(--page-accent);font-family:var(--sans);font-weight:600;line-height:1.15;justify-content:center;align-items:center;text-align:center;padding:2px 4px}
 .appearance-field.requested .lbl{font-size:max(7px,min(22cqh,9cqw))}
 .appearance-field.requested.paraaf .lbl{font-size:max(6px,min(34cqh,11cqw))}
 .ink-style{border:1px solid var(--ink-hair);padding:10px 12px;margin:12px 0;background:var(--card)}
-.ink-style legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);padding:0 4px}
+.ink-style legend{font-family:var(--sans);font-size:10px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);padding:0 4px}
 .ink-style .ink-choice{display:flex;align-items:center;gap:8px;font-size:13px;min-height:36px;cursor:pointer}
-.ink-name{margin-top:6px;font-family:"Times New Roman",Times,serif;font-style:italic;font-size:20px;color:#1D4ED8;background:#FFFFFF}
+.ink-name{margin-top:6px;font-family:"Times New Roman",Times,serif;font-style:italic;font-size:20px;color:var(--page-accent);background:var(--page-bg)}
 /* A name the pdf writes upright in Noto Sans (letters outside Times Italic) is shown upright too. */
 @font-face{font-family:"ParaSign Noto";src:url(/vendor/fonts/NotoSans-ParaSign.ttf?v=1) format("truetype");font-display:swap}
-.appearance-field .ink.ink-sans,.ink-name.ink-sans{font-family:"ParaSign Noto","Noto Sans",var(--sans),sans-serif;font-style:normal}
-.ink-pad{display:block;width:100%;height:130px;margin-top:6px;border:1px dashed var(--ink-hair);background:#FFFFFF;touch-action:none;cursor:crosshair}
+.appearance-field .ink.ink-sans,.ink-name.ink-sans{font-family:var(--sans);font-style:normal}
+.ink-pad{display:block;width:100%;height:130px;margin-top:6px;border:1px dashed var(--ink-hair);background:var(--page-bg);touch-action:none;cursor:crosshair}
 .ink-style .btn{width:auto;margin-top:8px}
 .cta-note{font-size:12px;line-height:1.6;color:var(--ink-dim);margin-top:10px}
 .cta-note a{color:var(--cobalt)}
@@ -180,9 +181,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 body.result-mode #appearance-editor,body.result-mode #sign-intro,body.result-mode #decline-wrap,body.result-mode #sign-confirm,body.result-mode #review-gate{display:none}
 body.request-closed #review-card,body.request-closed #sign-confirm,body.request-closed #sign-intro,body.request-closed #review-gate,body.request-closed #decline-wrap,body.request-closed #cs-pass-panel{display:none}
 body.owner-mode #sign-card .card-head{display:none}
-.doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
+.doc-preview-meta{font-family:var(--sans);font-size:10px;letter-spacing:var(--track-wide);color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
 .review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
-.blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
+.blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--sans);font-size:11px;cursor:pointer;padding:0}
 .blind-link:hover{color:var(--brick-ink)}
 @media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
 /* One step at a time. Until GATE 1 passes (co-sign.js puts .needs-login on
@@ -198,7 +199,7 @@ body.needs-login #sign-intro{display:none}
 /* Collapsed technical detail: the summary line is all an invitee sees until
    they ask for the rest. */
 .how{border:1px solid var(--ink-hair);margin-bottom:14px;background:var(--card)}
-.how>summary{cursor:pointer;padding:10px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-dim)}
+.how>summary{cursor:pointer;padding:10px 14px;font-family:var(--sans);font-size:11px;letter-spacing:var(--track-wide);color:var(--ink-dim)}
 .how>summary:hover{color:var(--ink)}
 .how-body{padding:0 14px 12px;font-size:12px;line-height:1.6;color:var(--ink-dim)}
 .how-body p{margin-bottom:8px}
@@ -333,7 +334,7 @@ body.needs-login #sign-intro{display:none}
            for this session: signing "like logging in again". -->
       <div class="banner" id="cs-pass-panel" hidden style="margin-top:12px">
         <p id="cs-pass-prompt" style="margin-bottom:10px"></p>
-        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="6-digit code" aria-label="Authenticator code" style="width:100%;padding:10px;border:1px solid var(--ink-hair);border-radius:6px;margin-bottom:8px;font-size:14px">
+        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="6-digit code" aria-label="Authenticator code" style="width:100%;padding:10px;border:1px solid var(--ink-hair);border-radius:var(--r-2);margin-bottom:8px;font-size:14px">
         <p id="cs-pass-err" hidden style="color:var(--danger);font-size:13px;margin-bottom:8px"></p>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline" id="cs-pass-cancel" type="button">Cancel</button>

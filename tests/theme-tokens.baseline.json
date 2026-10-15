@@ -1,0 +1,800 @@
+{
+ "404.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "about.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "account.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "admin.html": {
+  "colour": 14,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "all-systems-go.html": {
+  "colour": 12,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "app-2026.css": {
+  "colour": 2,
+  "radius": 0,
+  "shadow": 2,
+  "font": 0
+ },
+ "architecture.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "audit-log-export.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "auth/backup.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "auth/login.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "auth/request-reset.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "auth/reset-confirm.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "auth/setup.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "changelog.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "co-sign.html": {
+  "colour": 20,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "co-sign.js": {
+  "colour": 11,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "crypto-agility.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "ct-log.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "dashboard.html": {
+  "colour": 15,
+  "radius": 0,
+  "shadow": 5,
+  "font": 0
+ },
+ "design-system.css": {
+  "colour": 0,
+  "radius": 0,
+  "shadow": 6,
+  "font": 0
+ },
+ "developer.html": {
+  "colour": 36,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "docs.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "docs/paramant-ot-brief.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "download.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "dpa.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/404.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/about.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "en/account.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "en/all-systems-go.html": {
+  "colour": 12,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/architecture.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/audit-log-export.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/auth/backup.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/auth/login.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/auth/request-reset.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/auth/reset-confirm.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/auth/setup.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/changelog.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/co-sign.html": {
+  "colour": 20,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/crypto-agility.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/ct-log.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/dashboard.html": {
+  "colour": 15,
+  "radius": 0,
+  "shadow": 5,
+  "font": 0
+ },
+ "en/docs.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/docs/paramant-ot-brief.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/download.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/dpa.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/gereedschap.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/get.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/help/gmail-extension.html": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/help/outlook-extension.html": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/index.html": {
+  "colour": 26,
+  "radius": 0,
+  "shadow": 0,
+  "font": 19
+ },
+ "en/iot.html": {
+  "colour": 2,
+  "radius": 0,
+  "shadow": 0,
+  "font": 2
+ },
+ "en/license.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/ontvang.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/ophalen.html": {
+  "colour": 0,
+  "radius": 0,
+  "shadow": 2,
+  "font": 0
+ },
+ "en/parasend.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "en/parashare.html": {
+  "colour": 9,
+  "radius": 0,
+  "shadow": 2,
+  "font": 0
+ },
+ "en/parasign.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/partners.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/press.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/pricing.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "en/privacy.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/redeem.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/request-key.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/rules.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/security.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/sign.html": {
+  "colour": 17,
+  "radius": 0,
+  "shadow": 0,
+  "font": 3
+ },
+ "en/signup.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/signup/verified.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/sla.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/status.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/terms.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/trust.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/vault.html": {
+  "colour": 8,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/verify.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "en/vs.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "gereedschap.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "get.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "help/gmail-extension.html": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "help/outlook-extension.html": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "index.html": {
+  "colour": 26,
+  "radius": 0,
+  "shadow": 0,
+  "font": 19
+ },
+ "iot.html": {
+  "colour": 2,
+  "radius": 0,
+  "shadow": 0,
+  "font": 2
+ },
+ "js/account-seal.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/account.inline1.js": {
+  "colour": 0,
+  "radius": 1,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/account.inline2.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/admin.page.js": {
+  "colour": 14,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/auth-setup.js": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/cosign-share-memory.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/dashboard.js": {
+  "colour": 3,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/handshake-meta.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/login-return.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/nav-auth.js": {
+  "colour": 3,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/paraaf-place.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/parashare.page.js": {
+  "colour": 38,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "js/passkey.js": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/pdf-text-kit.js": {
+  "colour": 2,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/pricing-billing.js": {
+  "colour": 5,
+  "radius": 1,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/quota-upgrade.js": {
+  "colour": 3,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/redeem-code.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/signing-enrol.js": {
+  "colour": 2,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/signup.inline1.js": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "js/theme.js": {
+  "colour": 3,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "license.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "nav.css": {
+  "colour": 2,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "ontvang.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "ophalen.html": {
+  "colour": 0,
+  "radius": 0,
+  "shadow": 2,
+  "font": 0
+ },
+ "parasend.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "parashare.css": {
+  "colour": 0,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "parashare.html": {
+  "colour": 9,
+  "radius": 0,
+  "shadow": 2,
+  "font": 0
+ },
+ "parasign-verify.js": {
+  "colour": 3,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "parasign.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "partners.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "press.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "pricing.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ },
+ "privacy.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "redeem.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "relay-pulse.css": {
+  "colour": 1,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "request-key.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "rules.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "security.html": {
+  "colour": 7,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "setup.en.js": {
+  "colour": 8,
+  "radius": 0,
+  "shadow": 0,
+  "font": 1
+ },
+ "setup.js": {
+  "colour": 8,
+  "radius": 0,
+  "shadow": 0,
+  "font": 1
+ },
+ "sign-flow.js": {
+  "colour": 28,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "sign.html": {
+  "colour": 17,
+  "radius": 0,
+  "shadow": 0,
+  "font": 3
+ },
+ "signup.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "signup/verified.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "sla.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "status.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "terms.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "trust.html": {
+  "colour": 6,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "vault.html": {
+  "colour": 8,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "verify.html": {
+  "colour": 4,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "vs.html": {
+  "colour": 5,
+  "radius": 0,
+  "shadow": 0,
+  "font": 0
+ },
+ "werkplek.css": {
+  "colour": 20,
+  "radius": 0,
+  "shadow": 1,
+  "font": 0
+ }
+}

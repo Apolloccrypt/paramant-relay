@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Account maken · Paramant</title>
 <meta name="description" content="Een Paramant API-sleutel krijgt u nu via een account, beschermd met een authenticator-app. Maak een gratis account om te beginnen.">
@@ -12,9 +12,9 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/request-key">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/request-key">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/request-key">
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=34">
+<link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 .nav-help {
@@ -22,9 +22,9 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -43,13 +43,13 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -63,16 +63,16 @@
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -124,9 +124,9 @@
   <section class="section section--light" style="padding: 80px 24px;">
     <div style="max-width: 600px; margin: 0 auto; text-align: center;">
 
-      <span style="display:inline-block;background:var(--ochre);color:var(--ink);padding:3px 14px;font-family:&quot;IBM Plex Mono&quot;,monospace;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px;">NIEUWE WERKWIJZE</span>
+      <span style="display:inline-block;background:var(--ochre);color:var(--ink);padding:3px 14px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;margin-bottom:28px;">NIEUWE WERKWIJZE</span>
 
-      <h1 style="font-size:clamp(32px,5vw,52px);color:var(--ink);margin:0 0 20px 0;letter-spacing:-0.02em;line-height:1.1;font-weight:600;">
+      <h1 style="font-size:clamp(32px,5vw,52px);color:var(--ink);margin:0 0 20px 0;letter-spacing:var(--track-heading);line-height:1.1;font-weight:600;">
         API-sleutels horen nu bij een account.
       </h1>
 
@@ -134,7 +134,7 @@
         De proefsleutel per mail is vervangen door een echte aanmelding. U krijgt nog steeds een gratis sleutel. Die is nu beschermd met een authenticator-app en u krijgt er een dashboard bij. Er staat geen leesbare sleutel meer in uw inbox.
       </p>
 
-      <a href="/signup" style="display:inline-block;padding:16px 36px;background:var(--ochre);color:var(--ink);text-decoration:none;font-family:&quot;IBM Plex Mono&quot;,monospace;font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
+      <a href="/signup" style="display:inline-block;padding:16px 36px;background:var(--ochre);color:var(--ink);text-decoration:none;font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;">
         Account maken →
       </a>
 
@@ -142,7 +142,7 @@
         Had u al een proefsleutel? Die werkt tot hij verloopt. <a href="/signup" style="color:var(--cobalt);text-decoration:underline;">Maak een volledig account</a> om daarna toegang te houden.
       </p>
 
-      <p style="font-size:12px;color:var(--ink-dim);margin:24px 0 0 0;font-family:&quot;IBM Plex Mono&quot;,monospace;">
+      <p style="font-size:12px;color:var(--ink-dim);margin:24px 0 0 0;font-family:var(--mono);">
         Over 8 seconden gaat u vanzelf verder&hellip;
       </p>
 
@@ -155,7 +155,7 @@
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
         <p class="lang-switch"><a href="/en/request-key" hreflang="en" lang="en">This page in English</a></p>
       </div>
       <div>

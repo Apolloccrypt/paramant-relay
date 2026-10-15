@@ -18,17 +18,17 @@
 
 .rv-drop {
   display: block; padding: var(--space-5); border: 1.5px dashed var(--ink-hair);
-  border-radius: 10px; text-align: center; cursor: pointer; background: var(--ink-ghost);
+  border-radius: var(--r-2); text-align: center; cursor: pointer; background: var(--ink-ghost);
   transition: border-color .15s, background .15s;
 }
 .rv-drop:hover, .rv-drop.rv-over { border-color: var(--navy); }
 .rv-drop input[type=file] { display: none; }
 .rv-drop-cta { display: block; font-weight: 600; margin-bottom: var(--space-1); }
-.rv-drop-meta { display: block; font-family: var(--mono); font-size: var(--text-xs); color: var(--ink-dim); }
+.rv-drop-meta { display: block; font-family: var(--sans); font-size: var(--text-xs); color: var(--ink-dim); }
 
 .rv-paste {
   width: 100%; min-height: 8rem; margin-top: var(--space-4);
-  padding: var(--space-3); border: 1.5px solid var(--ink-hair); border-radius: 8px;
+  padding: var(--space-3); border: 1.5px solid var(--ink-hair); border-radius: var(--r-2);
   font-family: var(--mono); font-size: var(--text-xs); line-height: 1.6;
   background: var(--bone); color: var(--ink); resize: vertical;
 }
@@ -47,7 +47,7 @@
   display: grid; grid-template-columns: 1rem 1fr; gap: 0 var(--space-3);
   font-size: var(--text-sm); line-height: 1.6; padding: var(--space-2) 0;
 }
-.rv-mark { font-family: var(--mono); font-weight: 700; }
+.rv-mark { font-family: var(--sans); font-weight: 700; }
 .rv-body { min-width: 0; }
 .rv-detail { display: block; }
 .rv-ok .rv-mark { color: var(--lime-ink, var(--navy)); }
@@ -62,7 +62,7 @@
 .rv-raw { margin-top: var(--space-5); }
 .rv-raw summary { font-size: var(--text-sm); color: var(--ink-dim); cursor: pointer; }
 .rv-raw pre {
-  margin-top: var(--space-3); padding: var(--space-3); border-radius: 8px;
+  margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--r-2);
   background: var(--bone-2, var(--ink-ghost)); overflow-x: auto;
   font-size: var(--text-xs); line-height: 1.6; max-height: 24rem;
 }

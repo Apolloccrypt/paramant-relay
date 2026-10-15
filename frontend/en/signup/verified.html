@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Email verified, one step left · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
@@ -10,9 +10,9 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/signup/verified">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/signup/verified">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/signup/verified">
-  <link rel="stylesheet" href="/design-system.css?v=33">
-  <link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+  <link rel="stylesheet" href="/design-system.css?v=34">
+  <link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
   <script src="/nav.js?v=17" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
   <style>
@@ -25,7 +25,7 @@
       display: inline-flex; align-items: center; gap: 8px;
       background: var(--sig-done-bg); color: var(--sig-done);
       border: 1px solid var(--line);
-      padding: 6px 14px; border-radius: 100px;
+      padding: 6px 14px; border-radius: var(--r-pill);
       font-size: 13px; font-weight: 600;
       margin-bottom: 24px;
     }
@@ -40,12 +40,12 @@
     }
     .next-box {
       background: var(--accent-soft); border: 1px solid var(--line);
-      border-radius: 10px; padding: 28px; margin: 0 0 32px;
+      border-radius: var(--r-2); padding: 28px; margin: 0 0 32px;
     }
     .next-step {
       display: inline-block; background: var(--accent); color: var(--accent-ink);
-      border-radius: 999px; padding: 5px 14px;
-      font-weight: 700; font-size: 12px; letter-spacing: .04em;
+      border-radius: var(--r-pill); padding: 5px 14px;
+      font-weight: 700; font-size: 12px; letter-spacing: var(--track-label);
       text-transform: uppercase; margin-bottom: 14px;
     }
     .vwho {
@@ -63,9 +63,9 @@
     }
     .next-subject {
       display: inline-block; background: var(--surface);
-      border: 1px solid var(--line-2); border-radius: 5px;
+      border: 1px solid var(--line-2); border-radius: var(--r-1);
       padding: 8px 14px;
-      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-family: var(--sans);
       font-size: 13px; color: var(--ink-1);
       word-break: break-word;
     }
@@ -73,11 +73,11 @@
       margin-top: 36px; padding-top: 28px;
       border-top: 1px solid var(--line);
     }
-    .faq h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em;
+    .faq h2 { font-size: 14px; text-transform: uppercase; letter-spacing: var(--track-label);
               color: var(--ink-3); font-weight: 600; margin: 0 0 16px; }
     .faq details { margin-bottom: 10px;
                    border: 1px solid var(--line);
-                   border-radius: 6px; padding: 14px 18px; background: var(--surface); }
+                   border-radius: var(--r-2); padding: 14px 18px; background: var(--surface); }
     /* One indicator, the page's own plus. Chromium still draws its list-item
        triangle next to it unless the marker is removed on both sides, and the
        row is a flex line so it reads the same at every width. */
@@ -91,7 +91,7 @@
     .faq details[open] summary::after { content: '&minus;'; }
     .faq p { color: var(--ink-2); line-height: 1.6;
              margin: 10px 0 0; font-size: 14px; }
-    .faq code { background: var(--surface-sunk); padding: 2px 6px; border-radius: 3px;
+    .faq code { background: var(--surface-sunk); padding: 2px 6px; border-radius: var(--r-1);
                 font-size: 13px; color: var(--ink-1); }
     .faq a { color: var(--accent); text-decoration: underline; }
     /* A finger opens the accordion, so the row it grabs is a real target. */
@@ -100,7 +100,7 @@
     }
   </style>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=12">
+<link rel="stylesheet" href="/app-2026.css?v=13">
 <script src="/js/theme.js?v=6"></script>
 </head>
 <body>

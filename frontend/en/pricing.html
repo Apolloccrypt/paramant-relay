@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pricing for e-signatures and secure file transfer | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -22,27 +22,27 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/pricing">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/pricing">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/pricing">
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=34">
+<link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
 <style>
 .tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink-hair)}
 .tier-card{padding:var(--space-7) var(--space-6);background:var(--bone);min-height:440px;display:flex;flex-direction:column}
 .tier-card.featured{background:var(--night-2);box-shadow:inset 3px 0 0 var(--ochre)}
-.tier-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin-bottom:var(--space-4)}
+.tier-name{font-family:var(--sans);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;font-weight:700;color:var(--cobalt);margin-bottom:var(--space-4)}
 .tier-price{font-family:var(--mono);font-size:var(--text-3xl);font-weight:700;color:var(--navy);margin-bottom:var(--space-2)}
 .tier-price-note{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-6)}
 .tier-price-note .incl{color:var(--navy);font-weight:700}
-.yearly-alt{display:inline-block;margin-top:var(--space-2);font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;color:var(--cobalt);text-decoration:underline;text-underline-offset:3px}
+.yearly-alt{display:inline-block;margin-top:var(--space-2);font-family: var(--sans);font-size:var(--text-xs);letter-spacing:var(--track-wide);color:var(--cobalt);text-decoration:underline;text-underline-offset:3px}
 .yearly-alt:hover{color:var(--navy)}
 .tier-features{list-style:none;margin-bottom:var(--space-6)}
-.tier-features li{font-family:var(--mono);font-size:var(--text-sm);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid var(--ink-hair);line-height:1.5}
+.tier-features li{font-family: var(--sans);font-size:var(--text-sm);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid var(--ink-hair);line-height:1.5}
 .tier-features li:last-child{border-bottom:none}
 .tier-features li::before{content:'+ ';font-weight:700;color:var(--cobalt)}
 .tier-features li.dim{color:var(--ink-dim)}
 .tier-features li.dim::before{content:'· ';color:var(--ink-dim)}
 .prose-section{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
-.prose-section h3{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin-bottom:var(--space-4)}
+.prose-section h3{font-family:var(--sans);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;font-weight:700;color:var(--cobalt);margin-bottom:var(--space-4)}
 .prose-section p{font-size:var(--text-base);color:var(--ink);line-height:1.75;max-width:640px}
 .prose-fold{margin-top:var(--space-3);max-width:640px}
 .prose-fold summary{cursor:pointer;font-size:var(--text-sm);color:var(--cobalt)}
@@ -77,9 +77,9 @@
 .tier-grid,.tier-card{min-width:0}
 .pr-table{width:100%;border-collapse:collapse;font-size:var(--text-base)}
 .pr-table th,.pr-table td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink-hair);vertical-align:top;color:var(--ink)}
-.pr-table thead th{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);word-break:keep-all;overflow-wrap:normal;hyphens:none}
+.pr-table thead th{font-family:var(--sans);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);word-break:keep-all;overflow-wrap:normal;hyphens:none}
 .pr-table tbody th{font-weight:400}
-.pr-table tr.pr-group th{padding-top:18px;font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim)}
+.pr-table tr.pr-group th{padding-top:18px;font-family:var(--sans);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim)}
 @media(max-width:480px){.pr-table{font-size:var(--text-sm)}}
 .tier-card .btn{white-space:normal;line-height:1.45}
 @media(max-width:640px){
@@ -92,9 +92,9 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -113,13 +113,13 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -133,16 +133,16 @@
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -309,7 +309,7 @@
          in design-system.css is untouched. -->
     <div class="sec-head" style="margin-bottom:var(--space-4)">
       <h1 class="paramant-h2">Pricing</h1>
-      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Free for everyone, paid for organisations</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt)">Free for everyone, paid for organisations</span>
     </div>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
       Sign documents and send files that delete themselves after reading.
@@ -373,7 +373,7 @@
 <section style="padding:0 0 var(--space-9)" id="plans">
   <div class="container">
     <div style="margin-bottom:var(--space-6)">
-      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt)">Product</span>
       <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSign · Get a document signed</h3>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
         Sign a PDF yourself, or send it to the people who have to sign it. Community covers 2 signatures a month, forever. Organisations pay for volume: 100 a month on Firm, 1,000 a month on Business with a named contact. Firm is one payment for both products, ParaSign and ParaSend together, and it comes with a <strong>developer API</strong> with its own <a href="/en/docs#parasign-api" style="color:var(--cobalt)">documentation</a> and webhooks, so signing can run inside your own software.
@@ -460,7 +460,7 @@
          tests/site-claims.test.mjs pins this table to tiers.js and to
          frontend/js/dashboard.js. -->
     <div id="what-you-get" style="text-align:left;max-width:760px;margin:var(--space-6) auto 0">
-      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">What you can do afterwards</p>
+      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">What you can do afterwards</p>
       <div style="overflow-x:auto">
       <table class="pr-table">
         <thead><tr><th scope="col"></th><th scope="col">Community</th><th scope="col">Firm</th><th scope="col">Business</th></tr></thead>
@@ -493,7 +493,7 @@
          same claim in the same words; tests/site-claims.test.mjs pins all three
          against mollie.js. -->
     <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone)">
-      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">How payment works</p>
+      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">How payment works</p>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
         You pay a Dutch company, in euros, through a Dutch payment provider (Mollie). Every payment is a one-off for the term you buy: one month, or one year paid up front. Automatic renewal is not switched on, so there is no direct debit mandate and no subscription that renews by itself. Firm is one payment for one term on both products. Business is one payment for its own term, and includes ParaSend on the same terms as Firm. When a term ends, the products it paid for fall back to their free Community plan, and nothing is charged again unless you buy the next term yourself. A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.
       </p>
@@ -514,13 +514,13 @@
          redeem path never reaches lib/mollie.js and never draws an invoice
          number. tests/site-claims.test.mjs pins both directions. -->
     <form data-redeem-form style="text-align:left;max-width:760px;margin:var(--space-4) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
-      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">Have a code?</p>
+      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">Have a code?</p>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0 0 var(--space-3)">
         A code gives you a term as a gift. It is not a discount and not a payment: nothing is charged, now or later, and there is nothing to cancel. Sign in first and enter it here. Or open <a href="/en/redeem">the code page</a>.
       </p>
       <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:flex-end">
         <label style="display:flex;flex-direction:column;gap:6px;flex:1 1 220px">
-          <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)">Your code</span>
+          <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim)">Your code</span>
           <input type="text" name="code" data-redeem-input maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" style="font-family:var(--mono);font-size:var(--text-base);padding:10px 12px;border:1px solid var(--ink-hair);background:var(--bone-2, #fff);color:var(--ink);width:100%">
         </label>
         <button type="submit" class="btn btn-secondary" data-redeem-submit>Redeem code</button>
@@ -534,7 +534,7 @@
 <section style="padding:0 0 var(--space-9)">
   <div class="container">
     <div style="margin-bottom:var(--space-6)">
-      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt)">Product</span>
       <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h3>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
         Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. Community covers 50 transfers a month, forever, and the file size is the same on every plan: up to 500 MB handed over live, 5 MB for a one-time link, and 25 MB when you send to a list of named recipients. How many people one send may reach does differ: one on Community and thirty on every paid plan, each getting their own link that works once. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
@@ -729,7 +729,7 @@
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
         <p class="lang-switch"><a href="/pricing" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
       </div>
       <div>

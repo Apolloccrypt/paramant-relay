@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Trust and verification: check what we can see | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -29,9 +29,9 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=34">
+<link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -44,10 +44,10 @@ html{scroll-behavior:smooth}
 .page-hero--navy .btn-secondary{color:var(--invert-ink);border-color:rgba(255, 255, 255, .45)}
 .page-hero--navy .btn-secondary:hover{background:var(--bone);color:var(--navy);border-color:var(--invert-ink)}
 main{max-width:780px;margin:0 auto;padding:48px 48px 120px}
-h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
+h1{font-size:36px;font-weight:600;letter-spacing:var(--track-display);margin-bottom:12px}
 .lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
-h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:56px}
-h3{font-size:var(--text-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
+h2{font-size:18px;font-weight:600;letter-spacing:var(--track-heading);margin-bottom:12px;margin-top:56px}
+h3{font-size:var(--text-xs);font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
 p{color:var(--ink-dim);line-height:1.8;margin-bottom:16px;font-size:var(--text-base)}
 p strong{color:var(--cobalt)}
 a{color:var(--ink);text-decoration:none}
@@ -56,10 +56,10 @@ em{color:var(--cobalt)}
 .card{border:1px solid var(--ink-hair);padding:24px 28px;margin-bottom:16px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .stat-n{font-size:32px;font-weight:600;color:var(--ink);margin-bottom:4px}
-.stat-l{font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:.04em}
+.stat-l{font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:var(--track-wide)}
 .check{color:var(--ink);margin-right:8px}
 .table{width:100%;border-collapse:collapse}
-.table th{text-align:left;padding:10px 14px;color:var(--ink-dim);font-weight:500;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--ink-hair)}
+.table th{text-align:left;padding:10px 14px;color:var(--ink-dim);font-weight:500;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:var(--track-label);border-bottom:1px solid var(--ink-hair)}
 .table td{padding:10px 14px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost);vertical-align:top;font-size:var(--text-sm)}
 .table td:first-child{color:var(--ink);white-space:nowrap}
 .table tr:last-child td{border-bottom:none}
@@ -84,7 +84,7 @@ dd{color:var(--ink-dim);line-height:1.75;font-size:var(--text-sm);margin:4px 0 0
 pre{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:16px 18px;overflow-x:auto;font-size:var(--text-sm);line-height:1.6;margin-bottom:16px}
 pre code{font-family:var(--mono);color:var(--ink)}
 code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
-.badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border:1px solid var(--ink-hair);vertical-align:middle;margin-left:8px}
+.badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;padding:2px 8px;border:1px solid var(--ink-hair);vertical-align:middle;margin-left:8px}
 .badge-live{color:var(--cobalt);border-color:var(--cobalt)}
 .badge-planned{color:var(--ink-dim);border-color:var(--ink-hair)}
 .note{border-left:3px solid var(--ink-hair);padding:4px 0 4px 16px;margin:0 0 16px;font-size:var(--text-sm);color:var(--ink-dim);line-height:1.75}
@@ -102,9 +102,9 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -123,13 +123,13 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -143,16 +143,16 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -449,7 +449,7 @@ docker compose build   # build locally instead of pulling the published image</c
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
         <div class="footer-col-label">Company</div>
