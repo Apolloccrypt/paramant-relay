@@ -24,13 +24,13 @@
 .parapear-bubble {
   position: relative;
   flex: 1 1 auto;
-  font-family: var(--sans, Inter, system-ui, sans-serif);
+  font-family: var(--sans);
   font-size: var(--text-base, 15px);
   line-height: 1.55;
   color: var(--ink);
   background: transparent;
   border: 1px solid var(--ink-hair, rgba(var(--tint), 0.18));
-  border-radius: 12px;
+  border-radius: var(--r-3);
   padding: var(--space-3, 12px) var(--space-4, 16px);
 }
 
@@ -41,9 +41,9 @@
 
 .parapear-bubble .parapear-kicker {
   display: block;
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--sans);
   font-size: 11px;
-  letter-spacing: .08em;
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
   color: var(--ink-dim);
   margin-bottom: 4px;
@@ -58,8 +58,8 @@
   margin-left: var(--space-2, 8px);
   background: transparent;
   border: 1px solid var(--ink-hair, rgba(var(--tint), 0.18));
-  border-radius: 8px;
-  font-family: var(--sans, Inter, system-ui, sans-serif);
+  border-radius: var(--r-2);
+  font-family: var(--sans);
   font-size: 12px;
   color: var(--ink-dim);
   padding: 6px 10px;

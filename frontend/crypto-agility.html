@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F2F3F5;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crypto-agility: algoritmen wisselen zonder herbouw · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -22,24 +22,24 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/crypto-agility">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/crypto-agility">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/crypto-agility">
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=35">
+<link rel="stylesheet" href="/nav.css?v=31">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
 <style>
 a{color:var(--ink);text-decoration:none}
 a:hover{opacity:.7}
 code{font-size:var(--text-xs);padding:1px 5px;border:1px solid var(--ink-ghost);color:var(--ink-dim)}
 
 .hero{padding:60px 48px 48px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--ink-hair)}
-.hero-tag{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:14px}
-.hero h1{font-size:30px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-bottom:14px}
+.hero-tag{font-size:var(--text-xs);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:14px}
+.hero h1{font-size:30px;font-weight:600;letter-spacing:var(--track-display);line-height:1.2;margin-bottom:14px}
 .hero h1 em{font-style:normal;color:var(--cobalt)}
 .hero .subtitle{font-size:15px;color:var(--ink-dim);max-width:640px;line-height:1.7}
 
 main{max-width:860px;margin:0 auto;padding:0 48px 80px}
 
 section{margin-top:52px}
-section h2{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
+section h2{font-size:19px;font-weight:600;letter-spacing:var(--track-heading);margin-bottom:6px}
 section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 
 .summary{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:16px 22px;margin-top:36px}
@@ -48,7 +48,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 
 /* algo comparison */
 .algo-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
-.algo-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(29, 78, 216, .06)}
+.algo-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(var(--accent-rgb), .06)}
 .algo-table td{padding:10px 14px;border-bottom:1px solid var(--ink-ghost);vertical-align:top;color:var(--ink-dim)}
 .algo-table td:first-child{font-size:11px;color:var(--ink);font-weight:600}
 .algo-table tr:last-child td{border-bottom:none}
@@ -60,7 +60,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 .mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
 .mode-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:18px 20px}
 .mode-card.active{border-color:var(--ink-dim);background:var(--ink-ghost)}
-.mode-badge{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.mode-badge{font-size:10px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
 .mode-card.active .mode-badge{color:var(--cobalt)}
 .mode-card h4{font-size:13px;font-weight:600;margin-bottom:6px}
 .mode-card p{font-size:11px;color:var(--ink-dim);line-height:1.55}
@@ -78,8 +78,6 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 .cta p{font-size:13px;color:var(--ink-dim);line-height:1.65;margin-bottom:14px}
 .btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color: var(--on-ochre);background:var(--cobalt);padding:8px 18px;margin-right:10px}
 .btn-primary:hover{opacity:.88}
-.btn-sec{display:inline-block;font-size:13px;text-decoration:none;color:var(--ink);border:1px solid var(--ink-hair);padding:8px 18px}
-.btn-sec:hover{border-color:var(--cobalt)}
 
 @media(max-width:640px){
   .hero,main{padding-left:20px;padding-right:20px}
@@ -96,9 +94,9 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -117,13 +115,13 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -137,16 +135,16 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -155,16 +153,16 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 <style>
 /* brand-life refresh (pilot): lime eyebrow, hero stat-strip, section number
    chips, loaded-dots. Petrol/navy + lime, existing tokens only. */
-.hero-eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--sans);font-size:11px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px}
 .hero-eyebrow span{display:inline-block;width:22px;height:2px;background:var(--lime)}
 .hero-stats{list-style:none;display:flex;flex-wrap:wrap;margin:28px 0 0;padding:0;border:1px solid var(--ink-hair)}
 .hero-stats li{flex:1;min-width:150px;padding:16px 20px;border-right:1px solid var(--ink-hair)}
 .hero-stats li:last-child{border-right:none}
-.hero-stats b{display:flex;align-items:center;gap:9px;font-size:27px;font-weight:700;letter-spacing:-.02em;color:var(--navy);line-height:1}
+.hero-stats b{display:flex;align-items:center;gap:9px;font-size:27px;font-weight:700;letter-spacing:var(--track-heading);color:var(--navy);line-height:1}
 .hero-stats b::before{content:"";width:8px;height:8px;background:var(--lime);flex:none}
 .hero-stats li span{display:block;font-size:11px;color:var(--ink-dim);line-height:1.45;margin-top:8px}
 section h2{display:flex;align-items:baseline;gap:11px}
-.s-num{flex:none;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.03em;color: var(--on-ochre);background:var(--lime);padding:2px 7px;line-height:1.5}
+.s-num{flex:none;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:var(--track-wide);color: var(--on-ochre);background:var(--lime);padding:2px 7px;line-height:1.5}
 .algo-table td.safe::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--lime);margin-right:7px}
 @media(max-width:640px){.hero-stats li{min-width:100%;border-right:none;border-bottom:1px solid var(--ink-hair)}.hero-stats li:last-child{border-bottom:none}}
 </style>
@@ -295,7 +293,7 @@ section h2{display:flex;align-items:baseline;gap:11px}
   <section>
     <h2><span class="s-num">02</span>Het wire format (v1)</h2>
     <p class="section-sub">Een vaste header van 10 bytes, daarna velden van wisselende lengte met een lengteprefix.</p>
-    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:18px 22px;font-size:12px;overflow-x:auto;line-height:1.75;font-family:'IBM Plex Mono',ui-monospace,monospace">MAGIC    4 bytes   PQHB
+    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--inverse-line);padding:18px 22px;font-size:12px;overflow-x:auto;line-height:1.75;font-family:var(--mono)">MAGIC    4 bytes   PQHB
 VERSION  1 byte    0x01
 KEM_ID   2 bytes   uint16 BE
 SIG_ID   2 bytes   uint16 BE (0x0000 = anoniem)
@@ -411,9 +409,9 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
   <section>
     <h2><span class="s-num">05</span>Controleer het zelf</h2>
     <p class="section-sub">Het live capabilities-endpoint is de bron van waarheid.</p>
-    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:'IBM Plex Mono',ui-monospace,monospace">curl https://paramant.app/v2/capabilities</pre>
+    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--inverse-line);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:var(--mono)">curl https://paramant.app/v2/capabilities</pre>
     <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Wat onze relays vandaag antwoorden (modus core). Een relay in de modus extended noemt 21 vermeldingen:</p>
-    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.6;font-family:'IBM Plex Mono',ui-monospace,monospace">{
+    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--inverse-line);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.6;font-family:var(--mono)">{
   "wire_version": 1,
   "kem": [
     { "id": 2, "name": "ML-KEM-768", "loaded": true }
@@ -581,7 +579,7 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
         <div class="footer-col-label">Bedrijf</div>
@@ -605,7 +603,7 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=17" defer></script>
+<script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

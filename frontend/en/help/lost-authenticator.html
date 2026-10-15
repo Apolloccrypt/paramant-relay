@@ -35,10 +35,10 @@ main{max-width:780px;margin:0 auto;padding:80px 48px 120px}
 .breadcrumb a{color:var(--cobalt);text-decoration:none}
 .breadcrumb a:hover{opacity:.7}
 .breadcrumb span{margin:0 8px;color:var(--ink-ghost)}
-h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
+h1{font-size:36px;font-weight:600;letter-spacing:var(--track-display);margin-bottom:12px}
 .lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
-h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:48px}
-h3{font-size:var(--text-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
+h2{font-size:18px;font-weight:600;letter-spacing:var(--track-heading);margin-bottom:12px;margin-top:48px}
+h3{font-size:var(--text-xs);font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
 p{color:var(--ink-dim);line-height:1.8;margin-bottom:16px;font-size:var(--text-base)}
 p strong{color:var(--ink)}
 a{color:var(--cobalt);text-decoration:none}
@@ -73,18 +73,18 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=35">
+<link rel="stylesheet" href="/nav.css?v=31">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
 <style>
 .nav-help {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -103,13 +103,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -123,16 +123,16 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -352,7 +352,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
         <p class="lang-switch"><a href="/help/lost-authenticator" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
       </div>
       <div>
@@ -378,7 +378,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 </footer>
 
-<script src="/nav.js?v=17" defer></script>
+<script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

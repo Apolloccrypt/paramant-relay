@@ -331,14 +331,14 @@ function showNewKeyModal(){
   const o=document.createElement('div');
   o.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12, 15, 17, .72);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px';
   o.innerHTML='<div style="background:var(--bone-2);border:1.5px solid var(--line);padding:28px;max-width:480px;width:100%;color:var(--ink)">'+
-    '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px">Nieuwe API-sleutel maken</div>'+
+    '<div style="font-family:var(--sans);font-size:11px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px">Nieuwe API-sleutel maken</div>'+
     '<label class="l-lbl">Label</label><input id="nk-l" class="l-inp" placeholder="acme-corp"><br>'+
     '<label class="l-lbl">Abonnement</label><select id="nk-p" class="l-inp"><option value="community">community</option><option value="pro" selected>pro</option><option value="enterprise">enterprise</option><option value="trial">trial</option></select><br>'+
     '<label class="l-lbl">E-mail (optioneel)</label><input id="nk-e" class="l-inp" type="email" placeholder="client@example.com"><br>'+
     '<div style="display:flex;gap:10px;margin-top:8px">'+
     '<button data-click="doCreateKey" class="btn" style="flex:1">Sleutel maken</button>'+
     '<button onclick="this.closest(\'[data-modal]\').remove()" class="btn out">Annuleren</button>'+
-    '</div><div id="nk-res" style="margin-top:12px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"></div></div>';
+    '</div><div id="nk-res" style="margin-top:12px;font-size:12px;font-family:var(--mono)"></div></div>';
   o.dataset.modal='1';
   o.addEventListener('click',e=>{if(e.target===o)o.remove();});
   document.body.appendChild(o);
@@ -404,7 +404,7 @@ async function fetchAudit(){
       '<td class="mono" style="font-size:11px;white-space:nowrap">'+esc(e.ts?new Date(e.ts).toISOString().replace('T',' ').slice(0,19):'-')+'</td>'+
       '<td><span class="chip active">'+esc(e.event_type||'-')+'</span></td>'+
       '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,20))+'</td>'+
-      '<td><details><summary style="cursor:pointer;font-size:11px;color:var(--ink-dim)">tonen</summary><pre style="font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:4px;color:var(--ink-2);white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
+      '<td><details><summary style="cursor:pointer;font-size:11px;color:var(--ink-dim)">tonen</summary><pre style="font-size:10px;font-family:var(--mono);margin-top:4px;color:var(--ink-2);white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
     '</tr>').join('')+'</tbody></table>';
 }
 
@@ -553,7 +553,7 @@ async function loadRelay(){
 function renderRelayShell(el){
   el.innerHTML=
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-      '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#475569">Stand van de relays, ververst elke 10 s</div>'+
+      '<div style="font-family:var(--sans);font-size:11px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--label-2)">Stand van de relays, ververst elke 10 s</div>'+
       '<button class="btn out" data-click="fetchRelay">Nu vernieuwen</button>'+
     '</div>'+
     '<div id="r-strip" class="rs"><div class="ri loading"><div class="ri-name">health</div><div class="ri-det">laden…</div></div><div class="ri loading"><div class="ri-name">legal</div><div class="ri-det">laden…</div></div><div class="ri loading"><div class="ri-name">finance</div><div class="ri-det">laden…</div></div><div class="ri loading"><div class="ri-name">iot</div><div class="ri-det">laden…</div></div></div>'+

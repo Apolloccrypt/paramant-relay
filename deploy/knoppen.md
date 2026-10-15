@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **213 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **215 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -172,6 +172,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `ROF_JSON` | `tests/responsive-overflow.test.mjs` | geen | pad waar de overloopmeting elke bevinding als JSON neerzet, voor een telling voor en na; leeg betekent geen bestand |
 | `ROF_POOL` | `tests/responsive-overflow.test.mjs` | `6` | hoeveel pagina's de overloopmeting tegelijk open heeft |
 | `SHOT_LABEL` | `scripts/shot-dashboard.mjs` | geen | label onder een schermafdruk |
+| `THEME_TOKENS_REPORT` | `tests/theme-tokens.test.mjs` | geen | drukt de totalen af van ruwe kleuren, radii, schaduwen en lettertypestapels buiten de tokenblokken |
+| `THEME_TOKENS_WRITE` | `tests/theme-tokens.test.mjs` | geen | schrijft `tests/theme-tokens.baseline.json` opnieuw; een getal kan daarbij alleen omlaag |
 | `TMPDIR` | `tests/parasend-send-a-link.test.mjs` | `'/tmp'` | werkdir voor een tijdelijk bestand in de test |
 
 ## Knoppen in de schelp

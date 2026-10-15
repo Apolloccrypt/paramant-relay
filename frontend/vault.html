@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F2F3F5;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Verzegel een bestand met een wachtwoordzin · Paramant</title>
 <meta name="twitter:description" content="Verzegel elk bestand met een wachtwoordzin voordat u het bewaart of deelt. Alles gebeurt op dit apparaat. Het bestand en de wachtwoordzin verlaten uw browser niet.">
@@ -29,36 +29,36 @@
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/vault">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=33">
+<link rel="stylesheet" href="/design-system.css?v=35">
 <style>
 .vt-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--ink-hair)}
-.vt-brand{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--navy);text-decoration:none}
+.vt-brand{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:var(--track-label);color:var(--navy);text-decoration:none}
 .vt-brand span{color:var(--cobalt)}
-.vt-back{font-family:var(--mono);font-size:12px;color:var(--ink-dim);text-decoration:none}
+.vt-back{font-family: var(--sans);font-size:12px;color:var(--ink-dim);text-decoration:none}
 .vt-back:hover{color:var(--cobalt)}
 .vt-wrap{max-width:640px;margin:40px auto;padding:0 20px}
-.vt-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
-.vt-title{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0 0 10px;color:var(--navy)}
+.vt-kicker{font-family:var(--sans);font-size:11px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.vt-title{font-size:30px;font-weight:700;letter-spacing:var(--track-heading);margin:0 0 10px;color:var(--navy)}
 .vt-lede{font-size:14px;color:var(--ink-dim);line-height:1.7;margin:0 0 26px}
 .vt-tabs{display:flex;gap:8px;margin-bottom:22px}
-.vt-tab{flex:1;padding:14px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink-dim);font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer;border-radius:12px;text-align:center;transition:all .14s}
+.vt-tab{flex:1;padding:14px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink-dim);font-family: var(--sans);font-size:13px;font-weight:600;letter-spacing:var(--track-wide);cursor:pointer;border-radius:var(--r-3);text-align:center;transition:all .14s}
 .vt-tab.on{border-color:var(--cobalt);color:var(--navy);background:rgba(var(--tint), .05)}
-.vt-card{background:var(--card);border:1px solid var(--ink-hair);border-radius:16px;padding:24px}
-.vt-drop{border:2px dashed var(--ink-hair);background:var(--bone);border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .14s;outline:none}
+.vt-card{background:var(--card);border:1px solid var(--ink-hair);border-radius:var(--r-3);padding:24px}
+.vt-drop{border:2px dashed var(--ink-hair);background:var(--bone);border-radius:var(--r-3);padding:36px 20px;text-align:center;cursor:pointer;transition:all .14s;outline:none}
 .vt-drop:hover,.vt-drop:focus-visible,.vt-drop.drag{border-color:var(--cobalt);background:rgba(var(--tint), .04)}
 .vt-drop .big{font-size:16px;font-weight:600;color:var(--navy);margin:0 0 4px}
 .vt-drop .small{font-size:12px;color:var(--ink-dim);margin:0}
-.vt-info{margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--navy);background:var(--bone-2,rgba(var(--tint), .04));border:1px solid var(--ink-hair);border-radius:10px;padding:10px 12px;word-break:break-all}
+.vt-info{margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--navy);background:var(--bone-2,rgba(var(--tint), .04));border:1px solid var(--ink-hair);border-radius:var(--r-2);padding:10px 12px;word-break:break-all}
 .vt-field{margin-top:16px}
-.vt-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
-.vt-input{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:10px;background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px}
+.vt-label{display:block;font-family:var(--sans);font-size:10px;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.vt-input{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:var(--r-2);background:var(--bone);color:var(--ink);font-family: var(--sans);font-size:14px}
 .vt-input:focus{outline:none;border-color:var(--cobalt)}
 .vt-run{width:100%;margin-top:20px;min-height:48px;font-size:15px}
-.vt-status{margin-top:16px;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.5;border:1px solid var(--ink-hair);background:var(--bone)}
-.vt-status.ok{border-color:var(--lime);background:rgba(29, 78, 216, .14);color:var(--navy)}
+.vt-status{margin-top:16px;padding:12px 14px;border-radius:var(--r-2);font-size:13px;line-height:1.5;border:1px solid var(--ink-hair);background:var(--bone)}
+.vt-status.ok{border-color:var(--lime);background:rgba(var(--accent-rgb), .14);color:var(--navy)}
 .vt-status.err{border-color:rgba(196, 96, 79, .5);background:rgba(196, 96, 79, .06);color:rgba(170,20,20,1)}
 .vt-note{margin-top:22px;font-size:12px;color:var(--ink-dim);line-height:1.6;text-align:center}
-.vt-warn{margin:20px 0;padding:14px 16px;border:1px solid #d4a017;background:var(--card);border-radius:10px;color:var(--warn-ink);font-size:13px}
+.vt-warn{margin:20px 0;padding:14px 16px;border:1px solid #d4a017;background:var(--card);border-radius:var(--r-2);color:var(--warn-ink);font-size:13px}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {

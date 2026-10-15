@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const KEY = 'paramant.theme.v1';
-const LIGHT = 'rgb(255, 255, 255)';
+const LIGHT = 'rgb(242, 243, 245)';   // #F2F3F5, the grouped light ground (design-system.css v6.1)
 const DARK = 'rgb(14, 20, 27)';
 const TYPES = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.png':'image/png','.json':'application/json','.webp':'image/webp','.jpg':'image/jpeg' };
 

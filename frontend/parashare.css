@@ -40,7 +40,7 @@
 .ps-mode-title{font-family:var(--sans);font-size:16px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink-1);line-height:1.3}
 .ps-mode-card[aria-checked="true"] .ps-mode-title{color:var(--ink-1)}
 .ps-mode-body{font-size:14px;line-height:1.5;color:var(--ink-2)}
-.ps-mode-lock{display:inline-flex;align-items:center;gap:4px;margin-left:4px;padding:1px 7px;border:1px solid var(--line-2);border-radius:999px;font-size:12px;font-weight:500;color:var(--ink-2);vertical-align:2px;white-space:nowrap}
+.ps-mode-lock{display:inline-flex;align-items:center;gap:4px;margin-left:4px;padding:1px 7px;border:1px solid var(--line-2);border-radius:var(--r-pill);font-size:12px;font-weight:500;color:var(--ink-2);vertical-align:2px;white-space:nowrap}
 .ps-mode-lock svg{display:inline-block;width:12px;height:12px}
 .ps-mode-lock[hidden]{display:none}
 /* A check in the chosen card's corner: the choice is seen, not only coloured. */
@@ -86,7 +86,7 @@ textarea.ps-input{resize:vertical;min-height:120px}
 /* A 22px box to see and a 44px square to hit: the box is drawn as a
    background so the control itself keeps the size a thumb needs. */
 .ps-safe input{flex:0 0 auto;-webkit-appearance:none;appearance:none;width:44px;height:44px;margin:-11px -8px -11px -11px;border:0;background:transparent;cursor:pointer;position:relative}
-.ps-safe input::before{content:"";position:absolute;left:11px;top:11px;width:22px;height:22px;box-sizing:border-box;border:2px solid var(--ink-2);border-radius:5px;background:transparent}
+.ps-safe input::before{content:"";position:absolute;left:11px;top:11px;width:22px;height:22px;box-sizing:border-box;border:2px solid var(--ink-2);border-radius:var(--r-1);background:transparent}
 .ps-safe input:checked::before{border-color:var(--accent);background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.3l2.8 2.8L12.5 5' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
 .ps-safe input:focus-visible{outline:none}
 .ps-safe:has(input:checked){border-color:var(--accent)}

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F2F3F5;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Architecture: how encrypted file transfer works | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -29,15 +29,15 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=35">
+<link rel="stylesheet" href="/nav.css?v=31">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 
 /* ── typography ── */
-body{font-family:Inter,system-ui,-apple-system,sans-serif}
+body{font-family:var(--sans)}
 
 /* ── layout primitives ── */
 .arch-section{padding:80px 0}
@@ -46,26 +46,27 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 .arch-inner{max-width:900px;margin:0 auto;padding:0 48px}
 
 /* ── eyebrow pill ── */
-.eyebrow{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--ochre);color: var(--on-ochre);padding:4px 12px;margin-bottom:20px}
+.eyebrow{display:inline-block;font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;background:var(--ochre);color: var(--on-ochre);padding:4px 12px;margin-bottom:20px}
 
 /* ── hero ── */
 .page-hero{padding:100px 0 80px;border-bottom:1px solid var(--ink-hair)}
 .page-hero-inner{max-width:900px;margin:0 auto;padding:0 48px}
-.page-hero h1{font-size:42px;font-weight:700;letter-spacing:-.03em;margin-bottom:16px;line-height:1.1}
+.page-hero h1{font-size:42px;font-weight:700;letter-spacing:var(--track-display);margin-bottom:16px;line-height:1.1}
 .lede{font-size:18px;color:var(--ink-2);line-height:1.7;max-width:600px}
 .lede a{color:var(--cobalt);text-decoration:none}
 .lede a:hover{opacity:.7}
 
 /* ── section headings ── */
-.section-num{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:8px}
+.section-num{font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:8px}
 .section-num--dark{color:var(--ink-dim)}
-.section-title{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px}
+.section-title{font-size:28px;font-weight:700;letter-spacing:var(--track-heading);margin-bottom:16px}
 .section-desc{font-size:16px;line-height:1.75;color:var(--ink-2);max-width:640px;margin-bottom:40px}
 .arch-section--navy .section-desc{color:var(--ink-dim)}
 .arch-section--navy .section-title{color:var(--ink)}
 
 /* ── diagram box ── */
-.arch-diagram{background:var(--paper);border:1px solid var(--ink-hair);border-radius:var(--r);padding:40px;margin:32px 0;overflow-x:auto}
+.arch-diagram text{font-family:var(--sans)}
+.arch-diagram{background:var(--sheet-bg);border:1px solid var(--ink-hair);border-radius:var(--r);padding:40px;margin:32px 0;overflow-x:auto}
 
 /* ── the ink of the drawn figures ──
    The figures sit on the cream paper of the design system, like a printed
@@ -92,7 +93,7 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 .arch-diagram .d-bar{fill:var(--paper-ink)}
 .arch-diagram .d-bar-ink{fill:#B2FF3F}
 .arch-diagram .d-root{fill:var(--ochre-ink)}
-.arch-diagram .d-root-ink{fill:var(--paper)}
+.arch-diagram .d-root-ink{fill:var(--sheet-bg)}
 .arch-diagram .d-h{fill:var(--paper-ink)}
 .arch-diagram .d-t{fill:var(--paper-ink-2)}
 .arch-diagram .d-accent{fill:var(--petrol)}
@@ -109,15 +110,15 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
    strength. tests/ui-elements-contrast.test.mjs carries that reading as a
    named exception rather than as silence. */
 .loc-ring{fill:none;stroke:rgba(var(--tint), .10);stroke-width:1}
-.loc-ring-2{fill:none;stroke:rgba(29, 78, 216, .22);stroke-width:1}
-.loc-ring-3{fill:none;stroke:rgba(29, 78, 216, .38);stroke-width:1.5}
+.loc-ring-2{fill:none;stroke:rgba(var(--accent-rgb), .22);stroke-width:1}
+.loc-ring-3{fill:none;stroke:rgba(var(--accent-rgb), .38);stroke-width:1.5}
 .loc-dot{fill:var(--ochre)}
 .loc-cross{stroke:var(--cobalt);stroke-width:1}
 .loc-coord{fill:var(--ochre)}
 
 /* ── takeaway callout ── */
 .arch-takeaway{border-left:3px solid var(--ochre);padding:16px 20px;background:var(--card);margin-top:32px}
-.arch-takeaway--navy{border-left:3px solid var(--ochre);padding:16px 20px;background:rgba(29, 78, 216, .07);margin-top:32px}
+.arch-takeaway--navy{border-left:3px solid var(--ochre);padding:16px 20px;background:rgba(var(--accent-rgb), .07);margin-top:32px}
 .arch-takeaway p{font-size:14px;color:var(--ink-2);line-height:1.7;margin:0}
 .arch-takeaway--navy p{color:var(--ink-dim)}
 .arch-takeaway strong{color:var(--ink)}
@@ -127,8 +128,8 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
 .compare-col{padding:28px 32px;border:1px solid rgba(var(--tint), .12)}
 .compare-col--bad{background:rgba(var(--tint), .04);border-color:rgba(var(--tint), .1)}
-.compare-col--good{background:rgba(29, 78, 216, .08);border-color:rgba(29, 78, 216, .3)}
-.compare-col h3{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+.compare-col--good{background:rgba(var(--accent-rgb), .08);border-color:rgba(var(--accent-rgb), .3)}
+.compare-col h3{font-size:13px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;margin-bottom:20px}
 .compare-col--bad h3{color:var(--brick-ink)}
 .compare-col--good h3{color:var(--lime)}
 .compare-col ul{list-style:none;display:flex;flex-direction:column;gap:10px}
@@ -139,7 +140,7 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 
 /* ── URL anatomy ── */
 .url-anatomy{margin:36px 0;position:relative}
-.url-display{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6;word-break:break-all;background:var(--card);border:1px solid var(--ink-hair);padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:0}
+.url-display{font-family:var(--mono);font-size:15px;line-height:1.6;word-break:break-all;background:var(--card);border:1px solid var(--ink-hair);padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:0}
 .url-part{display:inline}
 .url-sent{color:var(--cobalt)}
 .url-not-sent{background:var(--ochre);color: var(--on-ochre);padding:2px 4px}
@@ -149,14 +150,14 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 .url-label-dot--blue{background:var(--ochre)}
 .url-label-dot--lime{background:var(--ochre)}
 .url-label-text{font-size:13px;color:var(--ink-2);line-height:1.6}
-.url-label-text strong{color:var(--ink);display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
+.url-label-text strong{color:var(--ink);display:block;font-size:12px;letter-spacing:var(--track-label);text-transform:uppercase;margin-bottom:2px}
 
 /* ── lifecycle grid ── */
 .lifecycle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:32px 0}
 .lifecycle-state{padding:24px;border:1px solid var(--ink-hair);background:var(--card);position:relative}
 .lifecycle-state--active{border-color:var(--ochre);border-width:2px}
 .lifecycle-state--gone{opacity:.5}
-.lifecycle-num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:12px}
+.lifecycle-num{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:12px}
 .lifecycle-state--active .lifecycle-num{color:var(--lime)}
 .lifecycle-heading{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px}
 .lifecycle-body{font-size:13px;color:var(--ink-2);line-height:1.6}
@@ -164,25 +165,23 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 
 /* ── modes table ── */
 .modes-table{width:100%;border-collapse:collapse;margin-top:32px}
-.modes-table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);border-bottom:2px solid var(--ink-hair)}
+.modes-table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);border-bottom:2px solid var(--ink-hair)}
 .modes-table th:not(:first-child){text-align:center}
 .modes-table td{padding:12px 16px;font-size:14px;color:var(--ink-2);border-bottom:1px solid var(--ink-hair);vertical-align:top}
 .modes-table td:first-child{color:var(--ink);font-weight:600}
 .modes-table td:not(:first-child){text-align:center;color:var(--ink-2)}
 .modes-table tr:last-child td{border-bottom:none}
-.modes-table .mode-head{font-size:13px;font-weight:700;color:var(--cobalt);text-transform:uppercase;letter-spacing:.04em}
-.modes-table .mode-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;background:var(--card);color:var(--cobalt)}
+.modes-table .mode-head{font-size:13px;font-weight:700;color:var(--cobalt);text-transform:uppercase;letter-spacing:var(--track-label)}
+.modes-table .mode-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;padding:2px 8px;background:var(--card);color:var(--cobalt)}
 .modes-table .mode-badge--lime{background:var(--card);color:var(--ok-ink)}
 
 /* ── going deeper ── */
 .going-deeper{text-align:center;padding:64px 48px}
-.going-deeper h2{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px;color:var(--ink)}
+.going-deeper h2{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bottom:12px;color:var(--ink)}
 .going-deeper p{font-size:16px;color:var(--ink-2);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
-.btn-arch{display:inline-block;background:var(--bone-2);color:var(--ink);text-decoration:none;padding:14px 32px;font-size:14px;font-weight:600;letter-spacing:.02em;transition:opacity .15s}
-.btn-arch:hover{opacity:.85}
 
 /* ── SVG helpers ── */
-.diagram-label{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.diagram-label{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase}
 
 footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
 .footer-links{display:flex;gap:20px;flex-wrap:wrap}
@@ -211,9 +210,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -232,13 +231,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -252,16 +251,16 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -405,52 +404,52 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <!-- Stage boxes -->
         <!-- 1: YOUR BROWSER -->
         <rect x="0" y="40" width="180" height="140" rx="2" class="d-panel"/>
-        <text x="90" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">YOUR BROWSER</text>
+        <text x="90" y="64" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">YOUR BROWSER</text>
         <rect x="20" y="76" width="140" height="28" rx="2" class="d-slot"/>
-        <text x="90" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" class="d-accent">file.pdf</text>
-        <text x="90" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">AES-256-GCM</text>
-        <text x="90" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">encrypt in browser</text>
+        <text x="90" y="95" text-anchor="middle" font-size="10" class="d-accent">file.pdf</text>
+        <text x="90" y="118" text-anchor="middle" font-size="8.5" class="d-t">AES-256-GCM</text>
+        <text x="90" y="132" text-anchor="middle" font-size="8.5" class="d-t">encrypt in browser</text>
         <rect x="20" y="144" width="140" height="24" rx="2" class="d-bar"/>
-        <text x="90" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">&#x1F511; key generated</text>
+        <text x="90" y="160" text-anchor="middle" font-size="9" class="d-bar-ink">&#x1F511; key generated</text>
 
         <!-- Arrow 1→2 -->
         <line x1="183" y1="110" x2="227" y2="110" class="d-line" marker-end="url(#arr)"/>
-        <text x="205" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">ciphertext</text>
+        <text x="205" y="102" text-anchor="middle" font-size="8" class="d-t">ciphertext</text>
 
         <!-- 2: PARAMANT RELAY -->
         <rect x="230" y="40" width="180" height="140" rx="2" class="d-panel"/>
-        <text x="320" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">PARAMANT RELAY</text>
+        <text x="320" y="64" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">PARAMANT RELAY</text>
         <rect x="250" y="76" width="140" height="52" rx="2" class="d-slot-bad"/>
-        <text x="320" y="98" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bad">████████████</text>
-        <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-bad">opaque ciphertext</text>
-        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">RAM only, no disk write</text>
-        <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">no key, no plaintext</text>
+        <text x="320" y="98" text-anchor="middle" font-size="9" class="d-bad">████████████</text>
+        <text x="320" y="114" text-anchor="middle" font-size="8" class="d-bad">opaque ciphertext</text>
+        <text x="320" y="146" text-anchor="middle" font-size="8.5" class="d-t">RAM only, no disk write</text>
+        <text x="320" y="160" text-anchor="middle" font-size="8.5" class="d-t">no key, no plaintext</text>
 
         <!-- Arrow 2→3 -->
         <line x1="413" y1="110" x2="457" y2="110" class="d-line" marker-end="url(#arr)"/>
-        <text x="435" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">ciphertext</text>
+        <text x="435" y="102" text-anchor="middle" font-size="8" class="d-t">ciphertext</text>
 
         <!-- 3: RECIPIENT BROWSER -->
         <rect x="460" y="40" width="180" height="140" rx="2" class="d-panel"/>
-        <text x="550" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">RECIPIENT BROWSER</text>
+        <text x="550" y="64" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">RECIPIENT BROWSER</text>
         <rect x="480" y="76" width="140" height="28" rx="2" class="d-slot"/>
-        <text x="550" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" class="d-accent">file.pdf ✓</text>
-        <text x="550" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">key from link #fragment</text>
-        <text x="550" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">decrypt locally</text>
+        <text x="550" y="95" text-anchor="middle" font-size="10" class="d-accent">file.pdf ✓</text>
+        <text x="550" y="118" text-anchor="middle" font-size="8.5" class="d-t">key from link #fragment</text>
+        <text x="550" y="132" text-anchor="middle" font-size="8.5" class="d-t">decrypt locally</text>
         <rect x="480" y="144" width="140" height="24" rx="2" class="d-bar"/>
-        <text x="550" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">flagged for erasure</text>
+        <text x="550" y="160" text-anchor="middle" font-size="9" class="d-bar-ink">flagged for erasure</text>
 
         <!-- Arrow 3→4 -->
         <line x1="643" y1="110" x2="687" y2="110" class="d-line" marker-end="url(#arr)"/>
-        <text x="665" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">burn</text>
+        <text x="665" y="102" text-anchor="middle" font-size="8" class="d-t">burn</text>
 
         <!-- 4: GONE -->
         <rect x="690" y="40" width="170" height="140" rx="2" class="d-gone" stroke-dasharray="4 3"/>
-        <text x="775" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-bad">GONE</text>
+        <text x="775" y="64" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-bad">GONE</text>
         <text x="775" y="95" text-anchor="middle" font-size="28" class="d-bad">⌫</text>
-        <text x="775" y="126" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">erased from RAM</text>
-        <text x="775" y="142" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">410 Gone</text>
-        <text x="775" y="158" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">no recovery</text>
+        <text x="775" y="126" text-anchor="middle" font-size="8.5" class="d-bad">erased from RAM</text>
+        <text x="775" y="142" text-anchor="middle" font-size="8.5" class="d-bad">410 Gone</text>
+        <text x="775" y="158" text-anchor="middle" font-size="8.5" class="d-bad">no recovery</text>
 
         <!-- Arrowhead marker -->
         <defs>
@@ -510,7 +509,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">03</div>
     <h2 class="section-title">The # in the link</h2>
-    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half (the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code>) never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
+    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half (the part after <code style="font-family:var(--mono);font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code>) never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
 
     <div class="url-anatomy">
       <div class="url-display">
@@ -520,16 +519,16 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--blue"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt)">Sent to relay</strong>
+            <strong style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt)">Sent to relay</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The path <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">/r/a8f3c92d</code> identifies which blob to retrieve. The relay sees this and serves the matching ciphertext.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The path <code style="font-family:var(--mono);font-size:12px">/r/a8f3c92d</code> identifies which blob to retrieve. The relay sees this and serves the matching ciphertext.</p>
         </div>
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--lime"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ok-ink)">Never leaves the browser</strong>
+            <strong style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ok-ink)">Never leaves the browser</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never sent to any server, including ours.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:var(--mono);font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never sent to any server, including ours.</p>
         </div>
       </div>
     </div>
@@ -556,7 +555,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div class="lifecycle-state lifecycle-state--active">
         <div class="lifecycle-num">State 02 · active</div>
         <div class="lifecycle-heading">Link opened</div>
-        <div class="lifecycle-body">The recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. The file appears in the browser.</div>
+        <div class="lifecycle-body">The recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:var(--mono);font-size:12px">#key=…</code>. The file appears in the browser.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--gone">
         <svg class="lifecycle-gone-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -586,8 +585,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
         <!-- ROOT -->
         <rect x="265" y="10" width="150" height="44" rx="2" class="d-root"/>
-        <text x="340" y="30" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.06em" class="d-root-ink">MERKLE ROOT</text>
-        <text x="340" y="46" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-root-ink">SHA3-256 fingerprint</text>
+        <text x="340" y="30" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="0.06em" class="d-root-ink">MERKLE ROOT</text>
+        <text x="340" y="46" text-anchor="middle" font-size="8" class="d-root-ink">SHA3-256 fingerprint</text>
 
         <!-- Mid-level lines -->
         <line x1="290" y1="54" x2="175" y2="110" class="d-line"/>
@@ -595,12 +594,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
         <!-- Mid-level nodes -->
         <rect x="105" y="110" width="140" height="38" rx="2" class="d-panel"/>
-        <text x="175" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-t">hash(A + B)</text>
-        <text x="175" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">transfers 1–2</text>
+        <text x="175" y="127" text-anchor="middle" font-size="9" class="d-t">hash(A + B)</text>
+        <text x="175" y="141" text-anchor="middle" font-size="8" class="d-t">transfers 1–2</text>
 
         <rect x="435" y="110" width="140" height="38" rx="2" class="d-panel"/>
-        <text x="505" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-t">hash(C + D)</text>
-        <text x="505" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">transfers 3–4</text>
+        <text x="505" y="127" text-anchor="middle" font-size="9" class="d-t">hash(C + D)</text>
+        <text x="505" y="141" text-anchor="middle" font-size="8" class="d-t">transfers 3–4</text>
 
         <!-- Leaf lines -->
         <line x1="145" y1="148" x2="75" y2="196" class="d-line"/>
@@ -610,24 +609,24 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
         <!-- Leaf nodes -->
         <rect x="25" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="75" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT A</text>
-        <text x="75" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 1</text>
-        <text x="75" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="75" y="212" text-anchor="middle" font-size="8.5" font-weight="700" class="d-accent">EVENT A</text>
+        <text x="75" y="228" text-anchor="middle" font-size="7.5" class="d-t">transfer 1</text>
+        <text x="75" y="240" text-anchor="middle" font-size="7" class="d-t">timestamp + hash</text>
 
         <rect x="215" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="265" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT B</text>
-        <text x="265" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 2</text>
-        <text x="265" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="265" y="212" text-anchor="middle" font-size="8.5" font-weight="700" class="d-accent">EVENT B</text>
+        <text x="265" y="228" text-anchor="middle" font-size="7.5" class="d-t">transfer 2</text>
+        <text x="265" y="240" text-anchor="middle" font-size="7" class="d-t">timestamp + hash</text>
 
         <rect x="365" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="415" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT C</text>
-        <text x="415" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 3</text>
-        <text x="415" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="415" y="212" text-anchor="middle" font-size="8.5" font-weight="700" class="d-accent">EVENT C</text>
+        <text x="415" y="228" text-anchor="middle" font-size="7.5" class="d-t">transfer 3</text>
+        <text x="415" y="240" text-anchor="middle" font-size="7" class="d-t">timestamp + hash</text>
 
         <rect x="555" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="605" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT D</text>
-        <text x="605" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 4</text>
-        <text x="605" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="605" y="212" text-anchor="middle" font-size="8.5" font-weight="700" class="d-accent">EVENT D</text>
+        <text x="605" y="228" text-anchor="middle" font-size="7.5" class="d-t">transfer 4</text>
+        <text x="605" y="240" text-anchor="middle" font-size="7" class="d-t">timestamp + hash</text>
       </svg>
     </div>
 
@@ -645,7 +644,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <p class="section-desc">One jurisdiction. One data centre. No CDN caching your files. No US entity stores ciphertext. The one American sub-processor, Resend, sends the email under Standard Contractual Clauses, and that email sometimes carries key material: for a send to named recipients the link with the token and, in a second email, the pickup code, which together open the file; for a signing invite half of the document key. The CLOUD Act can reach that.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
 
       <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentric circles showing relay location in Nuremberg, Germany">
         <!-- Concentric circles -->
@@ -662,23 +661,23 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <line x1="150" y1="140" x2="158" y2="140" class="loc-cross"/>
         <line x1="202" y1="140" x2="210" y2="140" class="loc-cross"/>
         <!-- Coordinates label -->
-        <text x="196" y="128" font-family="'IBM Plex Mono',monospace" font-size="8" class="loc-coord">49.45°N 11.08°E</text>
+        <text x="196" y="128" font-size="8" class="loc-coord">49.45°N 11.08°E</text>
       </svg>
 
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(29, 78, 216, 0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
+      <div style="font-family:var(--mono);font-size:11px;color:rgba(var(--accent-rgb), 0.8);letter-spacing:var(--track-label);margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px">
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Jurisdiction</div>
+        <div style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:8px">Jurisdiction</div>
         <div style="font-size:14px;color:var(--ink-2);line-height:1.6">EU / Germany<br><span style="font-size:12px;color:var(--ink-dim)">GDPR · DSGVO</span></div>
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">US Cloud Act</div>
+        <div style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:8px">US Cloud Act</div>
         <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Not on the relay<br><span style="font-size:12px;color:var(--ink-dim)">it does reach email via Resend (US)</span></div>
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Storage</div>
+        <div style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:8px">Storage</div>
         <div style="font-size:14px;color:var(--ink-2);line-height:1.6">RAM only<br><span style="font-size:12px;color:var(--ink-dim)">no disk, no CDN</span></div>
       </div>
     </div>
@@ -806,7 +805,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
         <div class="footer-col-label">Company</div>
@@ -831,7 +830,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 </footer>
 
-<script src="/nav.js?v=17" defer></script>
+<script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

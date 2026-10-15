@@ -34,7 +34,7 @@ const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const THEME_KEY = 'paramant.theme.v1';
 
 // The two page grounds, --ground in frontend/design-system.css.
-const LIGHT = 'rgb(255, 255, 255)';
+const LIGHT = 'rgb(242, 243, 245)';   // #F2F3F5, the grouped light ground (design-system.css v6.1)
 const DARK = 'rgb(14, 20, 27)';   // #0E141B, the dark edition
 
 const TYPES = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.png':'image/png','.json':'application/json','.woff2':'font/woff2' };

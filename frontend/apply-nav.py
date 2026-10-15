@@ -62,7 +62,7 @@ NEW_FOOTER = '''\
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
         <div class="footer-col-label">Company</div>
@@ -272,7 +272,7 @@ NEW_FOOTER_NL = '''\
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
         <div class="footer-col-label">Bedrijf</div>
@@ -310,9 +310,9 @@ LEGAL_STRIP_NL = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=33">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=29">'
-NAV_JS    = '<script src="/nav.js?v=17" defer></script>'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=35">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=31">'
+NAV_JS    = '<script src="/nav.js?v=18" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=22" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical

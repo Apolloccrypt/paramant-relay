@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F2F3F5;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Algemene voorwaarden · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -23,36 +23,35 @@
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/terms">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/terms">
 
-<link rel="stylesheet" href="/design-system.css?v=33">
-<link rel="stylesheet" href="/nav.css?v=29">
-<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=35">
+<link rel="stylesheet" href="/nav.css?v=31">
+<link rel="stylesheet" href="/relay-pulse.css?v=6">
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --black:var(--navy);;
-  --mono:ui-monospace,'Cascadia Code','SF Mono','Fira Code',monospace
-}
+  }
 html{scroll-behavior:smooth}
-body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{background:var(--bone);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 .wrap{max-width:720px;margin:0 auto;padding:80px 48px 120px}
-.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;font-family:var(--mono)}
-h1{font-size:36px;font-weight:600;letter-spacing:-.025em;color:var(--ink);margin-bottom:10px}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;font-family:var(--sans)}
+h1{font-size:36px;font-weight:600;letter-spacing:var(--track-display);color:var(--ink);margin-bottom:10px}
 .sub{font-size:15px;color:var(--ink-dim);margin-bottom:56px;line-height:1.7}
-h2{font-size:18px;font-weight:600;letter-spacing:-.015em;color:var(--ink);margin-bottom:12px;margin-top:52px}
+h2{font-size:18px;font-weight:600;letter-spacing:var(--track-heading);color:var(--ink);margin-bottom:12px;margin-top:52px}
 h2:first-of-type{margin-top:0}
 p{color:var(--ink-dim);margin-bottom:16px;line-height:1.8}
 .sla-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:40px}
 .sla-cell{background:var(--bone);padding:24px 20px}
 .sla-cell.head{background:var(--ink-ghost)}
-.tier{font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
-.uptime{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--cobalt)}
+.tier{font-size:11px;font-family:var(--sans);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.uptime{font-size:24px;font-weight:600;letter-spacing:var(--track-heading);color:var(--cobalt)}
 .uptime-sub{font-size:12px;color:var(--ink-dim);margin-top:4px}
 table{width:100%;border-collapse:collapse;margin-bottom:40px;font-size:13px}
-th{text-align:left;padding:10px 16px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);font-weight:500}
+th{text-align:left;padding:10px 16px;font-size:11px;font-family:var(--sans);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);font-weight:500}
 td{padding:12px 16px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost)}
 tr:last-child td{border-bottom:none}
 td:first-child{color:var(--ink);font-weight:500}
-.badge{display:inline-block;padding:2px 8px;font-size:11px;font-family:var(--mono);letter-spacing:.04em}
+.badge{display:inline-block;padding:2px 8px;font-size:11px;font-family:var(--sans);letter-spacing:var(--track-label)}
 .badge-comm{background:var(--ink-ghost);color:var(--ink-dim)}
 .badge-pro{background:var(--ink-ghost);color:var(--ink-dim)}
 .badge-ent{background:var(--ink-ghost);color:var(--cobalt)}
@@ -71,9 +70,9 @@ a:hover{opacity:.8}
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border: 1px solid var(--ink-hair);
@@ -92,13 +91,13 @@ a:hover{opacity:.8}
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-dim);
-  font-family: Inter, sans-serif;
+  font-family: var(--sans);
   line-height: 1;
 }
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -112,16 +111,16 @@ a:hover{opacity:.8}
 .nav-help-mobile {
   display: block;
   padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
+  font-family: var(--sans);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-wide);
   color: var(--ink-2);
   text-decoration: none;
   border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -329,7 +328,7 @@ a:hover{opacity:.8}
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
         <div class="footer-col-label">Bedrijf</div>
@@ -353,7 +352,7 @@ a:hover{opacity:.8}
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=17" defer></script>
+<script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 </body>
 </html>

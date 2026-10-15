@@ -50,7 +50,7 @@
   font-size: var(--text-xl, 24px);
   font-weight: 600;
   line-height: 1.25;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--track-heading);
   color: var(--ink);
   margin: 0 0 var(--space-3, 12px);
 }
@@ -81,7 +81,7 @@
   color: var(--ink-2, var(--ink));
   background: var(--card, transparent);
   border: 1px solid var(--ink-hair);
-  border-radius: 10px;
+  border-radius: var(--r-2);
   padding: var(--space-3, 12px);
   word-break: break-all;
   margin: 0 0 var(--space-2, 8px);
@@ -155,7 +155,7 @@
   content: "+";
   display: inline-block;
   width: 1.1em;
-  font-family: var(--mono);
+  font-family: var(--sans);
   color: var(--ink-dim);
 }
 
