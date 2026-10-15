@@ -85,8 +85,18 @@ const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) =>
   webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
   paper: getComputedStyle(document.body).backgroundColor,
 }));
-// Pinned to the bone hex until 4 September 2026; the homepage now paints the bar in the night colour, so the pin is what it always guarded: fully opaque, no blur.
-ok('mobile navigation is opaque before opening the menu', /^rgb\(/.test(publicMobilePaint.background) && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
+// Pinned to the bone hex until 4 September 2026, then to "fully opaque, no
+// blur". What it guards is that no sharp letter of the page reads through the
+// bar. Since design-system.css v6.1 the bar may be translucent, but only with a
+// real frost behind it (blur of 12px or more): a letter under 20px of blur is a
+// smudge, not spook text. A see-through bar without a blur stays red.
+function barHidesThePage(paint) {
+  if (/^rgb\(/.test(paint.background)) return true;
+  const filter = [paint.backdropFilter, paint.webkitBackdropFilter].filter(Boolean).join(' ');
+  const blur = /blur\((\d+(?:\.\d+)?)px\)/.exec(filter);
+  return !!blur && Number(blur[1]) >= 12;
+}
+ok('mobile navigation is opaque, or frosted, before opening the menu', barHidesThePage(publicMobilePaint), JSON.stringify(publicMobilePaint));
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => {
   const nav = document.querySelector('nav.nav')?.getBoundingClientRect();
@@ -501,7 +511,7 @@ await appBarPage.close();
 // different colour: /parashare, /dashboard, /sign, /account and the auth pages
 // load app-2026.css AFTER nav.css, and that file paints the bar in the app's
 // own paper rather than the marketing bone. What must be identical is the
-// opacity. nav.css turns the bar opaque under 1024px on purpose, because at .92
+// opacity, or since v6.1 the frost. A bar at .92 with no backdrop-filter, because at .92
 // with no backdrop-filter behind it the page scrolls through the letters; the
 // later stylesheet had quietly put the translucent token back, and a review of
 // /parashare on a 390 phone read it off the screen as spook letters. So this
@@ -515,9 +525,7 @@ const appPaint = await appPaintPage.locator('nav.nav').evaluate((node) => ({
   backdropFilter: getComputedStyle(node).backdropFilter,
   webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
 }));
-ok('the /parashare navigation is opaque on a phone', /^rgb\(\d+, \d+, \d+\)$/.test(appPaint.background)
-  && appPaint.backdropFilter === 'none'
-  && (!appPaint.webkitBackdropFilter || appPaint.webkitBackdropFilter === 'none'), JSON.stringify(appPaint));
+ok('the /parashare navigation is opaque, or frosted, on a phone', barHidesThePage(appPaint), JSON.stringify(appPaint));
 await appPaintPage.close();
 
 // A signed-in tablet has the room the phone does not, so Help is a text link in

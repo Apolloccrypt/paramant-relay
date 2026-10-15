@@ -5,7 +5,7 @@
 <!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
      before every module and deferred script that signals or awaits. -->
 <script src="/js/ready.js?v=1"></script>
-<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F2F3F5;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign a PDF in your browser | ParaSign | Paramant</title>
 <meta property="og:site_name" content="Paramant">
@@ -31,10 +31,10 @@
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/sign">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="stylesheet" href="/design-system.css?v=34">
-<link rel="stylesheet" href="/nav.css?v=30">
+<link rel="stylesheet" href="/design-system.css?v=35">
+<link rel="stylesheet" href="/nav.css?v=31">
 <link rel="stylesheet" href="/relay-pulse.css?v=6">
-<link rel="stylesheet" href="/components-parasign.css?v=8">
+<link rel="stylesheet" href="/components-parasign.css?v=9">
 <style>
 .ds-note{margin:12px 0 0;padding:13px 16px;border:1px solid var(--line);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);color:var(--ink-2);font-size:14px;line-height:1.6}
 .ds-note p{margin:0 0 8px}
@@ -44,8 +44,9 @@
 .ds-head{margin-bottom:30px;max-width:740px}
 .ds-kicker{display:inline-flex;align-items:center;font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
 .ds-kicker::before{content:"";width:14px;height:2px;margin-right:9px;background:var(--mark)}
-.ds-title{font-size:clamp(30px,5vw,48px);font-weight:600;letter-spacing:var(--track-display);line-height:1.06;margin-bottom:14px;color:var(--ink-1);max-width:18ch}
-.ds-lede{font-size:clamp(16px,2vw,18px);color:var(--ink-2);line-height:1.62;max-width:58ch}
+@media(min-width:900px){.ds-head .ds-title{font-size:var(--t-large);line-height:var(--lh-large);letter-spacing:var(--track-display)}}
+.ds-title{font-size:var(--t-title1);font-weight:700;letter-spacing:var(--track-heading);line-height:var(--lh-title1);margin-bottom:14px;color:var(--ink-1);max-width:18ch}
+.ds-lede{font-size:var(--t-headline);color:var(--ink-2);line-height:1.5;max-width:58ch}
 .ds-facts{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding:0;max-width:690px}
 .ds-facts li{font-family: var(--sans);font-size:11px;letter-spacing:var(--track-wide);color:var(--ink-2);border:1px solid var(--line-2);border-left:2px solid var(--mark);background:var(--surface);padding:6px 10px;line-height:1.5}
 .ds-facts li b{color:var(--ink-1);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label)}
@@ -113,8 +114,8 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 .ds-stepper li.done{color:var(--ink-2)}
 .ds-stepper li.done::before{border-color:var(--sig-done);color:var(--surface);background:var(--sig-done)}
 .ds-step{margin-bottom:24px}
-.ds-step h2{font-size:20px;font-weight:600;letter-spacing:var(--track-heading);margin-bottom:6px;color:var(--ink-1)}
-.ds-step .ds-sub{font-size:14px;color:var(--ink-2);margin-bottom:20px;line-height:1.62;max-width:62ch}
+.ds-step h2{font-size:var(--t-title2);line-height:var(--lh-title2);font-weight:700;letter-spacing:var(--track-heading);margin-bottom:6px;color:var(--ink-1)}
+.ds-step .ds-sub{font-size:var(--t-body);color:var(--ink-2);margin-bottom:20px;line-height:1.62;max-width:62ch}
 .ds-dropzone{border:1px solid var(--line-2);border-radius:var(--r-2);background:var(--surface-sunk);padding:44px 24px;text-align:center;cursor:pointer;transition:border-color var(--d-1) var(--e-standard),background var(--d-1) var(--e-standard)}
 .ds-dropzone:hover,.ds-dropzone.drag{border-color:var(--accent);background:var(--accent-soft)}
 .ds-dropzone:focus-visible{outline:none;box-shadow:var(--ring)}
@@ -372,7 +373,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   /* Tap targets on a phone. Padding, not type: the words keep their size. */
   .ds-headlink a,footer .footer-links a{display:inline-flex;align-items:center;min-height:var(--tap)}
   .ds-wrap{padding:0 16px;margin-top:24px}
-  .ds-title{font-size:24px}
+  .ds-title{font-size:var(--t-title1)}
+  /* a step title on a phone is a bar title: 17, so the page under it stays in view */
+  .ds-step h2{font-size:var(--t-headline);line-height:var(--lh-headline)}
+  .ds-step .ds-sub{font-size:var(--t-footnote);line-height:var(--lh-footnote)}
   .ds-stepper li{font-size:10px;padding:10px 0}
   .ds-stepper li::before{display:block;margin:0 auto 4px}
   .ds-info-card dl{grid-template-columns:1fr}
@@ -550,10 +554,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 }
 </script>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=13">
+<link rel="stylesheet" href="/app-2026.css?v=14">
 <link rel="stylesheet" href="/protocol-trail.css?v=1">
 <link rel="stylesheet" href="/done-state.css?v=2">
-<link rel="stylesheet" href="/werkplek.css?v=4">
+<link rel="stylesheet" href="/werkplek.css?v=5">
 <script src="/js/theme.js?v=6"></script>
 </head>
 <body>
@@ -1081,7 +1085,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=17" defer></script>
+<script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=10" defer></script>

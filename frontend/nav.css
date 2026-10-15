@@ -18,14 +18,32 @@ nav.nav {
   gap: var(--space-4);
   padding: 0 40px;
   height: 56px;
-  background: var(--bone-blur);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--ink-hair);
+  /* The bar is one surface with the page until the page moves under it. It
+     starts solid in the ground colour, with no line: at the top there is
+     nothing to separate. Where the browser can blur, it turns translucent
+     and the content that scrolls under it is frosted, not legible (a sharp
+     letter through a .78 bar is what a review of /parashare called spook
+     letters). The hairline appears once the page has scrolled: in CSS where
+     the browser has scroll timelines, from nav.js (html[data-scrolled])
+     everywhere else. */
+  background: var(--headerbar-bg-solid, var(--bone));
+  border-bottom: 1px solid var(--separator);
   position: sticky;
   top: 0;
   z-index: 300;
+  transition: border-color var(--d-2) var(--e-standard);
 }
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  nav.nav {
+    background: var(--headerbar-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+/* nav.js marks the root once it runs; from then on the line follows the
+   scroll position. Without the script the line simply stays. */
+html[data-nav-top] nav.nav { border-bottom-color: transparent; }
+@media (prefers-reduced-motion: reduce) { nav.nav { transition: none; } }
 
 /* Logo */
 nav.nav .nav-logo {
@@ -107,8 +125,10 @@ nav.nav .nav-dropdown-menu {
   top: calc(100% + 4px);
   left: 0;
   min-width: 220px;
-  background: var(--bone);
-  border: 1px solid var(--ink-hair);
+  background: var(--popover-bg);
+  border: 1px solid var(--separator);
+  border-radius: var(--r-2);
+  box-shadow: var(--sh-2);
   padding: var(--space-2) 0;
   list-style: none;
   margin: 0;
@@ -478,9 +498,6 @@ body.nav-locked .nav {
   nav.nav {
     padding: 0 16px;
     gap: var(--space-3);
-    background: var(--nav-paper, var(--bone));
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
   nav.nav .nav-links { display: none !important; }
   nav.nav .nav-hamburger { display: flex; }
@@ -738,8 +755,10 @@ nav.nav .nav-user-menu {
   right: 0;
   top: calc(100% + 8px);
   min-width: 220px;
-  background: var(--bone);
-  border: 1px solid var(--ink-hair);
+  background: var(--popover-bg);
+  border: 1px solid var(--separator);
+  border-radius: var(--r-2);
+  box-shadow: var(--sh-2);
   border-radius: var(--r-1);
   box-shadow: var(--sh-2);
   padding: var(--space-1) 0;

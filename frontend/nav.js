@@ -140,6 +140,24 @@
     }
   });
 
+  // ── The hairline under the bar ─────────────────────────
+  // At the top of the page the bar and the page are one surface; the line
+  // under the bar only means something once content moves beneath it.
+  // nav.css hides the line while <html data-nav-top> is set.
+  var root = document.documentElement;
+  var navTopQueued = false;
+  function markNavTop() {
+    navTopQueued = false;
+    if ((window.scrollY || root.scrollTop || 0) < 2 && !document.body.classList.contains('nav-locked')) root.setAttribute('data-nav-top', '');
+    else root.removeAttribute('data-nav-top');
+  }
+  markNavTop();
+  window.addEventListener('scroll', function () {
+    if (navTopQueued) return;
+    navTopQueued = true;
+    window.requestAnimationFrame(markNavTop);
+  }, { passive: true });
+
   // ── Mobile menu ───────────────────────────────────────
   if (!hamburger || !mobile) return;
 
@@ -259,4 +277,5 @@
   mobile.querySelectorAll('.nav-mobile-standalone').forEach(function (a) {
     if (a.getAttribute('href') === path) a.setAttribute('aria-current', 'page');
   });
+
 })();

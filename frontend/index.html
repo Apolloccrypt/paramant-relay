@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F2F3F5;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0B3A6A">
 <title>Veilig bestanden versturen en laten ondertekenen · Paramant</title>
@@ -25,9 +25,9 @@
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/design-system.css?v=34">
-<link rel="stylesheet" href="/nav.css?v=30">
-<link rel="stylesheet" href="/werkplek.css?v=4">
+<link rel="stylesheet" href="/design-system.css?v=35">
+<link rel="stylesheet" href="/nav.css?v=31">
+<link rel="stylesheet" href="/werkplek.css?v=5">
 <style>
 /* The homepage stands on the shared roles of /design-system.css v6.0: the
    white window, the #0C1B2A label, the one cobalt. It used to re-point every
@@ -70,15 +70,16 @@ main{display:block;overflow:hidden}
 .home-hero + .check-sec{border-top:0}
 
 /* buttons: one ochre, one hairline */
-.hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;border-radius:var(--r-3);font-size:15px;font-weight:600;text-decoration:none;line-height:1;transition:background .15s,color .15s,border-color .15s,transform .15s;white-space:nowrap}
+.hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--control-h);padding:0 18px;border-radius:var(--r-control);font-size:var(--t-body);font-weight:600;text-decoration:none;line-height:1;transition:background var(--d-1) var(--e-standard),color var(--d-1) var(--e-standard),border-color var(--d-1) var(--e-standard);white-space:nowrap}
 .hp-btn-fill{background:var(--ochre);color:var(--on-ochre);border:1px solid var(--ochre)}
 .hp-btn-fill:hover{background:var(--ochre-2);border-color:var(--ochre-2)}
-.hp-btn-line{background:var(--card);color:var(--fg);border:1px solid var(--line-2)}
-.hp-btn-line:hover{border-color:var(--fg);background:rgba(var(--tint),.09)}
+.hp-btn-line{background:var(--view-bg);color:var(--fg);border:1px solid var(--line-2)}
+.hp-btn-line:hover{border-color:var(--fg-dim);background:var(--card-bg-2)}
 .hp-btn-paper{background:var(--paper-ink);color:var(--paper);border:1px solid var(--paper-ink)}
 .hp-btn-paper:hover{background:#fff}
-.hp-btn:focus-visible{outline:3px solid rgba(var(--accent-rgb), .5);outline-offset:2px}
-.hp-btn:active{transform:translateY(1px)}
+.hp-btn:focus-visible{outline:2px solid transparent;box-shadow:var(--ring)}
+.hp-btn-fill:active{background:var(--accent-bg-press);border-color:var(--accent-bg-press)}
+.hp-btn-line:active{background:var(--fill)}
 
 /* ---------- signed in: the hero is the whole page ----------
    js/home-auth.js stamps data-session="in" on <html> once the session check
@@ -257,7 +258,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
   .hp-art{height:min(380px,38vw)}
   .hp-doc,.hp-dust{width:min(340px,32vw);top:6%}
 }
-@media (min-width:1100px){.hp-btn{min-height:48px;padding:0 22px;font-size:15px}}
+@media (min-width:1100px){.hp-btn{padding:0 22px}}
 
 /* the receipt that stays while the document dissolves */
 .hp-receipt{position:absolute;right:2%;bottom:8px;width:min(230px,22vw);background:var(--night-2);border:1px solid var(--line-2);border-radius:var(--r-2);box-shadow:var(--sh-3);padding:14px 14px 12px;transform:rotate(3deg);font-family:var(--hp-mono);font-size:10px;letter-spacing:var(--track-wide);color:var(--fg-dim);z-index:3}
@@ -927,7 +928,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=17" defer></script>
+<script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/format-date.js?v=5" defer></script>
 <script src="/js/home-auth.js?v=10" defer></script>

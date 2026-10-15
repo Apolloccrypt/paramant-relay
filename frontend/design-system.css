@@ -1,4 +1,4 @@
-/* PARAMANT design-system.css v6.0
+/* PARAMANT design-system.css v6.1
    The one token source of the site. Every page, the /en copies and the app
    screens read their colours, radii, shadows, motion and type from here.
    /app-2026.css defines no token values of its own any more.
@@ -72,11 +72,22 @@
   --text-6xl:  clamp(6rem, 14vw, 12rem);
   --text-num:  clamp(4rem, 10vw, 8rem);
 
+  /* the one reading scale for app and page text, after Apple's text styles:
+     size / line-height. Display type above it (--text-3xl and up) is for a
+     marketing hero only. */
+  --t-large:    2.125rem;  --lh-large:    1.12;   /* 34/38 page title  */
+  --t-title1:   1.75rem;   --lh-title1:   1.12;   /* 28/31 section     */
+  --t-title2:   1.375rem;  --lh-title2:   1.27;   /* 22/28 group       */
+  --t-headline: 1.0625rem; --lh-headline: 1.35;   /* 17/23 row, lede   */
+  --t-body:     0.9375rem; --lh-body:     1.5;    /* 15/22 body        */
+  --t-footnote: 0.8125rem; --lh-footnote: 1.4;    /* 13/18 meta        */
+
   /* tracking: four steps. Display type is pulled in, headings a little,
      small type opened up a little, and an uppercase label opened up enough
      to read as a label. Everything else is the face's own spacing. */
-  --track-display: -.03em;
-  --track-heading: -.015em;
+  --track-display: -.032em;
+  --track-heading: -.022em;
+  --track-title:   -.012em;
   --track-wide:     .02em;
   --track-label:    .06em;
 
@@ -121,31 +132,41 @@
 
   /* the smallest thing a finger has to hit (WCAG 2.5.5, Apple HIG 44pt) */
   --tap: 44px;
+  /* every control, button, field, segment, is this tall: one line of hit
+     area, so a row of mixed controls lines up */
+  --control-h: 44px;
+  --r-control: 8px;
 }
 
-/* LIGHT. Contrast, WCAG 2.1 relative luminance, on the window #FFFFFF:
-   label 17.42, label-2 8.30, label-3 5.54, accent 6.70, destructive 7.58,
-   success 6.49, warning 6.01, teal 7.27. On the second band #F5F6F7 the
-   lowest is label-3 at 5.12. White on the accent fill 6.70. */
+/* LIGHT. v6.1 (October 2026) layers it: a grey grouped ground, white
+   sheets on it, a hairline, and a shadow only under what floats. Contrast,
+   WCAG 2.1 relative luminance. On a white card or field: label 17.42,
+   label-2 8.30, label-3 5.54, accent 6.70, destructive 7.58, success 6.49,
+   warning 6.01, teal 7.27. On the ground #F2F3F5: label 15.69, label-2 7.47,
+   label-3 4.99, accent 6.04. On the band #EAECEF the lowest is label-3 at
+   4.68. White on the accent fill 6.70, on the pressed fill 9.85. */
 /* @roles:light */
 :root {
   /* window: the page ground and its text */
-  --window-bg:   #FFFFFF;
-  --window-bg-2: #F5F6F7;   /* a grouped or alternate band */
+  --window-bg:   #F2F3F5;   /* the grouped ground: a quiet grey, so a white sheet reads as a sheet */
+  --window-bg-2: #EAECEF;   /* an alternate band, one step down */
   --window-fg:   #0C1B2A;
 
   /* view: an inset area that holds content, a field, a code well */
   --view-bg: #FFFFFF;
   --view-fg: #0C1B2A;
 
-  /* card: a raised sheet on the window */
+  /* card: a raised sheet on the window. White on the grey ground; depth is
+     the step in tone plus a hairline, never a shadow. */
   --card-bg:   #FFFFFF;
-  --card-bg-2: #F5F6F7;
+  --card-bg-2: #F7F8FA;   /* a grouped area inside a card */
   --card-fg:   #0C1B2A;
 
-  /* headerbar: the sticky nav, translucent over the page */
-  --headerbar-bg: rgba(255, 255, 255, .92);
-  --headerbar-fg: #0C1B2A;
+  /* headerbar: the sticky nav, translucent over the page where the browser
+     can blur, solid where it cannot (nav.css, @supports) */
+  --headerbar-bg:       rgba(242, 243, 245, .78);
+  --headerbar-bg-solid: #F2F3F5;
+  --headerbar-fg:       #0C1B2A;
 
   /* popover: a menu or a tooltip, one step above a card */
   --popover-bg: #FFFFFF;
@@ -167,6 +188,7 @@
   --accent-rgb:      29, 78, 216;
   --accent-bg:       #1D4ED8;
   --accent-bg-hover: #1A43BE;
+  --accent-bg-press: #163A9E;
   --accent-fg:       #FFFFFF;
   --accent-soft:     rgba(29, 78, 216, .08);
   --accent-ring:     rgba(29, 78, 216, .40);
@@ -219,11 +241,14 @@
   --page-accent: #1D4ED8;
   --page-line:   rgba(12, 27, 42, .20);
 
-  /* elevation. In light, depth is a soft shadow under a hairline. */
-  --sh-1: 0 1px 2px rgba(12, 27, 42, .05);
-  --sh-2: 0 1px 2px rgba(12, 27, 42, .05), 0 8px 24px -12px rgba(12, 27, 42, .16);
-  --sh-3: 0 24px 64px -24px rgba(12, 27, 42, .28);
-  --ring: 0 0 0 2px var(--window-bg), 0 0 0 4px var(--accent-ring);
+  /* elevation. In light, a sheet that rests on the page has no shadow at all:
+     the white on the grey ground and a hairline carry it (sh-1). Only what
+     floats over the page casts one, and a small one: a menu or popover (sh-2),
+     a dialog (sh-3). */
+  --sh-1: 0 0 0 0 transparent;
+  --sh-2: 0 0 0 .5px rgba(12, 27, 42, .10), 0 6px 16px -6px rgba(12, 27, 42, .16);
+  --sh-3: 0 0 0 .5px rgba(12, 27, 42, .10), 0 18px 44px -16px rgba(12, 27, 42, .26);
+  --ring: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-ring);
 
   color-scheme: light;
 }
@@ -232,8 +257,8 @@
    data-theme="dark" before the first paint when the reader chose dark, or
    never chose and runs a dark system.
    On the window #0E141B: label 15.69, label-2 9.48, label-3 7.19, accent
-   6.87. On a card #16202B: label 13.95, label-2 8.44, label-3 6.39, accent
-   6.11. A light cobalt fill carries dark ink (6.95), the way the light
+   6.87. On a card #1B2531: label 13.13, label-2 7.94, label-3 6.02, accent
+   5.75. On a popover #243040: label 11.32, label-3 5.19, accent 4.96. A light cobalt fill carries dark ink (6.95), the way the light
    edition's fill carries white: white on #6E9BFF would be 2.69. The lime
    on the navy slab is 9.45, white on it 11.49.
    Elevation turns round: a black shadow vanishes on a dark ground, so depth
@@ -241,21 +266,24 @@
    a lit surface reads at night. */
 /* @roles:dark */
 :root[data-theme="dark"] {
+  /* four steps, each one lighter: ground, view, card, popover. At night a
+     surface that comes forward is a lit one. */
   --window-bg:   #0E141B;
   --window-bg-2: #121A23;
   --window-fg:   #E6EDF5;
 
-  --view-bg: #0A0F15;
+  --view-bg: #131B24;
   --view-fg: #E6EDF5;
 
-  --card-bg:   #16202B;
-  --card-bg-2: #1A2531;
+  --card-bg:   #1B2531;
+  --card-bg-2: #151E28;   /* a grouped area inside a card, one step back */
   --card-fg:   #E6EDF5;
 
-  --headerbar-bg: rgba(14, 20, 27, .92);
-  --headerbar-fg: #E6EDF5;
+  --headerbar-bg:       rgba(14, 20, 27, .76);
+  --headerbar-bg-solid: #0E141B;
+  --headerbar-fg:       #E6EDF5;
 
-  --popover-bg: #1A2531;
+  --popover-bg: #243040;
   --popover-fg: #E6EDF5;
 
   --label:   #E6EDF5;
@@ -263,14 +291,15 @@
   --label-3: #94A3B4;
   --tint:    230, 237, 245;
 
-  --separator:        rgba(230, 237, 245, .14);
-  --separator-strong: rgba(230, 237, 245, .28);
+  --separator:        rgba(230, 237, 245, .11);
+  --separator-strong: rgba(230, 237, 245, .26);
   --fill:             rgba(230, 237, 245, .06);
 
   --accent:          #6E9BFF;
   --accent-rgb:      110, 155, 255;
   --accent-bg:       #6E9BFF;
   --accent-bg-hover: #8FB2FF;
+  --accent-bg-press: #5A88EE;
   --accent-fg:       #0B1220;
   --accent-soft:     rgba(110, 155, 255, .12);
   --accent-ring:     rgba(110, 155, 255, .50);
@@ -315,10 +344,12 @@
   --page-accent: #1D4ED8;
   --page-line:   rgba(12, 27, 42, .20);
 
-  --sh-1: inset 0 1px 0 rgba(230, 237, 245, .04), 0 1px 2px rgba(0, 0, 0, .40);
-  --sh-2: inset 0 1px 0 rgba(230, 237, 245, .06), 0 0 0 1px rgba(230, 237, 245, .06), 0 8px 24px -12px rgba(0, 0, 0, .66);
-  --sh-3: inset 0 1px 0 rgba(230, 237, 245, .08), 0 0 0 1px rgba(230, 237, 245, .10), 0 24px 64px -24px rgba(0, 0, 0, .80);
-  --ring: 0 0 0 2px var(--window-bg), 0 0 0 4px var(--accent-ring);
+  /* no black: a shadow is invisible on this ground. A raised surface gets a
+     lit top edge and, when it floats, a light hairline round it. */
+  --sh-1: inset 0 1px 0 rgba(230, 237, 245, .04);
+  --sh-2: inset 0 1px 0 rgba(230, 237, 245, .07), 0 0 0 1px rgba(230, 237, 245, .09);
+  --sh-3: inset 0 1px 0 rgba(230, 237, 245, .09), 0 0 0 1px rgba(230, 237, 245, .13);
+  --ring: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-ring);
 
   color-scheme: dark;
 }
@@ -455,6 +486,7 @@ main li a:not([class]) {
    hairline names inside a slab; these lines re-point them there and nowhere
    else. */
 .section-dark, .section-navy, .section-cobalt, .page-hero--navy, .invert {
+  --btn-secondary-bg: transparent;   /* a hairline button on a slab stays see-through */
   --lime: var(--inverse-accent);
   --on-ochre: var(--inverse-accent-fg);
   --separator: var(--inverse-line);
@@ -585,6 +617,41 @@ h6 { font-size: var(--text-base); }
 
 p + p { margin-top: var(--space-4); }
 
+/* ═══════════════════════════════════════════════════
+   SYSTEM (v6.1): what every screen shares under its own rules
+   Low weight on purpose (:where), so a page that already says something
+   about one of these keeps saying it.
+   ═══════════════════════════════════════════════════ */
+
+/* Numbers that are compared, prices, counts, dates, line up digit under
+   digit. Running text keeps the face's own figures. */
+:where(.price, .tier-price, .offer-h, .offer-btw, .panel-amt, .hw-num, .hw-of,
+       .hw-strip-val, .hw-tail, .wp-plan, .count, .num, time, td, th,
+       .dh-document-progress, .dh-send-progress, .dh-document-name > span,
+       .dh-send-name > span, .stat-num, .ax-chip, .wp-demo-tag) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Meta text is the secondary or tertiary label, never a third grey. */
+:where(small, figcaption, .meta, .hint, .note) { color: var(--label-2); }
+
+/* One focus ring for everything a keyboard can reach. The outline stays,
+   transparent, so Windows high-contrast mode still draws one. */
+:where(a, button, input, select, textarea, summary, [tabindex], [role="tab"]):focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--ring);
+}
+
+/* Pressed and unavailable, the same for every control. Pressed is a darker
+   fill, not a jump: a button that moves under a finger feels loose. */
+:where(button, [role="button"], .btn, .ax-btn, .hp-btn, .wp-try):disabled,
+:where(button, [role="button"], .btn, .ax-btn, .hp-btn, .wp-try)[aria-disabled="true"] {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+
 /* Highlighted italic in H1 — signature v4 move */
 h1 em {
   font-style: italic;
@@ -711,7 +778,7 @@ h1 em::after {
   gap: var(--space-4);
   padding: 0 40px;
   height: 32px;
-  background: var(--bone);
+  background: var(--headerbar-bg-solid);
   border-bottom: 1px solid var(--ink-hair);
   font-family: var(--mono);
   font-size: var(--text-xs);
@@ -937,7 +1004,7 @@ h1 em::after {
   position: relative;
   border: 2px solid var(--navy);
   padding: 40px var(--space-6);
-  background: var(--bone);
+  background: var(--card-bg);
   cursor: pointer;
   transition: background var(--duration-base) var(--ease-sharp),
               border-color var(--duration-base) var(--ease-sharp),
@@ -1002,7 +1069,7 @@ h1 em::after {
 }
 
 .dropzone-spec-cell {
-  background: var(--bone);
+  background: var(--card-bg);
   padding: var(--space-2) var(--space-3);
   text-align: left;
 }
@@ -1060,7 +1127,7 @@ h1 em::after {
 .spec-card {
   border: 2px solid var(--navy);
   padding: 40px var(--space-6) var(--space-6);
-  background: var(--bone);
+  background: var(--card-bg);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1110,7 +1177,7 @@ h1 em::after {
   display: flex;
   flex-wrap: wrap;
   border: 1.5px solid var(--navy);
-  background: var(--bone);
+  background: var(--card-bg);
   overflow: hidden;
 }
 
@@ -1442,7 +1509,7 @@ h1 em::after {
 .tier,
 .pricing-card {
   padding: var(--space-7) var(--space-6);
-  background: var(--bone);
+  background: var(--card-bg);
   min-height: 440px;
   display: flex;
   flex-direction: column;
@@ -1555,8 +1622,8 @@ h1 em::after {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: var(--tap);
-  padding: 12px 20px;
+  min-height: var(--control-h);
+  padding: 10px 18px;
   font-family: var(--sans);
   font-size: 14px;
   font-weight: 600;
@@ -1565,7 +1632,7 @@ h1 em::after {
   text-decoration: none;
   cursor: pointer;
   border: 1px solid transparent;
-  border-radius: var(--r-1);
+  border-radius: var(--r-control);
   transition: background var(--d-1) var(--e-standard),
               color var(--d-1) var(--e-standard),
               border-color var(--d-1) var(--e-standard),
@@ -1581,14 +1648,15 @@ h1 em::after {
   user-select: none;
 }
 .btn:active:not(:disabled) {
-  transform: translateY(1px);
+  filter: brightness(.94);
 }
+:root[data-theme="dark"] .btn:active:not(:disabled) { filter: brightness(1.12); }
 .btn:focus-visible {
   outline: none;
   box-shadow: var(--ring);
 }
 .btn:disabled {
-  opacity: .5;
+  opacity: .42;
   cursor: not-allowed;
   pointer-events: none;
 }
@@ -1604,10 +1672,15 @@ h1 em::after {
   border-color: var(--accent-bg-hover);
   color: var(--accent-fg);
 }
+.btn-primary:active:not(:disabled), .btn-lime:active:not(:disabled), .btn-green:active:not(:disabled) {
+  filter: none;
+  background: var(--accent-bg-press);
+  border-color: var(--accent-bg-press);
+}
 
 /* secondary */
 .btn-secondary, .btn-outline, .btn-sec, .btn-arch {
-  background: transparent;
+  background: var(--btn-secondary-bg, var(--view-bg));
   color: var(--label);
   border-color: var(--separator-strong);
 }
@@ -1915,7 +1988,7 @@ pre code { background: none; padding: 0; }
   gap: var(--space-3);
   padding: var(--space-8) var(--space-5);
   border: 1px dashed var(--ink-hair);
-  background: var(--bone);
+  background: var(--card-bg);
   color: var(--ink-dim);
 }
 .empty-state-glyph {
@@ -2583,7 +2656,7 @@ pre code { background: none; padding: 0; }
   max-width: 520px;
   padding: 24px;
   border: 1px solid var(--ink-hair);
-  background: var(--bone);
+  background: var(--card-bg);
 }
 .form-card label {
   display: block;
@@ -2598,17 +2671,19 @@ pre code { background: none; padding: 0; }
 .form-card input[type="email"],
 .form-card input[type="text"] {
   width: 100%;
-  padding: 12px;
+  min-height: var(--control-h);
+  padding: 10px 12px;
   font-family: var(--sans);
   font-size: var(--text-base);
-  border: 1.5px solid var(--ink-hair);
-  background: var(--bone);
+  border: 1px solid var(--separator-strong);
+  background: var(--view-bg);
   color: var(--ink);
-  border-radius: 0;
+  border-radius: var(--r-control);
 }
 .form-card input:focus {
   outline: none;
   border-color: var(--cobalt);
+  box-shadow: var(--ring);
 }
 .form-card input#totp,
 .form-card input#verify-code {
@@ -2703,7 +2778,7 @@ pre code { background: none; padding: 0; }
 
 .qr-card {
   padding: 16px;
-  background: var(--bone);
+  background: var(--card-bg);
   border: 1px solid var(--ink-hair);
   text-align: center;
 }
@@ -2762,7 +2837,7 @@ pre code { background: none; padding: 0; }
 }
 .backup-code {
   padding: 14px 16px;
-  background: var(--bone);
+  background: var(--view-bg);
   border: 1px solid var(--ink-hair);
   font-family: var(--mono);
   font-size: var(--text-base);
@@ -3272,7 +3347,7 @@ a.skip-link:focus-visible,
   padding: var(--space-4) var(--space-5);
   border: 1px solid rgba(var(--tint), 0.14);
   border-radius: var(--r-3);
-  background: var(--bone);
+  background: var(--card-bg);
   box-shadow: 0 4px 14px rgba(var(--tint), 0.06);
   text-align: left;
 }
@@ -3308,7 +3383,7 @@ a.skip-link:focus-visible,
   max-width: 560px;
   border: 1px solid rgba(var(--tint), 0.14);
   border-left: 3px solid var(--lime);
-  background: var(--bone);
+  background: var(--card-bg);
   text-align: left;
 }
 .pa-sign-note span {
@@ -3324,7 +3399,11 @@ a.skip-link:focus-visible,
    document hierarchy. These two classes let the level be corrected without
    changing how anything looks. */
 h2.paramant-h1 { font-size: var(--text-5xl); font-weight: 800; letter-spacing: var(--track-display); line-height: 0.94; }
-h1.paramant-h2 { font-size: var(--text-3xl); font-weight: inherit; letter-spacing: var(--track-heading); line-height: inherit; }
+/* A page title is the large title of the reading scale: bold, pulled in,
+   34px from a tablet up and 28px on a phone. It used to be the display size
+   at the body weight, which read as a poster on a page that is a form. */
+h1.paramant-h2 { font-size: var(--t-title1); font-weight: 700; letter-spacing: var(--track-heading); line-height: var(--lh-title1); }
+@media (min-width: 768px) { h1.paramant-h2 { font-size: var(--t-large); line-height: var(--lh-large); } }
 
 /* ── Legal strip ────────────────────────────────────────────
    Auth, account and download pages carry no site footer. They still owe the

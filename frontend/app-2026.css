@@ -55,28 +55,16 @@ main :where(p, li, dd, .acct-lead, .ds-lede, .sub) a:not(.btn):not([class*="cta"
    The nav ships its own hard-coded hexes on several app pages. They are
    corrected here rather than in six inline blocks.
    ═══════════════════════════════════════════════════════════════════════════ */
-nav.nav { background: var(--paper-blur); border-bottom: 1px solid var(--line); }
-/* nav.css turns the bar opaque under 1280px, and it is not decoration: at .92
-   with no backdrop-filter behind it the page scrolls straight through the
-   letters, which is what a review of /parashare on a 390 phone reported. This
-   file loads after nav.css and its rule above put the translucent token back on
-   every app screen, so it carries the same exception. The paint is the app's own
-   paper, not the marketing bone, because the bar has to match the page under
-   it and has to follow the theme; what tests/navigation-shell.test.mjs pins on
-   /parashare is therefore the opacity and the absent filter, not a hex. */
-@media (max-width: 1279px) {
-  nav.nav {
-    background: var(--paper);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-}
+/* The bar itself (solid ground, translucent and frosted where the browser
+   can blur, a hairline once the page scrolls) is nav.css. App screens used to
+   repaint it here in their own paper; since design-system.css v6.1 the app and
+   the public pages stand on the same ground, so there is nothing to repaint. */
 nav.nav .nav-logo .logo-para { color: var(--ink-1); }
 nav.nav .nav-link { color: var(--ink-2); }
 nav.nav .nav-link:hover, nav.nav .nav-link[aria-current="page"] { color: var(--accent); }
-.nav-mobile { background: var(--surface); border-bottom: 1px solid var(--line); }
+.nav-mobile { background: var(--window-bg); border-bottom: 1px solid var(--line); }
 .nav-mobile a, .nav-mobile-standalone { color: var(--ink-1); }
-.nav-user-menu { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-2); }
+.nav-user-menu { background: var(--popover-bg); border: 1px solid var(--line); border-radius: var(--r-2); box-shadow: var(--sh-2); }
 .nav-user-menu a { color: var(--ink-1); }
 .settings-tabs { background: var(--surface); border: 1px solid var(--line); }
 .settings-tabs a { color: var(--ink-2); }
@@ -99,7 +87,7 @@ nav.nav .nav-link:hover, nav.nav .nav-link[aria-current="page"] { color: var(--a
 .nav-signin { color: var(--ink-2); }
 .nav-signin:hover { color: var(--ink-1); }
 
-footer { background: var(--surface-sunk); border-top: 1px solid var(--line); color: var(--ink-2); }
+footer { background: var(--window-bg); border-top: 1px solid var(--line); color: var(--ink-2); }
 footer a { color: var(--ink-2); }
 footer a:hover { color: var(--accent); }
 footer .logo .a { color: var(--ink-1); }
@@ -172,17 +160,18 @@ footer .logo .a { color: var(--ink-1); }
 /* Buttons. Precisely one filled accent per screen; everything else hairline. */
 .ax-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: var(--tap); padding: 11px 18px;
-  border: 1px solid var(--line-2); border-radius: var(--r-1);
-  background: transparent; color: var(--ink-1);
-  font: 500 14px/1.2 var(--sans); text-decoration: none; cursor: pointer;
+  min-height: var(--control-h); padding: 10px 18px;
+  border: 1px solid var(--line-2); border-radius: var(--r-control);
+  background: var(--view-bg); color: var(--ink-1);
+  font: 500 var(--t-body)/1.2 var(--sans); text-decoration: none; cursor: pointer;
   transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard);
 }
 .ax-btn:hover { border-color: var(--ink-3); background: var(--line-ghost); }
-.ax-btn:active { transform: translateY(1px); }
-.ax-btn[disabled], .ax-btn[aria-disabled="true"] { opacity: .5; cursor: default; transform: none; }
+.ax-btn:active { background: var(--fill); }
+.ax-btn[disabled], .ax-btn[aria-disabled="true"] { opacity: .42; cursor: not-allowed; }
 .ax-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .ax-btn.primary:hover { background: var(--accent-hov); border-color: var(--accent-hov); }
+.ax-btn.primary:active { background: var(--accent-bg-press); border-color: var(--accent-bg-press); }
 .ax-btn.bare { border-color: transparent; background: transparent; color: var(--accent); }
 .ax-btn.bare:hover { background: var(--accent-soft); border-color: transparent; }
 /* Dangerous work is a hairline that reddens, never the only filled button
@@ -206,15 +195,16 @@ footer .logo .a { color: var(--ink-1); }
 .ax-field > label { font: 500 13px/1.3 var(--sans); color: var(--ink-1); }
 .ax-field .ax-hint { font: 12px/1.5 var(--sans); color: var(--ink-3); }
 .ax-input {
-  width: 100%; min-height: var(--tap); padding: 11px 13px;
-  border: 1px solid var(--line-2); border-radius: var(--r-1);
-  background: var(--surface); --field-bg: var(--surface); color: var(--ink-1);
+  width: 100%; min-height: var(--control-h); padding: 10px 13px;
+  border: 1px solid var(--line-2); border-radius: var(--r-control);
+  background: var(--view-bg); --field-bg: var(--view-bg); color: var(--ink-1);
   font: 15px/1.4 var(--sans);
   transition: border-color var(--d-1) var(--e-standard);
 }
 .ax-input:hover { border-color: var(--ink-3); }
 .ax-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
 .ax-input::placeholder { color: var(--ink-3); }
+.ax-input:disabled { opacity: .42; cursor: not-allowed; background: var(--fill); }
 
 /* A field error is text plus a mark, never colour alone. */
 .ax-error {

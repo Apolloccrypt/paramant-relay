@@ -37,12 +37,15 @@
 .ps-field { margin-top: var(--space-4); }
 .ps-label { display: block; font-size: var(--text-sm); font-weight: 500; color: var(--ink-dim); margin-bottom: var(--space-2); }
 .ps-input {
-  width: 100%; padding: var(--space-3); border: 1.5px solid var(--ink-hair);
-  border-radius: var(--r-2); font-size: var(--text-md); background: var(--bone);
+  width: 100%; min-height: var(--control-h); padding: 10px var(--space-3); border: 1px solid var(--separator-strong);
+  border-radius: var(--r-control); font-size: var(--text-md); background: var(--view-bg);
   color: var(--ink); font-family: var(--sans);
+  transition: border-color var(--d-1) var(--e-standard);
 }
 .ps-input.mono { font-family: var(--mono); }
-.ps-input:focus { outline: none; border-color: var(--navy); }
+.ps-input:hover { border-color: var(--label-3); }
+.ps-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+.ps-input:disabled { opacity: .42; cursor: not-allowed; }
 
 .ps-kv { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-5); font-size: var(--text-sm); }
 .ps-kv dt { color: var(--ink-dim); }
@@ -100,8 +103,9 @@
 .home-section-head p { color: var(--ink-dim); max-width: 620px; margin: 0 auto; line-height:1.5; }
 
 .pgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); gap: var(--space-4); }
-.pcard { display:flex; flex-direction:column; padding: var(--space-5); border:1px solid var(--ink-hair); border-radius:var(--r-3); background: var(--bone); text-decoration:none; color:inherit; transition: border-color .15s, transform .15s; }
-a.pcard:hover { border-color: var(--navy); transform: translateY(-2px); }
+.pcard { display:flex; flex-direction:column; padding: var(--space-5); border:1px solid var(--ink-hair); border-radius:var(--r-3); background: var(--card-bg); text-decoration:none; color:inherit; transition: border-color var(--d-1) var(--e-standard); }
+a.pcard:hover { border-color: var(--separator-strong); }
+a.pcard:active { background: var(--card-bg-2); }
 .pcard .ptag { align-self:flex-start; font-family: var(--sans); font-size: var(--text-xs); letter-spacing:var(--track-label); padding: var(--space-1) var(--space-2); border-radius:var(--r-pill); background: var(--ink-ghost); color: var(--navy); margin-bottom: var(--space-3); }
 .pcard h3 { font-size: var(--text-xl); margin:0 0 var(--space-2); }
 .pcard p { font-size: var(--text-sm); color: var(--ink-dim); line-height:1.5; margin:0 0 var(--space-3); flex-grow:1; }
@@ -109,7 +113,7 @@ a.pcard:hover { border-color: var(--navy); transform: translateY(-2px); }
 .pcard .pcta::after { content:" \2192"; }
 
 .sgrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(270px,1fr)); gap: var(--space-4); }
-.scard { padding: var(--space-5); border:1px solid var(--ink-hair); border-radius:var(--r-3); background: var(--bone); display:flex; flex-direction:column; }
+.scard { padding: var(--space-5); border:1px solid var(--ink-hair); border-radius:var(--r-3); background: var(--card-bg); display:flex; flex-direction:column; }
 .scard .slabel { font-family: var(--sans); font-size: var(--text-xs); letter-spacing:var(--track-label); text-transform:uppercase; color: var(--navy); margin-bottom: var(--space-2); }
 .scard h3 { font-size: var(--text-lg); margin:0 0 var(--space-2); }
 .scard .suse { font-size: var(--text-sm); color: var(--ink-dim); line-height:1.5; margin:0 0 var(--space-3); flex-grow:1; }
@@ -128,7 +132,7 @@ a.pcard:hover { border-color: var(--navy); transform: translateY(-2px); }
 .selfhost { text-align:center; padding: var(--space-7) var(--space-4); background: var(--ink-ghost); border-radius:var(--r-3); margin: var(--space-5) var(--space-4); }
 .selfhost h2 { margin:0 0 var(--space-2); font-size: var(--text-2xl); }
 .selfhost p { color: var(--ink-dim); max-width:560px; margin: 0 auto var(--space-4); line-height:1.5; }
-.selfhost code { display:inline-block; padding: var(--space-2) var(--space-4); background: var(--bone); border:1px solid var(--ink-hair); border-radius:var(--r-2); font-family: var(--mono); font-size: var(--text-sm); }
+.selfhost code { display:inline-block; padding: var(--space-2) var(--space-4); background: var(--view-bg); border:1px solid var(--ink-hair); border-radius:var(--r-2); font-family: var(--mono); font-size: var(--text-sm); }
 .home-center { text-align:center; }
 
 /* ---- Homepage section-dark inversion (tokens only) ---- */

@@ -19,7 +19,7 @@
 :root {
   --wp-sign: #FFC917;          /* Schiphol yellow; black on it is 13.9:1 */
   --wp-sign-ink: #111111;
-  --wp-paper: #FFFFFF;
+  --wp-paper: var(--card-bg, #FFFFFF);
   --wp-ink: var(--ink-1, #0C1B2A);
   --wp-ink-2: var(--ink-2, #40505F);
   --wp-ink-3: var(--ink-3, #5C6A78);
@@ -36,7 +36,6 @@
   --wp-enter: cubic-bezier(.16, 1, .3, 1);
 }
 :root[data-theme="dark"] {
-  --wp-paper: #16202B;
   --wp-ok: var(--sig-done, #7FCB9E);
   --wp-tile: #FFC917;
   --wp-tile-ink: #111111;
@@ -60,22 +59,26 @@
 .wp-price { margin: 12px 0 0; font-size: 15px; line-height: 1.5; color: var(--wp-ink-2); }
 .wp-price b { color: var(--wp-ink); font-weight: 600; }
 
+/* The demo is a window on the page, built the way a grouped settings screen
+   is: a white sheet on top (the bar and the hero), a grouped grey area under
+   it, and in that area one inset list of white rows. Depth is the step in
+   tone and one hairline; nothing casts a shadow, because nothing floats. */
 .wp-demo {
-  margin-top: 28px; border: 1px solid var(--wp-line-2); border-radius: var(--r-3);
-  background: var(--surface-sunk, var(--wp-paper)); overflow: hidden;
-  box-shadow: 0 1px 2px rgba(var(--tint), .04), 0 18px 40px -28px rgba(var(--tint), .30);
+  margin-top: 28px; border: 1px solid var(--separator); border-radius: var(--r-3);
+  background: var(--window-bg, var(--wp-paper)); overflow: hidden;
+  box-shadow: var(--sh-1);
 }
 .wp-demo-bar {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 12px 16px; border-bottom: 1px solid var(--wp-line);
   background: var(--wp-paper);
 }
-.wp-demo-h { margin: 0; font: 600 15px/1.35 var(--sans); color: var(--wp-ink); letter-spacing: var(--track-heading); }
+.wp-demo-h { margin: 0; font: 600 var(--t-body)/1.35 var(--sans); color: var(--wp-ink); letter-spacing: var(--track-heading); }
 .wp-demo-h span { font-weight: 400; color: var(--wp-ink-2); }
-.wp-demo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 16px 4px; }
-.wp-demo-hi { margin: 0; font: 600 clamp(19px, 2vw, 24px)/1.2 var(--sans); letter-spacing: var(--track-heading); color: var(--wp-ink); }
+.wp-demo-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 22px 16px 2px; }
+.wp-demo-hi { margin: 0; font: 700 var(--t-title2)/var(--lh-title2) var(--sans); letter-spacing: var(--track-heading); color: var(--wp-ink); }
 /* The one mark that this is a demo (13-10-2026): small, quiet, said once. */
-.wp-demo-tag { font: 400 13px/1.3 var(--sans); color: var(--wp-ink-3); }
+.wp-demo-tag { font: 400 var(--t-footnote)/var(--lh-footnote) var(--sans); color: var(--wp-ink-3); }
 .wp-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--sans); font-size: 11px; letter-spacing: var(--track-label); text-transform: uppercase; color: var(--wp-ink-3); padding: 6px 12px; border: 1px solid var(--wp-line-2); border-radius: var(--r-pill); background: var(--wp-paper); white-space: nowrap; }
 .wp-plan::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--wp-ok); }
 .wp-plan strong { color: var(--wp-ink); font-weight: 600; }
@@ -88,13 +91,16 @@
 .wp-appnav { display: none; margin: 0 0 0 auto; padding: 0; list-style: none; gap: 2px; }
 /* the bar only carries the app menu, which a phone does not show */
 @media (max-width: 979px) { .wp-demo-top .wp-demo-bar { display: none; } }
-.wp-appnav li { padding: 6px 10px; border-radius: var(--r-2); font: 500 13.5px/1.2 var(--sans); color: var(--wp-ink-3); }
-.wp-appnav li.on { color: var(--wp-ink); background: var(--line-ghost, rgba(var(--tint), .06)); font-weight: 600; }
+/* a segmented control in rest: one track, the chosen segment a raised chip */
+.wp-appnav { padding: 2px; border-radius: var(--r-2); background: var(--fill); }
+.wp-appnav li { padding: 6px 12px; border-radius: var(--r-1); font: 500 var(--t-footnote)/1.3 var(--sans); color: var(--wp-ink-2); }
+.wp-appnav li.on { color: var(--wp-ink); background: var(--card-bg); box-shadow: 0 0 0 .5px var(--separator-strong); font-weight: 600; }
 @media (min-width: 980px) { .wp-appnav { display: flex; } }
-.wp-demo-hero { display: grid; gap: 16px; padding: 20px 16px 18px; border-bottom: 1px solid var(--wp-line); background: var(--wp-paper); }
-.wp-demo .wp-demo-hero h1 { margin: 0; max-width: 30ch; font: 650 clamp(22px, 1.6vw + 14px, 36px)/1.14 var(--sans); letter-spacing: var(--track-heading); color: var(--wp-ink); text-wrap: balance; }
-.wp-demo .wp-demo-hero .hero-line { margin: 12px 0 0; max-width: 52ch; font-size: 17px; line-height: 1.5; color: var(--wp-ink-2); }
-.wp-demo .wp-demo-hero .hero-note { margin: 0; max-width: none; font-size: 13.5px; line-height: 1.5; color: var(--wp-ink-3); }
+.wp-demo-hero { display: grid; gap: 18px; padding: 22px 16px 20px; border-bottom: 1px solid var(--wp-line); background: var(--wp-paper); }
+.wp-demo .wp-demo-hero h1 { margin: 0; max-width: 30ch; font: 700 var(--t-title1)/var(--lh-title1) var(--sans); letter-spacing: var(--track-heading); color: var(--wp-ink); text-wrap: balance; }
+.wp-demo .wp-demo-hero .hero-line { margin: 10px 0 0; max-width: 52ch; font-size: var(--t-headline); line-height: var(--lh-headline); color: var(--wp-ink-2); }
+.wp-demo .wp-demo-hero .hero-note { margin: 0; max-width: none; font-size: var(--t-footnote); line-height: var(--lh-footnote); color: var(--wp-ink-3); }
+@media (min-width: 900px) { .wp-demo .wp-demo-hero h1 { font-size: var(--t-large); line-height: var(--lh-large); letter-spacing: var(--track-display); } }
 .wp-demo-hero .hero-note b { color: var(--wp-ink); }
 .wp-demo .wp-demo-hero .home-actions { margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 @media (max-width: 420px) { .wp-demo-hero .home-actions .hp-btn { flex: 1 1 0; padding: 0 12px; } }
@@ -117,8 +123,10 @@
 }
 
 /* 13-10-2026: one list, the way /dashboard lists documents, not three cards
-   with a caption each. */
-.wp-tiles { display: grid; gap: 0; margin: 8px 16px 16px; border: 1px solid var(--wp-line); border-radius: var(--r-2); background: var(--wp-paper); overflow: hidden; }
+   with a caption each. An inset grouped list: white rows on the grouped
+   ground, no outline of its own (the tone step is the edge), and the line
+   between two rows starts where the text starts. */
+.wp-tiles { display: grid; gap: 0; margin: 10px 16px 16px; border: 0; border-radius: var(--r-3); background: var(--wp-paper); overflow: hidden; box-shadow: var(--sh-1); }
 
 /* A tile is the dashboard's register card with one row in it, and the whole
    card is the control. It lifts and its arrow moves on hover, because that is
@@ -130,12 +138,13 @@
   transition: background-color .18s var(--wp-ease);
   -webkit-tap-highlight-color: transparent;
 }
-.wp-tile + .wp-tile { border-top: 1px solid var(--wp-line); }
+.wp-tile + .wp-tile::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--separator); }
 .wp-tile:hover { background: var(--line-ghost, rgba(var(--tint), .035)); }
+.wp-tile:active { background: var(--fill); }
 .wp-tile:focus-visible { outline: 3px solid var(--accent-ring, rgba(var(--accent-rgb), .32)); outline-offset: -3px; }
 .wp-tile-k { font: 600 11px/1.2 var(--mono); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--wp-ink-3); }
 .wp-tile-t { margin: 6px 0 10px; font: 600 16px/1.3 var(--sans); color: var(--wp-ink); letter-spacing: var(--track-heading); }
-.wp-tile .wp-row { display: block; padding: 14px 16px; border: 0; background: transparent; }
+.wp-tile .wp-row { display: block; min-height: var(--control-h); padding: 13px 16px; border: 0; background: transparent; }
 .wp-tile .wp-row:hover { background: transparent; }
 .wp-tile .dh-document-open, .wp-tile .dh-send-open {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name status" "prog prog"; align-items: start; gap: 10px 12px; padding: 0; cursor: inherit;
@@ -145,16 +154,17 @@
 .wp-tile .dh-status { grid-area: status; }
 @media (min-width: 900px) {
   .wp-tiles { margin: 8px 24px 24px; }
-  .wp-tile .wp-row { padding: 16px 20px; }
+  .wp-tile .wp-row { padding: 15px 20px; }
+  .wp-tile + .wp-tile::before { left: 20px; }
   .wp-tile .dh-document-open, .wp-tile .dh-send-open { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 150px; grid-template-areas: "name prog status"; align-items: center; gap: 24px; }
   .wp-tiles .wp-tile .dh-status { justify-self: end; }
 }
-.wp-row-next { display: block; margin-top: 8px; font: 400 13.5px/1.4 var(--sans); color: var(--wp-ink-2); }
-.wp-tile .dh-document-name strong, .wp-tile .dh-send-name strong { display: block; overflow-wrap: anywhere; font: 600 14.5px/1.35 var(--sans); color: var(--wp-ink); }
-.wp-tile .dh-document-name > span, .wp-tile .dh-send-name > span { display: block; margin-top: 3px; font-size: 13px; color: var(--wp-ink-3); }
-.wp-tile .dh-document-progress > span:first-child, .wp-tile .dh-send-progress > span:first-child { display: block; margin-bottom: 6px; font-size: 13px; color: var(--wp-ink-2); }
-.wp-tile .dh-progress { display: block; width: 100%; height: 3px; background: var(--wp-line); overflow: hidden; }
-.wp-tile .dh-progress i { display: block; height: 100%; background: var(--wp-accent); }
+.wp-row-next { display: block; margin-top: 6px; font: 400 var(--t-footnote)/var(--lh-footnote) var(--sans); color: var(--wp-ink-2); }
+.wp-tile .dh-document-name strong, .wp-tile .dh-send-name strong { display: block; overflow-wrap: anywhere; font: 600 var(--t-body)/1.35 var(--sans); letter-spacing: var(--track-title); color: var(--wp-ink); }
+.wp-tile .dh-document-name > span, .wp-tile .dh-send-name > span { display: block; margin-top: 2px; font-size: var(--t-footnote); line-height: var(--lh-footnote); color: var(--wp-ink-3); font-variant-numeric: tabular-nums; }
+.wp-tile .dh-document-progress > span:first-child, .wp-tile .dh-send-progress > span:first-child { display: block; margin-bottom: 6px; font-size: var(--t-footnote); color: var(--wp-ink-2); font-variant-numeric: tabular-nums; }
+.wp-tile .dh-progress { display: block; width: 100%; height: 4px; border-radius: var(--r-pill); background: var(--fill); overflow: hidden; }
+.wp-tile .dh-progress i { display: block; height: 100%; border-radius: inherit; background: var(--wp-accent); }
 .wp-tile .dh-status { justify-self: start; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: var(--r-pill); font: 600 12px/1.35 var(--sans); white-space: nowrap; }
 .wp-tile .dh-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .wp-tile .dh-status.in_progress { color: var(--sig-move, #1D4ED8); background: var(--sig-move-bg, rgba(var(--accent-rgb), .09)); }

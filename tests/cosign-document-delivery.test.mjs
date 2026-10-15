@@ -321,13 +321,18 @@ const roundTrip = await seedPage.evaluate(() => {
 ok('a click in the middle of the page is the middle of the page',
   Math.abs(roundTrip.cx - 0.5) < 0.01 && Math.abs(roundTrip.cy - 0.5) < 0.01, JSON.stringify(roundTrip));
 
-// The nav over a scrolling document must be opaque below 1024 (#399 fixed the
-// app-2026 pages; /co-sign loads the same nav.css and has to stay covered).
+// The nav over a scrolling document must hide the document under it (#399
+// fixed the app-2026 pages; /co-sign loads the same nav.css and has to stay
+// covered). Since design-system.css v6.1 that is opaque, or translucent with a
+// real frost (blur of 12px or more): no sharp letter reads through the bar.
 const navPaint = await seedPage.evaluate(() => {
   const cs = getComputedStyle(document.querySelector('.nav'));
   return { bg: cs.backgroundColor, blur: cs.backdropFilter, position: cs.position };
 });
-ok('the co-sign nav is opaque on a phone', /^rgb\(\d+, \d+, \d+\)$/.test(navPaint.bg) && navPaint.blur === 'none', JSON.stringify(navPaint));
+const navBlur = /blur\((\d+(?:\.\d+)?)px\)/.exec(navPaint.blur || '');
+ok('the co-sign nav is opaque, or frosted, on a phone',
+  (/^rgb\(\d+, \d+, \d+\)$/.test(navPaint.bg) && navPaint.blur === 'none') || (!!navBlur && Number(navBlur[1]) >= 12),
+  JSON.stringify(navPaint));
 
 // Whatever the signer last placed is what must survive the refresh, so read it
 // now rather than comparing against a position two placements ago.
