@@ -52,6 +52,43 @@
 .ds-headlink{margin:14px 0 0;font-size:13px}
 .ds-headlink a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .ds-anon-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 0}
+/* Function first (15-10): the page opens on the tool, not on a brochure.
+   What and why sit in small tips that open in place, one sentence each. */
+.ds-head{margin-bottom:22px}
+.ds-title{font-size:clamp(26px,4vw,38px);margin-bottom:8px}
+.ds-lede{font-size:15px;line-height:1.55}
+.ds-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0 0;padding:0;list-style:none}
+.ds-chips>li{margin:0}
+.ds-head .ds-facts{margin:0;display:contents}
+.ds-head .ds-facts li{display:inline-block!important}
+.ds-head .ds-facts li,.ds-tip>summary{font-family:inherit;font-size:12.5px;letter-spacing:0;line-height:1.3;color:var(--ink-2);border:1px solid var(--line-2);border-radius:999px;background:var(--surface);padding:7px 12px;min-height:32px;display:inline-flex;align-items:center;gap:6px}
+.ds-head .ds-facts li b{text-transform:none;letter-spacing:0;font-weight:600}
+.ds-tip{position:relative;display:inline-block}
+.ds-tip>summary{list-style:none;cursor:pointer;user-select:none}
+.ds-tip>summary::-webkit-details-marker{display:none}
+.ds-tip>summary::before{content:"i";display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;border:1px solid currentColor;font-size:10px;font-weight:700;font-style:italic;font-family:Georgia,serif;opacity:.8}
+.ds-tip>summary:hover,.ds-tip[open]>summary{border-color:var(--accent);color:var(--ink-1)}
+.ds-tip>summary:focus-visible{outline:none;box-shadow:var(--ring)}
+.ds-tip-body{position:absolute;z-index:30;top:calc(100% + 10px);left:0;width:max-content;max-width:min(320px,calc(100vw - 32px));margin:0;padding:12px 14px;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);color:var(--ink-2);font-size:13px;line-height:1.55;box-shadow:0 12px 32px rgba(0,0,0,.28);animation:ds-tip-in .16s ease-out}
+.ds-tip-body::before{content:"";position:absolute;top:-6px;left:18px;width:10px;height:10px;background:inherit;border-left:1px solid var(--line-2);border-top:1px solid var(--line-2);transform:rotate(45deg)}
+.ds-tip-body a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.ds-step .ds-tip-body.ds-sub{margin:0;max-width:min(320px,calc(100vw - 32px));font-size:13px}
+@keyframes ds-tip-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.ds-tip-body{animation:none}}
+@media(pointer:coarse){.ds-tip>summary{min-height:var(--tap)}.ds-headlink a{display:inline-flex;align-items:center;min-height:var(--tap)}}
+.ds-headlink{margin:0;font-size:12.5px}
+.ds-step .ds-dropzone{border:1.5px dashed var(--line-2);border-radius:18px;padding:36px 20px}
+.ds-step .ds-dropzone:hover,.ds-step .ds-dropzone.drag{border-color:var(--accent)}
+.ds-drop-icon{display:inline-grid;place-items:center;width:52px;height:52px;margin:0 auto 12px;border-radius:50%;background:var(--accent-soft);color:var(--accent)}
+.ds-drop-icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ds-step .ds-dropzone p.small{font-family:inherit;font-size:13px;letter-spacing:0}
+.ds-step .ds-dropzone p.big{font-size:17px}
+.ds-doc-tips{margin-top:12px}
+.ds-signedout{border-left-width:1px;border-radius:14px;margin:20px 0}
+.ds-signedout-actions .btn{border-radius:999px}
+.ds-anon{margin-top:4px}
+.ds-anon .ds-chips{margin:0}
+@media(max-width:640px){.ds-tip{display:block}.ds-chips>li{max-width:100%}.ds-tip-body{position:static;width:auto;max-width:none;margin-top:8px}.ds-step .ds-tip-body.ds-sub{max-width:none}.ds-tip-body::before{display:none}}
 .ds-service-note{margin:0 0 16px;padding:10px 14px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);font-size:13px;line-height:1.6;color:var(--ink-2)}
 /* Not signed in. This belongs to the whole flow, not to one step: #step-anon
    is a .ds-step, so setActive() hides it the second a workflow is chosen, and a
@@ -63,17 +100,19 @@
 .ds-signedout-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0}
 .ds-signedout-actions .btn{font-size:13px;padding:8px 14px}
 /* The hero is the pitch for a visitor who has not started yet. From the step
-   after the document is chosen it is only in the way: at 390px it held the
+   where the document is chosen it is only in the way (15-10: function first;
+   before, only from the step after it): at 390px it held the
    whole uploaded PDF below the fold. sign-flow.js stamps the active step on
    <body>, so this is a CSS collapse to a single line, no script in the page. */
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head{margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-kicker,
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-lede,
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-facts,
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-headlink{display:none}
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head{margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-kicker,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-lede,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-facts,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-chips,
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-headlink{display:none}
 /* After step 1 the title is a one-line reminder. On a wide font (DejaVu on
    the CI runner) it wrapped to two lines and pushed page 1 below the fold. */
-body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-title{font-size:15px;font-weight:600;line-height:1.4;letter-spacing:0;margin:0;max-width:none;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body[data-ds-step]:not([data-ds-step="step-mode"]) .ds-head .ds-title{font-size:15px;font-weight:600;line-height:1.4;letter-spacing:0;margin:0;max-width:none;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* On a phone the document itself comes into view on the Place step: the
    explanations that repeat the hint go, and sign-flow.js scrolls the step to
    the top. Measured on an iPhone 13 (hertest r2 T5-12c): only the top 36 px of
@@ -588,20 +627,13 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <main id="main-content" role="main">
 <div class="ds-wrap">
   <header class="ds-head">
-    <p class="ds-kicker">ParaSign · documenten veilig laten tekenen</p>
     <h1 class="ds-title">Laat een belangrijk document ondertekenen.</h1>
-    <p class="ds-lede">Zelf tekenen, samen tekenen of naar anderen sturen. Bij elke handtekening hoort bewijs dat iedereen kan nakijken.</p>
-    <ul class="ds-facts">
-      <li id="ds-plan-fact"><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li>
+    <p class="ds-lede">Zelf, samen of door anderen. Met bewijs dat iedereen kan nakijken.</p>
+    <ul class="ds-chips">
+      <li><ul class="ds-facts"><li id="ds-plan-fact"><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li></ul></li>
+      <li><details class="ds-tip"><summary>Waarom is dit veilig?</summary><p class="ds-tip-body">Uw ondertekensleutel wordt op uw apparaat gemaakt en komt nooit op onze servers. De servers staan in Duitsland, onder Europees recht.</p></details></li>
+      <li class="ds-headlink"><a href="/parasign">Over ParaSign en prijzen &rarr;</a></li>
     </ul>
-    <details class="wp-fold ds-facts-fold">
-      <summary>Waarom uw document veilig blijft</summary>
-      <ul class="ds-facts wp-fold-body">
-      <li><b>Uw ondertekensleutel blijft hier</b> &middot; hij wordt op uw apparaat gemaakt en komt nooit op onze servers</li>
-      <li><b>Europees recht</b> &middot; servers in Duitsland, onder EU-recht</li>
-      </ul>
-    </details>
-    <p class="ds-headlink"><a href="/parasign">Wat ParaSign is, en wat organisaties betalen &rarr;</a></p>
   </header>
 
   <!-- The session probe could not answer. NOT the same event as "you are not
@@ -610,20 +642,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        "your account is gone". One sentence, the shared one from
        js/error-message.js, so both products apologise in the same words. -->
   <p class="ds-service-note" id="ds-service-note" role="status" hidden></p>
-
-  <!-- No session, said once and said for every step. Revealed by sign-flow.js
-       only after /api/user/session/verify has answered, so it never flashes at
-       a signed-in customer, and never dismissible: the requirement does not go
-       away by being closed. Both links carry ?next=/sign, which auth-login.js
-       honours on the way back; signup still finishes through the emailed
-       verification link and does not carry it yet. -->
-  <div class="ds-signedout" id="ds-signedout" role="status" hidden>
-    <p class="ds-signedout-text">U bent niet ingelogd. U kunt al wel een document klaarzetten. Om te tekenen of te versturen heeft u een gratis Community-account nodig.</p>
-    <p class="ds-signedout-actions">
-      <a class="btn btn-secondary" href="/auth/login?next=/sign">Inloggen</a>
-      <a class="btn btn-primary" href="/signup?next=/sign">Account maken</a>
-    </p>
-  </div>
 
   <ol class="ds-stepper" id="ds-stepper" aria-label="Voortgang ondertekenen" hidden>
     <li data-step="doc" class="active">Document</li>
@@ -641,42 +659,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        what was being sent. -->
   <p class="ds-doc-meta" id="ds-doc-meta" hidden><span class="ds-doc-meta-label">Bestand</span><span class="ds-doc-meta-name" id="ds-doc-meta-name"></span><span class="ds-doc-meta-size" id="ds-doc-meta-size"></span></p>
 
-  <!-- No session: say what this needs BEFORE a document is picked.
-       The page used to be behind an nginx auth_request, so a visitor never got
-       here at all; he got /auth/login and, measurably, stopped. Serving the page
-       and then failing at the last step with "please sign in" would only move
-       the dead end to a worse place: after he has already chosen a file. So the
-       honest version states the requirement up front, next to what the product
-       actually does. Hidden by default and revealed by sign-flow.js only when
-       /api/user/check answers 401, so a signed-in user never sees it. -->
-  <section class="ds-step ds-anon" id="step-anon" hidden>
-    <!-- The requirement itself is said once, in the bar above (#ds-signedout).
-         This block repeated that requirement as its heading, right
-         under it (acceptatie 3.1.1 ronde 2, taal #18); it now says what works
-         without one, which the bar does not. -->
-    <h2>Wat zonder account kan</h2>
-    <details class="wp-fold">
-      <summary>Waarom is een account nodig?</summary>
-      <p class="ds-sub">
-        Uw document gaat nergens heen. Het bestand en uw privésleutel blijven in deze browser.
-        Onze server ziet alleen een vingerafdruk van het bestand. U tekent met een sleutel die
-        bij de passkey op uw apparaat hoort, en die sleutel moet eerst aan een account vastzitten.
-      </p>
-    </details>
-    <p class="ds-sub">
-      Een verzoek openen dat iemand u stuurde. U ziet dan om welk
-      bestand het gaat en wie al tekende. Het document zelf opent pas als u inlogt met het adres waarop u
-      bent uitgenodigd. Nog geen account? Maak dan gratis een account op dat adres. Daarna opent het
-      document en tekent u. <a href="/verify">Een getekend document controleren</a> kan ook zonder account.
-    </p>
-    <!-- No buttons here: the bar above (#ds-signedout) already carries
-         "Inloggen" and "Account maken", and two blocks with the same message
-         and the same buttons read as one message said twice (acceptance
-         3.1.1, 18). -->
-    <p class="ds-sub ds-anon-foot">
-      Met een Community-account zet u 2 handtekeningen per maand. Een paraaf op elke pagina telt niet apart. <a href="/pricing">Bekijk wat Firm toevoegt</a>.
-    </p>
-  </section>
 
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
@@ -703,13 +685,49 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 1: pick document -->
   <section class="ds-step" id="step-doc" hidden>
     <h2>Kies het document dat u wilt ondertekenen</h2>
-    <p class="ds-sub">ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.</p>
     <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" aria-label="Kies of sleep een bestand">
-      <p class="big">Sleep een bestand hierheen, of klik om te kiezen</p>
-      <p class="small">Blijft in uw browser. Er wordt nog niets geüpload.</p>
+      <span class="ds-drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 17v-6"/><path d="m9 14 3-3 3 3"/></svg></span>
+      <p class="big">Kies een pdf</p>
+      <p class="small">of sleep hem hierheen. Er wordt nog niets geüpload.</p>
       <input type="file" id="ds-doc-input" accept="application/pdf,.pdf" hidden>
     </div>
     <p class="ds-doc-error" id="ds-doc-error" role="alert" hidden></p>
+    <div class="ds-doc-tips"><details class="ds-tip"><summary>Alleen pdf, blijft in uw browser</summary><p class="ds-sub ds-tip-body">ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.</p></details></div>
+  </section>
+  <!-- Under the tool on the first two screens, above it on the later ones:
+       function first, and still said on every step.
+       No session, said once and said for every step. Revealed by sign-flow.js
+       only after /api/user/session/verify has answered, so it never flashes at
+       a signed-in customer, and never dismissible: the requirement does not go
+       away by being closed. Both links carry ?next=/sign, which auth-login.js
+       honours on the way back; signup still finishes through the emailed
+       verification link and does not carry it yet. -->
+  <div class="ds-signedout" id="ds-signedout" role="status" hidden>
+    <p class="ds-signedout-text">U bent niet ingelogd. U kunt al wel een document klaarzetten. Om te tekenen of te versturen heeft u een gratis Community-account nodig.</p>
+    <p class="ds-signedout-actions">
+      <a class="btn btn-secondary" href="/auth/login?next=/sign">Inloggen</a>
+      <a class="btn btn-primary" href="/signup?next=/sign">Account maken</a>
+    </p>
+  </div>
+
+  <!-- No session: say what this needs BEFORE a document is picked.
+       The page used to be behind an nginx auth_request, so a visitor never got
+       here at all; he got /auth/login and, measurably, stopped. Serving the page
+       and then failing at the last step with "please sign in" would only move
+       the dead end to a worse place: after he has already chosen a file. So the
+       honest version states the requirement up front, next to what the product
+       actually does. Hidden by default and revealed by sign-flow.js only when
+       /api/user/check answers 401, so a signed-in user never sees it. -->
+  <!-- Function first (15-10): this used to stand above the tool as a heading
+       and three paragraphs. It is now three tips that open in place, under
+       the tool, and only on the first screen (applySignedOut). -->
+  <section class="ds-step ds-anon" id="step-anon" aria-label="Wat zonder account kan" hidden>
+    <ul class="ds-chips">
+      <li><details class="ds-tip"><summary>Waarom een account?</summary><p class="ds-tip-body">Uw document gaat nergens heen. Het bestand en uw privésleutel blijven in deze browser. Onze server ziet alleen een vingerafdruk van het bestand. U tekent met een sleutel die bij de passkey op uw apparaat hoort, en die sleutel moet eerst aan een account vastzitten.</p></details></li>
+      <li><details class="ds-tip"><summary>Verzoek gekregen?</summary><p class="ds-tip-body">Zonder account kunt u een verzoek openen dat iemand u stuurde. U ziet dan om welk bestand het gaat en wie al tekende. Het document zelf opent pas als u inlogt met het adres waarop u bent uitgenodigd. Nog geen account? Maak dan gratis een account op dat adres.</p></details></li>
+      <li><details class="ds-tip"><summary>Wat telt als handtekening?</summary><p class="ds-tip-body">Met een Community-account zet u 2 handtekeningen per maand. Een paraaf op elke pagina telt niet apart. <a href="/pricing">Bekijk wat Firm toevoegt</a>.</p></details></li>
+      <li class="ds-headlink"><a href="/verify">Getekend document controleren</a></li>
+    </ul>
   </section>
 
   <!-- Step 2 (PDF): place stamp -->
