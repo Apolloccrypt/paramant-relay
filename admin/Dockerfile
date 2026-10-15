@@ -5,7 +5,7 @@ FROM node:24-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5
 
 # See relay/Dockerfile: default matches admin/package.json, CI overrides it per
 # build, and tests/version-consistency.test.mjs holds the two together.
-ARG IMAGE_VERSION=3.1.4
+ARG IMAGE_VERSION=3.1.5
 
 LABEL org.opencontainers.image.title="paramant-admin" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
