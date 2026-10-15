@@ -5211,9 +5211,11 @@ function applySignedOut() {
   const bar = $('ds-signedout');
   if (bar) bar.hidden = false;
   const el = $('step-anon');
-  // The mode picker stays visible underneath: a visitor should still see what
+  // The mode picker stays visible above it: a visitor should still see what
   // the three workflows are before deciding whether the account is worth it.
-  if (el) el.hidden = false;
+  // Only on that first screen: the probe can answer after ?mode= has already
+  // opened the file picker, and the notice then sat between the steps.
+  if (el) el.hidden = document.body.getAttribute('data-ds-step') !== 'step-mode';
   applySessionToSendButton();
   applySessionToSignButton();
 }
