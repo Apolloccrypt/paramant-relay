@@ -9,7 +9,28 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [3.1.4] - unreleased
+## [3.1.5] - unreleased
+
+Tagged `v3.1.5` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+`v3.1.4` stays where it is; a published tag is not moved.
+
+### Changed
+- One theme source: every colour, radius, shadow and font comes from
+  `design-system.css`, with matching roles in light and dark. Light is a grey
+  ground with white cards; dark rises in layers instead of black shadows. A
+  translucent top bar gets its hairline only after scrolling, one type scale,
+  44px controls and one focus ring. `tests/theme-tokens.test.mjs` keeps raw
+  values from growing (PR #599).
+- `/sign` puts the tool first: one short sentence, details in small
+  expandable notes and a link to the full explanation; the heading folds away
+  once you start. NL and EN alike (PR #598).
+
+### Fixed
+- `deploy/de-server.json` no longer lists the 3.1.3 to 3.1.4 version gap that
+  the 3.1.4 rollout closed (PR #594).
+
+## [3.1.4] - 2026-10-14
 
 Tagged `v3.1.4` on the merge commit before the frontend rollout
 (`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
