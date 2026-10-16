@@ -9,7 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [3.1.5] - unreleased
+## [3.1.5] - 2026-10-16
 
 Tagged `v3.1.5` on the merge commit before the frontend rollout
 (`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
