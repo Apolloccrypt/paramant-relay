@@ -298,6 +298,12 @@ async function eachSector(list, fn) {
 }
 
 const app = express();
+// CSRF: enforce the same-origin check (see lib/same-origin.js /
+// requireSameOrigin below) on every /api request from the very first
+// middleware in the stack. Registering it only where it was originally
+// declared (near the end of this file) meant every route defined earlier
+// in the file already matched and responded before the check ever ran.
+app.use(`${BASE_PATH}/api`, requireSameOrigin);
 app.use(express.json({ limit: '1mb' }));
 // Every relay call made while serving this request names the customer's
 // address (lib/client-ip-forward.js). After the body parser, so the handlers
