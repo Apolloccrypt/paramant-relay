@@ -15,7 +15,10 @@ on:
 jobs:
   sign-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 10 was te krap: op main duurde de job al 8m39s, en met de eigen fonts
+    # (Inter variabel, 350 kB per verse browsercontext) liep hij twee keer
+    # vast op de grens terwijl elke suite groen was.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
