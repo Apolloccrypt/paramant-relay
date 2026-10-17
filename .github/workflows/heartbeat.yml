@@ -116,7 +116,7 @@ jobs:
       # The evidence, always. A red run's evidence is the more useful of the two.
       - name: Keep the evidence
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: heartbeat-evidence-${{ github.run_id }}
           path: heartbeat-evidence/
