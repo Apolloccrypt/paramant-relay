@@ -12,22 +12,46 @@ on:
   pull_request:
     branches: [main]
 
+#
+# Sharded since 2026-10-17. One job ran everything in 7 to 9.2 minutes against a
+# 10-minute timeout, and on 2026-10-17 run 39008721252 on main was cancelled
+# three times in "Browser suites", which held the 3.1.6 deploy. The timeout
+# stays at 10; the work is split instead. The same file list is cut into
+# SHARDS parts by node's own --test-shard, so the set that is tested does not
+# change, only where each file runs. The job `sign-e2e` at the bottom keeps the
+# name of the required status check and is green only when every shard is.
 jobs:
-  sign-e2e:
+  browser:
+    name: browser ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      SHARDS: '4'
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+          cache: npm
       - name: Install deps (browsers installed separately)
         run: npm ci
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      # Keyed on the lockfile, so a playwright bump downloads its own Chromium.
+      # --with-deps still runs on a hit: the system libraries are not cached.
+      - name: Cache Chromium
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run signing functional suite
+        if: matrix.shard == 1
         run: node tests/sign-full.test.mjs
 
       # Every other root suite that drives a browser. They import playwright, so
@@ -63,5 +87,24 @@ jobs:
       # failed nine times over with "Cannot find module admin/node_modules/redis".
       # It runs in relay-crypto-tests, the job that builds a backend. The two
       # lists partition the browser suites, so nothing falls between them.
+      #
+      # --test-shard cuts the list by position, so every file lands in exactly
+      # one shard. The list is computed whole in every shard and only then cut.
       - name: Browser suites
-        run: node --test $(node scripts/browser-suites.mjs --browser-no-stack | grep -vE 'sign-full|product-heartbeat')
+        run: node --test --test-shard="${{ matrix.shard }}/$SHARDS" $(node scripts/browser-suites.mjs --browser-no-stack | grep -vE 'sign-full|product-heartbeat')
+
+  # The required status check is named sign-e2e. This job carries that name, and
+  # deploy/deploy-3.1.sh reads the conclusion of the whole workflow run, which is
+  # success only when every job is. A cancelled or failed shard makes this red.
+  sign-e2e:
+    needs: browser
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every shard green
+        env:
+          RESULT: ${{ needs.browser.result }}
+        run: |
+          echo "browser shards: $RESULT"
+          test "$RESULT" = success
