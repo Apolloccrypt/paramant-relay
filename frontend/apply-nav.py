@@ -310,7 +310,7 @@ LEGAL_STRIP_NL = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=35">'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=36">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=31">'
 NAV_JS    = '<script src="/nav.js?v=18" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=22" defer></script>'

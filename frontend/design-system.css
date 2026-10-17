@@ -3475,3 +3475,108 @@ main .lang-switch, body > .lang-switch {
   font-size: 14px;
   text-align: center;
 }
+
+/* ==========================================================================
+   Huisstijl, één lijn met totaledigitalewaarborging.nl, mickbeer.com en
+   paramantis.nl (16-10-2026). Bron: ~/huisstijl/huisstijl.css.
+
+   Wat dit blok doet, en niet meer:
+   - Inter en DM Mono, self-hosted onder /fonts/ (CSP font-src 'self' blijft).
+     Alles loopt via --sans en --mono, dus tests die de letter vastzetten
+     (first-screen) blijven werken.
+   - Tekst- en accentkleuren naar de TDW-waarden. De opbouw van vlakken
+     (grijze grond, wit blad, haarlijn) blijft zoals hij is.
+   - Vierkante kaarten en panelen, zoals TDW. Status-chips houden hun pil.
+   - Een raster met zachte kleurbollen achter de pagina, in licht en donker.
+   - De kop van een pagina rijst bij laden. Niets herhaalt, en onder
+     prefers-reduced-motion staat alles direct op zijn eindstand.
+   ========================================================================== */
+/* @tokens:start */
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "DM Mono"; font-style: normal; font-weight: 400 500; font-display: swap;
+  src: url("/fonts/dm-mono.woff2") format("woff2");
+}
+
+:root {
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --track-display: -.035em;
+  --track-heading: -.025em;
+
+  --r-2: 0;
+  --r-3: 0;
+
+  --hs-grid-line: rgba(30, 30, 64, .045);
+  --hs-orbs:
+    radial-gradient(52% 44% at 8% -6%, rgba(66,105,208,.16), transparent 64%),
+    radial-gradient(48% 44% at 96% 4%, rgba(255,114,92,.12), transparent 64%),
+    radial-gradient(54% 48% at 90% 62%, rgba(60,169,81,.10), transparent 66%),
+    radial-gradient(48% 44% at 2% 76%, rgba(239,177,24,.10), transparent 64%);
+  --hs-ease: cubic-bezier(.2, .7, .2, 1);
+}
+:root:not([data-theme="dark"]) {
+  --window-fg: #161620;
+  --view-fg:   #161620;
+  --card-fg:   #161620;
+  --headerbar-fg: #161620;
+  --popover-fg: #161620;
+  --label:   #161620;
+  --label-2: #46464F;
+  --label-3: #5E5E69;
+  --tint:    22, 22, 32;
+
+  --accent:          #3A5DBF;
+  --accent-rgb:      58, 93, 191;
+  --accent-bg:       #3A5DBF;
+  --accent-bg-hover: #2F4DA3;
+  --accent-bg-press: #283F86;
+  --accent-soft:     rgba(58, 93, 191, .08);
+  --accent-ring:     rgba(58, 93, 191, .40);
+}
+:root[data-theme="dark"] {
+  --hs-grid-line: rgba(220, 220, 255, .035);
+  --hs-orbs:
+    radial-gradient(52% 44% at 8% -6%, rgba(66,105,208,.20), transparent 64%),
+    radial-gradient(48% 44% at 96% 4%, rgba(255,114,92,.09), transparent 64%),
+    radial-gradient(54% 48% at 90% 62%, rgba(60,169,81,.07), transparent 66%),
+    radial-gradient(48% 44% at 2% 76%, rgba(239,177,24,.07), transparent 64%);
+}
+
+/* @tokens:end */
+
+/* raster plus kleurbollen, vast achter de pagina; fadet naar onder weg */
+html { background-color: var(--window-bg); }
+body { background-color: transparent; }
+html::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    linear-gradient(var(--hs-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hs-grid-line) 1px, transparent 1px),
+    var(--hs-orbs);
+  background-size: 46px 46px, 46px 46px, auto, auto, auto, auto;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, black 50%, transparent 100%);
+          mask-image: radial-gradient(120% 90% at 50% 0%, black 50%, transparent 100%);
+}
+
+/* koppen: zwaar en strak, zoals TDW */
+h1, h2 { text-wrap: balance; }
+h2, h3 { letter-spacing: var(--track-heading); }
+
+/* de kop van de pagina rijst bij laden, één keer */
+@keyframes hs-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+main > :first-child, .page-hero { animation: hs-rise .6s var(--hs-ease) both; }
+
+/* knoppen tillen een fractie bij aanwijzen */
+.btn, .btn-sec, .btn-outline, .btn-primary {
+  transition: transform var(--d-1, 110ms) ease, background-color var(--d-2, 180ms) ease, border-color var(--d-2, 180ms) ease;
+}
+.btn:hover:not(:disabled), .btn-sec:hover, .btn-outline:hover, .btn-primary:hover { transform: translateY(-1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  main > :first-child, .page-hero { animation: none; }
+  .btn:hover:not(:disabled), .btn-sec:hover, .btn-outline:hover, .btn-primary:hover { transform: none; }
+}

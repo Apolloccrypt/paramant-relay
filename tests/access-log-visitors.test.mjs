@@ -36,7 +36,7 @@ test('a client that renders is not excluded for lacking a referer', () => {
   // exclude every genuine visitor on this site.
   const r = analyse([
     line({ ip: '8.8.8.8', path: '/sign' }),
-    line({ ip: '8.8.8.8', path: '/design-system.css?v=35' }),
+    line({ ip: '8.8.8.8', path: '/design-system.css?v=36' }),
     // Mick 05-10: taalronde (sign-flow.js naar v=76)
     line({ ip: '8.8.8.8', path: '/sign-flow.js?v=82' }),
   ]);
