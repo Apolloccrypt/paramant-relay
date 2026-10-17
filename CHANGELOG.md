@@ -9,6 +9,23 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.6] - unreleased
+
+Tagged `v3.1.6` on the merge commit before the frontend rollout
+(`deploy/DEPLOY-3.1.md`, step 5). The one-line installer clones this tag.
+`v3.1.5` stays where it is; a published tag is not moved.
+
+### Changed
+- The site takes the house style of totaledigitalewaarborging.nl, like
+  mickbeer.com and paramantis.nl: Inter and DM Mono served from
+  `frontend/fonts/`, the TDW colours and square cards, in light and dark
+  (PR #602).
+
+### Fixed
+- `CHANGELOG.md` and the changelog pages carry the live date of 3.1.5, and
+  `deploy/de-server.json` no longer lists the 3.1.4 to 3.1.5 version gap that
+  the 3.1.5 rollout closed (PR #601).
+
 ## [3.1.5] - 2026-10-16
 
 Tagged `v3.1.5` on the merge commit before the frontend rollout
