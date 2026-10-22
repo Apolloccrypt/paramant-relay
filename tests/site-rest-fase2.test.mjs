@@ -28,23 +28,17 @@ function englishPages(dir = path.join(FE, 'en')) {
   return out;
 }
 
-test('SITE-03-A: /gereedschap has an English page, and the language switch on both sides points at it', () => {
-  assert.ok(exists('frontend/en/gereedschap.html'), 'frontend/en/gereedschap.html is missing');
-  const nl = pg('gereedschap'); const en = pg('en/gereedschap');
-  assert.match(en, /<html lang="en">/);
-  for (const html of [nl, en]) {
-    assert.match(html, /<link rel="alternate" hreflang="en" href="https:\/\/paramant\.app\/en\/gereedschap">/);
-    assert.match(html, /<link rel="alternate" hreflang="nl" href="https:\/\/paramant\.app\/gereedschap">/);
-    assert.match(html, /<a href="\/en\/gereedschap" hreflang="en" lang="en"/);
+test('SITE-03-A: /gereedschap is gone, in both languages, and nothing still points at it', () => {
+  // Mick, 22-10-2026: "overbodig, liever alles via account". The tools keep
+  // their own addresses; the overview page and its nav item are removed.
+  assert.ok(!exists('frontend/gereedschap.html') && !exists('frontend/en/gereedschap.html'));
+  for (const f of englishPages(FE)) assert.ok(!/href="(\/en)?\/gereedschap"/.test(fs.readFileSync(f, "utf8")), f + " still links to /gereedschap");
+  assert.doesNotMatch(rd('frontend/sitemap.xml'), /gereedschap/);
+  assert.doesNotMatch(rd('frontend/js/nav-auth.js'), /gereedschap/);
+  for (const conf of ['deploy/nginx-paramant-live.conf', 'deploy/nginx-paramant-public.conf']) {
+    assert.match(rd(conf), /location = \/gereedschap \{ return 301 https:\/\/\$host\/dashboard; \}/, conf);
+    assert.match(rd(conf), /location = \/en\/gereedschap \{ return 301 https:\/\/\$host\/en\/dashboard; \}/, conf);
   }
-  assert.match(rd('frontend/sitemap.xml'), /<loc>https:\/\/paramant\.app\/en\/gereedschap<\/loc>/);
-  // The English bar, stamped and re-rendered, sends Tools to the English page.
-  assert.match(rd('frontend/js/nav-auth.js'), /\['Tools', '\/en\/gereedschap'\]/);
-  assert.match(pg('en/about'), /<a href="\/en\/gereedschap" class="nav-link">Tools<\/a>/);
-  // The same promises as the Dutch page: Community numbers and the sign-in-first buttons.
-  assert.ok(en.includes('two signatures a month') && en.includes('fifty transfers a month'));
-  for (const r of ['/en/sign', '/en/parashare']) assert.ok(en.includes(`href="/en/auth/login?next=${r}"`), r);
-  for (const r of ['/en/vault', '/en/verify', '/en/ct-log', '/en/get']) assert.ok(en.includes(`href="${r}"`), r);
 });
 
 test('SITE-03-F*: an English page links to the English page wherever one exists, the drawer Help included', () => {
@@ -174,7 +168,7 @@ test('SITE-49-A: every numbered block comment in site-claims.test.mjs is its reg
   for (const n of nums) assert.ok(rows.has(n), `block ${n} has no register row`);
   // The blocks the register names by title carry the register number.
   const want = { 43: 'no page promises a signing order', 44: 'every TLS-terminating server block', 45: 'the ParaSend credential /privacy describes',
-    46: 'the two legal facts', 47: 'the ParaSend read counts', 48: 'every ParaSend link lifetime', 49: 'the tools page only calls', 50: 'the sign-in and account pages' };
+    46: 'the two legal facts', 47: 'the ParaSend read counts', 48: 'every ParaSend link lifetime', 49: 'the account-free tools stay', 50: 'the sign-in and account pages' };
   for (const [n, title] of Object.entries(want)) {
     const at = t.indexOf(`test('${title}`);
     assert.ok(at > 0, title);

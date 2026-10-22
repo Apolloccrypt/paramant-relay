@@ -269,12 +269,6 @@
   "shadow": 0,
   "font": 0
  },
- "en/gereedschap.html": {
-  "colour": 4,
-  "radius": 0,
-  "shadow": 0,
-  "font": 0
- },
  "en/get.html": {
   "colour": 7,
   "radius": 0,
@@ -445,12 +439,6 @@
  },
  "en/vs.html": {
   "colour": 5,
-  "radius": 0,
-  "shadow": 0,
-  "font": 0
- },
- "gereedschap.html": {
-  "colour": 4,
   "radius": 0,
   "shadow": 0,
   "font": 0
