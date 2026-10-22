@@ -131,17 +131,15 @@
   var PUBLIC_NAV = DUTCH ? [
     ['Versturen', '/parasend'],
     ['Ondertekenen', '/parasign'],
-    ['Gereedschap', '/gereedschap'],
     ['Beveiliging', '/security'],
     ['Prijzen', '/pricing']
   ] : [
     // The English bar points at the English pages (apply-nav.py
-    // to_english_links), /en/gereedschap included since fase 2 SITE-03-A.
-    // The same five destinations as the Dutch bar since acceptance 3.1.1:
-    // the two products first, then tools, security and pricing.
+    // to_english_links). The same four destinations as the Dutch bar: the
+    // two products first, then security and pricing. The separate tools page
+    // is gone (22-10-2026); every tool lives behind the account now.
     ['Send', '/en/parasend'],
     ['Sign', '/en/parasign'],
-    ['Tools', '/en/gereedschap'],
     ['Security', '/en/security'],
     ['Pricing', '/en/pricing']
   ];

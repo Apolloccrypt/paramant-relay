@@ -54,7 +54,7 @@ const aliases = {
   '/security':'/security.html', '/trust':'/trust.html', '/docs':'/docs.html',
   '/about':'/about.html', '/help':'/help/index.html', '/download':'/download.html',
   '/login':'/auth/login.html', '/verify':'/verify.html',
-  '/gereedschap':'/gereedschap.html', '/partners':'/partners.html',
+  '/partners':'/partners.html',
   '/en':'/en/index.html', '/en/pricing':'/en/pricing.html', '/en/sign':'/en/sign.html',
 };
 const PAGES = Object.keys(aliases);

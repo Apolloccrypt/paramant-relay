@@ -11,7 +11,6 @@ NEW_NAV = '''\
   <ul class="nav-links">
     <li><a href="/parasend" class="nav-link">Send</a></li>
     <li><a href="/parasign" class="nav-link">Sign</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
   </ul>
@@ -39,7 +38,6 @@ NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
   <a href="/parasend" class="nav-mobile-standalone">Send</a>
   <a href="/parasign" class="nav-mobile-standalone">Sign</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 </div>
@@ -236,7 +234,6 @@ NEW_NAV_NL = '''\
   <ul class="nav-links">
     <li><a href="/parasend" class="nav-link">Versturen</a></li>
     <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
     <li><a href="/security" class="nav-link">Beveiliging</a></li>
     <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
@@ -256,7 +253,6 @@ NEW_MOBILE_NL = '''\
 <div class="nav-mobile" id="nav-mobile">
   <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
   <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
   <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
   <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
@@ -313,7 +309,7 @@ LEGAL_STRIP_NL = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=36">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=31">'
 NAV_JS    = '<script src="/nav.js?v=18" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=22" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=23" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -323,7 +319,6 @@ ADD_NAV_TO = {
     '404.html',
     'changelog.html',
     'download.html',
-    'gereedschap.html',
     'partners.html',
     'security/acknowledgements.html',
     'signup/verified.html',

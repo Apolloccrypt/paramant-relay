@@ -32,17 +32,13 @@ await publicPage.route('**/api/user/session/verify', (route) => route.fulfill({ 
 // at /en since 23 September 2026. The Dutch homepage at / has its own bar,
 // checked right after them.
 await publicPage.goto(ORIGIN + '/en', { waitUntil:'domcontentloaded' });
-await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Send,Sign,Tools,Security,Pricing');
+await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Send,Sign,Security,Pricing');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
-// The bar carries the free tools as their own destination. Everything a
-// visitor can use without an account lived one level down, behind /pricing or
-// a body link, so the page that collects it was the least reachable thing on
-// the site. It is the front door of the ladder, so it sits next to Product.
-// The label is "Tools" and the route is /gereedschap: the page behind it is
-// Dutch because the paid work behind it is, and this is the one word that
-// reads the same in both languages, so the bar stays English on the 42 English
-// pages that also carry it.
-ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Send','Sign','Tools','Security','Pricing']), publicDesktop.join(', '));
+// The bar carries the two products, security and pricing. The separate
+// tools page (/gereedschap) is gone since 22 October 2026 (Mick: "overbodig,
+// liever alles via account"); every tool sits in the signed-in bar, and the
+// old address redirects to the dashboard.
+ok('public navigation names its four destinations', JSON.stringify(publicDesktop) === JSON.stringify(['Send','Sign','Security','Pricing']), publicDesktop.join(', '));
 // Signed out, the visitor lands in the demo dashboard (Mick, 5 October 2026),
 // and its head carries ONE primary action and one secondary, not three: make
 // an account, or try it yourself. Both sit inside the dashboard, and there is
@@ -68,7 +64,7 @@ await (async () => {
   const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
   await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
   await nl.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
-  const want = 'Versturen,Ondertekenen,Gereedschap,Beveiliging,Prijzen';
+  const want = 'Versturen,Ondertekenen,Beveiliging,Prijzen';
   const got = await nl.waitForFunction((w) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((n) => n.textContent).join(',') === w, want, { timeout:10000 }).then(() => true, () => false);
   ok('the Dutch homepage names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
   const authText = await nl.locator('#nav-auth').evaluate((n) => n.textContent);
