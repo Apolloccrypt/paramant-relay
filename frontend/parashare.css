@@ -138,6 +138,12 @@ textarea.ps-input{resize:vertical;min-height:120px}
 .ps-drop.just-taken .ps-drop-icon{animation:ps-take .38s var(--e-standard, ease-out)}
 .ps-count.bump{animation:ps-bump .22s ease-out}
 .ps-go.is-sending{opacity:.85}
+/* De code die de afzender zelf doorgeeft, op het eindscherm. */
+.ps-own-code{margin:18px auto 6px;max-width:30rem;padding:16px 18px;border:1px solid var(--accent);border-radius:var(--r-1);background:var(--surface);text-align:left}
+.ps-own-code[hidden]{display:none}
+.ps-own-code-title{margin:0 0 6px;font-weight:600;color:var(--ink-1)}
+.ps-own-code-value{margin:0 0 10px;font:600 26px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;color:var(--ink-1);user-select:all;overflow-wrap:anywhere}
+.ps-own-code-note{margin:0 0 8px;font-size:14.5px;line-height:1.55;color:var(--ink-2)}
 @media (prefers-reduced-motion: reduce){
   .ps-drop.just-taken .ps-drop-icon,.ps-count.bump{animation:none}
   .ps-drop,.ps-mode-card{transition:none}

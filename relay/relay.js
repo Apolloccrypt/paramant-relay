@@ -286,6 +286,12 @@ function modeAllows(p) {
 // "Paramant bewaart het bestand" read as storage, while /pricing says the
 // file lives in memory and is wiped (acceptatie 3.1.1, taal #37): the footer
 // says how long it waits and that it is gone after.
+// The line in the invitation and the reminder when the sender passes on a code
+// of their own. It says a code is coming, and never contains it: the mail is
+// exactly the channel that code is there to stay out of.
+const AFZENDERCODE_NL = 'De afzender geeft je apart een code. Die heb je nodig om het bestand te openen.';
+const AFZENDERCODE_EN = 'The sender will give you a code separately. You need it to open the file.';
+
 function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
@@ -6171,6 +6177,24 @@ async function handleRelayRequest(req, res) {
       // them is deliberate: a recipient who gets bytes they cannot open is
       // worse off than one who never got them.
       const sealed = (input.sealed && typeof input.sealed === 'object') ? input.sealed : null;
+      // "Ik geef de code zelf door": a flag and the salt of the slow derivation.
+      // The code itself never comes here; every sealed entry then carries a
+      // check instead (lib/send.js, MAX_SENDER_CODE_WRONG).
+      const senderCode = (input.sender_code && typeof input.sender_code === 'object'
+                          && !Array.isArray(input.sender_code))
+        ? { salt: String(input.sender_code.salt || '').slice(0, 128) } : null;
+      // ALWAYS, for every new send. Without it the token in the invitation and
+      // the code in the second mail both land in one mailbox, through one mail
+      // provider, and whoever reads either can open the file. Sends made before
+      // this rule keep working until they expire: that lives in lib/send.js,
+      // which still serves a record without the flag. SEND_SENDER_CODE=optional
+      // exists for the older test suites that exercise that legacy shape.
+      if (!senderCode && String(process.env.SEND_SENDER_CODE || '').toLowerCase() !== 'optional') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'sender_code_required',
+          message: 'A send to named recipients needs the sender\'s own code. Reload the page and send again.',
+          message_nl: 'Versturen op naam gaat altijd met een eigen code van de afzender. Laad de pagina opnieuw en verstuur het nog een keer.' }));
+      }
 
       // Seats for the whole send, before anything is written. The count comes
       // off `sealed`, which is the browser's own list and therefore the number
@@ -6190,7 +6214,7 @@ async function handleRelayRequest(req, res) {
       }
 
       const made = await _sendStore().create({
-        plan: _tier, blob, addresses: input.recipients, sealed,
+        plan: _tier, blob, addresses: input.recipients, sealed, senderCode,
         // The file's name is never taken from the request: the web app no
         // longer sends it, and an old client, an API caller or a fork would
         // otherwise still leak it to the mailer and the store. It travels
@@ -6311,6 +6335,7 @@ async function handleRelayRequest(req, res) {
               + '\n\nDeze link is alleen voor u en werkt één keer. Als u hem opent, sturen we een '
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
+              + (made.sender_code ? '\n\n' + AFZENDERCODE_NL : '')
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
               + ' uw adres heeft ingevuld. Het bestand staat versleuteld klaar tot het is opgehaald of de link verloopt. Daarna is het weg. Deze link bewaren wij niet.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
@@ -6319,6 +6344,7 @@ async function handleRelayRequest(req, res) {
               + '\n\nThe link is yours alone and works once. Opening it sends a short code '
               + 'to this address, so only somebody who can read this mailbox can collect the '
               + 'file. Available until ' + totEn + '.'
+              + (made.sender_code ? '\n\n' + AFZENDERCODE_EN : '')
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
               + ' entered your address. The file waits, encrypted, until it is picked up or the link expires. Then it is gone. We do not keep this link.'
               + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
@@ -6331,7 +6357,8 @@ async function handleRelayRequest(req, res) {
               + 'Bestand openen</a></p>'
               + '<p style="color:#666;font-size:13px">Deze link is alleen voor u en werkt één keer. '
               + 'Als u hem opent, sturen we een korte controlecode naar dit adres. Zo kan alleen '
-              + 'wie deze mailbox leest het bestand ophalen.<br>Beschikbaar tot ' + tot + '.</p>',
+              + 'wie deze mailbox leest het bestand ophalen.<br>Beschikbaar tot ' + tot + '.</p>'
+              + (made.sender_code ? '<p><strong>' + AFZENDERCODE_NL + '</strong></p>' : ''),
                 '<p>' + (wie ? '<strong>' + wie + '</strong> sent you a file through Paramant.'
                              : 'A file is waiting for you.') + '</p>'
               + (taal === 'en'
@@ -6342,7 +6369,8 @@ async function handleRelayRequest(req, res) {
                   : '<p>Use the button above to open the file.</p>')
               + '<p style="color:#666;font-size:13px">This link is yours alone and works once. '
               + 'Opening it sends a short code to this address, so only somebody who can read '
-              + 'this mailbox can collect the file.<br>Available until ' + totEn + '.</p>')
+              + 'this mailbox can collect the file.<br>Available until ' + totEn + '.</p>'
+              + (made.sender_code ? '<p><strong>' + AFZENDERCODE_EN + '</strong></p>' : ''))
               + VOET(wieRuw, kd.email, taal),
         });
         if (bezorgd && bezorgd.ok) { gemaild += 1; if (bezorgd.delivered !== false) echtBezorgd += 1; }
@@ -6505,23 +6533,27 @@ async function handleRelayRequest(req, res) {
               'Er staat nog een bestand voor u klaar.\n\n' + link3
             + '\n\nDit is dezelfde link als in de eerste mail. Hij is alleen voor u en werkt één keer. '
             + 'Als u hem opent, sturen we een korte controlecode naar dit adres. '
-            + 'Beschikbaar tot ' + tot + '.',
+            + 'Beschikbaar tot ' + tot + '.'
+            + (out.sender_code ? '\n\n' + AFZENDERCODE_NL : ''),
               'A file is still waiting for you.'
             + (taal3 === 'en' ? '\n\n' + link3 : '\n\nUse the link above.')
             + '\n\nIt is the same link as in the first mail. It is yours alone and works once. '
             + 'Opening it sends a short code to this address. '
-            + 'Available until ' + totEn + '.'),
+            + 'Available until ' + totEn + '.'
+            + (out.sender_code ? '\n\n' + AFZENDERCODE_EN : '')),
         html: tweetaligHtml(taal3,
               '<p>Er staat nog een bestand voor u klaar.</p>'
             + knop3('Bestand openen')
             + '<p style="color:#666;font-size:13px">Dit is dezelfde link als in de eerste mail. '
             + 'Hij is alleen voor u en werkt één keer. Als u hem opent, sturen we een korte '
-            + 'controlecode naar dit adres.<br>Beschikbaar tot ' + escHtml(tot) + '.</p>',
+            + 'controlecode naar dit adres.<br>Beschikbaar tot ' + escHtml(tot) + '.</p>'
+            + (out.sender_code ? '<p><strong>' + AFZENDERCODE_NL + '</strong></p>' : ''),
               '<p>A file is still waiting for you.</p>'
             + (taal3 === 'en' ? knop3('Open the file') : '<p>Use the button above to open the file.</p>')
             + '<p style="color:#666;font-size:13px">It is the same link as in the first mail. '
             + 'It is yours alone and works once. Opening it sends a short code to this address.'
-            + '<br>Available until ' + escHtml(totEn) + '.</p>')
+            + '<br>Available until ' + escHtml(totEn) + '.</p>'
+            + (out.sender_code ? '<p><strong>' + AFZENDERCODE_EN + '</strong></p>' : ''))
             + VOET(wie3, out.sender_email, taal3),
       });
       if (!bezorgd || !bezorgd.ok) {
@@ -8775,6 +8807,7 @@ async function handleRelayRequest(req, res) {
   function _pickupRefused(res, reason, limit) {
     const status = reason === 'already_collected' ? 410
                  : reason === 'revoked' ? 403
+                 : reason === 'sender_code_locked' ? 403
                  : reason === 'expired' ? 410
                  : reason === 'too_many_codes' ? 429
                  : reason === 'too_many_tries' ? 429 : 404;
@@ -8882,7 +8915,11 @@ async function handleRelayRequest(req, res) {
       log('info', 'pickup_code_mailed', {});
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       return res.end(J({ ok: true, step: 'code_sent', sent_to: vraag.masked,
-                         expires_in_s: vraag.expires_in_s }));
+                         expires_in_s: vraag.expires_in_s,
+                         // The page then also asks for the sender's own code.
+                         // The salt is no secret: it only makes the slow
+                         // derivation the recipient's browser runs.
+                         ...(vraag.sender_code ? { sender_code: true, code_salt: vraag.code_salt } : {}) }));
      } catch (e) {
       if (redisOutage503(e, res)) return;
       log('warn', 'pickup_code_failed', { err: e && e.message });
@@ -8894,8 +8931,17 @@ async function handleRelayRequest(req, res) {
     // Step two: the code, and then the bytes.
     try {
       const code = String(_body.code || '');
-      const got = await _sendStore().collect(pickm[1], code);
+      // Not the sender's code: a proof derived from it in the recipient's
+      // browser. Only looked at on a send that has the flag.
+      const proof = typeof _body.sender_proof === 'string' ? _body.sender_proof : '';
+      const got = await _sendStore().collect(pickm[1], code, proof);
       if (!got.ok) {
+        if (got.reason === 'wrong_sender_code' || got.reason === 'sender_code_required') {
+          log('info', 'pickup_sender_code_refused', { reason: got.reason });
+          res.writeHead(got.reason === 'sender_code_required' ? 400 : 401,
+                        { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          return res.end(J({ error: got.reason, tries_left: got.tries_left }));
+        }
         // A wrong or stale code is a separate answer from a link that cannot be
         // used at all: the holder needs to know whether to try again or stop.
         if (got.reason === 'wrong_code' || got.reason === 'too_many_tries'

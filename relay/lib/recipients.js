@@ -116,7 +116,12 @@ function safeHexEqual(a, b) {
 // Returns { ok, reason, limit, records, tokens }. `tokens` maps the address to
 // its one-time token, for the caller to mail and then forget: it cannot be
 // recovered from `records`.
-function buildRecipients(plan, list, now, sealed) {
+//
+// `senderCode` true means the sender gives the recipients a code of their own,
+// outside the mail (frontend/js/send-wrap.js, wrapWithCode). Every entry then
+// also carries `code_check`: SHA-256 of a proof derived from that code and the
+// token. Never the code itself, and nothing here can turn it back into one.
+function buildRecipients(plan, list, now, sealed, senderCode) {
   const checked = tiers.checkRecipients(plan, list);
   if (!checked.ok) {
     return { ok: false, reason: checked.reason, limit: checked.limit,
@@ -144,7 +149,7 @@ function buildRecipients(plan, list, now, sealed) {
   // collect -- while allSettled never turns true and the file sits out its TTL.
   const gezien = new Set();
   for (const email of checked.recipients) {
-    let token, wrapped = null;
+    let token, wrapped = null, check = null;
     {
       const paar = Object.prototype.hasOwnProperty.call(meegeleverd, email)
         ? meegeleverd[email] : null;
@@ -173,6 +178,14 @@ function buildRecipients(plan, list, now, sealed) {
       gezien.add(paar.token);
       token = paar.token;
       wrapped = paar.wrapped_key;
+      // With the sender's code on, a row without a check is a recipient who
+      // can never be let through: refused here, where the sender can fix it.
+      if (senderCode && (typeof paar.code_check !== 'string' || !CHECK_SHAPE.test(paar.code_check))) {
+        return { ok: false, reason: 'missing_code_check', limit: checked.limit,
+                 asked: checked.recipients.length, records: [], tokens: {},
+                 rejected: email };
+      }
+      check = senderCode ? paar.code_check : null;
     }
     tokens[email] = token;
     records.push({
@@ -182,6 +195,9 @@ function buildRecipients(plan, list, now, sealed) {
       // The file key, locked under this recipient's token. Useless here: we
       // keep only the hash of the token that opens it.
       wrapped_key: wrapped,
+      // Only on a send with the sender's own code. Absent, not null, on every
+      // other send, so a record written before this field existed reads the same.
+      ...(check ? { code_check: check, sender_wrong: 0 } : {}),
       invited_at: at,
       picked_up_at: null,
       revoked_at: null,
@@ -207,6 +223,8 @@ const TOKEN_SHAPE = /^[A-Za-z0-9_-]{32,128}$/;
 // daarna te horen dat het niet ging. Weigeren hoort bij het aanmaken, waar de
 // AFZENDER het nog kan oplossen.
 const WRAP_SHAPE  = /^[A-Za-z0-9_-]{60,4096}$/;
+// SHA-256 in base64url: exactly 43 characters.
+const CHECK_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 
 // Find the recipient a pickup token belongs to. Walks the whole table so a
 // caller cannot learn which addresses exist by timing the miss. Rows that are

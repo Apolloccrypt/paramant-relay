@@ -104,12 +104,18 @@ await fetch(RELAY + '/v2/inbound', { method: 'POST',
   headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
   body: JSON.stringify({ hash, payload: ct.toString('base64'), meta: { device_id: 'transfer-web-link' } }) });
 
+// Met de eigen code van de afzender, zoals elke nieuwe send op naam nu gaat.
 const token = wrap.newToken();
 const adres = 'partner@extern.test';
-const sealed = { [adres]: { token, wrapped_key: await wrap.wrap(token, new Uint8Array(Buffer.concat([rawKey, iv]))) } };
+const afzenderCode = wrap.newSenderCode();
+const codeZout = wrap.newCodeSalt();
+const gerekt = await wrap.stretchCode(afzenderCode, codeZout);
+const gewikkeld = await wrap.wrapWithCode(token, new Uint8Array(Buffer.concat([rawKey, iv])), gerekt);
+const sealed = { [adres]: { token, wrapped_key: gewikkeld.wrapped_key, code_check: gewikkeld.code_check } };
 const vr = await fetch(RELAY + '/v2/sends', { method: 'POST',
   headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
-  body: JSON.stringify({ hashes: [hash], recipients: [adres], sealed, filename: naam, ttl_ms: 3600000 }) });
+  body: JSON.stringify({ hashes: [hash], recipients: [adres], sealed, filename: naam, ttl_ms: 3600000,
+                         sender_code: { salt: codeZout } }) });
 ok('de verzending is aangemaakt', vr.status === 201, 'status ' + vr.status);
 
 // ── EN NU DE BROWSER ────────────────────────────────────────────────────────
@@ -117,6 +123,10 @@ const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePa
 const page = await browser.newPage({ acceptDownloads: true });
 const fouten = [];
 page.on('pageerror', (e) => fouten.push(String(e)));
+// Alles wat de pagina naar de server stuurt. De code van de afzender hoort
+// daar nooit in te staan, in geen enkele vorm.
+const verzonden = [];
+page.on('request', (r) => { if (r.url().includes('/v2/')) verzonden.push(r.postData() || ''); });
 // De browser logt elke 4xx als console-fout, en deze test lokt er bewust een
 // uit met een foute code. Die ene telt niet mee; al het andere wel, want een
 // onverwachte fout op dit scherm is het soort ding dat een ontvanger een
@@ -142,6 +152,7 @@ mails.length = 0;
 await page.click('#ask');
 await page.waitForSelector('#step-code', { state: 'visible', timeout: 10000 });
 ok('na "stuur mij de code" komt het codescherm', await page.isVisible('#step-code'));
+ok('met een tweede veld voor de code van de afzender', await page.isVisible('#sender-code'));
 
 const gemaskeerd = await page.textContent('#sent-to');
 ok('het adres staat gemaskeerd op het scherm', /\*/.test(gemaskeerd || ''), gemaskeerd);
@@ -155,6 +166,7 @@ const code = codeMail ? (String(codeMail.text).match(/\b(\d{6})\b/) || [])[1] : 
 ok('met een zescijferige code erin', !!code);
 
 // Eerst fout typen, want dat doet een mens.
+await page.fill('#sender-code', wrap.formatCode(afzenderCode).toLowerCase());
 await page.fill('#code', '000000');
 await page.click('#open');
 await page.waitForFunction(() => {
@@ -166,9 +178,24 @@ const naFout = await page.textContent('#code-say');
 ok('een foute code geeft een leesbare melding', /Die code klopt niet\. Nog \d+ pogingen? over\./.test(naFout || ''), naFout);
 ok('en de knop blijft bruikbaar', !(await page.isDisabled('#open')));
 
+// De goede mailcode, maar een verkeerd getypte code van de afzender.
+let foutCode = wrap.newSenderCode();
+while (foutCode === afzenderCode) foutCode = wrap.newSenderCode();
+await page.fill('#code', code);
+await page.fill('#sender-code', foutCode);
+await page.click('#open');
+await page.waitForFunction(() => {
+  const n = document.getElementById('code-say');
+  return n && /afzender klopt niet/i.test(n.textContent || '');
+}, { timeout: 20000 }).catch(() => {});
+const naFoutAfzender = await page.textContent('#code-say');
+ok('een foute code van de afzender geeft een eigen melding',
+   /De code van de afzender klopt niet\. Nog 4 pogingen over\./.test(naFoutAfzender || ''), naFoutAfzender);
+
 // En dan goed.
 const wachtDownload = page.waitForEvent('download', { timeout: 20000 });
 await page.fill('#code', code);
+await page.fill('#sender-code', wrap.formatCode(afzenderCode));
 await page.click('#open');
 const download = await wachtDownload;
 
@@ -194,8 +221,13 @@ const stopTitel = await page2.textContent('#stop-title');
 ok('en dat scherm legt uit wat er aan de hand is',
    (stopTitel || '').length > 10 && !/undefined/i.test(stopTitel || ''), stopTitel);
 
-ok('de foute code gaf inderdaad de 401 die we uitlokten', verwacht401.length === 1,
-   verwacht401.length + ' keer 401, verwacht 1');
+ok('de twee foute codes gaven inderdaad de 401 die we uitlokten', verwacht401.length === 2,
+   verwacht401.length + ' keer 401, verwacht 2');
+const alles = verzonden.join('\n');
+ok('de code van de afzender ging in geen enkel verzoek naar de server',
+   verzonden.length > 0 && ![afzenderCode, wrap.formatCode(afzenderCode), afzenderCode.toLowerCase()]
+     .some((v) => alles.includes(v)), verzonden.length + ' verzoeken');
+ok('en ook niet in een mail', !JSON.stringify(mails).includes(afzenderCode));
 ok('en verder geen enkele fout op de pagina', fouten.length === 0, fouten.join(' | ').slice(0, 300));
 
 // ── afsluiten ───────────────────────────────────────────────────────────────

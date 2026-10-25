@@ -84,6 +84,12 @@ function bootRelayBaseEnv(port) {
     REDIS_URL: '',
     RELAY_REDIS_URL: '',
     NATS_URL: '',
+    // Every new send to named recipients now carries the sender's own code,
+    // and the relay refuses one without it. The suites booted through here
+    // were written before that and test everything else about a send (races,
+    // limits, mail, attacks), so they keep the old shape. sender-code-e2e
+    // boots with SEND_SENDER_CODE unset to test the rule itself.
+    SEND_SENDER_CODE: 'optional',
   };
 }
 
