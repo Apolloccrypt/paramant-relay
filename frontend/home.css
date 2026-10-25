@@ -18,7 +18,7 @@
   --h-paper: #FFFFFF;
   --h-panel: #F4F5F7;
   --h-line: #E3E6EB;
-  --h-wm: #8A94A0;
+  --h-wm: #687381;
   --h-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --h-mono: "DM Mono", ui-monospace, Menlo, monospace;
 }
@@ -172,7 +172,7 @@ html[data-session="checking"] body > * { visibility: hidden; }
   .h-wrap { padding: 0 16px; }
   .h-top .h-wrap { height: 68px; }
   .h-mark { font-size: 17px; }
-  .h-login { font-size: 16px; padding: 7px 14px; }
+  .h-login { font-size: 16px; padding: 7px 14px; min-height: 44px; display: inline-flex; align-items: center; }
   .h-hero { padding: 24px 0 72px; }
   .h-hero .h-wrap { grid-template-columns: 1fr; gap: 48px; }
   .h-cta { display: block; text-align: center; margin-top: 32px; }

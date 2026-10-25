@@ -40,13 +40,16 @@
   var mark = signedInHere();
   if (mark) html.setAttribute('data-session', 'checking');
   // Never leave a page blank on a server that does not answer.
-  var guard = setTimeout(function () { if (mark) go(); else showPitch(); }, 6000);
+  var guard = setTimeout(function () { if (mark) go(); else showPitch(); }, 8000);
 
   function verify(attempt) {
     return fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' })
       .then(function (r) {
-        if ((r.status === 429 || r.status >= 500) && attempt < 1) {
-          return new Promise(function (res) { setTimeout(res, 1000); })
+        // Asked three times in all, as before (fase 1 SITE-02-K), honouring a
+        // short Retry-After, before the answer counts as unknown.
+        if ((r.status === 429 || r.status >= 500) && attempt < 2) {
+          var wait = Math.min(2, Number(r.headers.get('Retry-After')) || 1);
+          return new Promise(function (res) { setTimeout(res, wait * 1000); })
             .then(function () { return verify(attempt + 1); });
         }
         if (r.status === 429 || r.status >= 500) return { unknown: true };

@@ -54,7 +54,7 @@ body.pa-app{background:var(--window-bg);color:var(--label);font-family:var(--san
 .pa-card + .pa-card{margin-top:12px}
 .pa-ch{display:flex;align-items:center;gap:12px;padding:14px;width:100%;background:none;border:0;text-align:left}
 button.pa-ch:hover .pa-nm{text-decoration:underline;text-underline-offset:3px}
-.pa-ic{width:40px;height:40px;border-radius:50%;background:var(--card-bg-2);border:1px solid var(--separator);display:grid;place-items:center;color:var(--label-2);flex:none}
+.pa-ic{width:40px;height:40px;border-radius:50%;background:transparent;border:1px solid var(--separator);display:grid;place-items:center;color:var(--label-2);flex:none}
 .pa-txt{min-width:0;flex:1}
 .pa-nm{font-size:16px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pa-sub{font-size:13px;color:var(--label-3);margin-top:1px}
@@ -166,6 +166,23 @@ button.pa-ch:hover .pa-nm{text-decoration:underline;text-underline-offset:3px}
   .pa-tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;height:80px;border-top:1px solid var(--separator);background:var(--headerbar-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);justify-content:space-around;padding-top:8px;z-index:5}
   .pa-tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:500;color:var(--label-3);width:84px;text-decoration:none}
   .pa-tabbar a.on{color:var(--accent)}
+  /* The house minimum for a finger is 44px, reached with padding so the type
+     keeps its size (koper review, 390px). */
+  .pa-seg button{height:44px}
+  .pa-btn{min-height:44px}
+  .pa-links{gap:0 18px;padding-bottom:4px}
+  .pa-links button,.pa-links a{min-height:44px;display:inline-flex;align-items:center}
+  .pa-row .x{min-height:44px}
+  .pa-dl{width:44px;height:44px}
+  .pa-lang a{display:inline-flex;align-items:center;min-height:44px}
+  .pa-plan a{display:inline-flex;align-items:center;min-height:44px}
+}
+@media (pointer:coarse){
+  .pa-seg button,.pa-new,.pa-dialog-close,.pa-dl{min-height:44px;min-width:44px}
+  .pa-btn,.pa-links button,.pa-links a,.pa-row .x,.pa-lang a,.pa-plan a,.pa-avatar,.pa-menu a{min-height:44px;min-width:44px}
+  .pa-links button,.pa-links a,.pa-lang a,.pa-plan a{display:inline-flex;align-items:center}
+  .pa-avatar{width:44px;height:44px}
+  .pa-mark,.pa-skip{display:inline-flex;align-items:center;min-height:44px}
 }
 .pa-btn.danger{color:var(--danger)}
 .pa-lang{margin:32px 4px 0;font-size:13px}

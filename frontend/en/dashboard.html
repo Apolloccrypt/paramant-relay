@@ -75,12 +75,12 @@
       <!-- Only when there is something to do: a payment just made, a term about
            to end, a month almost used up. -->
       <aside class="pa-band" id="dh-billing-return" role="status" hidden>
-        <strong data-dh="return-kicker"></strong>
-        <span data-dh="return-lede"></span>
+        <strong data-dh="return-kicker">--</strong>
+        <span data-dh="return-lede">--</span>
         <a data-dh="return-retry" href="/en/pricing">Pay again</a>
       </aside>
       <div class="pa-band warn" id="dh-term-warn" role="status" hidden>
-        <span data-dh="term-warn"></span> <a href="/en/pricing">Renew</a>
+        <span data-dh="term-warn"></span> <a class="plan-term-warn-cta" href="/en/pricing">Renew</a>
       </div>
       <div class="pa-band warn" id="dh-usage-warn" role="status" hidden>
         <span data-dh="usage-warn"></span> <a id="dh-usage-upgrade" href="/en/pricing">See a bigger plan</a>
@@ -116,6 +116,8 @@
         <summary>Your plan: <span data-dh="paid-name"></span></summary>
         <div class="pa-group">
           <p class="pa-help" data-dh="paid-includes"></p>
+          <p class="pa-help" id="dh-term-line" hidden>--</p>
+          <ul class="pa-help" id="dh-term-products" hidden></ul>
           <p class="pa-help"><span data-dh="paid-foot-lead">Invoices and renewing are under </span><a href="/en/account#billing-section">Account</a>.</p>
         </div>
       </details>

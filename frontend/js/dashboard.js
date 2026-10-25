@@ -69,7 +69,9 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   function ico(name, size) {
     return '<svg width="' + size + '" height="' + size + '" aria-hidden="true"><use href="#i-' + name + '"/></svg>';
   }
-  // One notation for every date (js/format-date.js): day, month, year.
+  // One notation for every date (js/format-date.js): day, month, year. A
+  // sending also gets its time, because two sends of one day to the same
+  // number of people are otherwise one line twice (fase 1, SENDNAME-18-A).
   function fmtDate(iso) { return paramantDate.day(iso); }
 
   // What went wrong, in words, and the way back that fits. A 429 or a 5xx says
@@ -521,8 +523,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     (L.sends || []).forEach(function (x) { out.push({ kind: 'send', item: x, at: Date.parse(x.created_at || '') || 0 }); });
     (L.requests || []).forEach(function (x) { out.push({ kind: 'request', item: x, at: Number(x.created_at) || 0 }); });
     out.forEach(function (e) { e.state = docState.stateOf(e.kind, e.item); e.open = docState.isOpenState(e.state); });
+    // What waits on the reader comes first, the one that closes soonest on
+    // top; the rest newest first.
+    out.forEach(function (e) { if (e.kind === 'inbox') e.closes = Date.parse(e.item.signing_closes_at || '') || Infinity; });
     out.sort(function (a, b) {
       if ((a.kind === 'inbox') !== (b.kind === 'inbox')) return a.kind === 'inbox' ? -1 : 1;
+      if (a.kind === 'inbox') return a.closes - b.closes;
       return b.at - a.at;
     });
     return out;
@@ -594,10 +600,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var line = document.getElementById('pa-plan');
     if (!line) return;
     var caps = quota && quota.caps;
-    if (!nothing || !planIsFree || !caps || typeof caps.signs !== 'number' || typeof caps.transfers !== 'number') { line.hidden = true; return; }
-    line.innerHTML = esc(nlEn('Je zit op Community. ', 'You are on Community. ') + caps.signs + nlEn(' handtekeningen en ', ' signatures and ') +
-      caps.transfers + nlEn(' verzendingen per maand.', ' transfers a month.')) +
-      '<a href="' + LP + '/pricing">' + nlEn('Meer nodig?', 'Need more?') + '</a>';
+    if (!nothing || !planIsFree) { line.hidden = true; return; }
+    // The numbers only when the relay gave them: no guessed allowance.
+    var known = caps && typeof caps.signs === 'number' && typeof caps.transfers === 'number';
+    line.innerHTML = esc(nlEn('Je zit op Community.', 'You are on Community.') + (known ? ' ' + caps.signs + nlEn(' handtekeningen en ', ' signatures and ') +
+      caps.transfers + nlEn(' verzendingen per maand.', ' transfers a month.') : '')) +
+      ' <a href="' + LP + '/pricing">' + nlEn('Meer nodig?', 'Need more?') + '</a>';
     line.hidden = false;
     var wrap = document.getElementById('pa-empty');
     if (wrap && line.parentNode !== wrap) wrap.appendChild(line);
@@ -662,7 +670,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       if (p.status === 'signed') return row(true, partyName(p), p.signed_at ? fmtDate(p.signed_at) : nlEn('getekend', 'signed'));
       return row(false, partyName(p), p.status === 'viewed' ? nlEn('geopend, nog niet getekend', 'opened, not signed yet') : nlEn('moet nog tekenen', 'still has to sign'));
     }).join('');
-    if (!rows) rows = row(false, signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed'), nlEn('Tekenen kan tot ', 'Signing closes ') + fmtDate(docState.signUntil(doc)));
+    if (!rows) rows = row(false, signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed'),
+      docState.signUntil(doc) ? nlEn('tekenen kan tot ', 'signing closes ') + fmtDate(docState.signUntil(doc)) : '');
     var id = esc(doc.id || '');
     return '<div class="pa-card dh-document" data-document-id="' + id + '">' +
       head('pen', name, nlEn('Laten tekenen op ', 'Sent for signing on ') + fmtDate(doc.created_at), signed + nlEn(' van ', ' of ') + total, '', 'document-open', doc.id || '') +
@@ -676,7 +685,17 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     '</div>';
   }
 
+  // The list route names it total; an older shape said count.
+  function sendTotal(s) { return Number(s.total != null ? s.total : s.count) || 0; }
+  function sendWaitingLine(s) {
+    if (s.status === 'expired') return nlEn('Deze verzending is verlopen. Het bestand is weg.', 'This send has expired. The file is gone.');
+    if (s.outstanding === 0) return nlEn('Iedereen heeft het opgehaald.', 'Everyone has collected it.');
+    if (s.outstanding === 1) return nlEn('Eén persoon heeft het nog niet opgehaald.', 'One person has not collected yet.');
+    return s.outstanding + nlEn(' mensen hebben het nog niet opgehaald.', ' people have not collected yet.');
+  }
+  var sendAll = {};         // send id -> true when the reader asked for everyone
   function sendName(s) {
+    s = { total: sendTotal(s), filename: s.filename };
     var wie = s.total === 1 ? nlEn('1 ontvanger', '1 recipient') : (s.total || 0) + nlEn(' ontvangers', ' recipients');
     return s.filename || (nlEn('Bestand aan ', 'File to ') + wie);
   }
@@ -686,15 +705,25 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var rows;
     if (people === undefined) rows = '<div class="pa-row"><span class="meta" style="margin-left:0">' + nlEn('Even kijken wie het heeft opgehaald...', 'Checking who has collected it...') + '</span></div>';
     else if (people === null) rows = '<div class="pa-row"><span class="meta" style="margin-left:0">' + nlEn('We konden niet zien wie het heeft opgehaald.', 'We could not see who has collected it.') + '</span></div>';
-    else rows = people.map(function (p) {
+    else {
+      // A send to thirty people is thirty rows. Who has not collected is what
+      // the sender came for, so those stay; the rest folds into one line.
+      var many = people.length > 5 && !sendAll[s.id];
+      var shown = many ? people.filter(function (p) { return p.status === 'waiting'; }) : people;
+      rows = shown.map(personRow).join('') + (many
+        ? '<div class="pa-row"><button type="button" class="x" style="margin:0" data-pa-action="send-open" data-send-id="' + id + '">' +
+          nlEn('Toon iedereen (', 'Show everyone (') + people.length + ')</button></div>' : '');
+    }
+    function personRow(p) {
       if (p.status === 'collected') return row(true, p.email, p.picked_up_at ? fmtDate(p.picked_up_at) : nlEn('opgehaald', 'collected'));
       if (p.status === 'revoked') return row(false, p.email, nlEn('ingetrokken', 'withdrawn'));
       return row(false, p.email, nlEn('nog niet opgehaald', 'not collected yet'),
         '<button type="button" class="x" data-pa-action="send-revoke" data-send-id="' + id + '" data-email="' + esc(p.email) + '">' + nlEn('Intrekken', 'Withdraw') + '</button>');
-    }).join('');
+    }
     return '<div class="pa-card dh-send-row" data-send-id="' + id + '">' +
-      head('send', sendName(s), nlEn('Verstuurd op ', 'Sent on ') + fmtDate(s.created_at), (s.collected || 0) + nlEn(' van ', ' of ') + (s.total || 0)) +
-      prog(s.collected || 0, s.total || 0) + '<div data-send-people="' + id + '">' + rows + '</div>' +
+      head('send', sendName(s), nlEn('Verstuurd ', 'Sent ') + paramantDate.moment(s.created_at), (s.collected || 0) + nlEn(' van ', ' of ') + sendTotal(s)) +
+      prog(s.collected || 0, sendTotal(s)) + '<p class="pa-say dh-send-next">' + esc(sendWaitingLine(s)) + '</p>' +
+      '<div data-send-people="' + id + '">' + rows + '</div>' +
       '<div class="pa-acts"><button type="button" class="pa-btn" data-pa-action="send-remind" data-send-id="' + id + '"' +
         nlEn(' title="Stuurt een herinnering met dezelfde link als de eerste mail. De link verandert niet."', ' title="Sends a reminder with the same link as the first mail. The link does not change."') + '>' +
         ico('bell', 18) + nlEn('Herinnering sturen', 'Send a reminder') + '</button></div>' +
@@ -730,8 +759,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var from = String(doc.sender || '').trim();
     var bits = [];
     if (from) bits.push(nlEn('Van ', 'From ') + from);
+    if (doc.sent_at) bits.push((from ? nlEn('verstuurd ', 'sent ') : nlEn('Verstuurd ', 'Sent ')) + fmtDate(doc.sent_at));
     if (doc.signing_closes_at) bits.push(nlEn('tekenen kan tot ', 'signing closes ') + fmtDate(doc.signing_closes_at));
-    else if (doc.sent_at) bits.push(nlEn('verstuurd op ', 'sent on ') + fmtDate(doc.sent_at));
     var sub = bits.join(' · ');
     sub = sub.charAt(0).toUpperCase() + sub.slice(1);
     return '<div class="pa-card dh-inbox-row">' +
@@ -755,7 +784,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       opener = 'data-pa-action="document-open" data-document-id="' + esc(x.id || '') + '"';
       if (e.state === 'completed') end = '<a class="pa-dl" href="/api/user/documents/' + encodeURIComponent(x.id) + '/receipt" download aria-label="' + esc(nlEn('Bewijs downloaden van ', 'Download proof for ') + name) + '" title="' + nlEn('Bewijs downloaden', 'Download proof') + '">' + ico('down', 20) + '</a>';
     } else if (e.kind === 'send') {
-      name = x.filename || (x.total ? sendName(x) : nlEn('Verzending', 'Send'));
+      name = x.filename || (sendTotal(x) ? sendName(x) : nlEn('Verzending', 'Send'));
       sub = e.state === 'completed' ? nlEn('Iedereen heeft het opgehaald', 'Everyone has collected it') + (x.created_at ? ' · ' + fmtDate(x.created_at) : '')
         : nlEn('Verlopen. Het bestand is weg.', 'Expired. The file is gone.');
     } else {
@@ -1269,6 +1298,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         catch (e2) { window.prompt(nlEn('Kopieer de link:', 'Copy the link:'), link); }
         return;
       }
+      if (act === 'send-open') { ev.preventDefault(); sendAll[sendId] = true; redrawSend(sendId); return; }
       if (act === 'send-remind') { ev.preventDefault(); remindSend(sendId, t); return; }
       if (act === 'send-revoke') { ev.preventDefault(); askSendRevoke(sendId, t.getAttribute('data-email'), t); return; }
       if (act === 'send-revoke-no') { ev.preventDefault(); redrawSend(sendId); return; }

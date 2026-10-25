@@ -61,12 +61,11 @@
 
   // A file sent by name: open while somebody has not collected it and the
   // sending has not run out; then everyone has it, or the file is gone.
-  function sendState(s, nowMs) {
+  function sendState(s) {
     if (!s) return 'waiting';
+    // The relay answers a send whose time ran out as status 'expired' (its
+    // record is gone), so that word is the rule here, not a clock.
     if (s.status === 'expired') return 'expired';
-    var t = Date.parse(s.expires_at || '');
-    var now = typeof nowMs === 'number' ? nowMs : Date.now();
-    if (!isNaN(t) && t <= now) return 'expired';
     if (Number(s.outstanding) === 0) return 'completed';
     return Number(s.collected || 0) > 0 ? 'in_progress' : 'waiting';
   }
@@ -83,7 +82,7 @@
   }
 
   function stateOf(kind, item, nowMs) {
-    if (kind === 'send') return sendState(item, nowMs);
+    if (kind === 'send') return sendState(item);
     if (kind === 'request') return requestState(item, nowMs);
     if (kind === 'inbox') return 'waiting';
     return state(item, nowMs);
