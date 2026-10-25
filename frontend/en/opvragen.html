@@ -43,6 +43,7 @@
     <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 19.5a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
     <symbol id="i-image" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="10" r="1.6" fill="currentColor"/><path d="M4.5 17l4.5-4 3 2.5 3.5-3.5 4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
     <symbol id="i-mark" viewBox="0 0 24 24"><rect class="mk-bg" x="3" y="3" width="18" height="18" rx="5"/><rect class="mk-fg" x="8.2" y="11" width="7.6" height="5.6" rx="1.2" fill="none" stroke-width="1.5"/><path class="mk-fg" d="M9.8 11V9.5a2.2 2.2 0 0 1 4.4 0V11" fill="none" stroke-width="1.5"/></symbol>
+    <symbol id="i-docs" viewBox="0 0 24 24"><path d="M8 3.5h6.5L19 8v11.5a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14.5 3.5V8H19M10 12.5h6M10 16h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 7v13a.5.5 0 0 0 .5.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity=".5"/></symbol>
   </defs>
 </svg>
 <div class="app">
@@ -106,10 +107,10 @@
   </div>
 
   <nav class="tabs" aria-label="Menu">
+    <a href="/en/dashboard"><svg width="24" height="24"><use href="#i-docs"/></svg>Documents</a>
     <a href="/en/parashare"><svg width="24" height="24"><use href="#i-send"/></svg>Send</a>
     <a href="/en/sign"><svg width="24" height="24"><use href="#i-pen"/></svg>Sign</a>
     <a href="/en/opvragen" class="on" aria-current="page"><svg width="24" height="24"><use href="#i-inbox"/></svg>Requests</a>
-    <a href="/en/account"><svg width="24" height="24"><use href="#i-user"/></svg>Account</a>
   </nav>
 </div>
 <script type="module" src="/js/opvragen.page.js?v=1"></script>
