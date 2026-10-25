@@ -95,29 +95,28 @@
   }
 
   // ── The state of one signing request ───────────────────────────────────────
-  // The same four states /dashboard shows, derived the same way, so a document
-  // does not read as "in progress" here and "waiting" one click later.
-  function stateOf(doc) {
-    if (doc.status === 'complete') return 'completed';
-    if (doc.status === 'void') return 'cancelled';
-    return Number(doc.signed_count || 0) > 0 ? 'in_progress' : 'waiting';
-  }
+  // The same states /dashboard shows, from the same file (js/document-state.js),
+  // so a document does not read as "waiting" here and "Gestopt" one click
+  // later. This page kept its own copy until 25 October 2026 and that copy did
+  // not know a request past its signing window is expired: the homepage said
+  // "Nog open: 1" while /dashboard said "Lopend 0, Gestopt 1".
+  var docState = window.paramantDocState;
+  function stateOf(doc) { return docState.state(doc); }
   var STATE_WORD = {
     waiting: tr('Wacht', 'Waiting'),
     in_progress: tr('Bezig', 'In progress'),
     completed: tr('Afgerond', 'Completed'),
-    cancelled: tr('Geannuleerd', 'Cancelled')
+    cancelled: tr('Geannuleerd', 'Cancelled'),
+    expired: tr('Verlopen', 'Expired')
   };
   var STATE_DOT = {
     waiting: 'wait',
     in_progress: 'busy',
     completed: 'done',
-    cancelled: 'done'
+    cancelled: 'done',
+    expired: 'done'
   };
-  function isOpen(doc) {
-    var s = stateOf(doc);
-    return s === 'waiting' || s === 'in_progress';
-  }
+  function isOpen(doc) { return docState.isOpen(doc); }
 
   // Who a request is still waiting on. The list route hands back party labels
   // and their status and nothing else: no addresses, no invite tokens. A party
@@ -276,6 +275,16 @@
   // you and the reading is the account's own open requests, then the month's
   // signature balance, which is the number the buyer review of 5 September
   // found nowhere on the site while the route already had it.
+  // Every number is a button: the reading links to the list it counts, so the
+  // figure a reader taps is the figure he lands on. No data, no link.
+  var DASH = EN ? '/en/dashboard' : '/dashboard';
+  function figureLink(href) {
+    var go = pick('hw-go');
+    if (!go) return;
+    if (href) go.setAttribute('href', href);
+    else go.removeAttribute('href');
+  }
+
   function renderFigure(docs, overview, inbox) {
     var kicker = pick('hw-kicker');
     var read = pick('hw-read');
@@ -318,6 +327,9 @@
       words(cap, inbox.length === 1 ? tr('document wacht op uw handtekening', 'document is waiting for your signature') : tr('documenten wachten op uw handtekening', 'documents are waiting for your signature'));
       words(sub, earliest ? tr('Het eerste kwam binnen op ', 'The first one arrived on ') + day(earliest.t) + '.' : tr('Door iemand anders naar u gestuurd.', 'Sent to you by someone else.'));
       show(read, true); show(cap, true); show(sub, true);
+      // The documents themselves open only from the invitation mail, so the
+      // number goes to the card that lists them with "send me the link again".
+      figureLink('#voor-u');
       // The account's own open requests move down into the strip: still worth a
       // glance, no longer the headline, and never a second big number arguing
       // with the first.
@@ -340,6 +352,7 @@
       words(cap, open.length === 1 ? tr('verzoek wacht op een handtekening', 'request is waiting on a signature') : tr('verzoeken wachten op een handtekening', 'requests are waiting on a signature'));
       words(sub, oldest ? tr('Het oudste ging weg op ', 'The oldest went out on ') + day(oldest.t) + '.' : tr('Verstuurd vanaf dit account.', 'Sent from this account.'));
       show(read, true); show(cap, true); show(sub, true);
+      figureLink(DASH + '?filter=open#documenten');
       if (capped) items.push([tr('Handtekeningen over', 'Signatures left'), left + tr(' van ', ' of ') + limit]);
       strip(pick('hw-strip'), items);
       return;
@@ -360,6 +373,9 @@
       }
       words(sub, tr('De teller begint opnieuw op ', 'The count resets on ') + day(resetDate()) + '.');
       show(read, true); show(cap, true); show(sub, true);
+      // No page lists the month's signatures one by one yet, so this number
+      // stays plain text rather than a link to a page that does not show it.
+      figureLink('');
       if (docs && docs.length) items.push(['Open', String(open ? open.length : 0)]);
       strip(pick('hw-strip'), items);
       return;
@@ -367,6 +383,7 @@
 
     // Neither route answered. One line, no number, no raw error.
     show(read, false); show(cap, false); show(sub, false);
+    figureLink('');
     words(kicker, tr('Uw account', 'Your account'));
     show(quiet, true);
     strip(pick('hw-strip'), items);

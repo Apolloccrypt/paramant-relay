@@ -138,6 +138,16 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .hw-figure{min-height:208px;display:flex;flex-direction:column}
 .hw-figure-body{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex:1 1 auto}
 .hw-figure-words{min-width:0}
+/* every number is a button. js/home-auth.js gives the reading an href to the
+   list that number counts; without one (no data) it stays plain text. The
+   ::after stretches the tap target over the whole card. */
+.hw-figure{position:relative}
+.hw-go{display:block;color:inherit;text-decoration:none}
+.hw-go[href]::after{content:"";position:absolute;inset:0;border-radius:inherit}
+.hw-go[href] .hw-cap::after{content:" \2192";color:var(--fg-dim)}
+.hw-figure:has(.hw-go[href]:hover){border-color:var(--fg-dim)}
+.hw-figure:has(.hw-go[href]:focus-visible){outline:2px solid var(--ochre);outline-offset:2px}
+.hw-go:focus-visible{outline:none}
 .hw-read{display:flex;align-items:baseline;gap:10px;margin-top:10px}
 .hw-num{font-size:clamp(3.4rem,16vw,4.8rem);line-height:.9;font-weight:700;letter-spacing:var(--track-display);color:var(--fg)}
 .hw-of{font-family:var(--hp-mono);font-size:clamp(1rem,4.2vw,1.3rem);color:var(--fg-dim)}
@@ -692,11 +702,13 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
           <p class="hw-kicker" data-hw-kicker>Uw maand</p>
           <div class="hw-figure-body">
             <div class="hw-figure-words">
-              <div class="hw-read" data-hw-read hidden>
-                <span class="hw-num" data-hw-num></span>
-                <span class="hw-of" data-hw-of hidden></span>
-              </div>
-              <p class="hw-cap" data-hw-cap hidden></p>
+              <a class="hw-go" data-hw-go>
+                <div class="hw-read" data-hw-read hidden>
+                  <span class="hw-num" data-hw-num></span>
+                  <span class="hw-of" data-hw-of hidden></span>
+                </div>
+                <p class="hw-cap" data-hw-cap hidden></p>
+              </a>
               <p class="hw-sub" data-hw-sub hidden></p>
               <p class="hw-quiet" data-hw-quiet hidden>Uw documenten laden nu niet. Er is niets aan uw account veranderd. Open uw documenten hieronder, of probeer het over een minuut opnieuw.</p>
             </div>
@@ -716,7 +728,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
         <!-- Waiting for YOU. Full width and above the pair below, because it is
              the only list on this page about work the reader owes rather than
              work the reader is owed. -->
-        <div class="hw-card hw-list-card" data-hw-inbox hidden>
+        <div class="hw-card hw-list-card" id="voor-u" data-hw-inbox hidden>
           <p class="hw-kicker">Wacht op uw handtekening</p>
           <ul class="hw-list" data-hw-inbox-list></ul>
           <p class="hw-note">Elk document opent via de persoonlijke link in de uitnodigingsmail.</p>
@@ -726,7 +738,7 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
           <div class="hw-card hw-list-card" data-hw-waiting hidden>
             <p class="hw-kicker">Wacht op een handtekening</p>
             <ul class="hw-list" data-hw-waiting-list></ul>
-            <a class="hw-more" href="/dashboard">Open verzoeken</a>
+            <a class="hw-more" href="/dashboard?filter=open#documenten">Open verzoeken</a>
           </div>
 
           <div class="hw-card hw-list-card" data-hw-recent hidden>
@@ -931,7 +943,8 @@ main > .hp-sec:last-of-type .wp-more{border-bottom:1px solid var(--line)}
 <script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/format-date.js?v=5" defer></script>
-<script src="/js/home-auth.js?v=10" defer></script>
+<script src="/js/document-state.js?v=1" defer></script>
+<script src="/js/home-auth.js?v=11" defer></script>
 <script src="/js/home-demo.js?v=3" defer></script>
 </body>
 </html>

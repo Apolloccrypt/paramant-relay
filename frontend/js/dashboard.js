@@ -765,25 +765,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   var documentDialogReturnFocus = null;
 
   // A request past its expiry can no longer be signed: it is not "waiting",
-  // not open and has nothing to withdraw (acceptatie r3, A2).
-  // The signing window (sign_expires_at, 7 days) is what ends a request, the
-  // same date /co-sign shows as "Tekenen kan tot". expires_at is only how long
-  // the record is kept (30 days) and is the fallback for open envelopes that
-  // have no signing window (acceptatie r4, A2).
-  function documentSignUntil(doc) {
-    return (doc && (doc.sign_expires_at || doc.expires_at)) || '';
-  }
-  function documentExpired(doc) {
-    if (doc.status === 'expired') return true;
-    var t = Date.parse(documentSignUntil(doc));
-    return !isNaN(t) && t <= Date.now();
-  }
-  function documentState(doc) {
-    if (doc.status === 'complete') return 'completed';
-    if (doc.status === 'void') return 'cancelled';
-    if (documentExpired(doc)) return 'expired';
-    return Number(doc.signed_count || 0) > 0 ? 'in_progress' : 'waiting';
-  }
+  // not open and has nothing to withdraw (acceptatie r3, A2; r4, A2). The rule
+  // lives in js/document-state.js, shared with the homepage, so the two pages
+  // count the same document the same way.
+  var docState = window.paramantDocState;
+  function documentSignUntil(doc) { return docState.signUntil(doc); }
+  function documentState(doc) { return docState.state(doc); }
 
   function documentMatches(doc, filter) {
     var state = documentState(doc);
@@ -1336,6 +1323,15 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
 
   function wireDocumentFilters() {
     var filters = document.querySelectorAll('[data-doc-filter]');
+    // /dashboard?filter=cancelled opens on that list: the homepage figure
+    // links here, and the number a reader tapped has to be the list he lands
+    // on (every number is a button).
+    var asked = '';
+    try { asked = new URLSearchParams(location.search).get('filter') || ''; } catch (e) { asked = ''; }
+    if (docState.FILTERS.indexOf(asked) !== -1) documentFilter = asked;
+    for (var k = 0; k < filters.length; k++) {
+      filters[k].setAttribute('aria-pressed', filters[k].getAttribute('data-doc-filter') === documentFilter ? 'true' : 'false');
+    }
     for (var i = 0; i < filters.length; i++) {
       filters[i].addEventListener('click', function () {
         documentFilter = this.getAttribute('data-doc-filter') || 'open';
