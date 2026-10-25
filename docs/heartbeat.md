@@ -103,8 +103,10 @@ works.
 
 1. create the envelope and store the document capsule, and require the relay to
    agree on its hash
-2. read the party view over the public route and check it carries the sign
-   recipe and does not leak `invite_token`
+2. read the party view over the public route, with the party's invite token
+   as the signing link carries it, and check it carries the sign recipe and
+   does not leak `invite_token`. Both the view and the sign route refuse an
+   open slot without its token
 3. **submit a signature that does not verify and require a 400 `bad_signature`.**
    This is the load-bearing negative: a relay that rubber-stamps would sail
    through every positive check ever written

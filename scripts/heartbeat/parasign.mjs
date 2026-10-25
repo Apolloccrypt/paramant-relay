@@ -187,6 +187,14 @@ export async function parasign(evidence) {
   assert(!!env?.id, 'the relay accepted the envelope but returned no id', JSON.stringify(created.json).slice(0, 300));
   const id = env.id;
   evidence.artifacts.envelope.id = id;
+  // Each slot is a capability: since 88c36cd6 (2026-09-05) the party view and
+  // the sign route refuse an open slot without its invite token, exactly as the
+  // link in a recipient's mail carries it. Kept in memory only, never in the
+  // evidence file: the token is the secret that fills the slot.
+  const tokens = (env.party_links || []).map((l) => l?.invite_token || '');
+  assert(tokens.length === 2 && tokens.every((t) => t.length > 0),
+    'the relay created the envelope but handed back no invite token per party',
+    'Without the token in the signing link no recipient can open or sign the envelope.');
   proof(evidence, 'envelope created', {
     id, binding_mode: env.binding_mode, recipe_version: env.recipe_version,
     party_count: env.party_count, ttl_days: TTL_DAYS,
@@ -212,7 +220,9 @@ export async function parasign(evidence) {
 
   // ── 3. the recipient's view, over the public route ────────────────────────
   const view = await timed(evidence, 'GET /v2/envelopes/:id?p=0 (public party view)', SLOW_MS, () =>
-    http(evidence, 'GET', `${RELAY}/v2/envelopes/${id}?p=0`, { timeoutMs: 20000 }));
+    http(evidence, 'GET', `${RELAY}/v2/envelopes/${id}?p=0`, {
+      headers: { 'X-Parasign-Invite-Token': tokens[0] }, timeoutMs: 20000,
+    }));
   assert(view.status === 200, `a recipient cannot read the envelope: HTTP ${view.status}`,
     'This is the first thing a person clicking a signing link does. A failure here is a dead ceremony ' +
     'no matter how healthy the rest of the relay is.');
@@ -248,7 +258,7 @@ export async function parasign(evidence) {
   const badSig = crypto.randomBytes(sig.length).toString('base64');
   const refused = await timed(evidence, 'POST /v2/envelopes/:id/sign (deliberately invalid)', SLOW_SIGN_MS, () =>
     http(evidence, 'POST', `${RELAY}/v2/envelopes/${id}/sign`, {
-      body: { party_index: 1, signer_public_key: badPub, signature: badSig },
+      body: { party_index: 1, token: tokens[1], signer_public_key: badPub, signature: badSig },
     }));
   assert(refused.status === 400 && refused.json?.error === 'bad_signature',
     `the relay accepted a signature that does not verify: HTTP ${refused.status} ${JSON.stringify(refused.json)}`,
@@ -263,7 +273,7 @@ export async function parasign(evidence) {
   // would send it: no API key, no internal header.
   const signed = await timed(evidence, 'POST /v2/envelopes/:id/sign (party 0)', SLOW_SIGN_MS, () =>
     http(evidence, 'POST', `${RELAY}/v2/envelopes/${id}/sign`, {
-      body: { party_index: 0, signer_public_key: signerPub, signature: sigB64 },
+      body: { party_index: 0, token: tokens[0], signer_public_key: signerPub, signature: sigB64 },
     }));
   assert(signed.status !== 400 || signed.json?.error !== 'bad_signature',
     'the relay rejected a correctly built signature as bad_signature',
@@ -461,7 +471,9 @@ async function receiptChecks(evidence, auth, id, env) {
     `mode=${env.mode}. With a psk_test_ key the auto-signer completes the envelope inside the create ` +
     'call. A psk_live_ key never auto-signs, and if the signing engine is down the relay says so in ' +
     `_sandbox_note: ${JSON.stringify(env._sandbox_note ?? null)}.`);
-  assert(Array.isArray(env.signers) && env.signers.every((x) => x.status === 'completed'),
+  // A filled slot is 'signed', the same word GET /v1/envelopes/:id uses (20e0fc73,
+  // docs/parasign-open-api-spec.md). The envelope as a whole is 'completed'.
+  assert(Array.isArray(env.signers) && env.signers.every((x) => x.status === 'signed'),
     'not every signer slot completed',
     `Slots: ${JSON.stringify((env.signers || []).map((x) => x.status))}.`);
   proof(evidence, 'envelope created and driven to completed by the sandbox signer', {
