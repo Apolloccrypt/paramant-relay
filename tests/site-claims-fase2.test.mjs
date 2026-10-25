@@ -50,19 +50,17 @@ test('SITE-30: /terms is niet absoluut en noemt de uitzonderingen (NL en EN)', (
   assert.match(en, /Chromium and Outlook extensions/);
 });
 
-test('SITE-30: security, parasend, privacy, home en dpa noemen ontvangers op naam als uitzondering (NL en EN)', () => {
-  const nl = ['security', 'parasend', 'privacy', 'index', 'dpa', 'rules'];
+test('SITE-30: security, parasend, privacy en dpa noemen ontvangers op naam als uitzondering (NL en EN)', () => {
+  // De homepage van 25-10-2026 (NL en EN) noemt geen kanalen en geen
+  // mailprovider meer; ze linkt in de voet naar /privacy, waar de
+  // uitzondering staat (die pagina staat in de lijst).
+  const nl = ['security', 'parasend', 'privacy', 'dpa', 'rules'];
   for (const slug of nl) {
-    // De Nederlandse homepage legt de uitzondering sinds 25-10-2026 niet meer
-    // zelf uit (besluit Mick): hij noemt Resend en verwijst naar /privacy, waar
-    // de uitzondering wel staat (die pagina staat hierboven in de lijst).
-    if (slug === 'index') {
-      assert.match(lees('frontend/index.html'), /data-partners-rollen>[^]*?Resend[^]*?href="\/privacy"/, 'index: noemt Resend niet meer met een verwijzing naar /privacy');
-    } else {
-      assert.match(tekst(`frontend/${slug}.html`), /ontvangers op naam|genoemde ontvangers/, `${slug}: noemt de uitzondering niet`);
-    }
-    assert.match(tekst(`frontend/en/${slug}.html`), /named recipients/, `en/${slug}: noemt de uitzondering niet`);
+    assert.match(tekst(`frontend/${slug}.html`), /ontvangers op naam|genoemde ontvangers|versturen op naam/, `${slug}: noemt de uitzondering niet`);
+    assert.match(tekst(`frontend/en/${slug}.html`), /named recipients|sending by name/, `en/${slug}: noemt de uitzondering niet`);
   }
+  assert.match(lees('frontend/index.html'), /href="\/privacy"/, 'index: linkt niet meer naar /privacy');
+  assert.match(lees('frontend/en/index.html'), /href="\/en\/privacy"/, 'en/index: linkt niet meer naar /en/privacy');
   assert.match(tekst('frontend/security.html'), /Versturen naar ontvangers op naam \(per e-mailadres\) is niet zero-knowledge/);
   assert.match(tekst('frontend/en/security.html'), /Sending to named recipients \(by email address\) is not zero-knowledge/);
 });
@@ -164,16 +162,15 @@ test('SITE-47 en SIGN-06/07: /parasign belooft geen niet-pdf-ondertekening en no
   assert.doesNotMatch(nl, /geen API-sleutel, en de controle zelf maakt geen verbinding met ons/);
 });
 
-// SITE-05-A-en pinde de Engelse hero op "Send securely". Sinds 5 oktober 2026
-// (Mick: de bezoeker landt meteen in het dashboard) is er geen hero meer; de
-// kop van het voorbeelddashboard draagt Create account en Try it yourself. Wat
-// van SITE-05-A blijft: versturen is er vanaf het eerste scherm, via de tegel.
-test('SITE-09 en SITE-05-A-en: geen + als spatie in mailto, en het Engelse eerste scherm is het voorbeelddashboard', () => {
+// SITE-05-A-en pinde de Engelse hero op "Send securely", later op het
+// voorbeelddashboard. Sinds 25 oktober 2026 is de Engelse homepage de vertaling
+// van het goedgekeurde plaatje: een knop naar een gratis account. Wat van
+// SITE-05-A blijft: versturen is vanaf de homepage te bereiken.
+test('SITE-09 en SITE-05-A-en: geen + als spatie in mailto, en het Engelse eerste scherm heeft zijn ene knop', () => {
   assert.doesNotMatch(lees('frontend/en/pricing.html'), /mailto:[^"]*subject=[^"]*\+/);
   const en = lees('frontend/en/index.html');
-  assert.match(en, /<a class="hp-btn hp-btn-fill" href="\/en\/signup">Create account<\/a>/);
-  assert.match(en, /<a class="hp-btn hp-btn-line" href="\/en\/sign\?mode=invite">Try it yourself<\/a>/);
-  assert.match(en, /<a class="wp-tile dh-workspace" href="\/en\/parashare" data-wp-open="send"/);
+  assert.match(en, /<a class="h-cta" href="\/en\/signup">Try it free<\/a>/);
+  assert.match(en, /href="\/en\/parasend"/);
 });
 
 test('SITE-40 en SITE-35: TOTP-tolerantie en de edge-log staan eerlijk op /security', () => {

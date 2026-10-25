@@ -46,6 +46,8 @@ const ROUTES = {
   '/auth/backup':'/auth/backup.html', '/auth/request-reset':'/auth/request-reset.html',
   '/auth/reset-confirm':'/auth/reset-confirm.html',
   '/en/':'/en/index.html', '/en/pricing':'/en/pricing.html', '/partners':'/partners.html',
+  // A signed-in visit to /en is sent on to /en/dashboard (js/home-auth.js).
+  '/en/dashboard':'/en/dashboard.html',
 };
 
 const host = http.createServer((req, res) => {

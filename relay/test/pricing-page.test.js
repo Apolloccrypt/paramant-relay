@@ -855,7 +855,9 @@ ok('the compliance bullet on /parasend carries its own limit');
   // /help, /parasend, /parasign and /signup are Dutch since 23 September 2026;
   // their English copies live under /en and are held to the English form here.
   // The Dutch pages are held to theirs below.
-  const PAGES = ['en/pricing.html', 'en/parasend.html', 'en/parasign.html', 'en/index.html', 'en/signup.html', 'en/help/index.html'];
+  // en/index.html left this list on 25 October 2026: the homepage names a
+  // price, not an allowance, so there is no monthly limit on it to spell.
+  const PAGES = ['en/pricing.html', 'en/parasend.html', 'en/parasign.html', 'en/signup.html', 'en/help/index.html'];
   for (const rel of PAGES) {
     const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
     const stray = MONTHLY_FORM.exec(pageHtml);
@@ -893,85 +895,40 @@ ok('the compliance bullet on /parasend carries its own limit');
 // charge. billing-catalog holds prices; relay/lib/tiers.js holds LIMITS, and it
 // is pinned here too, for the plan name the same sentence uses. Neither can move
 // without this going red.
-(function dashboardPriceAnswer() {
-  // /dashboard is Dutch since 23 September 2026; the English answer lives on at
-  // /en/dashboard and is held here. The Dutch one is held to the same amount
-  // right after this block.
-  const dashHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'en', 'dashboard.html'), 'utf8');
-  const visible = dashHtml.replace(/<!--[\s\S]*?-->/g, ' ');
-  const answerMatch = /<dt>What does it cost\?<\/dt>\s*<dd>([\s\S]*?)<\/dd>/.exec(visible);
-  assert(answerMatch, 'en/dashboard.html must still answer "What does it cost?"');
-  const answer = answerMatch[1];
-
-  // The plan by the name /pricing sells it under, and both products it covers,
-  // so a reader can tell that one payment is the whole account and not half.
-  assert(/\bFirm\b/.test(answer), 'the dashboard price answer must name the Firm plan');
-  assert(html.includes('>Firm<'), '/pricing no longer sells Firm, so the dashboard answer points at nothing');
-  for (const productName of ['ParaSend', 'ParaSign']) {
-    assert(answer.includes(productName),
-      'the dashboard price answer must name ' + productName + '; naming one product prices half the account');
-  }
-
-  // The amount is the catalog's, read back out of it rather than typed here.
+// Since "Je documenten" (25 October 2026) the signed-in screen carries no
+// price at all and no FAQ: a number it does not print is a number it cannot
+// get wrong. The price now stands on the homepage, in one sentence per
+// language, and that sentence is held to the catalog the same way the
+// dashboard answer was.
+(function homePriceAnswer() {
   const order = catalog.resolveOrder({ product: 'firm', plan: 'firm', interval: 'monthly' });
   assert(!order.error, 'billing-catalog has no monthly Firm price: ' + order.error);
   const firmExcl = Math.round((parseFloat(order.amount) / 1.21) * 100) / 100;
-  assert(new RegExp('&euro;' + firmExcl + ' a month excl\\. VAT').test(answer),
-    'the dashboard must price Firm at the catalog amount (&euro;' + firmExcl + '), got: ' + answer.trim());
-
-  // ui-truthfulness in one line: no amount here that a reader cannot find on
-  // the page he is sent to. The boundary matters -- a bare &euro;29 is
-  // satisfied by &euro;290 sitting elsewhere on /pricing.
-  const amounts = [...new Set([...answer.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
-  assert(amounts.length >= 1, 'expected the dashboard answer to quote the price, found none');
-  for (const amount of amounts) {
-    assert(new RegExp('&euro;' + amount.replace(/[.]/g, '\\.') + '(?![\\d.,])').test(html),
-      'the dashboard names &euro;' + amount + ', which is not on /pricing');
+  const read = (rel) => fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8').replace(/<!--[\s\S]*?-->/g, ' ');
+  const homeNl = read('index.html');
+  const homeEn = read('en/index.html');
+  assert(new RegExp('(?<![\\d.,])' + firmExcl + '&nbsp;euro per maand voor je kantoor').test(homeNl),
+    'the Dutch homepage must price the office plan at the catalog amount excl. btw (' + firmExcl + ')');
+  assert(new RegExp('(?<![\\d.,])' + firmExcl + '&nbsp;euros a month for your office').test(homeEn),
+    'the English homepage must price the office plan at the catalog amount excl. VAT (' + firmExcl + ')');
+  assert(/href="\/pricing"/.test(homeNl) && /href="\/en\/pricing"/.test(homeEn), 'the homepage price links to the page that sells it');
+  assert(html.includes('>Firm<'), '/pricing no longer sells Firm, so the homepage price points at nothing');
+  assert(tiers.normalisePlan('free') === 'community', 'relay/lib/tiers.js no longer folds free onto community');
+  for (const rel of ['dashboard.html', 'en/dashboard.html']) {
+    const dash = read(rel);
+    assert(!/(&euro;|€)\s?\d|\d+ euros? (per|a) (maand|month)/.test(dash), rel + ' prints a price again; the signed-in screen carries none');
   }
-
-  // The free plan keeps the one name the whole site uses, and tiers.js is what
-  // says that name is the canonical row 'free' folds onto.
-  assert(tiers.normalisePlan('free') === 'community',
-    'relay/lib/tiers.js no longer folds free onto community; the dashboard answer names Community');
-  assert(/\bCommunity is free forever\b/.test(answer),
-    'the dashboard answer must still name the free plan Community');
-
-  // And /help answers the same question with the same amount, so the two pages
-  // a customer reads in the same minute cannot disagree again.
-  const helpHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'help', 'index.html'), 'utf8');
+  // And /help answers the price question with the same amount.
+  const helpHtml = read('help/index.html');
   assert(new RegExp('&euro;' + firmExcl + '(?![\\d.,])').test(helpHtml),
-    '/help must still name the Firm price (&euro;' + firmExcl + ') the dashboard agrees with');
+    '/help must still name the Firm price (&euro;' + firmExcl + ')');
   assert(/\bFirm\b/.test(helpHtml), '/help must name the plan by the name /pricing sells it under');
-  // The Dutch /dashboard: the same question, the same plan, the same amount,
-  // both products by the names the Dutch bar uses, and an amount the Dutch
-  // /pricing carries.
-  const dashNl = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'dashboard.html'), 'utf8')
-    .replace(/<!--[\s\S]*?-->/g, ' ');
-  const answerNlMatch = /<dt>Wat kost het\?<\/dt>\s*<dd>([\s\S]*?)<\/dd>/.exec(dashNl);
-  assert(answerNlMatch, 'dashboard.html must still answer "Wat kost het?"');
-  const answerNl = answerNlMatch[1];
-  assert(/\bFirm\b/.test(answerNl), 'the Dutch dashboard price answer must name the Firm plan');
-  for (const productName of ['Ondertekenen', 'Versturen']) {
-    assert(answerNl.includes(productName),
-      'the Dutch dashboard price answer must name ' + productName + '; naming one product prices half the account');
-  }
-  const firmExclNl = String(firmExcl).replace('.', ',');
-  assert(new RegExp('&euro;' + firmExclNl + ' per maand excl\\. btw').test(answerNl),
-    'the Dutch dashboard must price Firm at the catalog amount (&euro;' + firmExclNl + '), got: ' + answerNl.trim());
-  for (const amount of new Set([...answerNl.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))) {
-    // The Dutch /pricing writes its amounts as "29 euro"; either notation counts.
-    const a = amount.replace(/[.]/g, '\\.');
-    assert(new RegExp('(?:&euro;|€)\\s?' + a + '(?![\\d.,])|(?<![\\d.,])' + a + ' euro\\b').test(htmlNl),
-      'the Dutch dashboard names &euro;' + amount + ', which is not on the Dutch /pricing');
-  }
-  assert(/\bCommunity is altijd gratis\b/.test(answerNl),
-    'the Dutch dashboard answer must still name the free plan Community');
-  ok('the dashboard price answer names Firm, both products and the catalog amount');
+  ok('the homepage names the office price at the catalog amount, and the signed-in screen names none');
 })();
 
 // ── The Dutch /pricing: one offer, one button ───────────────────────────────
 //
-// Mick, 23 September 2026: "Voor uw kantoor: 29 euro per maand", one primary
+// Mick, 23 September 2026: "Voor je kantoor: 29 euro per maand", one primary
 // button, Community visible beside it, and Business and Enterprise only through
 // "Meer nodig?". The page may sell nothing but Firm, every amount on it is the
 // catalog amount written the Dutch way (35,09), and the one primary action is
@@ -996,7 +953,7 @@ ok('the compliance bullet on /parasend carries its own limit');
   const yearlyIncl = catalog.priceOf('firm', 'firm', 'yearly');
   const monthlyExcl = Math.round(Number(monthlyIncl) / 1.21 * 100) / 100;
   const yearlyExcl = Math.round(Number(yearlyIncl) / 1.21 * 100) / 100;
-  assert(body.includes(`Voor uw kantoor: ${monthlyExcl} euro per maand.`), 'the offer must name the catalog amount excl. btw: ' + monthlyExcl);
+  assert(body.includes(`Voor je kantoor: ${monthlyExcl} euro per maand.`), 'the offer must name the catalog amount excl. btw: ' + monthlyExcl);
   assert(body.includes(`&euro;${nl(monthlyIncl)} per maand, inclusief 21% btw`), 'the offer must name the incl. amount the checkout charges: ' + nl(monthlyIncl));
   assert(body.includes(`&euro;${nl(yearlyIncl)} incl. btw (&euro;${yearlyExcl} excl.)`), 'the yearly line must be the catalog yearly amount');
   // Since 05-10-2026 the line says who it is for: a larger organisation, and

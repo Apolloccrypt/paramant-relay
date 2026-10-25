@@ -432,15 +432,17 @@ test('every public page names the company and the founder in its Organization no
 // four saying the same false thing passed it.
 // Since 23 September 2026 /, /pricing, /about and /security are Dutch, and the
 // English text they carried before lives on under /en/ with its pins intact.
-// The Dutch sentences are pinned the same way: the homepage says what Mick
-// chose on 25 October 2026 (who can open your file, and signing with proof) and the company behind it; /pricing names the one offer, the
+// The Dutch sentences are pinned the same way: the homepage says what the
+// approved picture of 25 October 2026 says (your contract signed, the three
+// steps, free for yourself and 29 euro a month for your office, which is the
+// catalog amount excl. btw that relay/test/pricing-page.test.js holds); /pricing names the one offer, the
 // kantoorplan at 29 euro excl. btw, which is frontend/pricing.html and the
 // catalog behind it (tests/site-claims.test.mjs block 42); /about names the
 // founder and his title in Dutch.
 const PINNED = {
   index: {
-    title: 'Veilig bestanden versturen en laten ondertekenen · Paramant',
-    desc: 'Een bestand versturen dat alleen de ontvanger kan openen, en contracten laten tekenen met bewijs. Van Paramantis Solutions B.V. in Harderwijk.',
+    title: 'Je contract zo getekend, met Paramant · Paramant',
+    desc: 'Zet je pdf erin, geef aan waar getekend moet worden en iedereen krijgt het getekende contract. Gratis voor jezelf, 29 euro per maand voor je kantoor.',
   },
   pricing: {
     title: 'Prijzen · Voor je kantoor 29 euro per maand · Paramant',
@@ -451,8 +453,8 @@ const PINNED = {
     desc: 'Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker. Wie we zijn en hoe je ons nakijkt.',
   },
   'en/index': {
-    title: 'E-signatures and secure file transfer in the EU | Paramant',
-    desc: 'Get documents signed and send files securely from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.',
+    title: 'Your contract signed in no time, with Paramant | Paramant',
+    desc: 'Drop in your PDF, mark where to sign, and everyone gets the signed contract. Free for yourself, 29 euros a month for your office.',
   },
   'en/pricing': {
     title: 'Pricing for e-signatures and secure file transfer | Paramant',

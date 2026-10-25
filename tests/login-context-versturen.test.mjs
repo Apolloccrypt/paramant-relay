@@ -79,17 +79,12 @@ for (const [route, next, sentence, button, href] of CASES) {
   });
 }
 
-test('the landing tile still says "met een gratis account" and still points at the send page', () => {
-  // The Dutch homepage (25 October 2026) has no send tile any more: its one
-  // button is "Probeer het gratis" and goes to /signup, so a visitor learns
-  // that it starts with a free account before any send page.
+test('the homepage button still leads to a free account first, in both languages', () => {
+  // Since 25 October 2026 neither homepage has a send tile: the one button is
+  // "Probeer het gratis" / "Try it free" and goes to /signup, so a visitor
+  // learns that it starts with a free account before any send page.
   const nl = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  assert.ok(nl.includes('<a class="hp-btn hp-btn-fill" href="/signup">Probeer het gratis</a>'), 'index.html: the one button no longer leads to a free account');
-  for (const [file, href, note] of [
-    ['en/index.html', '/en/parashare', /With a free account/i],
-  ]) {
-    const html = fs.readFileSync(path.join(ROOT, file), 'utf8');
-    assert.ok(html.includes(`class="wp-try" href="${href}"`), `${file}: the Versturen try-button moved`);
-    assert.match(html, note, `${file}: the tile no longer announces the free account`);
-  }
+  assert.ok(nl.includes('<a class="h-cta" href="/signup">Probeer het gratis</a>'), 'index.html: the one button no longer leads to a free account');
+  const en = fs.readFileSync(path.join(ROOT, 'en/index.html'), 'utf8');
+  assert.ok(en.includes('<a class="h-cta" href="/en/signup">Try it free</a>'), 'en/index.html: the one button no longer leads to a free account');
 });

@@ -71,22 +71,21 @@ test('a request past its 7-day signing window is Verlopen, without Intrekken, an
   await stub(page);
   await page.goto(ORIGIN + '/dashboard', { waitUntil:'networkidle' });
   await page.locator('#dh-root:not([hidden])').waitFor();
-  // Lopend holds only the request that can still be signed.
   await page.waitForFunction(() => document.querySelectorAll('.dh-document').length >= 1);
-  assert.equal(await page.locator('[data-doc-count="open"]').innerText(), '1', 'only the live request counts as Lopend');
-  assert.equal(await page.locator('[data-doc-count="cancelled"]').innerText(), '1', 'the expired request is under Gestopt');
-  const openText = await page.locator('#dh-documents').innerText();
-  assert.ok(!/Huurcontract/.test(openText), 'the expired request is not under Lopend: ' + openText);
+  assert.equal(await page.locator('[data-doc-count="open"]').innerText(), '1', 'only the live request counts as Open');
+  assert.equal(await page.locator('[data-doc-count="klaar"]').innerText(), '1', 'the expired request is under Klaar');
+  const openText = await page.locator('#pa-open').innerText();
+  assert.ok(!/Huurcontract/.test(openText), 'the expired request is not under Open: ' + openText);
 
-  await page.locator('[data-doc-filter="cancelled"]').click();
-  const row = page.locator('.dh-document[data-document-id="' + EXPIRED.id + '"]');
+  await page.locator('#pa-tab-klaar').click();
+  const row = page.locator('#pa-klaar .dh-document[data-document-id="' + EXPIRED.id + '"]');
   await row.waitFor();
-  assert.match(await row.locator('.dh-status').innerText(), /Verlopen/);
+  const coSignDate = await page.evaluate((d) => window.paramantDate.day(d), EXPIRED.sign_expires_at);
+  assert.equal(await row.innerText().then((t) => t.includes('Verlopen op ' + coSignDate)), true, 'the row says Verlopen with the signing date');
   assert.equal(await row.locator('[data-pa-action="document-withdraw-ask"]').count(), 0, 'nothing to withdraw on an expired request');
 
-  await row.locator('.dh-document-open').click();
+  await row.locator('.pa-open').click();
   const body = await page.locator('#dh-document-dialog-body').innerText();
-  const coSignDate = await page.evaluate((d) => window.paramantDate.day(d), EXPIRED.sign_expires_at);
   const keptDate = await page.evaluate((d) => window.paramantDate.day(d), EXPIRED.expires_at);
   assert.match(body, /Tekenen kan tot/i, body);
   assert.ok(body.includes(coSignDate), 'dialog shows the signing window ' + coSignDate + ': ' + body);
@@ -95,23 +94,23 @@ test('a request past its 7-day signing window is Verlopen, without Intrekken, an
   await page.close();
 });
 
-test('the status chip fits inside the row on a desktop screen', async () => {
+test('the count pill fits inside the card on a desktop screen', async () => {
   for (const width of [1280, 1024]) {
     const page = await browser.newPage({ viewport:{ width, height:900 } });
     await stub(page);
     await page.goto(ORIGIN + '/dashboard', { waitUntil:'networkidle' });
     await page.locator('#dh-root:not([hidden])').waitFor();
-    const chip = page.locator('.dh-document[data-document-id="' + WAITING.id + '"] .dh-status');
+    const chip = page.locator('.dh-document[data-document-id="' + WAITING.id + '"] .pa-pill');
     await chip.waitFor();
-    assert.match(await chip.innerText(), /Wacht op handtekeningen/);
+    assert.match(await chip.innerText(), /0 van 2/);
     const m = await chip.evaluate((el) => {
-      const row = el.closest('.dh-document-open');
+      const row = el.closest('.pa-ch');
       const pad = parseFloat(getComputedStyle(row).paddingRight) || 0;
       return { chipRight:el.getBoundingClientRect().right, rowRight:row.getBoundingClientRect().right - pad,
         scroll:el.scrollWidth, client:el.clientWidth };
     });
-    assert.ok(m.chipRight <= m.rowRight + 0.5, `chip ends inside the row at ${width}px: ` + JSON.stringify(m));
-    assert.ok(m.scroll <= m.client + 1, `chip text is not clipped at ${width}px: ` + JSON.stringify(m));
+    assert.ok(m.chipRight <= m.rowRight + 0.5, `pill ends inside the card at ${width}px: ` + JSON.stringify(m));
+    assert.ok(m.scroll <= m.client + 1, `pill text is not clipped at ${width}px: ` + JSON.stringify(m));
     await page.close();
   }
 });

@@ -70,20 +70,20 @@ test('de statuspagina van de afzender na een weigering', async () => {
   assert.ok(!asked.some((p) => /owner-document/.test(p)), 'geen verzoek om het document (dat gaf 410): ' + asked.join(', '));
 });
 
-test('het dashboard: "Geweigerd door" met de naam, onder Gestopt', async () => {
+test('het overzicht: "Geweigerd door" met de naam, onder Klaar', async () => {
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   await page.route('**/api/**', (r) => json(r, {}));
   await page.route('**/api/user/session/verify', (r) => json(r, { authenticated: true, email: 's@example.nl' }));
   await page.route('**/api/user/documents**', (r) => json(r, { documents: [{ id: ENV_ID, original_filename: 'huurcontract.pdf', status: 'void', created_at: envelope.created_at, expires_at: envelope.expires_at, party_count: 2, signed_count: 0, parties: envelope.parties.map(({ index, label, status, signed_at }) => ({ index, label, status, signed_at })) }] }));
   await page.goto(ORIGIN + '/dashboard', { waitUntil: 'domcontentloaded' });
-  const tab = page.locator('[data-doc-filter="cancelled"]');
+  const tab = page.locator('#pa-tab-klaar');
   await tab.waitFor({ timeout: 15000 });
   await page.waitForTimeout(1500);
   await tab.click();
   await page.waitForTimeout(500);
-  const list = await page.locator('#dh-documents').innerText().catch(() => '');
+  const list = await page.locator('#pa-klaar').innerText().catch(() => '');
   const tabText = await tab.innerText();
   await page.close();
-  assert.match(tabText, /Gestopt/);
+  assert.match(tabText, /Klaar/);
   assert.match(list, /Geweigerd door Pieter Partner/, list);
 });

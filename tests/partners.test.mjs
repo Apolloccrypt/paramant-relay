@@ -389,9 +389,14 @@ test('elke data-partner-context is geldig en bevat de naam die hij uitzondert', 
   assert.deepEqual(fout, [], `\n  ${fout.join('\n  ')}\n`);
 });
 
-test('de weg van uw bestanden (home) en de kaart en tabel op /security noemen alleen actieve partijen, in hun rol', () => {
-  const eis = { 'index.html': 1, 'en/index.html': 1, 'security.html': 2, 'en/security.html': 2 };
+test('de kaart en tabel op /security noemen alleen actieve partijen, in hun rol', () => {
+  // De homepage van 25 oktober 2026 noemt geen infrastructuur meer; de weg van
+  // je bestanden staat op /security. Ze linkt wel naar /partners in de voet.
+  const eis = { 'security.html': 2, 'en/security.html': 2 };
   const fout = [];
+  for (const [rel, link] of [['index.html', '/partners'], ['en/index.html', '/en/partners']]) {
+    if (!leesPagina(rel).includes(`href="${link}"`)) fout.push(`${rel}: linkt niet naar ${link}`);
+  }
   for (const [rel, minstens] of Object.entries(eis)) {
     const html = leesPagina(rel);
     const blokken = [...html.matchAll(/<(\w+)\b[^>]*\bdata-partners-rollen\b[^>]*>([\s\S]*?)<\/\1>/g)];
@@ -431,7 +436,9 @@ test('elke pagina die een partij noemt linkt naar /partners, en de vaste plekken
     if (!noemt) continue;
     if (!/href="(\/en)?\/partners"/.test(html)) fout.push(`${rel}: noemt ${noemt.handelsnaam} en linkt nergens naar /partners`);
   }
-  const vast = ['privacy', 'dpa', 'security', 'index', 'trust', 'press', 'docs', 'docs/paramant-ot-brief'];
+  // De homepage staat hier sinds 25 oktober 2026 niet meer bij: ze beschrijft
+  // de keten niet meer (dat doet /security) en linkt in de voet naar /partners.
+  const vast = ['privacy', 'dpa', 'security', 'trust', 'press', 'docs', 'docs/paramant-ot-brief'];
   for (const naam of vast) {
     for (const [rel, link] of [[`${naam}.html`, '/partners'], [`en/${naam}.html`, '/en/partners']]) {
       const html = leesPagina(rel).replace(/<footer\b[\s\S]*?<\/footer>/g, ' ');

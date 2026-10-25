@@ -3,7 +3,8 @@
 //
 //   DASH-04-J  after a payment the page polls /api/user/me and every round
 //              added another set of click handlers: one click acted six times
-//   DASH-10-A  the three Vernieuwen buttons did nothing
+//   DASH-10-A  the three Vernieuwen buttons did nothing; since "Je documenten"
+//              (25-10-2026) a list that did not load carries the one retry
 //   DASH-01-K  a 429 said "Opnieuw inloggen HTTP 429"
 //   DASH-21-A  a 500 said "Opnieuw inloggen HTTP 500", with no way to retry
 //   DASH-15-A  "Herinnering verstuurd" stood there for less than 40 ms; and
@@ -46,11 +47,11 @@ before(async () => {
     df.lastAuth[u.pathname] = req.headers.authorization || '';
     const send = (status, body, type = 'application/json') => { res.writeHead(status, { 'content-type': type }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); };
     if (u.pathname === '/api/user/me') return send(df.me.status, df.me.body);
-    if (u.pathname === '/api/user/sends') return send(200, { sends: [dfSend] });
+    if (u.pathname === '/api/user/sends') return df.sendsFail ? send(500, { error: 'x' }) : send(200, { sends: [dfSend] });
     if (u.pathname === '/api/user/sends/snd_1') return send(200, { id: 'snd_1', recipients: [{ email: 'a@x.test', status: 'waiting' }, { email: 'b@x.test', status: 'waiting' }] });
     if (u.pathname === '/api/user/sends/snd_1/reinvite') {
       let b = ''; req.on('data', (c) => { b += c; });
-      return req.on('end', () => { try { df.lastReinvite = JSON.parse(b); } catch (_) { df.lastReinvite = null; } send(200, { ok: true }); });
+      return req.on('end', () => { try { df.lastReinvite = JSON.parse(b); } catch (_) { df.lastReinvite = null; } (df.reinvites = df.reinvites || []).push(df.lastReinvite); send(200, { ok: true }); });
     }
     if (u.pathname === '/api/user/documents') return send(200, { documents: [dfDoc] });
     if (u.pathname === '/api/user/sign-draft-key') return send(200, { key: Buffer.alloc(32, 5).toString('base64url') });
@@ -104,27 +105,30 @@ test('DASH-01-K / DASH-21-A: a 429 or a 500 says what happened and offers a retr
   }
 });
 
-test('DASH-10-A: every Vernieuwen button fetches its list again', async () => {
+test('DASH-10-A: a list that did not load offers one retry, and it fetches again', async () => {
+  df.sendsFail = true;
   const { ctx, page } = await dfOpen();
-  await page.waitForSelector('#dh-sends .dh-send-row', { timeout: 10000 });
-  for (const [btn, route] of [['#dh-documents-refresh', '/api/user/documents'], ['#dh-sends-refresh', '/api/user/sends']]) {
-    const before = df.hits[route] || 0;
-    await page.click(btn);
-    await page.waitForTimeout(400);
-    assert.equal(df.hits[route], before + 1, btn + ' did not fetch ' + route);
-  }
-  assert.equal(await page.locator('#dh-inbox-refresh').getAttribute('data-pa-action'), 'inbox-refresh');
+  await page.waitForSelector('[data-pa-action="lists-refresh"]', { timeout: 10000 });
+  assert.match(await page.locator('#pa-open').innerText(), /konden je verzendingen nu niet laden\. Er is niets veranderd/);
+  df.sendsFail = false;
+  const before = { docs: df.hits['/api/user/documents'] || 0, sends: df.hits['/api/user/sends'] || 0 };
+  await page.click('[data-pa-action="lists-refresh"]');
+  await page.waitForSelector('.dh-send-row', { timeout: 10000 });
+  assert.equal(df.hits['/api/user/documents'], before.docs + 1);
+  assert.equal(df.hits['/api/user/sends'], before.sends + 1);
   await ctx.close();
 });
 
 test('DASH-04-J: after the payment polls one click still acts once', async () => {
   df.me = { status: 200, body: { email: 'gratis@zorg.test', plan: 'community', usage_purpose: 'organisation' } };
   const { ctx, page } = await dfOpen('/dashboard?billing=return');
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.waitForFunction(() => /nog niet bevestigd/i.test(document.querySelector('#dh-billing-return')?.textContent || ''), null, { timeout: 20000 });
-  const before = df.hits['/api/user/documents'] || 0;
-  await page.click('#dh-documents-refresh');
-  await page.waitForTimeout(600);
-  assert.equal(df.hits['/api/user/documents'] - before, 1, 'one click on Vernieuwen fetched more than once');
+  // Nieuw toggles its menu: a handler wired once per poll round would open and
+  // close it an even or odd number of times.
+  await page.click('#pa-new');
+  await page.waitForTimeout(200);
+  assert.equal(await page.locator('#pa-menu').isVisible(), true, 'one click on Nieuw acted more than once');
   df.me = { status: 200, body: { email: 'firm@zorg.test', plan: 'pro', usage_purpose: 'organisation', created_at: null, backup_codes_remaining: 10 } };
   await ctx.close();
 });
@@ -139,15 +143,15 @@ test('DASH-15-A: the reminder carries the same link and the confirmation stays o
     return localStorage.getItem('paramant.send.links.v1:snd_1');
   });
   assert.ok(kept && !kept.includes('tok_demo_a'), 'the link sits readable in storage');
-  df.lastReinvite = undefined;
-  await page.waitForSelector('#dh-sends .dh-send-row', { timeout: 10000 });
-  await page.click('[data-pa-action="send-open"]');
-  await page.waitForSelector('[data-pa-action="send-remind"]', { timeout: 5000 });
+  df.reinvites = [];
+  await page.waitForSelector('.dh-send-row [data-pa-action="send-remind"]', { timeout: 10000 });
+  await page.waitForSelector('[data-send-people="snd_1"] .pa-row.miss', { timeout: 5000 });
   await page.click('[data-pa-action="send-remind"]');
   await page.waitForTimeout(3000);
-  assert.deepEqual(df.lastReinvite, { email: 'a@x.test', token: 'tok_demo_a' }, 'the reminder is built from the link this browser kept');
-  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Herinnering verstuurd, met dezelfde link als de eerste mail\. Die link opent het bestand ook op een ander apparaat\./);
-  assert.equal(await page.locator('[data-send-people="snd_1"]').isVisible(), true, 'the panel closed over the confirmation');
+  // One press reminds everyone who has not collected, each with their own link.
+  assert.deepEqual(df.reinvites, [{ email: 'a@x.test', token: 'tok_demo_a' }, { email: 'b@x.test', token: 'tok_demo_b' }], 'the reminder is built from the links this browser kept');
+  const card = await page.locator('.dh-send-row[data-send-id="snd_1"]').innerText();
+  assert.match(card, /Herinnering verstuurd naar a@x\.test, b@x\.test, met dezelfde link als de eerste mail\. Die link opent het bestand ook op een ander apparaat\./);
   await ctx.close();
 });
 
@@ -155,33 +159,31 @@ test('DASH-15-A: without the link in this browser, an honest way on and no remin
   const { ctx, page } = await dfOpen();
   df.lastReinvite = undefined;
   const before = df.hits['/api/user/sends/snd_1/reinvite'] || 0;
-  await page.waitForSelector('#dh-sends .dh-send-row', { timeout: 10000 });
-  await page.click('[data-pa-action="send-open"]');
-  await page.waitForSelector('[data-pa-action="send-remind"]', { timeout: 5000 });
+  await page.waitForSelector('[data-send-people="snd_1"] .pa-row.miss', { timeout: 10000 });
   await page.click('[data-pa-action="send-remind"]');
   await page.waitForTimeout(500);
   assert.equal(df.hits['/api/user/sends/snd_1/reinvite'] || 0, before, 'no reminder without a working link');
-  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw\./);
+  assert.match(await page.locator('.dh-send-row[data-send-id="snd_1"]').innerText(), /Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw\./);
   await ctx.close();
 });
 
 test('SENDNAME-18-A: a Dutch row says Verstuurd and tells sends apart', async () => {
   const { ctx, page } = await dfOpen();
-  await page.waitForSelector('#dh-sends .dh-send-row', { timeout: 10000 });
-  const row = await page.locator('#dh-sends .dh-send-row').first().innerText();
+  await page.waitForSelector('.dh-send-row', { timeout: 10000 });
+  const row = await page.locator('.dh-send-row').first().innerText();
   assert.doesNotMatch(row, /\bSent\b/);
   assert.match(row, /Verstuurd 4 oktober 2026 om \d\d:\d\d/);
   assert.match(row, /Bestand aan 2 ontvangers/);
   await ctx.close();
 });
 
-test('DASH-20-A: no "--" for a member-since date the account does not have', async () => {
+test('DASH-20-A: no "--" for a value the account does not have', async () => {
+  // The account panel with "member since" and backup codes moved to /account
+  // behind the initials; this screen must not print a placeholder either.
   const { ctx, page } = await dfOpen();
   await page.waitForSelector('#dh-root.dh-loaded', { timeout: 10000 });
-  await page.click('#dh-acct-toggle');
-  await page.waitForTimeout(200);
-  assert.equal(await page.locator('[data-dh="backup"]').isVisible(), true, 'the account panel did not open');
-  assert.equal(await page.locator('[data-dh="created"]').isVisible(), false);
+  await page.waitForSelector('.dh-send-row', { timeout: 10000 });
+  assert.doesNotMatch(await page.locator('main').innerText(), /(^|\s)--(\s|$)/);
   await ctx.close();
 });
 
@@ -189,6 +191,8 @@ test('VERIFY-36-A: a Business account can export the audit trail as CSV', async 
   df.me = { status: 200, body: { email: 'business@zorg.test', plan: 'business', usage_purpose: 'organisation', created_at: null, backup_codes_remaining: 10 } };
   const { ctx, page, errors } = await dfOpen();
   await page.waitForSelector('#dh-records:not([hidden])', { timeout: 10000 });
+  // One fold down on "Je documenten": the reader opens it.
+  await page.click('#dh-records summary');
   assert.equal(df.hits['/v2/parasign/audit-export'] || 0, 0, 'nothing may be fetched before the click');
   const dl = page.waitForEvent('download', { timeout: 10000 });
   await page.click('#dh-export-csv');
@@ -206,6 +210,8 @@ test('VERIFY-36-A: a Business account can export the audit trail as CSV', async 
 test('Firm sees the history but no audit-export buttons, and is told why', async () => {
   const { ctx, page } = await dfOpen();
   await page.waitForSelector('#dh-records:not([hidden])', { timeout: 10000 });
+  // One fold down on "Je documenten": the reader opens it.
+  await page.click('#dh-records summary');
   assert.equal(await page.locator('#dh-export-csv').isVisible(), false);
   assert.equal(await page.locator('#dh-export-json').isVisible(), false);
   assert.equal(await page.locator('#dh-hist-load').isVisible(), true);

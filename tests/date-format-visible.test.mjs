@@ -200,7 +200,7 @@ ok('a session says the day and the time on Dutch time, without UTC',
 // 3268d4a9). Wait for both before reading the page.
 const dashboard = await open('/dashboard', () => {
   const line = document.getElementById('dh-term-line');
-  return line && !line.hidden && /Gemaakt /.test(document.body.innerText);
+  return line && !line.hidden && /Laten tekenen op /.test(document.body.innerText);
 });
 const dash = await dashboard.evaluate(() => ({
   lang: document.documentElement.lang,
@@ -217,17 +217,19 @@ ok('/dashboard writes the term date exactly as /account does',
 // screen that already had two.
 // /dashboard is Dutch since 23 September 2026; the month name comes from the
 // shared js/format-date.js, so either spelling of the month is the one shape.
+// Since "Je documenten" the term line sits under "Je plan" and the card says
+// "Laten tekenen op", in the same notation.
 ok('a document row writes its date the same way the term line does',
-  new RegExp(`Gemaakt ${inLang(dash.lang, '31 August 2026')}`).test(dash.body), (dash.body.match(/Gemaakt [^\n]*/) || ['no document row'])[0]);
+  new RegExp(`Laten tekenen op ${inLang(dash.lang, '31 August 2026')}`).test(dash.body), (dash.body.match(/Laten tekenen op [^\n]*/) || ['no document row'])[0]);
 // The English copy loads the same script and must say it in English.
 const dashboardEn = await open('/en/dashboard', () => {
   const line = document.getElementById('dh-term-line');
-  return line && !line.hidden && /Created /.test(document.body.innerText);
+  return line && !line.hidden && /Sent for signing on /.test(document.body.innerText);
 });
 const dashEn = await dashboardEn.evaluate(() => document.body.innerText);
 await dashboardEn.close();
 ok('/en/dashboard writes the document row date the same way',
-  /Created 31 August 2026/.test(dashEn), (dashEn.match(/Created [^\n]*/) || ['no document row'])[0]);
+  /Sent for signing on 31 August 2026/.test(dashEn), (dashEn.match(/Sent for signing on [^\n]*/) || ['no document row'])[0]);
 
 // ── report ───────────────────────────────────────────────────────────────────
 await browser.close();

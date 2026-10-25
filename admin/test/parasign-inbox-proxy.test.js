@@ -70,11 +70,14 @@ test('the resend asserts the session address and can only mail that address', ()
 
 test('the resend mints no token, and the sender resends the same invitation', () => {
   // The resent mail is the invitation mail, through the same route as the
-  // first one (dashboard.js resendSignerInvite -> /invitations).
+  // first one (dashboard.js resendSignerInvite and the card's reminder, both
+  // through postInvitations -> /invitations).
   const dash = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'js', 'dashboard.js'), 'utf8');
-  const fn = dash.slice(dash.indexOf('function resendSignerInvite'), dash.indexOf('function openResendFromMail'));
+  const fn = dash.slice(dash.indexOf('function postInvitations'), dash.indexOf('function openResendFromMail'));
   assert.match(fn, /'\/api\/user\/envelopes\/' \+ encodeURIComponent\(id\) \+ '\/invitations'/);
   assert.match(fn, /invite_url: link\.url/);
+  const one = dash.slice(dash.indexOf('function resendSignerInvite'), dash.indexOf('function askWithdraw'));
+  assert.match(one, /postInvitations\(id, \[link\]\)/, 'one signer goes through the same route');
   assert.match(relaySource, /'\/dashboard\?herzend=' \+ encodeURIComponent\(String\(envelopeId\)\)/);
   assert.doesNotMatch(resendRoute[0], /randomBytes|createHash\("sha3/,
     'a resend that generated anything would be minting a capability');

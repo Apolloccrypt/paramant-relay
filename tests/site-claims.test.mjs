@@ -787,14 +787,15 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
 
   const problems = [];
   const says = (where, text, phrase) => { if (!text.includes(phrase)) problems.push(`${where}: must state "${phrase}"`); };
-  says('index', visible(page('en/index')), `${transfers} transfers a month`);
-  says('index', visible(page('en/index')), `files up to ${mb} MB`);
+  // The homepages of 25 October 2026 name a price, not the limits; the
+  // pricing pages carry the limits and are held here instead.
+  says('pricing', visible(page('en/pricing')), `${transfers} transfers a month`);
+  says('pricing', visible(page('en/pricing')), `up to ${mb} MB`);
   says('docs', visible(page('en/docs')), `${transfers} transfers a month`);
   says('docs', visible(page('en/docs')), `${mb} MB per file`);
   // The Dutch pages.
-  says('index (nl)', visible(page('index')), `${transfers} verzendingen per maand`);
-  // The Dutch homepage no longer names the file size (25 October 2026); the
-  // monthly sends are still on it and still come from tiers.js.
+  says('pricing (nl)', visible(page('pricing')), `${transfers} verzendingen per maand`);
+  says('pricing (nl)', visible(page('pricing')), `tot ${mb} MB`);
   says('docs (nl)', visible(page('docs')), `${transfers} overdrachten per maand`);
   says('docs (nl)', visible(page('docs')), `${mb} MB per bestand`);
   const apiMd = read('frontend/docs/api.md');
@@ -2200,8 +2201,15 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   // list. Scoped to list items that name a tier, because /index says "that is
   // in the signed Data Processing Agreement" in a breach-notification sentence
   // where the phrase is right.
-  assert.ok(visible(page('en/index')).includes('The Data Processing Agreement applies to every plan.'),
-    'index: the homepage must say the DPA applies to every plan, because the endpoint gates on nothing');
+  // Since 25 October 2026 the homepage names no DPA at all; if it ever names
+  // one again, it says the agreement applies to every plan.
+  for (const slug of ['index', 'en/index']) {
+    const t = visible(page(slug));
+    if (/Data Processing Agreement|verwerkersovereenkomst/i.test(t)) {
+      assert.ok(/applies to every plan|geldt voor (alle plannen|elk plan)/i.test(t),
+        `${slug}: the homepage names the DPA and must say it applies to every plan, because the endpoint gates on nothing`);
+    }
+  }
   // Two shapes carry a tier's feature list, and the sweep has to know both: the
   // one-line form on /index (<li> ... <b>Enterprise</b> ... </li>) and the card
   // on /pricing (a tier-name heading followed by its own <ul>). Scanning only
@@ -3173,7 +3181,9 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // het Nederlands, met de standnamen die /parashare toont.
   const SENTENCE_NL = 'In de webapp maak je een link die de ontvanger opent wanneer het hem uitkomt. Je stuurt die naar één persoon, of met Firm naar meerdere mensen tegelijk. Kies je ‘Extra veilig’, dan zijn jij en de ontvanger allebei online en vergelijk je een korte controlecode. Je kunt ook versturen met de API of de SDK.';
   const sentenceOf = (slug) => (slug === 'parasend' ? SENTENCE_NL : SENTENCE);
-  const THREE = ['en/index', 'en/parasend', 'parasend', 'en/pricing'];
+  // en/index left this list on 25 October 2026: the homepage names no channel
+  // any more, it sends a buyer to /parasend and /pricing, which carry it.
+  const THREE = ['en/parasend', 'parasend', 'en/pricing'];
 
   // Half one. The web app really does need the other side present, and really
   // does compare a code before anything moves.
@@ -3246,7 +3256,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
 
   // Both halves, phrase by phrase, so a rewrite that keeps the shape but drops
   // the plain words fails here rather than in a review a year from now.
-  for (const slug of ['en/index', 'en/parasend', 'en/pricing']) {
+  for (const slug of ['en/parasend', 'en/pricing']) {
     const text = visible(page(slug)).replace(/\s+/g, ' ');
     assert.ok(text.includes('both online'),
       `${slug}: the words "both online" are the whole point; a paraphrase is what hid this for months`);
@@ -3266,7 +3276,6 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // all three: the homepage card's list sits above its .prod-cta, the /parasend
   // hero line above .ps-actions, the /pricing paragraph above the tier grid.
   const before = {
-    'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/en\/parasend"/,
     parasend: /<div class="ps-actions">/,
     'en/parasend': /<div class="ps-actions">/,
     'en/pricing': /<div class="tier-grid">/,
@@ -3611,8 +3620,11 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   const monthlyIncl = Number(catalog.priceOf('firm', 'firm', 'monthly'));
   const excl = Math.round(monthlyIncl / 1.21 * 100) / 100;
   const inclNl = monthlyIncl.toFixed(2).replace('.', ',');
-  says('index', `€${excl} per maand, excl. btw`);
-  says('index', `Met btw is dat ${inclNl} euro per maand.`);
+  // The homepage of 25 October 2026 names the office price in one line, as on
+  // the approved picture, and sends the reader to /pricing for btw in and out.
+  if (!new RegExp(`(?<![\\d.,])${excl}(&nbsp;| )euro per maand voor je kantoor`).test(body('index'))) problems.push(`index: must say "${excl} euro per maand voor je kantoor"`);
+  if (!body('index').includes('href="/pricing"')) problems.push('index: the price links to /pricing, where btw is named');
+  says('pricing', `${inclNl} per maand, inclusief 21% btw`);
   says('pricing', `Voor je kantoor: ${excl} euro per maand.`);
   says('about', `Voor je kantoor: ${excl} euro per maand`);
   // /about is told by Mick himself since 13 October 2026, so it says "mij".
@@ -3620,11 +3632,9 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   // /pricing since 05-10-2026: who the line is for, and the same address.
   says('pricing', 'Grotere organisatie? Dan is er Business, op aanvraag: 1.000 handtekeningen per maand, een vaste contactpersoon en een overzicht van alle handelingen (audittrail) dat je kunt exporteren, voor €299 per maand excl. btw. Neem contact op: privacy@paramant.app');
   const lim = (tier, dim) => tiers.tierLimit(tier, dim);
-  // The homepage states the monthly limits as one sentence per plan
-  // ("2 handtekeningen en 50 verzendingen per maand"); recipients per send
-  // left it on 25 October 2026 and stay on /pricing and /about.
-  says('index', `${lim('community', 'signs_month')} handtekeningen en ${lim('community', 'transfers_month')} verzendingen per maand`);
-  says('index', `${lim('pro', 'signs_month')} handtekeningen en ${lim('pro', 'transfers_month')} verzendingen per maand`);
+  // Since 25 October 2026 the homepage names a price and no limits; the
+  // monthly limits stand on /pricing and /about, held here to tiers.js, and
+  // the signed-in screen writes them from the relay's own caps.
   for (const slug of ['pricing', 'about']) {
     says(slug, `${lim('community', 'signs_month')} handtekeningen per maand`);
     says(slug, `${lim('community', 'transfers_month')} verzendingen per maand`);
@@ -3645,29 +3655,30 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
     if (/het hele kantoor/i.test(flat(slug))) problems.push(`${slug}: "het hele kantoor" promises seats an account does not have yet`);
   }
   // One primary button on the signed-out homepage and on /pricing. Since 25
-  // October 2026 the signed-out homepage opens on a question and its answer,
-  // and its one primary button is Probeer het gratis (/signup).
-  const homeOut = (page('index').match(/<div class="home-state" data-home="out">[\s\S]*?<\/section>/) || [''])[0];
+  // October 2026 the homepage is the approved picture: one heading, one
+  // button, Probeer het gratis (/signup).
   const homeMain = visible(page('index')).slice(visible(page('index')).indexOf('<main'), visible(page('index')).indexOf('</main>'));
-  const signedIn = (homeMain.match(/<div class="home-state" data-home="in"[\s\S]*?<div class="hp-art"/) || [''])[0];
-  const fills = (homeMain.replace(signedIn, '').match(/class="hp-btn hp-btn-fill"/g) || []).length;
+  const fills = (homeMain.match(/class="h-cta"/g) || []).length;
   if (fills !== 1) problems.push(`index: ${fills} primary buttons signed out, the decision is one`);
-  if (!/<a class="hp-btn hp-btn-fill" href="\/signup">Probeer het gratis<\/a>/.test(homeOut)) problems.push('index: the one primary button is Probeer het gratis (/signup), in the hero');
+  if (!/<a class="h-cta" href="\/signup">Probeer het gratis<\/a>/.test(homeMain)) problems.push('index: the one primary button is Probeer het gratis (/signup), in the hero');
   const pricingMain = visible(page('pricing')).slice(visible(page('pricing')).indexOf('<main'));
   if ((pricingMain.match(/class="btn btn-primary/g) || []).length !== 1) problems.push('pricing: exactly one primary button');
 
-  // 3. The hero, word for word (Mick, 25 October 2026): the question, the
-  // answer and one sentence. The first thing signed out is the question.
-  assert.match(homeOut, /^<div class="home-state" data-home="out">\s*(?:<!--[\s\S]*?-->\s*)?<div class="hx">\s*<h1 id="home-h1">Wie kan je bestand openen\?<\/h1>/,
-    'index: the question is the first thing signed out');
-  says('index', 'Jij en de ontvanger. Wij niet, en dus ook niemand die het ons vraagt.');
-  says('index', 'Een bestand versturen dat alleen de ontvanger kan openen, en contracten laten tekenen met bewijs. Van een Nederlands bedrijf.');
+  // 3. The hero, word for word (the picture of 25 October 2026): the first
+  // thing in <main> is the heading.
+  assert.match(homeMain, /^<main id="main-content">\s*<section class="h-hero">\s*<div class="h-wrap">\s*<div>\s*<h1><span>Je contract\.<\/span> <span>Zo getekend, met Paramant<span class="h-dot">\.<\/span><\/span><\/h1>/,
+    'index: the heading is the first thing signed out');
+  says('index', 'Je dossier. Alleen bij de ontvanger.');
+  says('index', 'Je stuurt een link. Alleen wie hem krijgt, kan het bestand openen.');
+  says('index', 'Klaar. Iedereen krijgt het getekende contract.');
 
   // 4. Two product names outward. The Dutch bar names Versturen and
   // Ondertekenen, apply-nav.py and nav-auth.js carry the same list, and no nav
   // or heading on a public page presents a retired name as a product.
   const nav = (html) => (html.match(/<nav class="nav">[\s\S]*?<\/nav>/) || [''])[0];
-  for (const slug of ['index', 'pricing', 'about', 'security']) {
+  // The homepage of 25 October 2026 has no shared bar, only the word mark and
+  // Inloggen; the other public pages carry it.
+  for (const slug of ['pricing', 'about', 'security']) {
     const labels = [...nav(page(slug)).matchAll(/class="nav-link">([^<]+)</g)].map((m) => m[1]);
     if (labels.join(',') !== 'Versturen,Ondertekenen,Gereedschap,Beveiliging,Prijzen') problems.push(`${slug}: the Dutch bar reads ${labels.join(',')}`);
   }
@@ -3750,8 +3761,9 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   // Since 25 October 2026 the Dutch homepage no longer carries the takeover
   // list or the parent company; it says who owns Paramant in one line and
   // links to /about, which names the parent.
-  says('index', 'Paramant is van Paramantis Solutions B.V. in Harderwijk.');
-  for (const slug of ['en/index', 'about']) says(slug, 'Paramantis Digital B.V.');
+  says('index', 'Paramantis Solutions B.V., Harderwijk');
+  says('en/index', 'Paramantis Solutions B.V., Harderwijk');
+  for (const slug of ['about']) says(slug, 'Paramantis Digital B.V.');
   for (const slug of publicPages()) {
     if (/no parent company anywhere/i.test(flat(slug))) problems.push(`${slug}: "no parent company" is half the truth; the parent is Paramantis Digital B.V.`);
   }
@@ -3805,7 +3817,6 @@ test('the recipients per send on the site are the max_recipients tiers.js sets',
     'en/pricing': ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
     parasend: ['Eén ontvanger per verzending', `Tot ${firm} ontvangers per verzending, elk met een eigen eenmalige link`],
     'en/parasend': ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
-    'en/index': ['one recipient per send', `up to ${firm} recipients per send`],
     'en/docs': [`One recipient per send on Community, up to ${firm} on Firm and Enterprise`],
     'en/press': [`up to ${firm} named recipients`, `One per send on Community · up to ${firm} per send on Firm and Enterprise`],
     // The Dutch pages.

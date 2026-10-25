@@ -83,11 +83,15 @@ const groundOf = () => {
   return b === 'rgba(0, 0, 0, 0)' ? getComputedStyle(document.documentElement).backgroundColor : b;
 };
 
+// The homepage (/ and /en/) left this list on 25 October 2026: it is the
+// approved picture, a page of its own without the shared nav, so it has no bar
+// to carry the switch. It follows the reader's choice (js/theme.js reads the
+// same key) and the operating system, and the no-flash case below still holds
+// it to the dark ground. The same goes for "Je documenten" on /dashboard,
+// which is checked in the carry-over and no-flash cases.
 const PAGES = [
-  { url:'/', label:'Thema' },
   { url:'/pricing', label:'Thema' },
   { url:'/partners', label:'Thema' },
-  { url:'/en/', label:'Theme' },
   { url:'/en/pricing', label:'Theme' },
   { url:'/auth/login', label:'Thema' },
   { url:'/sign', label:'Thema' },
@@ -140,7 +144,9 @@ test('the choice carries from a public page to /en and into the app', async () =
   await page.goto(ORIGIN + '/pricing', { waitUntil:'load' });
   await page.locator('nav.nav [data-theme-toggle]').click();
   const wrong = [];
-  for (const url of ['/en/', '/en/pricing', '/sign', '/en/sign', '/account', '/dashboard']) {
+  // Signed in, / and /en/ send the reader on to the dashboard, so they are
+  // not pages of their own here; the no-flash case below holds them signed out.
+  for (const url of ['/en/pricing', '/sign', '/en/sign', '/account', '/dashboard', '/en/dashboard']) {
     await page.goto(ORIGIN + url, { waitUntil:'load' });
     const seen = await page.evaluate(groundOf);
     if (seen !== DARK) wrong.push(`${url}: ground is ${seen}, expected ${DARK}`);
@@ -151,7 +157,7 @@ test('the choice carries from a public page to /en and into the app', async () =
 
 test('on a phone the switch sits in the strip under the drawer, next to NL | EN', async () => {
   const wrong = [];
-  for (const url of ['/', '/pricing', '/en/', '/auth/login']) {
+  for (const url of ['/pricing', '/en/pricing', '/auth/login']) {
     const context = await browser.newContext({ viewport:{ width:390, height:844 }, colorScheme:'light', hasTouch:true, isMobile:true });
     const page = await context.newPage();
     await signedOut(page);
@@ -174,7 +180,7 @@ test('on a phone the switch sits in the strip under the drawer, next to NL | EN'
 
 test('no flash: a reload in the dark edition has the dark ground before <body> exists', async () => {
   const wrong = [];
-  for (const url of ['/', '/pricing', '/en/pricing', '/auth/login', '/sign', '/dashboard', '/partners']) {
+  for (const url of ['/', '/en/', '/pricing', '/en/pricing', '/auth/login', '/sign', '/dashboard', '/partners']) {
     const context = await browser.newContext({ viewport:{ width:1280, height:800 }, colorScheme:'light' });
     await context.addInitScript((key) => {
       try { localStorage.setItem(key, 'dark'); } catch { /* storage off */ }
@@ -190,7 +196,8 @@ test('no flash: a reload in the dark edition has the dark ground before <body> e
       }).observe(document, { childList:true, subtree:true });
     }, KEY);
     const page = await context.newPage();
-    await signedIn(page);
+    // The homepage is measured signed out: signed in, it sends the reader on.
+    if (url === '/' || url === '/en/') await signedOut(page); else await signedIn(page);
     await page.goto(ORIGIN + url, { waitUntil:'load' });
     const at = await page.evaluate(() => window.__atBody);
     if (!at) wrong.push(`${url}: the moment <body> appeared was not observed`);

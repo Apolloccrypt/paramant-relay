@@ -1,4 +1,4 @@
-// The homepage and /dashboard count one document the same way.
+// One count for one document, on the one signed-in screen.
 //
 // On 25 October 2026 the owner's phone showed, for one request sent on 27
 // September: "Nog open: 1 verzoek wacht op een handtekening" on the homepage,
@@ -7,12 +7,15 @@
 // that a request past its signing window (sign_expires_at, 7 days) is expired.
 // Both pages now read js/document-state.js.
 //
-// Second, the big figure on the homepage was a number you could not tap. It
-// now links to the list it counts (/dashboard?filter=open), and that list has
-// to open on the same filter.
+// Since "Je documenten" (25 October 2026) the homepage no longer draws its
+// own count: a signed-in visitor is sent on to /dashboard, and that screen
+// counts with js/document-state.js tally(). This file holds the same facts
+// against it: a stopped request is never Open, it reads Verlopen under Klaar,
+// the number on each tab is the number of cards under it, and an old link
+// with ?filter=cancelled lands on Klaar.
 //
 // PARAMANT_HOME_IN_SCREENSHOT_DIR=<dir> writes home-telt-gestopt-390.png, the
-// fixed homepage at phone width, into that directory.
+// screen at phone width, into that directory.
 //
 // Run: node --test tests/home-telt-gestopt.test.mjs
 
@@ -76,26 +79,28 @@ async function stub(page, documents) {
   await page.route('**/api/user/parasign/inbox', json({ ok:true, count:0, documents:[] }));
 }
 
-async function openHome(documents, home = '/') {
-  const page = await browser.newPage({ viewport:{ width:390, height:844 } });
+async function openDash(documents, at = '/dashboard', width = 390) {
+  const page = await browser.newPage({ viewport:{ width, height:844 } });
   await stub(page, documents);
-  await page.goto(ORIGIN + home, { waitUntil:'domcontentloaded' });
-  await page.locator('[data-home="in"]:not([hidden])').waitFor();
+  await page.route('**/api/user/sends', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ ok:true, sends:[] }) }));
+  await page.route('**/api/user/opvragen', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ requests:[] }) }));
+  await page.goto(ORIGIN + at, { waitUntil:'domcontentloaded' });
+  await page.locator('#dh-root:not([hidden])').waitFor();
   await page.waitForFunction(() => {
-    const fig = document.querySelector('[data-hw-read]');
-    const rec = document.querySelector('[data-hw-recent]');
-    const wait = document.querySelector('[data-hw-waiting]');
-    return fig && !fig.hidden && ((rec && !rec.hidden) || (wait && !wait.hidden));
+    const o = document.querySelector('[data-doc-count="open"]');
+    const k = document.querySelector('[data-doc-count="klaar"]');
+    return o && k && (o.textContent !== '0' || k.textContent !== '0');
   });
   return page;
 }
 
-async function dashboardCounts(page) {
-  await page.locator('#dh-root:not([hidden])').waitFor();
-  await page.waitForFunction(() => document.querySelector('[data-doc-count="all"]').textContent !== '0');
-  const out = {};
-  for (const key of ['open', 'completed', 'cancelled', 'all']) out[key] = await page.locator(`[data-doc-count="${key}"]`).innerText();
-  return out;
+async function counts(page) {
+  return {
+    open: await page.locator('[data-doc-count="open"]').innerText(),
+    klaar: await page.locator('[data-doc-count="klaar"]').innerText(),
+    openCards: await page.locator('#pa-open .pa-card').count(),
+    klaarRows: await page.locator('#pa-klaar .pa-mini').count(),
+  };
 }
 
 const server = await serve();
@@ -103,81 +108,57 @@ const ORIGIN = `http://localhost:${server.address().port}`;
 const browser = await chromium.launch({ headless:true, ...(EXE ? { executablePath:EXE } : {}) });
 test.after(async () => { await browser.close(); server.close(); });
 
-test('a request past its signing window is not "Nog open" on the homepage and is Gestopt on /dashboard', async () => {
-  const page = await openHome([STOPPED, STOPPED_OPEN]);
-  const home = await page.evaluate(() => ({
-    kicker: document.querySelector('[data-hw-kicker]').textContent,
-    num: document.querySelector('[data-hw-num]').textContent,
-    cap: document.querySelector('[data-hw-cap]').textContent,
-    waiting: !document.querySelector('[data-hw-waiting]').hidden,
-    recent: Array.from(document.querySelectorAll('[data-hw-recent-list] .hw-row')).map((r) => r.innerText.replace(/\s+/g, ' ')),
-    text: document.querySelector('[data-home="in"]').innerText,
-  }));
-  assert.notEqual(home.kicker, 'Nog open', 'the figure does not call a stopped request open: ' + JSON.stringify(home));
-  assert.doesNotMatch(home.cap, /wacht op een handtekening|wachten op een handtekening/, home.cap);
-  assert.equal(home.waiting, false, 'no "Wacht op een handtekening" card for stopped requests');
-  assert.doesNotMatch(home.text, /Open\s+[1-9]/, 'the strip does not count them as open: ' + home.text);
-  assert.equal(home.recent.length, 2, 'both stopped requests are listed under Recent');
-  for (const r of home.recent) assert.match(r, /Verlopen/, 'a stopped request reads Verlopen on the homepage: ' + r);
+test('a signed-in visitor of the homepage lands on the one screen that counts', async () => {
+  const page = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await stub(page, [STOPPED]);
+  await page.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+  await page.waitForURL(/\/dashboard$/);
+  await page.close();
+});
+
+test('a request past its signing window is not Open and reads Verlopen under Klaar', async () => {
+  const page = await openDash([STOPPED, STOPPED_OPEN]);
+  assert.deepEqual(await counts(page), { open:'0', klaar:'2', openCards:0, klaarRows:2 }, 'Open 0, Klaar 2, and the tabs count the cards');
+  assert.doesNotMatch(await page.locator('#pa-open').innerText(), /Demo verzoek|Demo open/);
+  await page.locator('#pa-tab-klaar').click();
+  const klaar = await page.locator('#pa-klaar').innerText();
+  assert.match(klaar, /Demo verzoek/);
+  for (const r of await page.locator('#pa-klaar .pa-mini').allInnerTexts()) assert.match(r, /Verlopen/, 'a stopped request reads Verlopen: ' + r);
   if (SHOTS) {
     fs.mkdirSync(SHOTS, { recursive:true });
     await page.emulateMedia({ reducedMotion:'reduce' });
     await stableScreenshot(page, { path:path.join(SHOTS, 'home-telt-gestopt-390.png'), fullPage:false });
   }
   await page.close();
-
-  const dash = await browser.newPage({ viewport:{ width:390, height:844 } });
-  await stub(dash, [STOPPED, STOPPED_OPEN]);
-  await dash.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
-  const counts = await dashboardCounts(dash);
-  assert.deepEqual(counts, { open:'0', completed:'0', cancelled:'2', all:'2' }, 'dashboard: Lopend 0, Gestopt 2');
-  await dash.close();
 });
 
-test('the English homepage applies the same rule', async () => {
-  const page = await openHome([STOPPED], '/en');
-  const kicker = await page.locator('[data-hw-kicker]').innerText();
-  assert.notEqual(kicker, 'Still open');
-  assert.match(await page.locator('[data-hw-recent-list]').innerText(), /Expired/);
+test('the English screen applies the same rule', async () => {
+  const page = await openDash([STOPPED], '/en/dashboard');
+  assert.equal((await counts(page)).open, '0');
+  await page.locator('#pa-tab-klaar').click();
+  assert.match(await page.locator('#pa-klaar').innerText(), /Expired/);
   await page.close();
 });
 
-test('the big figure links to the list it counts, and that list opens on the same filter', async () => {
-  const page = await openHome([LIVE, STOPPED]);
-  assert.equal(await page.locator('[data-hw-num]').innerText(), '1', 'one live request, the stopped one is not counted');
-  const go = page.locator('[data-hw-go]');
-  assert.equal(await go.getAttribute('href'), '/dashboard?filter=open#documenten');
-  // The tap target is the whole card, not only the digit.
-  const card = await page.locator('.hw-figure').boundingBox();
-  await page.mouse.click(card.x + card.width - 12, card.y + card.height - 12);
-  await page.waitForURL(/\/dashboard\?filter=open/);
-  const counts = await dashboardCounts(page);
-  assert.equal(counts.open, '1');
-  assert.equal(counts.cancelled, '1');
-  assert.equal(await page.locator('[data-doc-filter="open"]').getAttribute('aria-pressed'), 'true');
-  await page.waitForFunction(() => document.querySelectorAll('#dh-documents .dh-document').length >= 1);
-  const list = await page.locator('#dh-documents').innerText();
+test('a live request is the one card under Open, the stopped one is not counted there', async () => {
+  const page = await openDash([LIVE, STOPPED]);
+  const c = await counts(page);
+  assert.equal(c.open, '1');
+  assert.equal(c.klaar, '1');
+  assert.equal(c.openCards, 1);
+  const list = await page.locator('#pa-open').innerText();
   assert.match(list, /Demo lopend/);
   assert.doesNotMatch(list, /Demo verzoek/);
+  assert.equal(await page.locator('#pa-tab-open').getAttribute('aria-selected'), 'true');
   await page.close();
 });
 
-test('/dashboard?filter=cancelled opens on Gestopt', async () => {
-  const page = await browser.newPage({ viewport:{ width:1280, height:900 } });
-  await stub(page, [LIVE, STOPPED]);
-  await page.goto(ORIGIN + '/dashboard?filter=cancelled', { waitUntil:'domcontentloaded' });
-  await dashboardCounts(page);
-  assert.equal(await page.locator('[data-doc-filter="cancelled"]').getAttribute('aria-pressed'), 'true');
-  assert.equal(await page.locator('[data-doc-filter="open"]').getAttribute('aria-pressed'), 'false');
-  await page.waitForFunction(() => document.querySelectorAll('#dh-documents .dh-document').length >= 1);
-  const list = await page.locator('#dh-documents').innerText();
+test('/dashboard?filter=cancelled, the old link for Gestopt, opens on Klaar', async () => {
+  const page = await openDash([LIVE, STOPPED], '/dashboard?filter=cancelled', 1280);
+  assert.equal(await page.locator('#pa-tab-klaar').getAttribute('aria-selected'), 'true');
+  assert.equal(await page.locator('#pa-tab-open').getAttribute('aria-selected'), 'false');
+  const list = await page.locator('#pa-klaar').innerText();
   assert.match(list, /Demo verzoek/);
   assert.doesNotMatch(list, /Demo lopend/);
-  await page.close();
-});
-
-test('with nothing to count the figure is plain text, not a link', async () => {
-  const page = await openHome([STOPPED]);
-  assert.equal(await page.locator('[data-hw-go]').getAttribute('href'), null, 'quota figure has no page to link to');
   await page.close();
 });

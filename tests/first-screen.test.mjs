@@ -162,31 +162,22 @@ const measure = (page, claims) => page.evaluate((specs) => {
 // proof the right element was measured; the geometry is the assertion.
 const PAGES = [
   {
-    // The Dutch homepage (25 October 2026). Mick found the demo dashboard a
-    // justification instead of a homepage. The yardstick is BeerWeer: one
-    // question, one answer, one sentence, one button. The first screen is
-    // exactly that; the tiles, the table and the price follow under it.
+    // The homepage since 25 October 2026, approved as a picture (the
+    // "Moneybird" direction): one heading, one button, and who made it. The
+    // product screen, the steps and the price follow under it.
     slug: '/',
     claims: [
-      { name: 'the question', css: '[data-home="out"] .hx h1', text: 'Wie kan je bestand openen?' },
-      { name: 'the answer', css: '[data-home="out"] .hx p.hx-answer', text: 'Jij en de ontvanger. Wij niet' },
-      { name: 'what it does, in one line', css: '[data-home="out"] .hx p.hero-line', text: 'alleen de ontvanger kan openen' },
-      { name: 'the one button, Probeer het gratis', css: '[data-home="out"] .hx .home-actions a.hp-btn-fill', href: '/signup', text: 'Probeer het gratis' },
+      { name: 'the heading', css: '.h-hero h1', text: 'Je contract.' },
+      { name: 'the one button, Probeer het gratis', css: '.h-hero a.h-cta', href: '/signup', text: 'Probeer het gratis' },
+      { name: 'who made it', css: '.h-hero .h-proof', text: 'Gemaakt door Mick Beer' },
     ],
   },
   {
     slug: '/en',
     claims: [
-      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Send case files safely and get contracts signed' },
-      { name: 'what the code does, in one line', css: '[data-home="out"] .wp-demo-top p.hero-line', text: 'encrypted' },
-      // The split the whole homepage argues from. It has to be readable as a
-      // split, so both halves are checked in one line: free tier named, paid
-      // tier named, on the first screen.
-      { name: 'the account and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'free account', also: ['For your firm: 29 euros a month'] },
-      { name: 'the primary action, Create account', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/en/signup', text: 'Create account' },
-      { name: 'the second action, Try it yourself', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/en/sign?mode=invite', text: 'Try it yourself' },
-      { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Your documents' },
-      { name: 'the one mark that this is an example', css: '[data-home="out"] .wp-demo-top .wp-demo-tag', text: 'Example' },
+      { name: 'the heading', css: '.h-hero h1', text: 'Your contract.' },
+      { name: 'the one button, Try it free', css: '.h-hero a.h-cta', href: '/en/signup', text: 'Try it free' },
+      { name: 'who made it', css: '.h-hero .h-proof', text: 'Made by Mick Beer' },
     ],
   },
   {

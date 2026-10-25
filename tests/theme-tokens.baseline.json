@@ -108,9 +108,9 @@
   "font": 0
  },
  "dashboard.html": {
-  "colour": 15,
+  "colour": 7,
   "radius": 0,
-  "shadow": 5,
+  "shadow": 0,
   "font": 0
  },
  "design-system.css": {
@@ -240,9 +240,9 @@
   "font": 0
  },
  "en/dashboard.html": {
-  "colour": 15,
+  "colour": 7,
   "radius": 0,
-  "shadow": 5,
+  "shadow": 0,
   "font": 0
  },
  "en/docs.html": {
@@ -294,10 +294,10 @@
   "font": 0
  },
  "en/index.html": {
-  "colour": 26,
+  "colour": 50,
   "radius": 0,
   "shadow": 0,
-  "font": 19
+  "font": 0
  },
  "en/iot.html": {
   "colour": 2,
@@ -474,10 +474,10 @@
   "font": 0
  },
  "index.html": {
-  "colour": 26,
+  "colour": 50,
   "radius": 0,
   "shadow": 0,
-  "font": 19
+  "font": 0
  },
  "iot.html": {
   "colour": 2,
@@ -796,5 +796,17 @@
   "radius": 0,
   "shadow": 1,
   "font": 0
+ },
+ "app-ui.css": {
+  "colour": 10,
+  "radius": 4,
+  "shadow": 1,
+  "font": 0
+ },
+ "home.css": {
+  "colour": 61,
+  "radius": 19,
+  "shadow": 2,
+  "font": 5
  }
 }

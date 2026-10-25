@@ -64,7 +64,7 @@ async function dashboard() {
   }, LINK);
   const page = await ctx.newPage();
   await page.goto(ORIGIN + '/dashboard');
-  await page.waitForSelector('#dh-documents .dh-document', { timeout: 15000 });
+  await page.waitForSelector('#pa-open .dh-document', { timeout: 15000 });
   // The links as sign-flow.js keeps them: sealed under the account key
   // (review #573, M4), never readable.
   await page.evaluate(async (link) => {
@@ -74,16 +74,23 @@ async function dashboard() {
   return { ctx, page };
 }
 
-test('A2: a row is the container the CSS expects, with three columns on desktop', async () => {
+test('A2: a card is the container the CSS expects: a header that opens, rows, and its own strip', async () => {
+  // Since "Je documenten" (25-10-2026) a request is a card: the header opens
+  // the detail, the rows say who still has to sign, and the strip under it
+  // carries Details and Intrekken. Nothing runs into anything at 1280px.
   const { ctx, page } = await dashboard();
-  const row = page.locator('.dh-document[data-document-id="env_open_000000000000000001"]');
-  assert.equal(await row.locator('.dh-document-open').count(), 1, 'the row has its open button');
-  assert.equal(await row.locator('.dh-document-foot').count(), 1, 'the row has its strip');
-  const cols = await row.locator('.dh-document-open').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
-  assert.equal(cols, 3);
-  // Withdraw asks in the row; it does not open the dialog.
-  await row.locator('[data-pa-action="document-withdraw-ask"]').click();
-  await page.waitForSelector('.dh-rowask');
+  const card = page.locator('#pa-open .dh-document[data-document-id="env_open_000000000000000001"]');
+  assert.equal(await card.locator('button.pa-ch[data-pa-action="document-open"]').count(), 1, 'the card has its open header');
+  assert.equal(await card.locator('.dh-document-acts').count(), 1, 'the card has its strip');
+  const overlap = await card.evaluate((el) => {
+    const nm = el.querySelector('.pa-nm').getBoundingClientRect();
+    const pill = el.querySelector('.pa-pill').getBoundingClientRect();
+    return nm.right > pill.left + 0.5;
+  });
+  assert.equal(overlap, false, 'the name runs into the pill');
+  // Withdraw asks in the card; it does not open the dialog.
+  await card.locator('[data-pa-action="document-withdraw-ask"]').click();
+  await page.waitForSelector('.pa-ask.dh-document-acts');
   assert.equal(await page.locator('#dh-document-dialog').isHidden(), true);
   await ctx.close();
 });
@@ -91,8 +98,8 @@ test('A2: a row is the container the CSS expects, with three columns on desktop'
 test('A2: an expired request is "Verlopen", not open, and has nothing to withdraw', async () => {
   const { ctx, page } = await dashboard();
   assert.equal(await page.locator('[data-doc-count="open"]').innerText(), '1');
-  await page.locator('[data-doc-filter="all"]').click();
-  const row = page.locator('.dh-document[data-document-id="env_old_0000000000000000002"]');
+  await page.locator('#pa-tab-klaar').click();
+  const row = page.locator('#pa-klaar .dh-document[data-document-id="env_old_0000000000000000002"]');
   await row.waitFor();
   assert.match(await row.innerText(), /Verlopen/);
   assert.doesNotMatch(await row.innerText(), /Wacht op handtekeningen|Intrekken/);
@@ -101,7 +108,7 @@ test('A2: an expired request is "Verlopen", not open, and has nothing to withdra
 
 test('A3: the dialog of an open request hands over the full link kept in this browser, or says it is not here', async () => {
   const { ctx, page } = await dashboard();
-  await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] .dh-document-open').click();
+  await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] button.pa-ch').click();
   await page.waitForSelector('#dh-document-dialog:not([hidden])');
   const btn = page.locator('[data-pa-action="document-copy-link"]');
   await btn.waitFor();
@@ -118,7 +125,7 @@ test('A3: the dialog of an open request hands over the full link kept in this br
   assert.equal(invites[0].lang, undefined, 'the resend picks no single language');
   await page.evaluate(() => localStorage.removeItem('paramant.cosign.links.v1:env_open_000000000000000001'));
   await page.evaluate(() => document.querySelector('[data-pa-action="document-close"]')?.click());
-  await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] .dh-document-open').click();
+  await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] button.pa-ch').click();
   await page.waitForSelector('#dh-document-dialog:not([hidden])');
   await page.waitForFunction(() => /niet in deze browser/.test(document.querySelector('#dh-document-dialog')?.innerText || ''));
   assert.match(await page.locator('#dh-document-dialog').innerText(), /niet in deze browser\. Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw\./);

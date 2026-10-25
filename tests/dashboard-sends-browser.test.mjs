@@ -113,7 +113,7 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(300);
 const teKlein = await page.evaluate(() => {
   const uit = [];
-  for (const b of document.querySelectorAll('.dh-send-person button, .dh-rowbtn')) {
+  for (const b of document.querySelectorAll('.dh-send-row button')) {
     const r = b.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
     if (r.height < 32) uit.push(`${(b.textContent || '').trim().slice(0, 12)}=${Math.round(r.height)}px`);
@@ -130,9 +130,11 @@ await page.close();
 // sectie, dus er was geen weg terug.
 sendsAntwoord = { status: 500, body: { error: 'boom' } };
 page = await open();
+// Sinds "Je documenten" (25-10-2026) staat een lijst die niet laadt als een
+// zin met een knop in Open, en nooit als een leeg overzicht.
 const sectieWeg = await page.evaluate(() => {
-  const s = document.getElementById('dh-sends-section');
-  return !s || s.hidden || getComputedStyle(s).display === 'none';
+  const s = document.getElementById('pa-open');
+  return !s || s.hidden || !/verzendingen|sends/i.test(s.textContent) || !s.querySelector('[data-pa-action="lists-refresh"]');
 });
 const tekstBijFout = (await page.textContent('body')) || '';
 ok('bij een storing verdwijnt het overzicht niet spoorloos',
@@ -145,11 +147,9 @@ await page.close();
 // ── 5. Geen verzendingen is iets anders dan een storing ────────────────────
 sendsAntwoord = { status: 200, body: { sends: [] } };
 page = await open();
-const leegVerborgen = await page.evaluate(() => {
-  const s = document.getElementById('dh-sends-section');
-  return !s || s.hidden || getComputedStyle(s).display === 'none';
-});
-ok('zonder verzendingen blijft de sectie terecht weg', leegVerborgen);
+const leegVerborgen = await page.evaluate(() => !document.querySelector('.dh-send-row')
+  && !/konden je verzendingen|could not load your sends/i.test(document.body.textContent));
+ok('zonder verzendingen staat er terecht geen verzending en geen storing', leegVerborgen);
 await page.close();
 
 ok('geen javascriptfouten', fouten.length === 0, fouten.join(' | ').slice(0, 250));

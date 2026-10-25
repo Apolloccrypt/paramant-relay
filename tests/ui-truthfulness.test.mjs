@@ -421,9 +421,11 @@ const homeNl = read('frontend/index.html').replace(/<!--[\s\S]*?-->/g, '');
 // pricing.includes('&euro;15'), which stayed green on a pricing page that only
 // ever said &euro;150. The digits must be followed by something that is not
 // another digit or a decimal separator.
+// "29&nbsp;euro" and "29&nbsp;euros" (the homepage since 25 October 2026)
+// count as the same amount as "29 euro".
 const pricesOf = (html) => [...new Set([
   ...[...html.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]),
-  ...[...html.matchAll(/(?<![\d.,])([\d]+(?:,\d\d)?) euro\b/g)].map((m) => m[1]),
+  ...[...html.matchAll(/(?<![\d.,])([\d]+(?:,\d\d)?)(?: |&nbsp;|\u00a0)euros?\b/g)].map((m) => m[1]),
 ])];
 const onPage = (page) => (amount) => new RegExp(`(?:&euro;${amount.replace(/[.]/g, '\\.')}(?![\\d.,])|(?<![\\d.,])${amount} euro\\b)`).test(page);
 // English: five, the three tier prices (0, 29, 299) and the two incl.-btw
@@ -433,12 +435,14 @@ const onPage = (page) => (amount) => new RegExp(`(?:&euro;${amount.replace(/[.]/
 // else. Dutch: the two amounts of the one offer, 0 and 29.
 // Since acceptance 3.1.1 the English homepage has the Dutch homepage's cards
 // and sells the same one offer, so it is held to the same two amounts.
+// Since 25 October 2026 the homepages say the free half in words ("Gratis
+// voor jezelf", "Free for yourself") and the office plan as one amount.
 const homePricesEn = pricesOf(home);
-assert.ok(homePricesEn.includes('0') && homePricesEn.includes('29'),
-  `expected the English homepage to name Community at 0 and Firm at 29, found ${homePricesEn.join(', ')}`);
+assert.ok(/Free for yourself\./.test(home) && homePricesEn.includes('29'),
+  `expected the English homepage to call the plan for yourself free and the office plan 29, found ${homePricesEn.join(', ')}`);
 const homePrices = pricesOf(homeNl);
-assert.ok(homePrices.includes('0') && homePrices.includes('29'),
-  `expected the Dutch homepage to name Community at 0 and the kantoorplan at 29, found ${homePrices.join(', ')}`);
+assert.ok(/Gratis voor jezelf\./.test(homeNl) && homePrices.includes('29'),
+  `expected the Dutch homepage to call the plan for yourself free and the kantoorplan 29, found ${homePrices.join(', ')}`);
 const drifted = [
   ...homePrices.filter((p) => !onPage(pricingNl)(p)).map((p) => `/ ${p} not on /pricing`),
   ...homePricesEn.filter((p) => !onPage(pricing)(p)).map((p) => `/en ${p} not on /en/pricing`),
@@ -563,7 +567,17 @@ for (const [file, html] of [['dashboard.html', dashboardHtml], ['account.html', 
 // nothing to do with the upgrade path, so any link added anywhere below the
 // free band failed this check. Naming the tag per band bounds it to the element
 // the rule is about.
-for (const [file, html, id, close] of [['dashboard.html', dashboardHtml, 'dh-community', 'aside'], ['account.html', accountHtml, 'billing-community', 'div']]) {
+// "Je documenten" (25 October 2026) has no free band in its markup: a free
+// account with nothing yet gets one plan line, written by renderPlanLine in
+// js/dashboard.js, and that line is held to the same rule: one link up.
+{
+  const dashJsSrc = read('frontend/js/dashboard.js');
+  const planLine = dashJsSrc.slice(dashJsSrc.indexOf('function renderPlanLine'), dashJsSrc.indexOf('// ── One card'));
+  assert.ok(planLine.includes('planIsFree'), 'dashboard.js: the plan line is for a free account only');
+  assert.equal((planLine.match(/'\/pricing">/g) || []).length, 1, 'dashboard.js must offer exactly one upgrade link in the plan line');
+  assert.doesNotMatch(planLine, /called Free|tier is called|Same name on/i, 'dashboard.js must not explain a Free/Community mismatch');
+}
+for (const [file, html, id, close] of [['account.html', accountHtml, 'billing-community', 'div']]) {
   const band = (html.match(new RegExp(`id="${id}"[\\s\\S]*?<\\/${close}>`)) || [''])[0];
   assert.ok(band, `${file} must carry the free-plan band`);
   assert.equal((band.match(/href="\/pricing"/g) || []).length, 1,
@@ -693,7 +707,11 @@ const FOUNDER_REQUIRED = ['en/index'];
 // Pages that MAY name him. If they do, the same rules apply.
 const FOUNDER_OPTIONAL = ['en/pricing', 'parasign', 'dashboard', 'account'];
 for (const slug of [...FOUNDER_REQUIRED, ...FOUNDER_OPTIONAL]) {
-  const text = flatten(read(`frontend/${slug}.html`));
+  // On the homepage of 25 October 2026 the founder line is its own element
+  // (.h-proof) with no full stop after it, so the clause is that element.
+  const raw = read(`frontend/${slug}.html`);
+  const proof = slug === 'en/index' ? (raw.match(/<p class="h-proof">[\s\S]*?<\/p>/) || [''])[0] : '';
+  const text = flatten(proof || raw);
   if (FOUNDER_REQUIRED.includes(slug)) {
     assert.ok(text.includes('Mick Beer'),
       `${slug}.html sells on the founder, so it must name him; the line may not quietly disappear`);
@@ -715,11 +733,16 @@ assert.ok(!/\bMick Beer\b/.test(home) || /KvK 42115132/.test(home),
 // The signature under the founder's letter must carry the registration itself,
 // not lean on the footer or a card elsewhere on the page: the reader who stops
 // at the signature has to see who is accountable.
+// Since 25 October 2026 there is no letter on the homepage: the founder line
+// sits under the button and links to /about, which carries the registration,
+// and the company with its KvK number closes the same page.
 {
-  const letterSign = home.match(/<div class="letter-sign">[\s\S]*?<\/div>/);
-  assert.ok(letterSign, 'the homepage letter has a signature block (.letter-sign)');
-  assert.ok(/Mick Beer, privacy and security researcher/.test(letterSign[0]) && /KvK 42115132/.test(letterSign[0]),
-    'the letter signature names Mick Beer, privacy and security researcher, and KvK 42115132 in the same block');
+  const proof = home.match(/<p class="h-proof">[\s\S]*?<\/p>/);
+  assert.ok(proof, 'the homepage has its founder line (.h-proof)');
+  assert.ok(/Mick Beer<\/a>, privacy and security researcher/.test(proof[0]) && /href="\/en\/about"/.test(proof[0]),
+    'the founder line names Mick Beer, privacy and security researcher, and links to /en/about');
+  const foot = (home.match(/<footer[\s\S]*?<\/footer>/) || [''])[0];
+  assert.ok(/Paramantis Solutions B\.V\./.test(foot) && /KvK 42115132/.test(foot), 'the homepage footer names the company and KvK 42115132');
 }
 
 // 6. What /pricing promises, and in what order. relay/test/pricing-page.test.js
@@ -997,8 +1020,10 @@ assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
 // Fase 2 (SITE-34): the old line said the email carries "never ... a key".
 // For a send to named recipients the email carries the token that opens the
 // file, so the home page now says that, and /help says it shorter.
-assert.match(homeGrid, /Email still goes through Resend in the United States for now\. For a send to named recipients that email carries the link with the token/,
-  'index.html is the source of the data-path wording and its Resend exception');
+// Since 25 October 2026 the homepage carries no data path; /en/privacy is the
+// source the /help answer links to, and it names the same exception.
+assert.match(read('frontend/en/privacy.html'), /Email still goes through Resend in the United States for now\.[^<]*For a send to named recipients the invitation carries the link with the token/,
+  'en/privacy.html is the source of the data-path wording and its Resend exception');
 assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext/,
   'help/index.html must answer where the documents live, and say they are ciphertext there');
 assert.match(helpAnswers, /under EU law/,
@@ -1149,8 +1174,14 @@ const EU_EXCEPTION = 'Email still goes through Resend in the United States for n
 const homeVisible = visible('frontend/en/index.html');
 // The homepage says it in its "Why Dutch matters" card, in that card's words.
 const EU_CLAIM_HOME = 'Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. The encrypted files sit only there.';
-for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
-  assert.ok(text.includes(name === 'index' ? EU_CLAIM_HOME : EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
+// The homepage of 25 October 2026 makes no EU claim at all; if one comes
+// back, it brings the exception with it.
+if (/Hetzner|Nuremberg|Bunny/.test(homeVisible)) {
+  assert.ok(homeVisible.includes(EU_CLAIM_HOME), 'index.html names the servers without the data-path wording of the EU claim');
+  assert.ok(homeVisible.includes(EU_EXCEPTION), 'index.html states the EU claim without naming the Resend exception');
+}
+for (const [name, text] of [['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
+  assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
   assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
 }
 // /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
@@ -1213,9 +1244,12 @@ assert.ok(security.includes('The encrypted files sit only on our servers in the 
 // checkable: /privacy, /security and the DPA, pinned elsewhere in this file.
 assert.doesNotMatch(read('frontend/en/index.html'), /hp-band|goede buur/,
   'index.html: the band was taken off the homepage on purpose; bring it back deliberately, not by accident');
+// 25 October 2026: the English homepage became the translation of the
+// approved Dutch picture and carries no "Why Dutch matters" section; the
+// owner and the parent stay on /security, /about and the footer. If the
+// section comes back, it comes back with every sourced line below.
 const whyNl = visible0((read('frontend/en/index.html').match(/<section class="hp-sec why-nl-sec"[\s\S]*?<\/section>/) || [''])[0]);
-assert.ok(whyNl, 'index.html must keep the "Why Dutch matters" section');
-for (const claim of [
+if (whyNl) for (const claim of [
   // The ownership facts. Sourced on the page, not in the code, so the wording is
   // pinned here and the sources line is required to travel with it.
   'The parent of WeTransfer has been Bending Spoons in Milan since July 2024.',
@@ -1239,10 +1273,12 @@ for (const claim of [
 ]) {
   assert.ok(whyNl.includes(claim), `index.html: "Why Dutch matters" lost the line: ${claim}`);
 }
-assert.ok(/The parent of Paramant is named on paramantis\.nl, checked 23 September 2026\./.test(whyNl),
-  'index.html: the parent company is an external fact too, so its source and check date travel with it');
-assert.ok(/Ownership sources: .*Checked 3 September 2026\./.test(whyNl),
-  'index.html: the ownership facts are external, so the sources line and its check date must stay with them');
+if (whyNl) {
+  assert.ok(/The parent of Paramant is named on paramantis\.nl, checked 23 September 2026\./.test(whyNl),
+    'index.html: the parent company is an external fact too, so its source and check date travel with it');
+  assert.ok(/Ownership sources: .*Checked 3 September 2026\./.test(whyNl),
+    'index.html: the ownership facts are external, so the sources line and its check date must stay with them');
+}
 // terms.html \u00a713 is what "Dutch law governs the terms" points at.
 for (const file of ['frontend/en/terms.html', 'frontend/terms.html']) {
   assert.match(read(file), /<h2 id="law">/,

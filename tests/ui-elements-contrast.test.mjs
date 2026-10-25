@@ -45,6 +45,21 @@ const KNOWN = [
     why:'the middle radar ring is part of that fade' },
   { page:'/architecture', kind:'svg-stroke', sel:'circle.loc-ring-3 in div',
     why:'the inner radar ring is the last step of that fade, at 2.19:1' },
+  // The homepage of 25 October 2026 (the approved picture). Its product screen
+  // is a drawing of the signing page built from divs, inside an aria-hidden
+  // panel: a white sheet with pale placeholder lines where the text would be,
+  // and the three grey dots of a window bar. Those are tones in a drawing, not
+  // marks a reader has to find; the real controls they stand for live on /sign
+  // and are measured there. The svg drawings on the page declare themselves
+  // decorative on the svg itself and are not on this list.
+  ...['w96', 'w94', 'w92', 'w90', 'w88', 'w80', 'w70', 'w60'].map((w) => ({ page:'/', kind:'fill', sel:`div.l.${w}`,
+    why:'a placeholder line of text on the drawn pdf in the product screen' })),
+  { page:'/', kind:'fill', sel:'i',
+    why:'the three window dots in the bar of the drawn product screen' },
+  // The tile behind each of the three step drawings is a ground, not a mark;
+  // at phone width it is small enough (120px square) to be measured as one.
+  { page:'/', kind:'fill', sel:'div.pic',
+    why:'the panel a step drawing sits on, one shade off the page like every card' },
 ];
 
 test('every non-text element clears 3:1 in dark and light, at 390 and 1440', async (t) => {

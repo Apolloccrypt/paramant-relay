@@ -69,7 +69,10 @@ test('NL: één 429 en daarna ingelogd: de klant ziet de werkbalk', async () => 
   assert.deepEqual(nav, ['/dashboard', '/parashare', '/sign', '/vault', '/verify', '/account']);
 });
 
-test('home: één 429 en daarna ingelogd: het ingelogde blok verschijnt', async () => {
+// Sinds 25-10-2026 tekent de home geen ingelogd blok meer: wie ingelogd is,
+// gaat door naar "Je documenten" op /dashboard. Twee keer 429 en daarna
+// ingelogd moet daar dus uitkomen, ook zonder het merkje van deze browser.
+test('home: twee keer 429 en daarna ingelogd: door naar je documenten', async () => {
   let n = 0;
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
@@ -77,7 +80,7 @@ test('home: één 429 en daarna ingelogd: het ingelogde blok verschijnt', async 
     ? r.fulfill({ status: 429, headers: { 'Retry-After': '1' }, body: '' })
     : r.fulfill({ status: 200, contentType: 'application/json', body: '{"authenticated":true,"email":"demo@example.com"}' })));
   await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.documentElement.getAttribute('data-session') === 'in', null, { timeout: 15000 });
+  await page.waitForURL(origin + '/dashboard', { timeout: 15000, waitUntil: 'commit' });
   await page.close();
 });
 

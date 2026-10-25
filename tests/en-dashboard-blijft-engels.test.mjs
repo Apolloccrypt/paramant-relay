@@ -75,7 +75,9 @@ const dutch = en.filter((l) => {
 });
 ok('/en/dashboard links to no Dutch page', dutch.length === 0, JSON.stringify(dutch));
 const dev = en.filter((l) => l.href === '/developer');
-ok('the Dutch-only /developer says so on the English page', dev.length > 0 && dev.every((l) => /in Dutch/.test(l.text) && l.hreflang === 'nl'), JSON.stringify(dev));
+// "Je documenten" (25-10-2026) no longer links to /developer at all; if a link to it ever
+// comes back on the English page, it has to say it is in Dutch.
+ok('the Dutch-only /developer says so on the English page, wherever it is linked', dev.every((l) => /in Dutch/.test(l.text) && l.hreflang === 'nl'), JSON.stringify(dev));
 
 // The Dutch page keeps its own paths.
 const nl = await links('');

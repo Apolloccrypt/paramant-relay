@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/en/account':'/en/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html', '/en/docs':'/en/docs.html', '/en/pricing':'/en/pricing.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/security':'/security.html', '/sign':'/sign.html', '/en/dashboard':'/en/dashboard.html', '/account':'/account.html', '/en/account':'/en/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html', '/en/docs':'/en/docs.html', '/en/pricing':'/en/pricing.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -28,10 +28,11 @@ function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, 
 
 const publicPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await publicPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
-// The public checks below were written for the English homepage, which lives
-// at /en since 23 September 2026. The Dutch homepage at / has its own bar,
-// checked right after them.
-await publicPage.goto(ORIGIN + '/en', { waitUntil:'domcontentloaded' });
+// The public checks below were written for the English homepage. Since
+// 25 October 2026 neither homepage carries the shared bar (they have their own
+// header: the word mark and Inloggen), so the shared bar is measured on the
+// English /pricing, which carries it, and the homepages get their own checks.
+await publicPage.goto(ORIGIN + '/en/pricing', { waitUntil:'domcontentloaded' });
 await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Send,Sign,Tools,Security,Pricing');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 // The bar carries the free tools as their own destination. Everything a
@@ -43,42 +44,35 @@ const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').a
 // reads the same in both languages, so the bar stays English on the 42 English
 // pages that also carry it.
 ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Send','Sign','Tools','Security','Pricing']), publicDesktop.join(', '));
-// Signed out, the visitor lands in the demo dashboard (Mick, 5 October 2026),
-// and its head carries ONE primary action and one secondary, not three: make
-// an account, or try it yourself. Both sit inside the dashboard, and there is
-// no hero above it; the dashboard is the first thing in <main>.
-ok('public homepage leads with one primary action and one secondary, inside the demo dashboard', JSON.stringify(await publicPage.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((node) => [node.getAttribute('href'), node.className, node.textContent.trim()]))) === JSON.stringify([['/en/signup','hp-btn hp-btn-fill','Create account'],['/en/sign?mode=invite','hp-btn hp-btn-line','Try it yourself']]), await publicPage.locator('[data-home="out"] .home-actions').innerText());
-ok('public homepage opens on the demo dashboard, with nothing above it', await publicPage.evaluate(() => { const out = document.querySelector('[data-home="out"]'); return !!out && out.firstElementChild === document.querySelector('.wp-demo-top') && !!document.querySelector('.wp-demo-top h1'); }), 'the first child of [data-home="out"] must be .wp-demo-top, holding the h1');
-// Both product PAGES have to be reachable from the homepage, not just the two
-// apps. /parasend shipped with no inbound link anywhere on the site and
-// /parasign had exactly one, from /sign: a product page nothing links to is a
-// page a buyer never sees. So the two-products section now leads with the page
-// that explains the product and keeps the app as the second action, and this
-// pins the order: explain first, app second, per card.
-await (async () => {
-  const ctas = await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
-  // Since acceptance 3.1.1 the English homepage has the Dutch one's cards:
-  // one button per product, to the page that explains it, sending first.
-  ok('the homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/en/parasend','/en/parasign']), await publicPage.locator('#products').innerText());
-})();
-// The Dutch homepage: the same bar in Dutch, with the two outward product
-// names, re-rendered identically by js/nav-auth.js after the session check;
-// and in the hero one button (Probeer het gratis) and one quiet link (Hoe werkt dat?).
-// Since 25 October 2026 the homepage is a question, an answer and one button;
-// the demo dashboard is gone and the three tiles under the hero lead on.
+// The homepages, signed out (the approved picture of 25 October 2026): a
+// header with the word mark and one way to sign in, ONE button to a free
+// account, and both product pages reachable from the page (in the footer).
+for (const [slug, lp, button, signIn] of [['/en', '/en', 'Try it free', 'Sign in'], ['/', '', 'Probeer het gratis', 'Inloggen']]) {
+  const home = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await home.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+  await home.goto(ORIGIN + slug, { waitUntil:'domcontentloaded' });
+  await home.locator('.h-hero h1').waitFor();
+  const actions = await home.locator('main a.h-cta').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.textContent.trim()]));
+  ok(`${slug}: the homepage leads with one button, to a free account`, JSON.stringify(actions) === JSON.stringify([[lp + '/signup', button]]), JSON.stringify(actions));
+  const header = await home.locator('header.h-top a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.textContent.trim()]));
+  ok(`${slug}: the header carries the word mark and one way to sign in`, header.length === 2 && header[1][0] === lp + '/auth/login' && header[1][1] === signIn, JSON.stringify(header));
+  const hrefs = await home.locator('a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
+  ok(`${slug}: the homepage leads to both product pages`, hrefs.includes(lp + '/parasend') && hrefs.includes(lp + '/parasign'), JSON.stringify(hrefs));
+  ok(`${slug}: the homepage fits the phone viewport`, await home.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), '');
+  await home.close();
+}
+// The Dutch bar: the same bar in Dutch, with the two outward product names,
+// re-rendered identically by js/nav-auth.js after the session check. Measured
+// on /pricing, which carries it.
 await (async () => {
   const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
   await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
-  await nl.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+  await nl.goto(ORIGIN + '/pricing', { waitUntil:'domcontentloaded' });
   const want = 'Versturen,Ondertekenen,Gereedschap,Beveiliging,Prijzen';
   const got = await nl.waitForFunction((w) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((n) => n.textContent).join(',') === w, want, { timeout:10000 }).then(() => true, () => false);
-  ok('the Dutch homepage names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
+  ok('the Dutch bar names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
   const authText = await nl.locator('#nav-auth').evaluate((n) => n.textContent);
   ok('the Dutch bar says Hulp, Inloggen and Account maken after the session check', /Hulp/.test(authText) && /Inloggen/.test(authText) && /Account maken/.test(authText), authText);
-  const actions = await nl.locator('[data-home="out"] .hx .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className, n.textContent.trim()]));
-  ok('the Dutch homepage leads with one button, Probeer het gratis, and one quiet link', JSON.stringify(actions) === JSON.stringify([['/signup','hp-btn hp-btn-fill','Probeer het gratis'],['#hoe','hx-how','Hoe werkt dat?']]), JSON.stringify(actions));
-  const ctas = await nl.locator('#hoe .hx-tile a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
-  ok('the Dutch homepage leads to both product pages and to verify', JSON.stringify(ctas) === JSON.stringify(['/parasend','/parasign','/verify']), JSON.stringify(ctas));
   await nl.close();
 })();
 const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
@@ -182,12 +176,13 @@ await publicPage.close();
 // air between them. So the bar is measured now, and not by eye: what is in it,
 // how far apart, and how big a thumb's worth of it there is.
 //
-// It is measured on three pages, not on the homepage alone. The bar is shared,
+// It is measured on three pages. The homepage left this list on 25 October
+// 2026: it no longer carries the shared bar (its own header is measured below). The bar is shared,
 // but not every page gets it from the generator: developer.html keeps its own
 // (KEEP_OWN_NAV in frontend/apply-nav.py) and is stamped by hand, which is
 // exactly where the first round of this went wrong. A check that only ever
 // looks at / cannot see that.
-for (const route of ['/', '/pricing', '/developer']) {
+for (const route of ['/security', '/pricing', '/developer']) {
   const barPage = await browser.newPage({ viewport:{ width:390, height:844 } });
   await barPage.route('**/api/user/session/verify', (call) => call.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
   await barPage.goto(ORIGIN + route, { waitUntil:'domcontentloaded' });
@@ -222,9 +217,29 @@ for (const route of ['/', '/pricing', '/developer']) {
   await barPage.close();
 }
 
+// The homepage header, on the same phone: two things, apart, and the one that
+// is a button big enough for a thumb.
+{
+  const homeBar = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await homeBar.route('**/api/user/session/verify', (call) => call.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+  await homeBar.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+  await homeBar.locator('header.h-top').waitFor();
+  const bar = await homeBar.evaluate(() => {
+    const items = Array.from(document.querySelectorAll('header.h-top a')).map((node) => {
+      const box = node.getBoundingClientRect();
+      return { label:node.textContent.trim(), left:Math.round(box.left), right:Math.round(box.right), height:Math.round(box.height) };
+    }).sort((a, b) => a.left - b.left);
+    return { items, gaps:items.slice(1).map((item, index) => Math.round(item.left - items[index].right)) };
+  });
+  ok('the homepage header carries the word mark and one action', bar.items.length === 2, JSON.stringify(bar.items));
+  ok('nothing in the homepage header touches its neighbour', bar.gaps.every((gap) => gap >= 12), JSON.stringify(bar));
+  ok('the sign-in target in the homepage header is finger-sized', bar.items[1] && bar.items[1].height >= 44, JSON.stringify(bar.items));
+  await homeBar.close();
+}
+
 const tabletPage = await browser.newPage({ viewport:{ width:820, height:1180 } });
 await tabletPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
-await tabletPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+await tabletPage.goto(ORIGIN + '/pricing', { waitUntil:'domcontentloaded' });
 await tabletPage.waitForSelector('nav.nav a[href="/help"]');
 const tabletHelp = await tabletPage.evaluate(() => {
   const link = document.querySelector('nav.nav a[href="/help"]');
@@ -277,135 +292,94 @@ ok('every stamped page links support', stamped.length > 0 && withoutHelp.length 
 const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${/<html\b[^>]*\blang="en/i.test(html) ? '/en' + href : href}"`))).map(([name]) => name);
 ok('every stamped page names privacy, dpa and terms', withoutLegal.length === 0, withoutLegal.join(', ') || `${stamped.length} pages`);
 
+// Signed in, the homepage is not a second overview: js/home-auth.js sends the
+// visitor on to "Je documenten" on /dashboard before the pitch is painted.
 const homePage = await browser.newPage({ viewport:{ width:390, height:844 } });
+await homePage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
 await homePage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
 await homePage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
-await homePage.locator('[data-home="in"]:not([hidden])').waitFor();
-await homePage.locator('.nav-user').waitFor();
-ok('signed-in homepage leads to the document workspace', JSON.stringify(await homePage.locator('[data-home="in"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/dashboard','/sign','/parashare']), await homePage.locator('[data-home="in"] .home-actions').innerText());
-// And the hero is where the signed-in homepage ENDS. Under it sat the whole
-// sales page -- why half of it is free, the two products, the price table, the
-// founder letter -- so a customer who had already bought got three actions and
-// then eight screens of pitch on a phone. js/home-auth.js stamps
-// data-session="in" on <html> and the page hides the rest off that one
-// attribute in CSS; this measures what is on screen rather than the attribute,
-// because the attribute being set is not the thing anyone cares about.
-const homeSections = await homePage.evaluate(() => {
-  const visible = Array.from(document.querySelectorAll('main > section'))
-    .filter((section) => getComputedStyle(section).display !== 'none')
-    .map((section) => section.className || section.id || section.tagName);
-  return {
-    session: document.documentElement.getAttribute('data-session'),
-    visible,
-    total: document.querySelectorAll('main > section').length,
-    scrollHeight: document.documentElement.scrollHeight,
-  };
-});
-ok('the signed-in homepage stops after the hero', homeSections.total > 1 && JSON.stringify(homeSections.visible) === JSON.stringify(['home-hero']), JSON.stringify(homeSections));
-// Mick, 4 September: one note is enough. The founder line left both hero states,
-// so what the signed-in hero has to carry is the workspace a customer came for.
-ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Je documenten'), await homePage.locator('[data-home="in"]').innerText());
+await homePage.waitForURL(ORIGIN + '/dashboard', { timeout:10000, waitUntil:'commit' }).catch(() => {});
+ok('signed-in homepage leads to the document workspace', new URL(homePage.url()).pathname === '/dashboard', homePage.url());
+await homePage.locator('#dh-root:not([hidden])').waitFor({ timeout:10000 }).catch(() => {});
+ok('the signed-in screen opens on the documents', /Je documenten/.test(await homePage.locator('#dh-h1').innerText().catch(() => '')), '');
 if (process.env.PARAMANT_HOME_SCREENSHOT_PATH) await stableScreenshot(homePage, { path:process.env.PARAMANT_HOME_SCREENSHOT_PATH });
 await homePage.close();
 
-// Signed OUT, nothing above applies and the page is the page it was: the whole
-// pitch, in order, with no attribute on <html>.
+// Signed OUT, the page is the whole pitch, in order, with no attribute on <html>.
 const homeOutPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await homeOutPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
 await homeOutPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
-await homeOutPage.locator('[data-home="out"]:not([hidden])').waitFor();
+await homeOutPage.waitForTimeout(500);
 const homeOutSections = await homeOutPage.evaluate(() => ({
   session: document.documentElement.getAttribute('data-session'),
-  visible: Array.from(document.querySelectorAll('main > section')).filter((section) => getComputedStyle(section).display !== 'none').length,
+  visible: Array.from(document.querySelectorAll('main > section')).filter((section) => getComputedStyle(section).display !== 'none' && getComputedStyle(section).visibility !== 'hidden').length,
   total: document.querySelectorAll('main > section').length,
 }));
 ok('the signed-out homepage still shows the whole pitch', homeOutSections.session === null && homeOutSections.visible === homeOutSections.total && homeOutSections.total > 1, JSON.stringify(homeOutSections));
 await homeOutPage.close();
 
-// The hero art, on a desktop, measured against the edge that actually cuts.
-//
-// index.html gives <main> overflow:hidden, and .hp-doc inside .hp-art is
-// absolutely positioned: it draws roughly 120px BELOW the 380px box .hp-art
-// reserves for it. Signed out that overhang lands on the section underneath and
-// nobody sees it. Signed in the hero is the last thing in <main>, so main's box
-// ends where the hero ends and the overhang is simply cut off: the first review
-// of this change measured a 472px hero at 1440 with the document, the receipt
-// and the signature sliced through. That is the whole reason the art is retired
-// signed in rather than the hero being trimmed to fit around it.
-//
-// So this measures every box the art actually draws against main's own
-// rectangle, which is the clip. One exclusion, by name and with a reason:
-// .hp-art-glow is a blurred radial gradient with inset:-40% -20%, so it is
-// BUILT to bleed past its own box and has no edge that can read as cut. It has
-// hung 13px over the top of main since the art shipped. Everything else in
-// there has an outline someone can see the knife go through.
-async function artInsideTheClip(authenticated) {
-  const page = await browser.newPage({ viewport:{ width:1440, height:900 } });
-  await page.route('**/api/user/session/verify', (route) => route.fulfill({
-    status: authenticated ? 200 : 401,
-    contentType: 'application/json',
-    body: authenticated ? '{"authenticated":true,"email":"demo@example.com"}' : '{"authenticated":false}',
-  }));
+// The product screen in the hero, measured against its own panel: on a
+// desktop it used to run past the right edge of its panel in the first
+// picture, and the approved one keeps it inside. Every box the drawing draws
+// has to sit inside .h-art, at 1440 and at 390, and the three steps under it
+// draw whole inside <main>.
+for (const width of [1440, 390]) {
+  const page = await browser.newPage({ viewport:{ width, height:900 } });
+  await page.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
   await page.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
-  await page.locator(authenticated ? '[data-home="in"]:not([hidden])' : '[data-home="out"]:not([hidden])').waitFor();
-  const measured = await page.evaluate(() => {
+  await page.locator('.h-art').waitFor();
+  const art = await page.evaluate(() => {
+    const panel = document.querySelector('.h-art').getBoundingClientRect();
     const main = document.querySelector('main').getBoundingClientRect();
-    const hero = document.querySelector('.home-hero').getBoundingClientRect();
-    const art = document.querySelector('.hp-art');
-    const nodes = art ? [art, ...art.querySelectorAll('*')] : [];
-    const drawn = nodes
-      .filter((node) => !node.classList || !node.classList.contains('hp-art-glow'))
-      .map((node) => {
-        const box = node.getBoundingClientRect();
-        const name = (typeof node.className === 'string' && node.className) || node.tagName.toLowerCase();
-        return { name, top:Math.round(box.top), bottom:Math.round(box.bottom), width:Math.round(box.width), height:Math.round(box.height) };
-      })
-      .filter((box) => box.width > 0 && box.height > 0);
+    const drawn = Array.from(document.querySelectorAll('.h-art *')).map((node) => node.getBoundingClientRect()).filter((b) => b.width > 0 && b.height > 0);
+    const steps = Array.from(document.querySelectorAll('.h-step')).map((n) => n.getBoundingClientRect());
     return {
-      heroHeight: Math.round(hero.height),
-      mainTop: Math.round(main.top),
-      mainBottom: Math.round(main.bottom),
       drawn: drawn.length,
-      cut: drawn.filter((box) => box.bottom > Math.round(main.bottom) || box.top < Math.round(main.top))
-        .map((box) => `${box.name} ${box.top}..${box.bottom} outside main ${Math.round(main.top)}..${Math.round(main.bottom)}`),
+      cut: drawn.filter((b) => b.left < panel.left - 0.5 || b.right > panel.right + 0.5 || b.top < panel.top - 0.5 || b.bottom > panel.bottom + 0.5).length,
+      steps: steps.filter((b) => b.width > 0 && b.height > 0).length,
+      stepsCut: steps.filter((b) => b.left < main.left || b.right > main.right).length,
     };
   });
+  ok(`at ${width}, the product screen stays inside its panel`, art.drawn > 10 && art.cut === 0, JSON.stringify(art));
+  ok(`at ${width}, the three steps draw whole`, art.steps === 3 && art.stepsCut === 0, JSON.stringify(art));
   await page.close();
-  return measured;
 }
-const artIn = await artInsideTheClip(true);
-ok('signed in at 1440, no part of the hero art is cut off by the clip', artIn.cut.length === 0, JSON.stringify(artIn));
-// And the measurement above is capable of finding a box, which a vacuous pass
-// on an empty node list would not prove. Signed out the art is drawn, in full.
-//
-// Signed out, the drawn document retired on 5 October 2026: the hero now holds
-// the dashboard itself in a demo state (.wp-demo, js/home-demo.js), which shows
-// the real screens instead of a picture of a document. So signed out the art
-// draws nothing, and the measurement above is proven capable on the demo: its
-// three tiles are drawn, and drawn whole inside the same clip.
-const artOut = await artInsideTheClip(false);
-ok('signed out at 1440, the retired hero art draws nothing', artOut.drawn === 0, JSON.stringify(artOut));
-const demoPage = await browser.newPage({ viewport:{ width:1440, height:900 } });
-await demoPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
-await demoPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
-await demoPage.locator('[data-home="out"]:not([hidden])').waitFor();
-const demoOut = await demoPage.evaluate(() => {
-  const main = document.querySelector('main').getBoundingClientRect();
-  const tiles = Array.from(document.querySelectorAll('#hoe .hx-tile')).map((tile) => tile.getBoundingClientRect());
-  return {
-    tiles: tiles.filter((box) => box.width > 0 && box.height > 0).length,
-    cut: tiles.filter((box) => box.bottom > main.bottom || box.top < main.top || box.left < main.left || box.right > main.right).length,
-  };
-});
-await demoPage.close();
-ok('signed out at 1440, the three tiles under the hero draw whole', demoOut.tiles === 3 && demoOut.cut === 0, JSON.stringify(demoOut));
+
+// "Je documenten" itself, on a phone: the bar at the bottom carries the four
+// places in order, each a thumb's worth, and the account sits behind the
+// initials. On a desktop the bar goes and one button Nieuw takes its place.
+{
+  const dash = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await dash.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+  await dash.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+  await dash.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"email":"demo@example.com","label":"Demo","plan":"pro"}' }));
+  await dash.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+  await dash.locator('#dh-root:not([hidden])').waitFor();
+  const tabs = await dash.locator('.pa-tabbar a').evaluateAll((nodes) => nodes.map((n) => {
+    const b = n.getBoundingClientRect();
+    return { text:n.textContent.trim(), href:n.getAttribute('href'), height:Math.round(b.height), width:Math.round(b.width) };
+  }));
+  ok('the phone bar of Je documenten is Documenten, Versturen, Ondertekenen, Opvragen', JSON.stringify(tabs.map((t) => [t.text, t.href])) === JSON.stringify([['Documenten','/dashboard'],['Versturen','/parashare'],['Ondertekenen','/sign'],['Opvragen','/opvragen']]), JSON.stringify(tabs));
+  ok('every place in that bar is finger-sized', tabs.length === 4 && tabs.every((t) => t.height >= 44 && t.width >= 44), JSON.stringify(tabs));
+  ok('the current place is marked', await dash.locator('.pa-tabbar a[aria-current="page"]').getAttribute('href') === '/dashboard', '');
+  const avatar = await dash.locator('#pa-avatar').evaluate((n) => ({ href:n.getAttribute('href'), text:n.textContent.trim(), label:n.getAttribute('aria-label') }));
+  ok('the account sits behind the initials', avatar.href === '/account' && avatar.text === 'DE' && /account/i.test(avatar.label), JSON.stringify(avatar));
+  ok('Nieuw is not on the phone; the bar carries the starts', !(await dash.locator('#pa-new').isVisible()), '');
+  ok('Je documenten fits the phone viewport', await dash.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), '');
+  await dash.setViewportSize({ width:1280, height:900 });
+  ok('on a desktop the bar goes and Nieuw is there', !(await dash.locator('.pa-tabbar').isVisible()) && await dash.locator('#pa-new').isVisible(), '');
+  await dash.close();
+}
 
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
 await appPage.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"email":"demo@example.com","label":"Demo","plan":"pro","created_at":"2026-06-01T10:00:00.000Z","backup_codes_remaining":8,"session_expires_at":"2026-07-21T16:00:00.000Z","usage_purpose":"organisation"}' }));
 await appPage.route('**/api/user/documents', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"documents":[]}' }));
 await appPage.route('**/api/user/account/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
-await appPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+// Since 25 October 2026 /dashboard ("Je documenten") has its own header and
+// bottom bar (checked above); the shared workspace bar is measured on /sign,
+// a signed-in page that still carries it.
+await appPage.goto(ORIGIN + '/sign', { waitUntil:'domcontentloaded' });
 // The workspace bar is pinned item by item, in order, because the order is the
 // claim: Documents is where the work lands, then the three verbs you came to
 // do, then Verify and Settings. It went from five entries to six when /vault
@@ -425,7 +399,7 @@ await appPage.waitForFunction((expected) => Array.from(document.querySelectorAll
 const appDesktop = await appPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 ok('signed-in navigation follows document work', JSON.stringify(appDesktop) === JSON.stringify(WORKSPACE_NAV), appDesktop.join(', '));
 ok('locking a file is a verb in the bar, next to the other two', appDesktop.indexOf(WORKSPACE_NAV[3]) === appDesktop.indexOf(WORKSPACE_NAV[2]) + 1 && await appPage.locator('nav.nav .nav-links a[href="/vault"]').count() === 1, appDesktop.join(', '));
-ok('dashboard removes its duplicate marketing drawer', await appPage.locator('#nav-mobile-marketing').count() === 0 && await appPage.locator('nav.nav .nav-links').count() === 1, await appPage.locator('nav.nav .nav-links').count());
+ok('the workspace page carries no duplicate marketing drawer', await appPage.locator('#nav-mobile-marketing').count() === 0 && await appPage.locator('nav.nav .nav-links').count() === 1, await appPage.locator('nav.nav .nav-links').count());
 await appPage.locator('#nav-hamburger').click();
 const appMobile = await appPage.locator('#nav-mobile a').allInnerTexts();
 ok('signed-in mobile menu matches the workspace', appMobile.map((item) => item.toLowerCase()).join(',') === appDesktop.map((item) => item.toLowerCase()).join(','), appMobile.join(', '));
@@ -488,7 +462,7 @@ await appPage.close();
 const appBarPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appBarPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
 await appBarPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
-await appBarPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+await appBarPage.goto(ORIGIN + '/sign', { waitUntil:'domcontentloaded' });
 await appBarPage.locator('.nav-user').waitFor();
 const appBar = await appBarPage.evaluate(() => {
   const items = Array.from(document.querySelectorAll('nav.nav a, nav.nav button'))
@@ -536,7 +510,7 @@ await appPaintPage.close();
 const appTabletPage = await browser.newPage({ viewport:{ width:820, height:1180 } });
 await appTabletPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
 await appTabletPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
-await appTabletPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+await appTabletPage.goto(ORIGIN + '/sign', { waitUntil:'domcontentloaded' });
 await appTabletPage.locator('.nav-user').waitFor();
 // Bounded, and the failure is swallowed on purpose: when the link is gone this
 // check has to report "no Help in the bar" in one line, not stall for the
