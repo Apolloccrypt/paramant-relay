@@ -362,6 +362,12 @@ function createSendStore({ store, log, now }) {
   }
 
   return {
+    // The ledger itself, for the other product that writes files into this
+    // same store budget: stukken opvragen (opvraag.js). Its uploads count
+    // towards the same total, the same account share and the same free pool,
+    // because they take the same redis.
+    budget: { reserve: budgetReserve, release: budgetRelease },
+
     // Create a send. Returns { ok, id, tokens, expires_at, count } or a reason.
     //
     // `tokens` maps each address to its one-time token. The caller mails those

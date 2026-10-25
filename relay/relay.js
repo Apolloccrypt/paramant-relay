@@ -160,6 +160,7 @@ const billing         = require('./lib/billing');           // Mollie webhook de
 const billingRecurring = require('./lib/billing-recurring'); // subscription + mandate layer
 const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
 const sendMod       = require('./lib/send');            // sends to named recipients
+const opvraagMod    = require('./lib/opvraag');         // stukken opvragen: a client sends documents to an office
 const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
 const qes           = require('./lib/qes');                   // qualified-signature layer, off unless flagged
 const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
@@ -252,7 +253,7 @@ try {
 } catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'build/install @paramant/core', err: e.message }); }
 
 const ALLOWED = {
-  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
+  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/opvraag','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -260,7 +261,7 @@ const ALLOWED = {
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
-  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
+  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/opvraag','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -2992,6 +2993,49 @@ function _sendStore() {
     log('info', 'send_store_backend', { backend: store.backend });
   }
   return _sendStore._inst;
+}
+
+// ── Stukken opvragen: its own namespace, the sends' budget ───────────────────
+// Same durable machinery as the sends, under its own prefix and AAD so neither
+// can read the other's records. The files count against the SAME ledger as the
+// sends (send.js budget), because they take the same redis: a second pool would
+// have doubled what the 256 MB container was sized for.
+function _opvraagStore() {
+  if (!_opvraagStore._inst) {
+    const store = parasignStoreMod.createParaSignStore({
+      redis: redisClient, encKey: _parasignStoreKey(), log,
+      prefix: 'popvr', aadPrefix: 'opvraag',
+    });
+    _opvraagStore._inst = opvraagMod.createOpvraagStore({ store, budget: _sendStore().budget, log });
+  }
+  return _opvraagStore._inst;
+}
+
+// The name a client sees above the request: the company on the invoice
+// profile, else the account's label, else its address. Made safe for the
+// descriptor (one line, no markup), because the office browser hashes exactly
+// this string into the link.
+async function _opvraagOffice(userId) {
+  const kd = apiKeys.get(userId) || {};
+  let naam = '';
+  try { naam = (await _billingBuyerOf(acctOf(userId))).company || ''; } catch { naam = ''; }
+  if (!naam) naam = kd.label || '';
+  naam = String(naam).normalize('NFC').replace(/[\x00-\x1f\x7f\u2028\u2029<>]/g, ' ')
+    .replace(/\s+/g, ' ').trim().slice(0, 120).trim();
+  // No address as a fallback, and no name with a link or an invisible mark in
+  // it: the client reads this name as who is asking (opvraag.cleanText).
+  return opvraagMod.cleanText(naam, 120, false) === null ? '' : naam;
+}
+
+// Keyless reads and uploads on a request, per address. The request itself
+// caps files and bytes; this caps how fast one address can try ids or push.
+const _opvraagReads = new Map();
+const _opvraagUploads = new Map();
+const OPVRAAG_READS_PER_HOUR = 120;
+const OPVRAAG_UPLOADS_PER_HOUR = 60;
+function _opvraagRate(map, ip, limit) {
+  if (map.size > 20000) { const nu = Date.now(); for (const [k, v] of map) if (!v.length || v[v.length - 1] < nu - 3600_000) map.delete(k); }
+  return rateLimit.slidingWindowAllow(map, ip, limit, 3600_000);
 }
 
 function _parasignStore() {
@@ -6391,6 +6435,130 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── /v2/user/opvraag/*: the office's side of stukken opvragen ──────────────
+  // Internal only, like the sends below: the admin plane speaks for a signed-in
+  // session and the user_id comes from that session, never from the browser.
+  // Every request is looked up by id AND account; a stranger's id answers the
+  // same as one that never existed.
+  const opvrUser = path.match(/^\/v2\/user\/opvraag\/(info|kluis|create|list|detail|file|close|delete|remind)$/);
+  if (opvrUser && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    let input;
+    try { input = JSON.parse((await readBody(req, 65536)).toString() || '{}') || {}; }
+    catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid_json' })); }
+    const userId = String(input.user_id || '');
+    const kd = apiKeys.get(userId);
+    if (!userId || userId.length > 200 || !kd || !kd.active) {
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_account' }));
+    }
+    const accountId = accountVan(userId);
+    const plan = parasendLimitsOf(kd).tier;
+    const op = opvrUser[1];
+    const store = _opvraagStore();
+    const stuur = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J(body));
+    };
+    const reqId = typeof input.id === 'string' ? input.id : '';
+    try {
+      if (op === 'info') {
+        const i = await store.info(accountId, plan);
+        return stuur(200, { ok: true, office: await _opvraagOffice(userId), plan: i.limits.plan,
+          limits: i.limits, open: i.open, sector: sectorOfKey(kd), kluizen: await store.kluisList(accountId) });
+      }
+      if (op === 'kluis') {
+        const out = await store.kluisPut(accountId, { kluis_id: input.kluis_id, wrap: input.wrap });
+        return stuur(out.ok ? 200 : (out.reason === 'too_many_vaults' || out.reason === 'too_many_wraps' ? 409 : 400), out);
+      }
+      if (op === 'create') {
+        const out = await store.create({
+          accountId, plan, office: await _opvraagOffice(userId), descriptor: input.descriptor,
+          clientName: input.client_name, clientEmail: input.client_email, lang: input.lang,
+          skWrapped: input.sk_wrapped, kluisId: input.kluis_id,
+        });
+        if (!out.ok) return stuur(out.reason === 'too_many_open' ? 403 : out.reason === 'id_taken' || out.reason === 'office_changed' || out.reason === 'no_office_name' ? 409 : 400,
+          { error: out.reason, limit: out.limit, limit_ms: out.limit_ms });
+        return stuur(201, out);
+      }
+      if (op === 'list') return stuur(200, await store.list(accountId));
+      if (op === 'detail') {
+        const out = await store.detail(reqId, accountId);
+        return stuur(out.ok ? 200 : 404, out.ok ? out : { error: 'unknown' });
+      }
+      if (op === 'file') {
+        const out = await store.getFile(reqId, accountId, input.n);
+        if (!out.ok) return stuur(404, { error: 'unknown' });
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': out.bytes.length,
+                             'Cache-Control': 'no-store' });
+        return res.end(out.bytes);
+      }
+      if (op === 'close') {
+        const out = await store.close(reqId, accountId);
+        return stuur(out.ok ? 200 : 404, out.ok ? out : { error: 'unknown' });
+      }
+      if (op === 'delete') {
+        const out = await store.remove(reqId, accountId);
+        return stuur(out.ok ? 200 : 404, out.ok ? out : { error: 'unknown' });
+      }
+      if (op === 'remind') {
+        // No link in the reminder, on purpose. A link built here would be one
+        // this relay could point at a request and a key of its own; the only
+        // link the client should trust is the one the office shared itself.
+        const rem = inviteRateOk(accountId, kd, 1);
+        if (!rem.ok) return stuur(429, { error: 'too_many_invitations', retry_after_s: rem.retry_after_s });
+        const out = await store.takeReminder(reqId, accountId);
+        if (!out.ok) {
+          inviteRateGeef(accountId, 1);
+          return stuur(out.reason === 'unknown' ? 404 : out.reason === 'reminder_limit' || out.reason === 'reminder_too_soon' ? 429
+            : out.reason === 'paid_only' ? 403 : 409, { error: out.reason, limit: out.limit });
+        }
+        const taal = out.lang === 'en' ? 'en' : 'nl';
+        const kantoor = mailer.veiligeNaam(out.descriptor.office || '');
+        const tot = mailDatum(out.expires_at, taal, { weekday: 'long', day: 'numeric', month: 'long', timeZoneName: undefined });
+        const groet = out.descriptor.greet ? (taal === 'en' ? 'Hi ' : 'Hoi ') + out.descriptor.greet + ',' : (taal === 'en' ? 'Hi,' : 'Hoi,');
+        const mist = out.missing.join(', ');
+        const nl = {
+          onderwerp: 'Herinnering van ' + kantoor + ': we missen nog een paar stukken',
+          zin: kantoor + ' wacht nog op: ' + mist + '.',
+          link: 'Gebruik de link die je eerder van ' + kantoor + ' kreeg. Deze mail bevat bewust geen link.',
+          slot: 'Die link werkt tot ' + tot + '. Je bestanden gaan op slot op je telefoon. Alleen ' + kantoor + ' kan ze openen.',
+          voet: 'Je krijgt deze mail omdat ' + kantoor + ' je adres heeft ingevuld bij Paramant.',
+        };
+        const en = {
+          onderwerp: 'A reminder from ' + kantoor + ': a few documents are still missing',
+          zin: kantoor + ' is still waiting for: ' + mist + '.',
+          link: 'Use the link you received from ' + kantoor + ' earlier. This mail contains no link on purpose.',
+          slot: 'That link works until ' + tot + '. Your files are locked on your phone. Only ' + kantoor + ' can open them.',
+          voet: 'You are getting this mail because ' + kantoor + ' entered your address at Paramant.',
+        };
+        const t = taal === 'en' ? en : nl;
+        const bezorgd = await mailer.stuur({
+          to: out.email,
+          from: mailer.afzenderNamens(undefined, kantoor),
+          replyTo: kd.email || undefined,
+          subject: t.onderwerp,
+          text: groet + '\n\n' + t.zin + '\n\n' + t.link + '\n\n' + t.slot + '\n\n' + t.voet,
+          html: '<p>' + escHtml(groet) + '</p><p>' + escHtml(t.zin) + '</p><p>' + escHtml(t.link) + '</p>'
+              + '<p style="color:#666;font-size:13px">' + escHtml(t.slot) + '</p>'
+              + '<p style="color:#666;font-size:12px">' + escHtml(t.voet) + '</p>',
+        });
+        if (!bezorgd || !bezorgd.ok) {
+          await store.undoReminder(reqId, accountId);
+          inviteRateGeef(accountId, 1);
+          log('warn', 'opvraag_reminder_not_mailed', { reason: bezorgd && bezorgd.reason });
+          return stuur(502, { error: 'reminder_not_sent' });
+        }
+        log('info', 'opvraag_reminded', { id: reqId.slice(0, 6), reminders: out.reminders });
+        return stuur(200, { ok: true, reminders: out.reminders });
+      }
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      log('warn', 'opvraag_user_failed', { op, err: err && err.message });
+      return stuur(500, { error: 'internal' });
+    }
+  }
+
+
   // ── POST /v2/user/sends: wat dit account naar een groep stuurde ───────────
   // The sending side of the dashboard, and the thing a customer actually buys:
   // seeing who collected and who did not. Internal only, same as the signing
@@ -9008,6 +9176,83 @@ async function handleRelayRequest(req, res) {
       log('warn', 'pickup_failed', { err: e && e.message });
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'pickup_failed' }));
+    }
+  }
+
+
+  // ── Stukken opvragen, the client's side (relay/lib/opvraag.js) ─────────────
+  // No key, on purpose: the client is somebody an office asked for documents,
+  // not somebody with an account. The capability is the request id in the link
+  // the office shared. What it opens is narrow: read the request, and add
+  // encrypted files to it while it is open, within its own caps. Nothing here
+  // can read a file back; only the office's own session can (/v2/user/opvraag).
+  const opvrm = path.match(/^\/v2\/opvraag\/([A-Za-z0-9_-]{24})$/);
+  if (opvrm && req.method === 'GET') {
+    const rl = _opvraagRate(_opvraagReads, getClientIp(req), OPVRAAG_READS_PER_HOUR);
+    if (!rl.ok) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) });
+      return res.end(J({ error: 'too_many_requests' }));
+    }
+    try {
+      const v = await _opvraagStore().publicView(opvrm[1]);
+      const kop = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' };
+      if (!v.ok) {
+        res.writeHead(v.reason === 'closed' ? 410 : 404, kop);
+        return res.end(J(v.reason === 'closed' ? { error: 'closed', office: v.office } : { error: 'unknown' }));
+      }
+      res.writeHead(200, kop);
+      return res.end(J(v));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'opvraag_view_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
+    }
+  }
+  const opvrUp = path.match(/^\/v2\/opvraag\/([A-Za-z0-9_-]{24})\/stuk\/(\d{1,2})$/);
+  if (opvrUp && req.method === 'POST') {
+    const rl = _opvraagRate(_opvraagUploads, getClientIp(req), OPVRAAG_UPLOADS_PER_HOUR);
+    if (!rl.ok) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) });
+      return res.end(J({ error: 'too_many_uploads' }));
+    }
+    if (!ramOk()) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+    // Refuse a stranger before reading five megabytes from him: an id that
+    // opens nothing, or a body that announces itself as too big.
+    const _len = Number(req.headers['content-length'] || 0);
+    if (_len > opvraagMod.FILE_MAX_BYTES) {
+      res.writeHead(413, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'too_large', limit: opvraagMod.FILE_MAX_BYTES }));
+    }
+    try {
+      const pre = await _opvraagStore().publicView(opvrUp[1]);
+      if (!pre.ok) {
+        res.writeHead(pre.reason === 'closed' ? 410 : 404, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: pre.reason === 'closed' ? 'closed' : 'unknown' }));
+      }
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
+    }
+    let buf;
+    try { buf = await readBody(req, opvraagMod.FILE_MAX_BYTES); }
+    catch (e) { res.writeHead(413, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'too_large', limit: opvraagMod.FILE_MAX_BYTES })); }
+    try {
+      const out = await _opvraagStore().upload(opvrUp[1], Number(opvrUp[2]), buf);
+      if (!out.ok) {
+        const status = out.reason === 'unknown' ? 404 : out.reason === 'closed' ? 410
+                     : out.reason === 'too_large' || out.reason === 'request_full' || out.reason === 'account_full' ? 413
+                     : out.reason === 'item_full' ? 409
+                     : out.reason === 'store_full' || out.reason === 'account_store_full' ? 503 : 400;
+        const kop = { 'Content-Type': 'application/json' };
+        if (status === 503) kop['Retry-After'] = '900';
+        res.writeHead(status, kop);
+        return res.end(J({ error: out.reason, limit: out.limit }));
+      }
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, item: out.item, count: out.count }));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'opvraag_upload_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
     }
   }
 
