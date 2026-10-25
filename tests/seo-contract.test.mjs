@@ -52,6 +52,10 @@ const PRIVATE = new Set([
   'en/account', 'en/claim', 'en/dashboard', 'en/request-key',
   'en/auth/backup', 'en/auth/login', 'en/auth/request-reset', 'en/auth/reset-confirm',
   'en/auth/setup', 'en/billing/checkout', 'en/signup/verified',
+  // Stukken opvragen: /opvragen is het ingelogde scherm van het kantoor, en
+  // v/index.html is wat nginx op /v/<id> serveert, de link naar de klant. Net
+  // als /ontvang/<token>: de URL is de toegang, dus nooit in een index.
+  'opvragen', 'v/index',
 ]);
 
 // Meta-refresh stubs. They point their canonical at the real page and are held

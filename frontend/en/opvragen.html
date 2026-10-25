@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Request documents &middot; Paramant</title>
+<link rel="canonical" href="https://paramant.app/en/opvragen">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/opvragen">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/opvragen">
+<!--
+  Stukken opvragen, the office's side: the list of requests (what came in, what
+  is missing) and the form that makes a new link. Kept in its own files so the
+  signed-in redesign can take it over as one piece. The keys of every request
+  are made here and the files are opened here; the server never holds either
+  (js/opvragen-kluis.js, relay/lib/opvraag.js).
+-->
+<link rel="stylesheet" href="/design-system.css?v=36">
+<link rel="stylesheet" href="/opvragen.css?v=1">
+<script src="/js/theme.js?v=6"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M12 14.5v2.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2L18.5 7.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5a2 2 0 0 1 2-2h2l1.5-2h5L16 6.5h2a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.3" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3.5h6.5L18 8v11.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M13.5 3.5V8H18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15.5 5.5V5a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 5v8A1.5 1.5 0 0 0 6 14.5h.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 0-6.9 12.1L4 20l4-1.1A8 8 0 1 0 12 4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9.2 9.3c.2 2.3 2.4 4.6 4.9 5.2l1-1.1-1.6-.9-.8.6c-.9-.4-1.7-1.2-2.1-2.1l.6-.8-.9-1.6z" fill="currentColor"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 7l7.5 5.5L19.5 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5.5L8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-updown" viewBox="0 0 24 24"><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 20.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4.5v10.5M7.5 10.5L12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4.5 12h11M11.5 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.5 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 13.5l2.2-7.2A1.5 1.5 0 0 1 7.6 5.2h8.8a1.5 1.5 0 0 1 1.4 1.1L20 13.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M4 13.5h4.5l1 2h5l1-2H20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M14.5 5.5l4 4L9 19H5v-4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 19.5a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="10" r="1.6" fill="currentColor"/><path d="M4.5 17l4.5-4 3 2.5 3.5-3.5 4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-mark" viewBox="0 0 24 24"><rect class="mk-bg" x="3" y="3" width="18" height="18" rx="5"/><rect class="mk-fg" x="8.2" y="11" width="7.6" height="5.6" rx="1.2" fill="none" stroke-width="1.5"/><path class="mk-fg" d="M9.8 11V9.5a2.2 2.2 0 0 1 4.4 0V11" fill="none" stroke-width="1.5"/></symbol>
+  </defs>
+</svg>
+<div class="app">
+  <!-- the list: screen 4 -->
+  <div id="v-lijst" hidden>
+    <div class="ov-bar">
+      <a class="brand" href="/en/dashboard"><svg width="24" height="24"><use href="#i-mark"/></svg>Paramant</a>
+      <a class="avatar" href="/en/account" id="avatar-1" aria-label="Account"></a>
+    </div>
+    <div class="body">
+      <div class="titlerow">
+        <h1 class="ov-title">Received</h1>
+        <button class="newbtn" type="button" id="to-new"><svg width="16" height="16"><use href="#i-plus"/></svg>New</button>
+      </div>
+      <div class="seg" role="tablist">
+        <button type="button" role="tab" id="seg-open" class="on"></button>
+        <button type="button" role="tab" id="seg-done"></button>
+      </div>
+      <p class="say err" id="list-err" role="alert" hidden></p>
+      <div id="list"></div>
+    </div>
+  </div>
+
+  <!-- a new request: screen 1 -->
+  <div id="v-nieuw" hidden>
+    <div class="ov-bar">
+      <button class="back" type="button" id="to-list"><svg width="22" height="22"><use href="#i-back"/></svg>Requests</button>
+      <a class="avatar" href="/en/account" id="avatar-2" aria-label="Account"></a>
+    </div>
+    <div class="body">
+      <h1 class="ov-title">Request documents</h1>
+      <form id="form" autocomplete="off">
+        <div class="lbl">What do you need?</div>
+        <div class="group" id="items"></div>
+
+        <div class="lbl" style="margin-top:18px">From whom?</div>
+        <div class="group">
+          <label class="field"><span class="k">Name</span><input id="client-name" name="client-name" maxlength="80" required></label>
+          <label class="field"><span class="k">Email</span><input id="client-email" name="client-email" type="email" maxlength="254" placeholder="Can stay empty"></label>
+        </div>
+
+        <div class="group" style="margin-top:12px">
+          <label class="field"><span class="k" style="width:auto;color:var(--label)">Valid until</span>
+            <span class="chev"><select id="ttl" aria-label="Valid until"></select><svg width="16" height="16"><use href="#i-updown"/></svg></span></label>
+        </div>
+
+        <div style="margin-top:14px"><button class="ov-btn primary" id="make" type="submit">Make link</button></div>
+        <p class="say err" id="make-err" role="alert" hidden></p>
+      </form>
+
+      <div class="linkcard" id="linkcard" hidden>
+        <div class="head"><span class="ov-dot ok"><svg width="13" height="13"><use href="#i-check"/></svg></span>Your link is ready</div>
+        <div class="urlrow"><span class="u" id="link-url"></span><button class="copy" type="button" id="copy"><svg width="16" height="16"><use href="#i-copy"/></svg><span id="copy-t">Copy</span></button></div>
+        <div class="two">
+          <a class="ov-btn ghost sm" id="wa" target="_blank" rel="noopener noreferrer"><svg class="wa" width="18" height="18"><use href="#i-chat"/></svg>Share via WhatsApp</a>
+          <a class="ov-btn ghost sm" id="mail"><svg width="18" height="18"><use href="#i-mail"/></svg>Email the link</a>
+        </div>
+        <p class="ov-note" id="carry-note" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <nav class="tabs" aria-label="Menu">
+    <a href="/en/parashare"><svg width="24" height="24"><use href="#i-send"/></svg>Send</a>
+    <a href="/en/sign"><svg width="24" height="24"><use href="#i-pen"/></svg>Sign</a>
+    <a href="/en/opvragen" class="on" aria-current="page"><svg width="24" height="24"><use href="#i-inbox"/></svg>Requests</a>
+    <a href="/en/account"><svg width="24" height="24"><use href="#i-user"/></svg>Account</a>
+  </nav>
+</div>
+<script type="module" src="/js/opvragen.page.js?v=1"></script>
+</body>
+</html>
