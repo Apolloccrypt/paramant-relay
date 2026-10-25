@@ -4724,6 +4724,30 @@ async function lastFailures(kind, n = 20) {
   } catch { return []; }
 }
 
+// De gegevens naast een plan waaruit beheer.planSource de bron afleidt. Alleen
+// voor actieve accounts op een betaald plan, dus een handvol redis-lezingen.
+// Een lezing die mislukt telt als "niets gevonden", nooit als een bron.
+async function planSourceContext(users, docs, now = Date.now()) {
+  const paying = docs ? beheer.computeMrr(docs, now).paying_accounts : null;
+  const gifts = new Set(); const manual = new Set();
+  const paid = (users || []).filter((u) => u.active && beheer.onPaidPlan(u) && !beheer.isTeamKey(u));
+  let client = null; try { client = redis(); } catch { client = null; }
+  await Promise.all(paid.map(async (u) => {
+    if (client) {
+      try {
+        const raw = (await client.lRange(`paramant:billing:gift:list:${u._account}`, 0, -1)) || [];
+        const recs = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } });
+        if (beheer.runningGift(recs, now)) gifts.add(u._account);
+      } catch { /* niet te lezen: geen bron */ }
+    }
+    try {
+      const evs = await getAuditEvents(u._full, { limit: 50, event_types: ['admin_plan_changed', 'admin_product_plan_changed'] });
+      if (beheer.manualGrant(evs)) manual.add(u._full);
+    } catch { /* niet te lezen: geen bron */ }
+  }));
+  return { paying, gifts, manual };
+}
+
 api.get("/admin/overview", authMiddleware, async (req, res) => {
   try {
     const now = Date.now();
@@ -4760,7 +4784,7 @@ api.get("/admin/overview", authMiddleware, async (req, res) => {
     }));
     const ct = await ctStatus(sectors);
 
-    const paidTier = (u) => (u.plan_parasign && !['free', 'community'].includes(u.plan_parasign)) || (u.plan_parasend && u.plan_parasend !== 'community');
+    const sources = beheer.planSourceBreakdown(users, await planSourceContext(users, docs, now));
     const whoMap = beheer.buildWhoMap(users);
     res.json({
       stats: {
@@ -4776,7 +4800,11 @@ api.get("/admin/overview", authMiddleware, async (req, res) => {
       customers: {
         total: users.length,
         active: users.filter((u) => u.active).length,
-        on_paid_plan: users.filter((u) => u.active && paidTier(u)).length,
+        // Een plan is nog geen betaling: per bron uitgesplitst
+        // (lib/beheer.js planSource), zodat 12 op een betaald plan niet als
+        // 12 betalende klanten leest.
+        on_paid_plan: sources.on_paid_plan,
+        on_paid_plan_via: sources.via,
         paying: mrr ? mrr.paying_accounts.size : null,
       },
       revenue: revenue ? {
@@ -4844,6 +4872,13 @@ api.get("/admin/users", authMiddleware, async (req, res) => {
     if (statusFilter === "revoked") filtered = filtered.filter(u => !u.active);
     if (planFilter) filtered = filtered.filter(u => (u.plan || "community") === planFilter);
     if (q) filtered = filtered.filter(u => [u.email, u.label, u.key_id, u.key].some((v) => String(v || '').toLowerCase().includes(q)));
+    // Bron van een betaald plan (lib/beheer.js planSource): per rij getoond en
+    // te filteren, zodat een tik op de overzichtskaart de juiste klanten toont.
+    const sourceCtx = await planSourceContext(allUsers, await readDocuments().catch(() => null));
+    const sourceOf = new Map(allUsers.map((u) => [u, beheer.planSource(u, sourceCtx)]));
+    const sourceFilter = String(req.query.source || '');
+    if (sourceFilter === 'alle') filtered = filtered.filter((u) => u.active && sourceOf.get(u));
+    else if (beheer.PLAN_SOURCES.includes(sourceFilter)) filtered = filtered.filter((u) => u.active && sourceOf.get(u) === sourceFilter);
 
     // Sort
     filtered.sort((a, b) => {
@@ -4867,6 +4902,7 @@ api.get("/admin/users", authMiddleware, async (req, res) => {
       const use = usage.get(u._account) || null;
       return {
         ...publicUser(u),
+        plan_source: sourceOf.get(u) || null,
         last_activity: await lastActivity(u._full),
         usage_month: use ? { transfers: use.usage?.transfers_this_month ?? null, signs: use.usage?.signs_this_month ?? null } : null,
       };

@@ -267,6 +267,13 @@ test('overzicht en betalingen rekenen omzet en MRR uit de documenten', async () 
   assert.ok(Array.isArray(ov.relays) && ov.relays.length === 5);
   assert.ok(Array.isArray(ov.problems) && ov.problems.length >= 5);
   assert.ok(ov.recent_signups.some((u) => u.kid === KID));
+  // Het account betaalt (lopende factuur): het betaalde plan telt als betaald,
+  // en de klantenlijst zegt dat per rij en filtert erop.
+  assert.strictEqual(ov.customers.on_paid_plan, 1);
+  assert.deepStrictEqual(ov.customers.on_paid_plan_via, { betaald: 1, kortingscode: 0, team: 0, handmatig: 0, onbekend: 0 });
+  const lijst = (await get('/admin/users?source=betaald')).json;
+  assert.ok(lijst.users.some((u) => u.key_id === KID && u.plan_source === 'betaald'), JSON.stringify(lijst).slice(0, 300));
+  assert.strictEqual((await get('/admin/users?source=kortingscode')).json.users.length, 0);
   const b = (await get('/admin/billing')).json;
   const p = b.payments.find((x) => x.number === DOCS[0]);
   assert.ok(p, 'de factuur staat bij de betalingen');

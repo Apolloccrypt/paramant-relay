@@ -150,6 +150,7 @@ function goTo(el){
     PENDING_AUDIT={event:el.dataset.event||'',q:el.dataset.q||'',since:el.dataset.since||''};
     if(LOADED.audit){applyPendingAudit();fetchAudit();}
   }
+  if(tab==='users'&&el.dataset.source!==undefined){userSource=el.dataset.source;if(LOADED.users)loadUsers(1);}
   if(tab)switchTab(tab);
   if(el.dataset.focus){setTimeout(()=>{const t=document.getElementById(el.dataset.focus);if(t&&t.scrollIntoView)t.scrollIntoView({behavior:'smooth',block:'start'});},400);}
 }
@@ -164,6 +165,15 @@ async function loadOverview(){
   renderOverview(el,r.data||{});
   clearInterval(REFRESH.overview);
   REFRESH.overview=setInterval(()=>{if(document.getElementById('tab-overview').classList.contains('on'))apiSafe('/admin/overview').then(x=>{if(x.ok)renderOverview(el,x.data||{});});},30000);
+}
+// Waar een betaald plan vandaan komt (lib/beheer.js planSource). Een plan is
+// nog geen betaling: de kaart zegt hoeveel er echt betaald zijn.
+const SOURCE_NL={betaald:'betaald',kortingscode:'via kortingscode',team:'via een team',handmatig:'door jou toegekend',onbekend:'geen bron gevonden'};
+function paidPlanLine(cu){
+  const n=cu.on_paid_plan;if(n==null)return '- met een betaald plan';
+  const v=cu.on_paid_plan_via||{};
+  const parts=Object.keys(SOURCE_NL).filter(k=>v[k]>0).map(k=>v[k]+' '+SOURCE_NL[k]);
+  return n+' met een betaald plan'+(parts.length?': '+parts.join(', '):'')+(cu.paying==null&&n>0?' (betalingen niet te lezen)':'');
 }
 function statCard(id,lbl,val,sub,attrs){
   return '<button class="sc" id="'+id+'" data-click="goTo" '+(attrs||'')+'><div class="sc-lbl">'+esc(lbl)+'</div><div class="sc-val">'+esc(val)+'</div>'+(sub?'<div class="sc-sub">'+esc(sub)+'</div>':'')+'</button>';
@@ -187,10 +197,10 @@ function renderOverview(el,d){
   el.innerHTML=
     '<h1 class="h1">Overzicht</h1><p class="lead">Wat je nu moet weten. Tik op een getal voor de details.</p>'+sign+
     '<div class="sg">'+
-      statCard('ov-klanten','Klanten',vals['ov-klanten'],(cu.active??'-')+' actief, '+(cu.on_paid_plan??'-')+' op een betaald plan','data-tab="users"')+
+      statCard('ov-klanten','Klanten',vals['ov-klanten'],(cu.active??'-')+' actief. '+paidPlanLine(cu),'data-tab="users" data-source="'+(cu.on_paid_plan?'alle':'')+'"')+
       statCard('ov-betalend','Betalende klanten',vals['ov-betalend'],'met een betaalde periode die nu loopt','data-tab="billing" data-focus="b-terms"')+
       statCard('ov-omzet','Omzet '+monthName(rev&&rev.month),vals['ov-omzet'],rev?('MRR '+euro(rev.mrr_cents)+' per maand, netto'):'documenten niet te lezen','data-tab="billing"')+
-      statCard('ov-signups','Aanmeldingen vandaag',vals['ov-signups'],(st.active_sessions??0)+' klantsessies open','data-tab="users"')+
+      statCard('ov-signups','Aanmeldingen vandaag',vals['ov-signups'],(st.active_sessions??0)+' klantsessies open','data-tab="users" data-source=""')+
     '</div>'+
     '<div class="g2">'+
       '<div class="card"><div class="card-hdr">Openstaande punten <small>'+(bad.length?bad.length+' vraagt aandacht':'niets open')+'</small></div>'+
@@ -202,7 +212,7 @@ function renderOverview(el,d){
       '</div>'+
     '</div>'+
     '<div class="g2">'+
-      '<div class="card"><div class="card-hdr">Laatste aanmeldingen <small><button class="lnk" data-click="goTo" data-tab="users">alle klanten</button></small></div>'+
+      '<div class="card"><div class="card-hdr">Laatste aanmeldingen <small><button class="lnk" data-click="goTo" data-tab="users" data-source="">alle klanten</button></small></div>'+
         ((d.recent_signups||[]).length?'<ul class="ls">'+d.recent_signups.map(u=>'<li><div>'+(u.kid?'<button class="lnk" data-click="openKlant" data-kid="'+esc(u.kid)+'">'+esc(u.name)+'</button>':esc(u.name))+'<div class="mut" style="font-size:13px">ParaSign '+esc(tierNL(u.plan_parasign))+' · ParaSend '+esc(tierNL(u.plan_parasend))+'</div></div><div class="r">'+whenCell(toMs(u.created))+'</div></li>').join('')+'</ul>':'<div class="empty">Nog geen klanten.</div>')+
       '</div>'+
       '<div class="card"><div class="card-hdr">Laatste betalingen <small><button class="lnk" data-click="goTo" data-tab="billing">alle betalingen</button></small></div>'+
@@ -245,13 +255,13 @@ async function openFailures(focus){
 }
 
 /* ── Klanten ─────────────────────────────────────────────────────────────── */
-let allUsers=[],userCounts={},userQuery='',userPagination={page:1,page_size:50,total_items:0,total_pages:1,has_next:false,has_prev:false};
+let allUsers=[],userCounts={},userQuery='',userSource='',userPagination={page:1,page_size:50,total_items:0,total_pages:1,has_next:false,has_prev:false};
 async function loadUsers(page,pageSize){
   const el=document.getElementById('tab-users');
   if(page!==undefined)userPagination.page=page;
   if(pageSize!==undefined)userPagination.page_size=pageSize;
   if(!document.getElementById('u-table-wrap'))el.innerHTML=loading('Klanten laden…');
-  const r=await apiSafe('/admin/users?page='+userPagination.page+'&page_size='+userPagination.page_size+(userQuery?'&q='+encodeURIComponent(userQuery):''));
+  const r=await apiSafe('/admin/users?page='+userPagination.page+'&page_size='+userPagination.page_size+(userQuery?'&q='+encodeURIComponent(userQuery):'')+(userSource?'&source='+encodeURIComponent(userSource):''));
   if(!r.ok){el.innerHTML='<div class="empty">De klantenlijst kwam niet terug. <button class="lnk" data-click="reloadTab" data-tab="users">Opnieuw proberen</button></div>';return}
   allUsers=r.data.users||[];
   userCounts=r.data.counts||{};
@@ -270,6 +280,7 @@ function renderUsers(el){
       '<input id="u-search" type="search" placeholder="Zoek op e-mailadres of label" data-input="filterUsers" style="min-width:260px" value="'+esc(prev.q)+'" autocomplete="off" autocapitalize="off">'+
       '<select id="u-plan" aria-label="Plan" data-change="filterUsers"><option value="">Elk plan</option><option value="community">Community</option><option value="pro">Firm</option><option value="business">Business</option><option value="enterprise">Enterprise</option></select>'+
       '<select id="u-totp" aria-label="Tweestapsverificatie" data-change="filterUsers"><option value="">Tweestaps: alles</option><option value="active">Tweestaps aan</option><option value="pending">Ingesteld, niet bevestigd</option><option value="none">Tweestaps uit</option></select>'+
+      '<select id="u-source" aria-label="Bron van het plan" data-change="usersSource"><option value="">Elke bron</option><option value="alle">Alle betaalde plannen</option>'+Object.keys(SOURCE_NL).map(k=>'<option value="'+k+'"'+(userSource===k?' selected':'')+'>Plan '+esc(SOURCE_NL[k])+'</option>').join('')+'</select>'+
       '<select id="u-status" aria-label="Status" data-change="filterUsers"><option value="">Elke status</option><option value="active">Actief</option><option value="revoked">Ingetrokken</option></select>'+
     '</div>'+
     '<div id="u-table-wrap"></div>'+
@@ -281,6 +292,7 @@ function renderUsers(el){
     '</div>'+
     '</div>';
   for(const k of ['plan','totp','status']){const s=document.getElementById('u-'+k);if(s)s.value=prev[k];}
+  const src=document.getElementById('u-source');if(src)src.value=userSource;
   filterUsers(true);
 }
 let _userSearchT=null;
@@ -322,6 +334,7 @@ function usersTable(users){
           (u.label&&u.email?'<div class="mut" style="font-size:13px">'+esc(u.label)+'</div>':'')+
           (u.usage_purpose?'<div class="mut" style="font-size:13px">'+esc(PURPOSE_LABELS[u.usage_purpose]||u.usage_purpose)+'</div>':'')+'</td>'+
         '<td data-label="Plan">'+planLine('ParaSign',u.plan_parasign,u.paid_until_parasign)+planLine('ParaSend',u.plan_parasend,u.paid_until_parasend)+
+          (u.plan_source?'<div class="mut plan-src" style="font-size:13px">Plan '+esc(SOURCE_NL[u.plan_source]||u.plan_source)+'</div>':'')+
           (u.parasign?'<div class="mut" style="font-size:13px">ParaSign-API aan'+(u.parasign_keys?', '+u.parasign_keys+' sleutel'+(u.parasign_keys===1?'':'s'):'')+'</div>':'')+'</td>'+
         '<td data-label="Laatste activiteit">'+(la?'<div class="when"><b>'+esc(relTime(la.ts))+'</b><span>'+esc(la.label)+'</span></div>':'<span class="mut">Nog niets</span>')+'</td>'+
         '<td data-label="Gebruik">'+(use?'<span style="white-space:nowrap">'+esc(use.transfers??'-')+' verzonden</span><br><span style="white-space:nowrap">'+esc(use.signs??'-')+' getekend</span>':'<span class="mut">niet gemeten</span>')+'</td>'+
@@ -1064,5 +1077,6 @@ act('click', 'usersPage', (el) => loadUsers(parseInt(el.dataset.page, 10)));
 act('click', 'closeCreateKey', (el) => { const m = el.closest('[data-modal]'); if (m) m.remove(); });
 act('change', 'filterUsers', () => filterUsers());
 act('input', 'filterUsers', () => filterUsers());
+act('change', 'usersSource', (el) => { userSource = el.value; loadUsers(1); });
 act('change', 'usersPageSize', (el) => loadUsers(1, parseInt(el.value, 10)));
 act('input', 'confirmDelete', (el) => { const b = document.getElementById('da-btn'); if (b) b.disabled = el.value.trim().toUpperCase() !== 'DEACTIVATE'; });

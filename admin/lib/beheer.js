@@ -629,6 +629,82 @@ function failureForBrowser(entry) {
   return rest;
 }
 
+// ── Waar een betaald plan vandaan komt ───────────────────────────────────────
+// Een plan zegt niet hoe het er kwam: een betaling, een kortingscode en een
+// toekenning door beheer eindigen alle drie in relay.js setProductPlan, en het
+// record onthoudt alleen tier en einddatum (lib/entitlements.js). De bron
+// wordt dus afgeleid uit wat ernaast ligt:
+//   betaald       een lopende betaalde periode in de documenten (computeMrr)
+//   kortingscode  een cadeau in paramant:billing:gift:list:<account> dat nog loopt
+//   team          een sleutel die bij het account van een ander hoort
+//   handmatig     een plan-wijziging door beheer in de audit van de sleutel
+//   onbekend      niets van dit alles gevonden
+// Alleen tellen en tonen: niets hier verandert wie welk plan heeft.
+const PLAN_SOURCES = ['betaald', 'kortingscode', 'team', 'handmatig', 'onbekend'];
+const PLAN_SOURCE_NL = {
+  betaald: 'betaald', kortingscode: 'via kortingscode', team: 'via een team',
+  handmatig: 'door jou toegekend', onbekend: 'geen bron gevonden',
+};
+
+function onPaidPlan(u) {
+  if (!u) return false;
+  return !!((u.plan_parasign && !['free', 'community'].includes(u.plan_parasign)) || (u.plan_parasend && u.plan_parasend !== 'community'));
+}
+
+// Een sleutel van een team: hij hoort bij een account dat niet hijzelf is.
+function isTeamKey(u) {
+  return !!(u && u._account && u._full && u._account !== u._full);
+}
+
+// Loopt er nog een cadeau uit een kortingscode? records zoals
+// billing-history.recordGift ze schrijft: { code, grants: [{ tier, ends }] }.
+function runningGift(records, now = Date.now()) {
+  for (const r of records || []) {
+    for (const g of (r && Array.isArray(r.grants)) ? r.grants : []) {
+      const end = Date.parse(g && g.ends);
+      if (Number.isFinite(end) && end > now && g.tier && !['free', 'community'].includes(g.tier)) return true;
+    }
+  }
+  return false;
+}
+
+// Gaf beheer deze sleutel ooit een niet-gratis plan? Leest admin_plan_changed
+// (metadata.to) en admin_product_plan_changed (metadata.tier).
+function manualGrant(events) {
+  return (events || []).some((e) => {
+    if (!e || !e.metadata) return false;
+    const to = e.event_type === 'admin_plan_changed' ? e.metadata.to
+      : e.event_type === 'admin_product_plan_changed' ? e.metadata.tier : null;
+    return !!to && !['free', 'community', 'trial'].includes(to);
+  });
+}
+
+// ctx: { paying: Set van account_id's (computeMrr), gifts: Set van accounts met
+// een lopend cadeau, manual: Set van sleutels met een toekenning door beheer }.
+// Volgorde: een teamsleutel telt als team, ook als het account betaalt, zodat
+// één betaling niet als vijf betalende klanten telt.
+function planSource(u, ctx = {}) {
+  if (!onPaidPlan(u)) return null;
+  if (isTeamKey(u)) return 'team';
+  const has = (set, ...ids) => !!set && ids.some((id) => id && set.has(id));
+  if (has(ctx.paying, u._account, u._full)) return 'betaald';
+  if (has(ctx.gifts, u._account, u._full)) return 'kortingscode';
+  if (has(ctx.manual, u._full, u._account)) return 'handmatig';
+  return 'onbekend';
+}
+
+function planSourceBreakdown(users, ctx = {}) {
+  const via = Object.fromEntries(PLAN_SOURCES.map((s) => [s, 0]));
+  let n = 0;
+  for (const u of users || []) {
+    if (!u || !u.active) continue;
+    const s = planSource(u, ctx);
+    if (!s) continue;
+    via[s]++; n++;
+  }
+  return { on_paid_plan: n, via, payments_read: ctx.paying != null };
+}
+
 module.exports = {
   subjectFingerprint, mailFailedEntry, failureForBrowser,
   maskKey, isKey, scrubKeys, EVENT_NL, eventLabel, summarize, buildWhoMap, whoFor,
@@ -636,4 +712,5 @@ module.exports = {
   documentStatus, documentRow, describeNl, monthRevenue, computeMrr, euro, ymOf, parseMetrics,
   parseRedisInfo, mb, hourKey, countHit, read24h, sampleCt, ctGrowth24h, problems,
   GOED, LET_OP, KAPOT, NIET, KIND_NL,
+  PLAN_SOURCES, PLAN_SOURCE_NL, onPaidPlan, isTeamKey, runningGift, manualGrant, planSource, planSourceBreakdown,
 };

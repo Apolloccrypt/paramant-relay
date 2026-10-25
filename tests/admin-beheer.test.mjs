@@ -64,7 +64,7 @@ const FIX = {
   '/auth/check': { ok: true },
   '/admin/overview': {
     stats: { signups_today: 2, active_sessions: 3, pro_upgrades_today: 0, revenue_mrr: 9900 },
-    customers: { total: 12, active: 11, on_paid_plan: 4, paying: 3 },
+    customers: { total: 12, active: 11, on_paid_plan: 4, on_paid_plan_via: { betaald: 1, kortingscode: 2, team: 1, handmatig: 0, onbekend: 0 }, paying: 1 },
     revenue: { month: '2026-10', net_cents: 118800, gross_cents: 143748, documents: 1, mrr_cents: 9900, mrr_basis: 1 },
     relays: ['main', 'health', 'legal', 'finance', 'iot'].map((s) => ({ sector: s, ok: true, version: '3.1.0', uptime_s: 90000 })),
     problems: [
@@ -81,7 +81,7 @@ const FIX = {
   },
   '/admin/overview/failures': { mails: [{ ts: NOW - 600000, reason: 'http_502', provider: 'resend', subject_fp: 'a1b2c3d4' }], http429: [] },
   '/admin/users': {
-    users: [{ key: 'pgp_1a2b...9f0e', key_id: KID, email: 'jan@bakkerij-jansen.nl', label: 'jansen', plan: 'pro', plan_parasign: 'business', plan_parasend: 'community', paid_until_parasign: new Date(NOW + 300 * 86400000).toISOString(), active: true, created: new Date(NOW - 86400000).toISOString(), totp_status: 'active', last_activity: { ts: NOW - 3600000, label: 'Ingelogd met passkey' }, usage_month: { transfers: 4, signs: 2 } }],
+    users: [{ key: 'pgp_1a2b...9f0e', key_id: KID, email: 'jan@bakkerij-jansen.nl', label: 'jansen', plan: 'pro', plan_parasign: 'business', plan_parasend: 'community', paid_until_parasign: new Date(NOW + 300 * 86400000).toISOString(), active: true, created: new Date(NOW - 86400000).toISOString(), totp_status: 'active', plan_source: 'kortingscode', last_activity: { ts: NOW - 3600000, label: 'Ingelogd met passkey' }, usage_month: { transfers: 4, signs: 2 } }],
     counts: { total: 1, active: 1 }, pagination: { page: 1, page_size: 50, total_items: 1, total_pages: 1, has_next: false, has_prev: false },
   },
   '/admin/audit': { events: [ROW, ROW2], total: 2, event_types: ['admin_plan_changed', 'webauthn_login', 'account_activated'], event_labels: { admin_plan_changed: 'Plan gewijzigd door jou', webauthn_login: 'Ingelogd met passkey', account_activated: 'Account in gebruik genomen: authenticator-app gekoppeld' } },
@@ -105,6 +105,7 @@ const FIX = {
   },
 };
 
+const REQS = [];
 async function openPanel(ctxOpts, tag) {
   const ctx = await browser.newContext({ ...ctxOpts, acceptDownloads: true });
   await ctx.addInitScript(() => sessionStorage.setItem('adm_session', 'a'.repeat(64)));
@@ -115,6 +116,7 @@ async function openPanel(ctxOpts, tag) {
   await page.route('**/admin/api/**', (route) => {
     const u = new URL(route.request().url());
     const p = u.pathname.replace('/admin/api', '');
+    REQS.push(p + u.search);
     const body = FIX[p];
     return route.fulfill({ status: body ? 200 : 404, contentType: 'application/json', body: JSON.stringify(body || { error: 'nope' }) });
   });
@@ -145,6 +147,16 @@ for (const [tag, opts] of VIEWS) {
     // bij meer "6 betaald plannen loopt nu" (acceptatie 3.1.1).
     await page.waitForSelector('#b-betalend');
     assert.match(await page.innerText('#b-betalend'), /1 betaald plan loopt nu/);
+    // Een plan is nog geen betaling: de kaart splitst uit naar bron, en een tik
+    // opent de klantenlijst met alleen de betaalde plannen, elk met zijn bron.
+    await page.click('#tabBtn-overview');
+    assert.match(await page.innerText('#ov-klanten'), /4 met een betaald plan: 1 betaald, 2 via kortingscode, 1 via een team/);
+    await page.click('#ov-klanten');
+    await page.waitForSelector('#tab-users tbody tr');
+    assert.ok(REQS.some((r) => r.startsWith('/admin/users') && r.includes('source=alle')), REQS.join(' '));
+    assert.strictEqual(await page.inputValue('#u-source'), 'alle');
+    assert.match(await page.innerText('#tab-users tbody tr'), /Plan via kortingscode/);
+    await page.selectOption('#u-source', '');
     await page.click('#tabBtn-overview');
     await page.click('.pr[data-id="mails"]');
     await page.waitForSelector('#mo-info-body table', { timeout: 5000 });
