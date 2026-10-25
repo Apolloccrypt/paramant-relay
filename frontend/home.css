@@ -1,0 +1,197 @@
+/* The signed-out homepage, NL (/) and EN (/en). One heading, one button, one
+   product screen, three steps, one promise and one price. Approved as a
+   picture on 25 October 2026 (the "Moneybird" direction) and built from it.
+   It stands on its own: no shared nav, no design-system ground under it, so
+   nothing another page changes can move it. Light is the drawn edition; the
+   dark one keeps the same layout on the dark ground of the rest of the site. */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("/fonts/InterVariable.woff2") format("woff2"); }
+@font-face { font-family: "DM Mono"; font-style: normal; font-weight: 400 500; font-display: swap; src: url("/fonts/dm-mono.woff2") format("woff2"); }
+
+:root {
+  --h-navy: #0B3A6A;
+  --h-ink: #0C1B2A;
+  --h-text: #3B4A5A;
+  --h-muted: #5F6B78;
+  --h-accent: #1D4ED8;
+  --h-accent-hover: #1A43BE;
+  --h-accent-soft: #E8EEFC;
+  --h-paper: #FFFFFF;
+  --h-panel: #F4F5F7;
+  --h-line: #E3E6EB;
+  --h-wm: #8A94A0;
+  --h-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --h-mono: "DM Mono", ui-monospace, Menlo, monospace;
+}
+:root[data-theme="dark"] {
+  --h-navy: #E6EDF5;
+  --h-ink: #E6EDF5;
+  --h-text: #B9C4D0;
+  --h-muted: #9AA6B3;
+  --h-accent: #6E9BFF;
+  --h-accent-hover: #8AAEFF;
+  --h-accent-soft: rgba(110,155,255,.16);
+  --h-paper: #0E141B;
+  --h-panel: #161F29;
+  --h-line: #26313D;
+  --h-wm: #8D99A6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; background: var(--h-paper); }
+body {
+  margin: 0; background: var(--h-paper); color: var(--h-text);
+  font-family: var(--h-sans); font-size: 19px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+[hidden] { display: none !important; }
+a { color: var(--h-accent); }
+.skip-link { position: absolute; top: -200px; left: 0; z-index: 10; background: var(--h-paper); padding: 8px 12px; }
+.skip-link:focus { top: 0; }
+.h-wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+/* A browser that was signed in here hides the pitch for the moment it takes
+   to ask the server, so a customer is not shown "Probeer het gratis" before
+   he is sent on to his documents (js/home-auth.js). */
+html[data-session="checking"] body > * { visibility: hidden; }
+
+/* header */
+.h-top .h-wrap { display: flex; align-items: center; justify-content: space-between; height: 84px; }
+.h-mark { font-family: var(--h-mono); font-size: 19px; letter-spacing: .04em; text-decoration: none; }
+.h-mark .para { font-weight: 400; color: var(--h-ink); }
+.h-mark .suffix { font-weight: 500; color: var(--h-accent); }
+.h-login { color: var(--h-ink); text-decoration: none; font-weight: 500; font-size: 17px;
+  padding: 9px 18px; border: 1px solid var(--h-line); border-radius: 10px; }
+.h-login:hover { border-color: #C9CFD8; }
+
+/* type */
+.h-home h1, .h-home h2 { color: var(--h-navy); font-weight: 750; letter-spacing: -0.035em; line-height: 1.06; margin: 0; }
+.h-home h1 { font-size: clamp(44px, 6.4vw, 76px); }
+.h-home h2 { font-size: clamp(34px, 4.4vw, 52px); }
+.h-dot { color: var(--h-accent); }
+
+/* hero */
+.h-hero { padding: 40px 0 96px; }
+.h-hero .h-wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
+.h-hero h1 > span, .h-price h2 > span { display: block; }
+.h-cta { display: inline-block; margin-top: 40px; background: var(--h-accent); color: #fff; text-decoration: none;
+  font-weight: 600; font-size: 19px; padding: 17px 30px; border-radius: 12px; transition: background .15s; }
+:root[data-theme="dark"] .h-cta { color: #0E141B; }
+.h-cta:hover { background: var(--h-accent-hover); }
+.h-home a:focus-visible { outline: 3px solid var(--h-accent); outline-offset: 3px; }
+.h-proof { display: flex; align-items: center; gap: 12px; margin: 28px 0 0; font-size: 16px; color: var(--h-muted); }
+.h-proof .face { width: 36px; height: 36px; border-radius: 50%; background: var(--h-accent-soft); color: var(--h-accent);
+  display: grid; place-items: center; font-weight: 650; font-size: 13px; letter-spacing: .02em; flex: none; }
+.h-proof a { color: var(--h-ink); font-weight: 550; text-decoration: underline; text-decoration-color: #C9CFD8; text-underline-offset: 3px; }
+
+/* the product screen: inside its panel on every width, never past its edge */
+.h-art { background: var(--h-panel); border-radius: 32px; padding: 40px; min-width: 0; overflow: hidden; }
+.h-app { background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(12,27,42,.06), 0 18px 40px -12px rgba(11,58,106,.22);
+  overflow: hidden; font-size: 13px; line-height: 1.35; color: #0C1B2A; container-type: inline-size; }
+.h-app-bar { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-bottom: 1px solid #E3E6EB; background: #FAFBFC; }
+.h-app-bar i { width: 9px; height: 9px; border-radius: 50%; background: #DCE0E6; }
+.h-app-bar span { margin-left: 12px; font-size: 11.5px; color: #6B7785; background: #fff; border: 1px solid #E3E6EB; border-radius: 6px; padding: 2px 10px; }
+.h-app-body { display: grid; grid-template-columns: 1fr 170px; min-height: 340px; }
+.h-canvas { background: #F2F3F5; padding: 22px 20px 0; display: flex; justify-content: center; min-width: 0; }
+.h-pdf { background: #fff; width: 100%; max-width: 280px; padding: 22px 22px 26px; border-radius: 4px 4px 0 0; box-shadow: 0 1px 3px rgba(12,27,42,.08); position: relative; }
+.h-pdf .t { height: 8px; width: 46%; background: #0B3A6A; border-radius: 4px; margin-bottom: 16px; }
+.h-pdf .l { height: 5px; background: #E3E6EB; border-radius: 3px; margin-bottom: 8px; }
+.h-pdf .w96 { width: 96%; } .h-pdf .w94 { width: 94%; } .h-pdf .w92 { width: 92%; } .h-pdf .w90 { width: 90%; }
+.h-pdf .w88 { width: 88%; } .h-pdf .w80 { width: 80%; } .h-pdf .w70 { width: 70%; } .h-pdf .w60 { width: 60%; }
+.h-pdf .gap { height: 8px; }
+.h-sigbox { margin-top: 16px; height: 70px; width: 78%; background: #FFF6C9; border: 1.5px dashed #D9AE00; border-radius: 6px; position: relative; }
+.h-sigbox small, .h-initbox small { position: absolute; left: 7px; top: 4px; font-size: 9.5px; font-weight: 600; color: #7A6000; letter-spacing: .02em; }
+.h-sigbox svg { position: absolute; inset: 14px 8px 4px; width: calc(100% - 16px); height: calc(100% - 18px); }
+.h-initbox { position: absolute; right: 10px; bottom: 12px; width: 50px; height: 34px; background: #FFF6C9; border: 1.5px dashed #D9AE00; border-radius: 5px; }
+.h-initbox b { position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font: italic 15px "Times New Roman", serif; color: #0B3A6A; }
+.h-side { border-left: 1px solid #E3E6EB; padding: 18px 16px; display: flex; flex-direction: column; min-width: 0; }
+.h-side h3 { margin: 0 0 12px; font-size: 13px; font-weight: 650; color: #0B3A6A; letter-spacing: 0; line-height: 1.3; }
+.h-person { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid #EEF0F3; }
+.h-person:last-of-type { border-bottom: 1px solid #EEF0F3; }
+.h-person .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 650; flex: none; }
+.h-person .av.a { background: #E8EEFC; color: #1D4ED8; }
+.h-person .av.b { background: #F1EAD6; color: #0B3A6A; }
+.h-person .nm { display: block; font-weight: 550; font-size: 12.5px; }
+.h-person .st { display: block; font-style: normal; font-size: 11px; color: #5F6B78; margin-top: 1px; }
+.h-person .st.ok { color: #1B6B45; }
+.h-send { margin-top: auto; background: #1D4ED8; color: #fff; border-radius: 8px; text-align: center; font-weight: 600; padding: 9px 0; font-size: 13px; }
+@container (max-width: 420px) {
+  .h-app-body { grid-template-columns: 1fr; }
+  .h-side { border-left: 0; border-top: 1px solid #E3E6EB; }
+  .h-send { margin-top: 14px; }
+  .h-pdf { max-width: none; }
+}
+
+/* signature animation */
+.h-sig { stroke-dasharray: 420; stroke-dashoffset: 420; animation: h-draw 2.4s .6s cubic-bezier(.55,.1,.3,1) forwards; }
+@keyframes h-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .h-sig { animation: none; stroke-dashoffset: 0; }
+  .h-cta { transition: none; }
+}
+
+/* works with */
+.h-works { padding: 0 0 112px; }
+.h-works .h-wrap { display: flex; align-items: center; justify-content: center; gap: 56px; flex-wrap: wrap; }
+.h-works .lbl { font-size: 15px; color: var(--h-muted); }
+.h-wm { font-size: 24px; color: var(--h-wm); white-space: nowrap; }
+.h-wm-outlook { font-family: "Segoe UI", var(--h-sans); font-weight: 600; letter-spacing: -0.01em; }
+.h-wm-gmail { font-weight: 500; letter-spacing: -0.02em; }
+.h-wm-mb { font-weight: 750; letter-spacing: -0.04em; }
+.h-soon { font-size: 12px; font-weight: 600; color: var(--h-muted); background: var(--h-panel); border-radius: 99px; padding: 3px 9px; margin-left: 8px; vertical-align: 4px; letter-spacing: 0; }
+
+/* how */
+.h-block { padding: 0 0 120px; }
+.h-how h2 { text-align: center; margin-bottom: 56px; }
+.h-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin: 0; padding: 0; list-style: none; }
+.h-step .pic { background: var(--h-panel); border-radius: 24px; aspect-ratio: 4 / 3; display: grid; place-items: center; }
+.h-step .pic svg { width: 62%; height: auto; }
+.h-step p { margin: 22px 4px 0; font-size: 21px; line-height: 1.4; color: var(--h-navy); font-weight: 600; letter-spacing: -0.01em; }
+
+/* one promise */
+.h-panel { background: var(--h-panel); border-radius: 32px; padding: 72px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.h-panel p { font-size: 22px; line-height: 1.5; margin: 22px 0 0; max-width: 30ch; color: var(--h-text); }
+.h-panel .small-art { background: #fff; border-radius: 24px; padding: 32px; }
+.h-panel .small-art svg { width: 100%; height: auto; display: block; }
+
+/* price */
+.h-price { text-align: center; padding: 24px 0 128px; }
+.h-price h2 { max-width: 26ch; margin: 0 auto; }
+.h-price a { display: inline-block; margin-top: 28px; font-weight: 600; font-size: 19px; text-decoration: none; }
+.h-price a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* footer: the line from the picture, and under it the links a company owes */
+.h-foot { border-top: 1px solid var(--h-line); padding: 28px 0 32px; font-size: 15px; color: var(--h-muted); }
+.h-foot .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.h-foot .h-mark { font-size: 15px; }
+.h-foot nav { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 18px; font-size: 14px; }
+.h-foot nav a { color: var(--h-muted); text-decoration: none; }
+.h-foot nav a:hover { color: var(--h-ink); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 900px) {
+  body { font-size: 18px; }
+  .h-wrap { padding: 0 16px; }
+  .h-top .h-wrap { height: 68px; }
+  .h-mark { font-size: 17px; }
+  .h-login { font-size: 16px; padding: 7px 14px; }
+  .h-hero { padding: 24px 0 72px; }
+  .h-hero .h-wrap { grid-template-columns: 1fr; gap: 48px; }
+  .h-cta { display: block; text-align: center; margin-top: 32px; }
+  .h-art { border-radius: 24px; padding: 24px 16px; }
+  .h-block { padding-bottom: 80px; }
+  .h-panel { grid-template-columns: 1fr; padding: 40px 24px 24px; gap: 36px; border-radius: 24px; }
+  .h-panel p { font-size: 19px; }
+  .h-panel .small-art { order: 2; padding: 20px; border-radius: 18px; }
+  .h-works { padding-bottom: 80px; }
+  .h-works .h-wrap { gap: 18px 32px; }
+  .h-works .lbl { width: 100%; text-align: center; }
+  .h-wm { font-size: 20px; }
+  .h-how h2 { margin-bottom: 32px; }
+  .h-steps { grid-template-columns: 1fr; gap: 16px; }
+  .h-step { display: grid; grid-template-columns: 120px 1fr; gap: 18px; align-items: center; }
+  .h-step .pic { aspect-ratio: 1; border-radius: 18px; }
+  .h-step .pic svg { width: 80%; }
+  .h-step p { margin: 0; font-size: 19px; }
+  .h-price { padding: 8px 0 88px; }
+  .h-foot .row { flex-direction: column; gap: 6px; text-align: center; }
+  .h-foot nav { justify-content: center; }
+}
