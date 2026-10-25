@@ -77,6 +77,14 @@ const TIER_LIMITS = Object.freeze({
     max_parties: 20,
     concurrent_blobs: 8, // one live hand-over at a time, plus slack for its window
     outbound_per_hour: 50,  // mirrors legacy OUTBOUND_RATE.free
+    // Stukken opvragen (relay/lib/opvraag.js). One open request at a time: enough
+    // to try it with a real client, not enough to run a practice on. Ten MB is
+    // a passport photo, a payslip and an annual statement with room to spare,
+    // and it sits inside the free account's share of the store (send.js).
+    opvraag_open: 1, // requests open at once
+    opvraag_items: 5, // documents asked for in one request
+    opvraag_mb: 10, // what one request may receive in total
+    opvraag_ttl_ms: 7 * 86_400_000, // the longest "geldig tot"
   }),
   pro: Object.freeze({
     transfers_month: 500,
@@ -105,6 +113,13 @@ const TIER_LIMITS = Object.freeze({
     max_parties: 20,
     concurrent_blobs: 24, // about three at a time
     outbound_per_hour: 500,  // mirrors legacy OUTBOUND_RATE.pro
+    // A Firm runs a season of tax returns at once: twenty-five clients open
+    // together. Per request the ceiling is SEND_MAX_MB, the same 25 MB a send
+    // may hold, because both live in the same durable store and the same budget.
+    opvraag_open: 25, // requests open at once
+    opvraag_items: 10, // documents asked for in one request
+    opvraag_mb: 25, // what one request may receive in total
+    opvraag_ttl_ms: 14 * 86_400_000, // the longest "geldig tot"
   }),
   business: Object.freeze({
     transfers_month: 2000,
@@ -118,6 +133,10 @@ const TIER_LIMITS = Object.freeze({
     concurrent_blobs: 80, // about ten at a time
     outbound_per_hour: 2000, // its transfers_month; never below pro, which is
                              // what the old table did by leaving it out
+    opvraag_open: 100, // requests open at once
+    opvraag_items: 10, // documents asked for in one request
+    opvraag_mb: 25, // what one request may receive in total
+    opvraag_ttl_ms: 30 * 86_400_000, // the longest "geldig tot"
   }),
   enterprise: Object.freeze({
     transfers_month: UNLIMITED,
@@ -133,6 +152,11 @@ const TIER_LIMITS = Object.freeze({
     max_parties: 30,
     concurrent_blobs: UNLIMITED,
     outbound_per_hour: UNLIMITED, // mirrors legacy OUTBOUND_RATE.enterprise
+    // Not unlimited: every open request can hold files in the shared store.
+    opvraag_open: 250, // requests open at once
+    opvraag_items: 10, // documents asked for in one request
+    opvraag_mb: 25, // what one request may receive in total
+    opvraag_ttl_ms: 30 * 86_400_000, // the longest "geldig tot"
   }),
 });
 
