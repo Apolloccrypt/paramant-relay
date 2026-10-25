@@ -41,7 +41,7 @@ test('bekende wegwerpdomeinen worden bij aanmelden geweigerd', async () => {
     const u = await policy.toets(`iemand@${d}`, 'aanmelden', zonderDns);
     assert.equal(u.ok, false, `${d} kwam erdoor bij aanmelden`);
     assert.equal(u.categorie, 'wegwerp');
-    assert.equal(u.melding.nl, 'Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat u blijvend leest.');
+    assert.equal(u.melding.nl, 'Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat je blijvend leest.');
     assert.ok(u.melding.en.length > 20);
   }
 });

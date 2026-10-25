@@ -37,11 +37,11 @@ const DOELEN = Object.freeze({
 
 const MELDING = Object.freeze({
   aanmelden: Object.freeze({
-    nl: 'Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat u blijvend leest.',
+    nl: 'Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat je blijvend leest.',
     en: 'We cannot use this email address for an account. Please use an address you will keep reading.',
   }),
   verzenden: Object.freeze({
-    nl: 'Dit e-mailadres kunnen we hiervoor niet gebruiken. Gebruik een adres dat u blijvend leest.',
+    nl: 'Dit e-mailadres kunnen we hiervoor niet gebruiken. Gebruik een adres dat je blijvend leest.',
     en: 'We cannot use this email address for this. Please use an address you will keep reading.',
   }),
 });

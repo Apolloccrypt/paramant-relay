@@ -379,7 +379,7 @@ test('/sign, English, an answer without a log index and without a TLS header', a
 async function makeProof(page) {
   return page.evaluate(async () => {
     const pqc = await import('/vendor/paramant-pqc.js');
-    const signer = await import('/js/parasign-signer.js?v=24');
+    const signer = await import('/js/parasign-signer.js?v=25');
     const enc = new TextEncoder();
     const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
     const b64 = (bytes) => { let v = ''; for (const b of bytes) v += String.fromCharCode(b); return btoa(v); };
