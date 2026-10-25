@@ -428,24 +428,23 @@ test('every public page names the company and the founder in its Organization no
 // four saying the same false thing passed it.
 // Since 23 September 2026 /, /pricing, /about and /security are Dutch, and the
 // English text they carried before lives on under /en/ with its pins intact.
-// The Dutch sentences are pinned the same way: the homepage says the headline
-// Mick chose ("Patiëntdossiers en processtukken veilig versturen en laten
-// tekenen") and the company behind it; /pricing names the one offer, the
+// The Dutch sentences are pinned the same way: the homepage says what Mick
+// chose on 25 October 2026 (who can open your file, and signing with proof) and the company behind it; /pricing names the one offer, the
 // kantoorplan at 29 euro excl. btw, which is frontend/pricing.html and the
 // catalog behind it (tests/site-claims.test.mjs block 42); /about names the
 // founder and his title in Dutch.
 const PINNED = {
   index: {
     title: 'Veilig bestanden versturen en laten ondertekenen · Paramant',
-    desc: 'Patiëntdossiers en processtukken veilig versturen en digitaal laten ondertekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk.',
+    desc: 'Een bestand versturen dat alleen de ontvanger kan openen, en contracten laten tekenen met bewijs. Van Paramantis Solutions B.V. in Harderwijk.',
   },
   pricing: {
-    title: 'Prijzen · Voor uw kantoor 29 euro per maand · Paramant',
-    desc: 'Het Community-plan is gratis, voor altijd. Voor uw kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V.',
+    title: 'Prijzen · Voor je kantoor 29 euro per maand · Paramant',
+    desc: 'Het Community-plan is gratis, voor altijd. Voor je kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V.',
   },
   about: {
     title: 'Over Paramant en oprichter Mick Beer · Paramant',
-    desc: 'Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker. Wie we zijn en hoe u ons nakijkt.',
+    desc: 'Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker. Wie we zijn en hoe je ons nakijkt.',
   },
   'en/index': {
     title: 'E-signatures and secure file transfer in the EU | Paramant',
@@ -460,8 +459,8 @@ const PINNED = {
     desc: 'Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.',
   },
   sign: {
-    title: 'Pdf digitaal ondertekenen in uw browser · Paramant',
-    desc: 'Onderteken een pdf in uw browser. De tekst van het document en uw ondertekensleutel blijven op uw apparaat. Iedereen kan de handtekening later controleren.',
+    title: 'Pdf digitaal ondertekenen in je browser · Paramant',
+    desc: 'Onderteken een pdf in je browser. De tekst van het document en je ondertekensleutel blijven op je apparaat. Iedereen kan de handtekening later controleren.',
   },
   'en/sign': {
     title: 'Sign a PDF in your browser | ParaSign | Paramant',
@@ -472,13 +471,13 @@ const PINNED = {
   // had to cover both proofs instead of only the signed document.
   verify: {
     title: 'Document of ontvangstbewijs controleren · Paramant',
-    desc: 'Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.',
+    desc: 'Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in je browser, zonder account en zonder iets te uploaden.',
   },
   // download, trust and rules: Dutch on the plain path since this branch, the
   // English pins moved with the English text to /en/.
   download: {
     title: 'De desktop-app van Paramant wordt niet meer onderhouden',
-    desc: 'De desktop-app van Paramant is voor het laatst gebouwd in maart 2026 en wordt niet meer onderhouden. Paramant werkt nu in uw browser, zonder installatie.',
+    desc: 'De desktop-app van Paramant is voor het laatst gebouwd in maart 2026 en wordt niet meer onderhouden. Paramant werkt nu in je browser, zonder installatie.',
   },
   'en/download': {
     title: 'The Paramant desktop app is no longer maintained',
@@ -486,7 +485,7 @@ const PINNED = {
   },
   trust: {
     title: 'Vertrouwen en controle · Paramant',
-    desc: 'Wat Paramant op uw eigen server kan zien, wat het kan doen en hoe u beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland.',
+    desc: 'Wat Paramant op je eigen server kan zien, wat het kan doen en hoe je beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland.',
   },
   'en/trust': {
     title: 'Trust and verification: check what we can see | Paramant',
@@ -502,7 +501,7 @@ const PINNED = {
   },
   rules: {
     title: 'Onze regels · Waar Paramant voor staat',
-    desc: 'De regels waar Paramant zich aan houdt: geen verzoeken naar derden, Europese soevereiniteit, standaard post-quantum, u beheert uw eigen sleutels, eerlijk van opzet.',
+    desc: 'De regels van Paramant: je browser praat alleen met ons, de servers staan in Europa, de versleuteling is bestand tegen quantumcomputers en je sleutels zijn van jou.',
   },
   'en/rules': {
     title: 'Our rules · What Paramant stands for',

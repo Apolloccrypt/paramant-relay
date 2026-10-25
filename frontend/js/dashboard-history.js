@@ -89,7 +89,7 @@
   /* ---------- history ---------- */
   function renderHistory(entries) {
     if (!entries || !entries.length) {
-      histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Nog niets. Wat u verstuurt en ontvangt verschijnt hier.', 'Nothing yet. What you send and receive will appear here.') + '</div>';
+      histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Nog niets. Wat je verstuurt en ontvangt verschijnt hier.', 'Nothing yet. What you send and receive will appear here.') + '</div>';
       return;
     }
     histBody.innerHTML = entries.map(function (e) {
@@ -105,7 +105,7 @@
     histLoad.disabled = true;
     var orig = histLoad.textContent;
     histLoad.textContent = nlEn('Bezig...', 'Loading...');
-    histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw geschiedenis wordt geladen...', 'Loading your history...') + '</div>';
+    histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Je geschiedenis wordt geladen...', 'Loading your history...') + '</div>';
     relayCall(function (tok) {
       return fetch('/v2/user/history?limit=100', {
         headers: { Authorization: 'Bearer ' + tok, Accept: 'application/json' }, cache: 'no-store'
@@ -123,12 +123,12 @@
         return;
       }
       if (res.status === 401) {
-        histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('U bent uitgelogd. Log opnieuw in om uw geschiedenis te zien.', 'You were signed out. Sign in again to see your history.') + '</div>';
+        histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Je bent uitgelogd. Log opnieuw in om je geschiedenis te zien.', 'You were signed out. Sign in again to see your history.') + '</div>';
         return;
       }
       histBody.innerHTML = '<div class="dh-ops-dim">' + (res.status === 429
         ? nlEn('Even te veel tegelijk. Probeer het over een minuut opnieuw.', 'Too much at once. Try again in a minute.')
-        : nlEn('We konden uw geschiedenis nu niet laden. Er is niets veranderd. Probeer het zo opnieuw.', 'We could not load your history just now. Nothing changed. Try again shortly.')) + '</div>';
+        : nlEn('We konden je geschiedenis nu niet laden. Er is niets veranderd. Probeer het zo opnieuw.', 'We could not load your history just now. Nothing changed. Try again shortly.')) + '</div>';
     }).catch(function () {
       histLoad.disabled = false; histLoad.textContent = orig;
       histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Geen verbinding. Er is niets veranderd. Probeer het opnieuw.', 'No connection. Nothing changed. Try again.') + '</div>';
@@ -173,11 +173,11 @@
         return;
       }
       if (res.status === 403) {
-        expBody.innerHTML = upsell(nlEn('Exporteren hoort bij Business. Business is op aanvraag via privacy@paramant.app.', 'Exporting comes with Business.'), nlEn('/pricing#wat-u-kunt', '/en/pricing'));
+        expBody.innerHTML = upsell(nlEn('Exporteren kan met het Business-plan. Business vraag je aan via privacy@paramant.app.', 'Exporting comes with Business.'), nlEn('/pricing#wat-u-kunt', '/en/pricing'));
         return;
       }
       if (res.status === 401) {
-        expBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('U bent uitgelogd. Log opnieuw in om te exporteren.', 'You were signed out. Sign in again to export.') + '</div>';
+        expBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Je bent uitgelogd. Log opnieuw in om te exporteren.', 'You were signed out. Sign in again to export.') + '</div>';
         return;
       }
       expBody.innerHTML = '<div class="dh-ops-dim">' + (res.status === 429

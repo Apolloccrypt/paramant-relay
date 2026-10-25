@@ -13,11 +13,11 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const require = createRequire(import.meta.url);
 
-test('#59: "Heeft u", nergens meer "Hebt u" in klanttekst', () => {
+test('#59: je-vorm, nergens meer "Hebt u" of "Heeft u" in klanttekst', () => {
   for (const p of ['frontend/js/passkey.js', 'frontend/js/ophalen.page.js']) {
-    assert.doesNotMatch(read(p), /Hebt u/, p);
+    assert.doesNotMatch(read(p), /Hebt u|Heeft u/, p);
   }
-  assert.match(read('frontend/js/passkey.js'), /Heeft u zelf afgebroken\?/);
+  assert.match(read('frontend/js/passkey.js'), /Heb je zelf afgebroken\?/);
 });
 
 test('#37: de platte tekst van de bestandsmail zegt hetzelfde als de HTML-voet', () => {
@@ -52,7 +52,7 @@ test('#10 en N3: na afronding zegt /co-sign niet meer "Bekijk wat u ondertekent"
   assert.doesNotMatch(js, /Hieronder downloadt u het complete document|Download hieronder het complete document en het bewijs|Below you can download the complete document|Download the complete document and the proof below/);
   const fn = js.slice(js.indexOf('function retitleForResult'), js.indexOf('async function showResultForParty'));
   assert.match(fn, /'Het document', 'The document'/);
-  assert.match(fn, /'Uw handtekening', 'Your signature'/);
+  assert.match(fn, /'Je handtekening', 'Your signature'/);
   assert.match(js.slice(js.indexOf('async function showResultForParty')), /^async function showResultForParty[\s\S]*?retitleForResult\(false\)/);
   assert.match(js.slice(js.indexOf('async function initOwner')), /retitleForResult\(true\)/);
   for (const p of ['frontend/co-sign.html', 'frontend/en/co-sign.html']) {

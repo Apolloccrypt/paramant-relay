@@ -116,7 +116,7 @@ try {
     `the vault page may not make a quantum claim; it says: ${shown}`);
   // And the honest sentence: no recovery, because there is nothing to recover
   // from.
-  assert.match(shown, /niet voor u herstellen/i,
+  assert.match(shown, /niet voor jou (herstellen|terughalen)/i,
     `the page must say that a lost passphrase cannot be recovered; it says: ${shown}`);
 
   // ── A file locked TODAY carries the new count in its header ───────────────

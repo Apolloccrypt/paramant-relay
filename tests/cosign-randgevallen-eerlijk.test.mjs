@@ -152,7 +152,7 @@ test('COSIGN-02: de afzender heet niet "(you)", ook niet op de Nederlandse pagin
   const r = await read(page);
   await ctx.close();
   assert.equal(r.parties[0], 'Afzender Zelf');
-  assert.equal(r.parties[1], 'Ayşe Yılmaz (u)');
+  assert.equal(r.parties[1], 'Ayşe Yılmaz (jij)');
 });
 
 test('B8: beveiligde pdf belooft geen paraaf en geen pdf-kopie', async () => {

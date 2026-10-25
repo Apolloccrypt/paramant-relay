@@ -74,21 +74,21 @@ pre{margin:0;padding:20px;border:0;background:var(--deep-bg);color:var(--deep-fg
     <a href="/developer" aria-current="page">Ontwikkelaarsinstellingen</a>
   </nav>
   <header class="hero">
-    <div><p class="eyebrow">Instellingen · API voor Ondertekenen</p><h1>Ondertekenen in uw eigen product.</h1><p class="lede">Maak ondertekenverzoeken aan, volg elke ondertekenaar en haal een bewijs op dat u offline kunt controleren. Elk endpoint van de API voor Ondertekenen staat in de <a href="/docs#v1-envelopes">API-referentie</a>. Zo leest u alles na voordat u iets koppelt. API-toegang zit in het abonnement vanaf Firm, zie <a href="/pricing">prijzen</a>.</p></div>
+    <div><p class="eyebrow">Instellingen · API voor Ondertekenen</p><h1>Ondertekenen vanuit je eigen software</h1><p class="lede">Maak ondertekenverzoeken aan, volg elke ondertekenaar en haal een bewijs op dat je offline kunt controleren. Elk endpoint van de API voor Ondertekenen staat in de <a href="/docs#v1-envelopes">API-referentie</a>. Zo kun je alles nalezen voordat je iets koppelt. API-toegang hoort bij de abonnementen vanaf Firm, zie <a href="/pricing">prijzen</a>.</p></div>
     <div class="account"><span class="status-dot" id="api-status-dot"></span><span data-dv="email">Account wordt geladen</span><span>·</span><strong data-dv="plan">--</strong></div>
   </header>
 
   <div class="steps" aria-label="Verloop van de API voor Ondertekenen">
-    <div class="step"><b>01 · AANMAKEN</b><span>Stuur een pdf en een lijst met ondertekenaars. U krijgt per ontvanger een eigen ondertekenlink terug.</span></div>
-    <div class="step"><b>02 · VOLGEN</b><span>Volg elke factuur of elk contract via de status en ondertekende webhooks.</span></div>
-    <div class="step"><b>03 · BEWIJZEN</b><span>Haal het afgeronde .psign-bewijs op en controleer het zelf, zonder ons.</span></div>
+    <div class="step"><b>01 · AANMAKEN</b><span>Stuur een pdf en een lijst met ondertekenaars. Je krijgt per ontvanger een eigen ondertekenlink terug.</span></div>
+    <div class="step"><b>02 · VOLGEN</b><span>Volg de voortgang van elk contract of elke factuur. Je vraagt de status op of ontvangt webhooks, en elke webhook draagt onze handtekening.</span></div>
+    <div class="step"><b>03 · BEWIJZEN</b><span>Haal het .psign-bewijs op als iedereen heeft getekend. Je kunt het zelf controleren, zonder onze hulp.</span></div>
   </div>
 
   <div class="grid">
     <div class="stack">
       <section class="card" aria-labelledby="keys-title">
-        <div class="card-head"><div><h2 id="keys-title">API-sleutels</h2><p class="card-sub">Sleutels voor Ondertekenen beginnen met psk_. Een nieuwe geheime sleutel ziet u één keer. Deze browser bewaart hem nooit.</p></div><button class="btn btn-primary" id="psk-new" type="button">API-sleutel maken</button></div>
-        <div class="key-list" id="psk-keys"><div class="empty">Uw sleutels voor Ondertekenen worden geladen.</div></div>
+        <div class="card-head"><div><h2 id="keys-title">API-sleutels</h2><p class="card-sub">Sleutels voor Ondertekenen beginnen met psk_. Een nieuwe geheime sleutel zie je maar één keer. Je browser bewaart hem niet.</p></div><button class="btn btn-primary" id="psk-new" type="button">API-sleutel maken</button></div>
+        <div class="key-list" id="psk-keys"><div class="empty">Je sleutels voor Ondertekenen worden geladen.</div></div>
       </section>
 
       <section class="card code-card" aria-labelledby="quick-title">
@@ -110,14 +110,14 @@ curl -X POST https://paramant.app/v1/envelopes \
 
     <aside class="stack">
       <section class="card" aria-labelledby="usage-title">
-        <div class="card-head"><div><h2 id="usage-title">Handtekeningen deze maand</h2><p class="card-sub">Hoeveel van uw tegoed u deze maand gebruikte.</p></div></div>
+        <div class="card-head"><div><h2 id="usage-title">Handtekeningen deze maand</h2><p class="card-sub">Hoeveel van je tegoed je deze maand hebt gebruikt.</p></div></div>
         <div class="usage-number"><strong id="sign-used">--</strong><span id="sign-cap">van --</span></div>
         <div class="bar" aria-hidden="true"><span id="sign-bar"></span></div>
         <p class="usage-note" id="usage-note">Verbruik wordt geladen.</p>
       </section>
 
       <section class="card" aria-labelledby="links-title">
-        <div class="card-head"><div><h2 id="links-title">Bouwen en beheren</h2><p class="card-sub">Alles over de live API.</p></div></div>
+        <div class="card-head"><div><h2 id="links-title">Bouwen en beheren</h2><p class="card-sub">Handleidingen en controles bij de API.</p></div></div>
         <div class="links">
           <a class="link" href="/docs#quickstart">Snel starten <span>&rarr;</span></a>
           <a class="link" href="/docs#v1-envelopes">API-referentie <span>&rarr;</span></a>
@@ -140,15 +140,15 @@ curl -X POST https://paramant.app/v1/envelopes \
     <button class="modal-x" type="button" data-close aria-label="Sluiten">&times;</button>
     <div data-view="create">
       <h2 id="psk-title">Een API-sleutel voor Ondertekenen maken</h2>
-      <p class="card-sub">Gebruik per toepassing of omgeving een eigen sleutel. Dan kunt u een sleutel veiliger vervangen of intrekken.</p>
+      <p class="card-sub">Gebruik voor elke toepassing of omgeving een eigen sleutel. Dan kun je één sleutel vervangen of intrekken zonder dat de rest stopt.</p>
       <div class="field"><label for="psk-label">Naam van de sleutel</label><input id="psk-label" maxlength="80" placeholder="Ondertekenen in productie" autocomplete="off"></div>
-      <div class="notice">De volledige sleutel ziet u één keer. Bewaar hem in een secrets manager, niet in broncode of in de browser.</div>
+      <div class="notice">De volledige sleutel zie je één keer. Bewaar hem in een kluis voor geheimen (een secrets manager). Zet hem nooit in broncode of in de browser.</div>
       <p class="error" id="psk-error" hidden></p>
       <div class="actions"><button class="btn btn-primary" id="psk-generate" type="button">Sleutel maken</button><button class="btn btn-secondary" type="button" data-close>Annuleren</button></div>
     </div>
     <div data-view="secret" hidden>
       <h2>API-sleutel gemaakt</h2>
-      <div class="notice">Kopieer deze sleutel nu. Sluit u dit venster, dan ziet u alleen nog een afgeschermde versie.</div>
+      <div class="notice">Kopieer deze sleutel nu. Sluit je dit venster, dan zie je daarna alleen nog een afgeschermde versie.</div>
       <div class="secret" id="psk-secret"></div>
       <p class="card-sub" id="psk-meta"></p>
       <div class="actions"><button class="btn btn-primary" id="psk-copy" type="button">Sleutel kopiëren</button><button class="btn btn-secondary" type="button" data-close>Klaar</button></div>
@@ -158,6 +158,6 @@ curl -X POST https://paramant.app/v1/envelopes \
 
 <script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
-<script src="/js/developer.js?v=14" defer></script>
+<script src="/js/developer.js?v=15" defer></script>
 </body>
 </html>

@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API-sleutel of TOTP-code: wat is het verschil? · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Wanneer gebruikt u uw Paramant API-sleutel en wanneer een code uit uw authenticator-app? Het verschil, en waarom u ze nooit tegelijk nodig heeft.">
+<meta name="twitter:description" content="Wanneer gebruik je je Paramant API-sleutel en wanneer een code uit je authenticator-app? Het verschil, en waarom je ze nooit tegelijk nodig hebt.">
 <meta name="twitter:title" content="API-sleutel of TOTP-code: wat is het verschil? · Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:title" content="API-sleutel of TOTP-code: wat is het verschil? · Paramant">
-<meta property="og:description" content="Wanneer gebruikt u uw Paramant API-sleutel en wanneer een code uit uw authenticator-app? Het verschil, en waarom u ze nooit tegelijk nodig heeft.">
+<meta property="og:description" content="Wanneer gebruik je je Paramant API-sleutel en wanneer een code uit je authenticator-app? Het verschil, en waarom je ze nooit tegelijk nodig hebt.">
 <meta property="og:url" content="https://paramant.app/help/api-key-vs-totp">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
@@ -20,7 +20,7 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/help/api-key-vs-totp">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/help/api-key-vs-totp">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/help/api-key-vs-totp">
-<meta name="description" content="Wanneer gebruikt u uw Paramant API-sleutel en wanneer een code uit uw authenticator-app? Het verschil, en waarom u ze nooit tegelijk nodig heeft.">
+<meta name="description" content="Wanneer gebruik je je Paramant API-sleutel en wanneer een code uit je authenticator-app? Het verschil, en waarom je ze nooit tegelijk nodig hebt.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -156,7 +156,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Wanneer gebruikt u uw Paramant API-sleutel en wanneer een code uit uw authenticator-app? Het verschil, en waarom u ze nooit tegelijk nodig heeft."
+      "description": "Wanneer gebruik je je Paramant API-sleutel en wanneer een code uit je authenticator-app? Het verschil, en waarom je ze nooit tegelijk nodig hebt."
     },
     {
       "@type": "BreadcrumbList",
@@ -264,7 +264,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>API-sleutel of <em>TOTP</em>: wat is het verschil?</h1>
 
-  <p class="lead">Paramant kent twee soorten inloggegevens, elk voor iets anders. De accountsleutel is voor machines en scripts. De code van 6 cijfers (of uw passkey) is om zelf in te loggen op de website. U heeft ze nooit allebei tegelijk nodig.</p>
+  <p class="lead">Paramant kent twee manieren om te laten zien wie je bent, elk voor iets anders. De API-sleutel, ook wel accountsleutel genoemd, is voor machines en scripts. Zelf log je op de website in met je passkey of met een code van 6 cijfers uit je authenticator-app. Zo&#39;n code heet een TOTP-code. Je hebt ze nooit allebei tegelijk nodig.</p>
 
   <h2>In het kort</h2>
 
@@ -275,7 +275,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <li>Een vaste geheime reeks: <code>pgp_</code> gevolgd door 64 hexadecimale tekens</li>
         <li>Vertelt de API welk account het is</li>
         <li>Verloopt niet vanzelf</li>
-        <li>U krijgt hem één keer en bewaart hem zelf</li>
+        <li>Je krijgt hem één keer en bewaart hem zelf</li>
         <li>Voor machines, scripts en koppelingen</li>
       </ul>
     </div>
@@ -283,34 +283,34 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <h4>TOTP-code</h4>
       <ul>
         <li>Een code van 6 cijfers die elke 30 seconden verandert</li>
-        <li>Bewijst dat u er zelf bij bent</li>
-        <li>Uw authenticator-app maakt hem</li>
+        <li>Bewijst dat je er zelf bij bent</li>
+        <li>Je authenticator-app maakt hem</li>
         <li>Kan niet opnieuw gebruikt of uit logs gestolen worden</li>
-        <li>Om zelf in te loggen op de website, samen met uw e-mailadres</li>
+        <li>Om zelf in te loggen op de website, samen met je e-mailadres</li>
       </ul>
     </div>
   </div>
 
-  <h2>Wanneer u alleen de API-sleutel nodig heeft</h2>
+  <h2>Wanneer je alleen de API-sleutel nodig hebt</h2>
 
-  <p>Verkeer tussen machines gebruikt alleen de API-sleutel. Denk aan IoT-apparaten, CI-pipelines en serverscripts. De sleutel gaat bij elk verzoek mee in de <code>X-Api-Key</code>-header. Een TOTP-code is niet nodig, want een machine kan geen authenticator-app openen. U vindt de sleutel op <a href="/account">Account</a> onder <strong>Geavanceerde accountsleutel</strong>.</p>
+  <p>Werkt een apparaat of script zelf met Paramant, dan is alleen de API-sleutel nodig. Denk aan IoT-apparaten, automatische bouwstraten (CI-pipelines) en scripts op een server. De sleutel gaat bij elk verzoek mee in de <code>X-Api-Key</code>-header. Een TOTP-code is niet nodig, want een machine kan geen authenticator-app openen. Je vindt de sleutel op <a href="/account">Account</a> onder <strong>Geavanceerde accountsleutel</strong>.</p>
 
-  <div class="tip"><p>Elk account heeft één accountsleutel. De API-sleutels die u met een Firm-abonnement of hoger op uw accountpagina maakt (beginnend met <code>psk_live_</code>), zijn voor de ParaSign-API. Die maakt en trekt u zelf in, per koppeling. Ze staan los van de accountsleutel.</p></div>
+  <div class="tip"><p>Elk account heeft één accountsleutel. De API-sleutels die je met een Firm-abonnement of hoger op je accountpagina maakt (beginnend met <code>psk_live_</code>), zijn voor de ParaSign-API. Die maakt en trek je zelf in, per koppeling. Ze staan los van de accountsleutel.</p></div>
 
   <h2>Zelf inloggen op de website</h2>
   <p>Inloggen via <a href="/auth/login">paramant.app/auth/login</a> vraagt geen API-sleutel. Zo gaat het:</p>
   <ol style="margin:16px 0 16px 20px;display:flex;flex-direction:column;gap:10px">
-    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Vul uw e-mailadres in</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Log in met uw passkey, of kies <strong>Liever een code van 6 cijfers</strong> en vul de huidige code uit uw authenticator-app in</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Vul je e-mailadres in</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Log in met je passkey, of kies <strong>Liever een code van 6 cijfers</strong> en vul de huidige code uit je authenticator-app in</li>
   </ol>
-  <p>Heeft u uw authenticator-app niet bij de hand, dan logt u in met een back-upcode op <a href="/auth/backup">paramant.app/auth/backup</a>.</p>
+  <p>Heb je je authenticator-app niet bij de hand, dan log je in met een back-upcode op <a href="/auth/backup">paramant.app/auth/backup</a>.</p>
 
   <h2>Waarom geen gewoon wachtwoord?</h2>
-  <p>Paramant heeft geen wachtwoorden. U bewijst wie u bent met iets dat u heeft: een passkey op uw apparaat of de authenticator-app op uw telefoon. Er is dus geen wachtwoord om te onthouden, te hergebruiken of via een herstelmail over te nemen.</p>
+  <p>Paramant heeft geen wachtwoorden. Je bewijst wie je bent met iets dat je hebt: een passkey op je apparaat of de authenticator-app op je telefoon. Er is dus geen wachtwoord om te onthouden, te hergebruiken of via een herstelmail over te nemen.</p>
 
   <h2>Sleutel vervangen</h2>
 
-  <p>Een nieuwe accountsleutel maakt u nu niet zelf op de website. Denkt u dat hij is uitgelekt, mail dan meteen naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf het e-mailadres van uw account; wij vervangen hem. Zet de nieuwe sleutel daarna in elke koppeling die hem gebruikt. Een <code>psk_live_</code>-sleutel trekt u wel zelf in, op uw accountpagina.</p>
+  <p>Een nieuwe accountsleutel maak je nu niet zelf op de website. Denk je dat hij is uitgelekt, mail dan meteen naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf het e-mailadres van je account; wij vervangen hem. Zet de nieuwe sleutel daarna in elke koppeling die hem gebruikt. Een <code>psk_live_</code>-sleutel trek je wel zelf in, op je accountpagina.</p>
 
   <hr class="divider">
 
@@ -318,17 +318,17 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">Kan ik de API met mijn API-sleutel gebruiken zonder TOTP?</div>
-    <div class="a">Ja. Rechtstreekse API-verzoeken (uploaden, downloaden, verzendingen opvragen) hebben alleen de sleutel in de X-Api-Key-header nodig. TOTP is alleen nodig als u zelf inlogt op de website.</div>
+    <div class="a">Ja. Rechtstreekse API-verzoeken (uploaden, downloaden, verzendingen opvragen) hebben alleen de sleutel in de X-Api-Key-header nodig. TOTP is alleen nodig als je zelf inlogt op de website.</div>
   </div>
 
   <div class="troubleshoot-item">
     <div class="q">Mijn API-sleutel stond in een openbare Git-commit. Wat nu?</div>
-    <div class="a">Mail meteen naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf het adres van uw account, dan vervangen wij hem. Was het een <code>psk_live_</code>-sleutel, trek die dan zelf in op uw accountpagina. Beschouw verzendingen met de oude sleutel als mogelijk gelekt en laat uw ontvangers het weten als de inhoud gevoelig was.</div>
+    <div class="a">Mail meteen naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf het adres van je account, dan vervangen wij hem. Was het een <code>psk_live_</code>-sleutel, trek die dan zelf in op je accountpagina. Beschouw verzendingen met de oude sleutel als mogelijk gelekt en laat je ontvangers het weten als de inhoud gevoelig was.</div>
   </div>
 
   <div class="troubleshoot-item">
     <div class="q">Hoe lang is een API-sleutel geldig?</div>
-    <div class="a">API-sleutels verlopen niet vanzelf. Ze blijven geldig tot u ze intrekt. Een sessie op de website loopt af na een uur zonder activiteit, en na twaalf uur altijd.</div>
+    <div class="a">API-sleutels verlopen niet vanzelf. Ze blijven geldig tot je ze intrekt. Een sessie op de website loopt af na een uur zonder activiteit, en na twaalf uur altijd.</div>
   </div>
 
   <hr class="divider">
@@ -336,7 +336,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <h3>Zie ook</h3>
   <div class="next-steps">
     <a href="/help/authenticator-setup" class="next-step-card">
-      <h3>Uw authenticator-app instellen</h3>
+      <h3>Je authenticator-app instellen</h3>
       <p>Stap voor stap een authenticator-app koppelen.</p>
     </a>
     <a href="/help/iot-integration" class="next-step-card">

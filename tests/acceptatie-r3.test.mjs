@@ -121,7 +121,7 @@ test('A3: the dialog of an open request hands over the full link kept in this br
   await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] .dh-document-open').click();
   await page.waitForSelector('#dh-document-dialog:not([hidden])');
   await page.waitForFunction(() => /niet in deze browser/.test(document.querySelector('#dh-document-dialog')?.innerText || ''));
-  assert.match(await page.locator('#dh-document-dialog').innerText(), /niet in deze browser\. Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw\./);
+  assert.match(await page.locator('#dh-document-dialog').innerText(), /niet in deze browser\. Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw\./);
   await ctx.close();
   const relay = read('relay/relay.js');
   assert.match(relay, /Open deze link in de browser waarmee u het verzoek verstuurde/, 'the mail to the sender points at that exact place');
@@ -146,7 +146,7 @@ test('A1 and A4: the texts say what is true', () => {
   assert.match(flow, /De medeondertekenaars tekenen precies dit bestand\. Controleer het eindbewijs later op \/verify met /, 'together mode names the file to verify');
   const noKey = flow.slice(flow.indexOf("e.code === 'no_signing_passkey'"), flow.indexOf("e.code === 'no_signing_passkey'") + 1200);
   assert.match(noKey, /webauthn\/credentials/, 'no passkey on the account: the code, not Face ID');
-  assert.match(noKey, /U ondertekent met de code uit uw authenticator-app\./);
+  assert.match(noKey, /Je ondertekent met de code uit je authenticator-app\./);
   assert.doesNotMatch(read('frontend/sign.html'), /dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel\./);
   // Since acceptance 3.1.1 (16): keep the original, named by its file name,
   // together with the proof.

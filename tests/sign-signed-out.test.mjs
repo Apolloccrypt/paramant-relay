@@ -94,7 +94,7 @@ const out = await openSign(false);
 await out.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
 // Mick 05-10: taalronde
 ok('signed out, the flow carries a bar that says so',
-  /U bent niet ingelogd\. U kunt al wel een document klaarzetten\. Om te tekenen of te versturen heeft u een gratis Community-account nodig\./.test(await out.locator('#ds-signedout').innerText()),
+  /Je bent niet ingelogd\. Je kunt al wel een document klaarzetten\. Om te tekenen of te versturen heb je een gratis Community-account nodig\./.test(await out.locator('#ds-signedout').innerText()),
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /sign afterwards',
@@ -153,7 +153,7 @@ await pickJpeg(jpeg);
 await jpeg.locator('#ds-doc-error:not([hidden])').waitFor({ timeout: 15000 });
 ok('a JPEG is refused, and named',
   (await jpeg.locator('#ds-doc-error').innerText()).trim()
-    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent alleen pdf. Zet uw bestand eerst om naar pdf: exporteer het, of druk het af als pdf.',
+    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent alleen pdf. Zet je bestand eerst om naar pdf: exporteer het, of druk het af als pdf.',
   await jpeg.locator('#ds-doc-error').innerText());
 ok('a refused file does not move the flow on',
   await jpeg.locator('#step-doc').isVisible()

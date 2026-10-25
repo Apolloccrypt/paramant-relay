@@ -46,11 +46,11 @@
       notPrmnt: 'Dit is geen .prmnt-bestand.',
       newer: 'Dit .prmnt-bestand is gemaakt met een nieuwere versie.',
       wrongPw: 'Verkeerde wachtwoordzin, of het bestand is beschadigd.',
-      locked: 'Verzegeld. Uw .prmnt-bestand wordt gedownload. Bewaar uw wachtwoordzin goed: zonder die gaat het bestand niet open, en wij kunnen hem niet voor u herstellen.',
+      locked: 'Verzegeld. Je .prmnt-bestand wordt gedownload. Bewaar je wachtwoordzin goed: zonder die gaat het bestand niet open, en wij kunnen hem niet voor jou herstellen.',
       wrong: 'Er ging iets mis.',
       locking: 'Bezig met verzegelen…',
       opening: 'Bezig met openen…',
-      opened: 'Geopend. Uw oorspronkelijke bestand ({name}) wordt gedownload.',
+      opened: 'Geopend. Je oorspronkelijke bestand ({name}) wordt gedownload.',
       file: 'bestand',
     },
     en: {

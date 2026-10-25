@@ -311,12 +311,12 @@ body { min-height:100vh; }
 <div class="hero">
   <div class="tag">Openbaar auditlog</div>
   <h1>Certificate <span>transparency</span></h1>
-  <p>Registraties van sleutels, overdrachten en aanmeldingen van relays komen allemaal in één Merkle-boom waarin elke wijziging zichtbaar is. Iedereen kan nagaan dat een vermelding in de boom staat, zonder de inhoud te zien. De wiskunde is dezelfde als bij de certificate transparency-logs van HTTPS (RFC 6962): een Merkle-boom met ondertekende boomstanden. Het verschil is wie meekijkt. Bij HTTPS zijn er meerdere onafhankelijke logs en monitors; hier is er één beheerder, Paramant, en nog geen onafhankelijke bewaarder van de boomstanden.</p>
+  <p>Dit is een openbaar logboek. Elke registratie van een sleutel, elke overdracht en elke aanmelding van een van onze servers komt erin, in één Merkle-boom: een opbouw waarin elke latere wijziging zichtbaar wordt. Iedereen kan nagaan dat een vermelding in het logboek staat, zonder de inhoud te zien. De rekenkunde is dezelfde als bij de certificate transparency-logs die HTTPS gebruikt (RFC 6962): een Merkle-boom met ondertekende boomstanden. Het verschil zit in het toezicht. Bij HTTPS zijn er meerdere onafhankelijke logboeken en controleurs. Hier is er één beheerder, Paramant, en nog geen onafhankelijke bewaarder van de boomstanden.</p>
 </div>
 
 <div class="tabs">
   <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Vermeldingen</button>
-  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Geregistreerde relays</button>
+  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Geregistreerde servers</button>
 </div>
 
 <div id="pane-log">
@@ -362,28 +362,27 @@ body { min-height:100vh; }
 <div class="notice" id="composition-notice">
   <div class="body">
     <strong>Wat er in dit log staat, en van wie het is</strong>
-    <span>U ziet het log van één relay, <code>health.paramant.app</code>, de relay waarlangs
-    de webapp op deze site verstuurt. Elke relay die we draaien houdt een eigen log bij, dus
+    <span>Je ziet het logboek van één server, <code>health.paramant.app</code>. Via die server
+    verstuurt de webapp op deze site. Elke server die we draaien houdt een eigen logboek bij, dus
     dit is geen totaal. De meeste van de <span id="composition-count">vermeldingen</span> hieronder zijn
-    helemaal geen overdrachten: het zijn onze eigen relays die zich aanmelden. Elke vermelding
-    hier is iets wat een relay over zichzelf meldde, en lange tijd deed elke relay dat opnieuw bij
-    elke herstart. Daarom is het getal hieronder zo groot. Een relay die zich aanmeldt en niets
-    nieuws te melden heeft, schrijft nu geen regel meer. Hoe dan ook: het aantal vermeldingen
-    zegt niets over hoeveel de dienst wordt gebruikt.</span>
+    geen overdrachten. Het zijn onze eigen servers die zich aanmelden en iets over zichzelf melden.
+    Lange tijd deed elke server dat opnieuw bij elke herstart, en daarom is het getal hieronder zo groot.
+    Een server die zich aanmeldt zonder iets nieuws te melden, schrijft nu geen regel meer. Het aantal
+    vermeldingen zegt niets over hoeveel de dienst wordt gebruikt.</span>
   </div>
 </div>
 <div class="notice" id="persistence-notice">
   <div class="body">
-    <strong>Blijvend log: overleeft een herstart van de relay</strong>
-    <span>Bij elke registratie worden hashes naar schijf geschreven (<code>/data/ct-log.json</code>)
-    en bij het opstarten opnieuw ingelezen. Er wordt nooit inhoud opgeslagen, alleen cryptografische hashes.
-    In april 2026 is het log wel opnieuw begonnen, tijdens tests:
-    de boom van <code>health.paramant.app</code> is toen opnieuw gestart. 39 vermeldingen uit die tijd
+    <strong>Het logboek blijft bewaard, ook als de server herstart</strong>
+    <span>Bij elke registratie schrijft de server hashes naar schijf (<code>/data/ct-log.json</code>),
+    en bij het opstarten leest hij ze opnieuw in. Er wordt nooit inhoud opgeslagen, alleen cryptografische hashes.
+    In april 2026 is het log wel opnieuw begonnen, tijdens tests.
+    De boom van <code>health.paramant.app</code> is toen opnieuw gestart. 39 vermeldingen uit die tijd
     (posities 1 tot en met 34 en 42 tot en met 46) hebben een opgeslagen bewijs dat niet op de huidige boom past.
     Voor vijf ervan (42 tot en met 46) is aangetoond dat dat bewijs uit de herstarte boom komt; voor de andere 34
-    is dat waarschijnlijk, maar niet aangetoond. De lijst hieronder en het inclusiebewijs rekenen voor alle 39
-    met de huidige boom en tonen de oude waarde apart. Van elke latere vermelding past de opgeslagen boomstand wel op de huidige boom
-    (onafhankelijk nagerekend op 6 oktober 2026). Verder begint het log alleen opnieuw als het volume van de relay wordt verwijderd.</span>
+    is dat waarschijnlijk, maar niet aangetoond. De lijst hieronder en het inclusiebewijs gebruiken voor alle 39
+    de huidige boom, en tonen de oude waarde apart. Van elke latere vermelding past de opgeslagen boomstand wel op de huidige boom
+    (onafhankelijk nagerekend op 6 oktober 2026). Verder begint het log alleen opnieuw als de opslag van de server (het Docker-volume) wordt verwijderd.</span>
   </div>
 </div>
 
@@ -402,7 +401,7 @@ body { min-height:100vh; }
   </div>
   <div class="stat">
     <div class="val" id="stat-relayreg">n/a</div>
-    <div class="lbl">Aanmeldingen van relays</div>
+    <div class="lbl">Aanmeldingen van servers</div>
   </div>
   <div class="stat">
     <div class="val dim" id="stat-root">n/a</div>
@@ -410,7 +409,7 @@ body { min-height:100vh; }
   </div>
   <div class="stat">
     <div class="val green" id="stat-relay">n/a</div>
-    <div class="lbl">Relay</div>
+    <div class="lbl">Server</div>
   </div>
   <div class="stat">
     <div class="val dim" id="stat-last">n/a</div>
@@ -459,7 +458,7 @@ body { min-height:100vh; }
 
 <div id="pane-relays" style="display:none">
   <div class="stats" id="relay-stats">
-    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Geregistreerde relays</div></div>
+    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Geregistreerde servers</div></div>
     <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectoren</div></div>
     <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Laatste registratie</div></div>
   </div>
@@ -468,12 +467,12 @@ body { min-height:100vh; }
       <span>URL</span><span>Sector</span><span>Versie</span><span>Editie</span>
       <span>Geverifieerd sinds</span><span>Laatst gezien</span>
     </div>
-    <div id="relay-entries"><div class="loading">Relayregister laden…</div></div>
+    <div id="relay-entries"><div class="loading">Serverregister laden…</div></div>
   </div>
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.js?v=6" defer></script>
+<script src="/js/ct-log.page.js?v=7" defer></script>
 </main>
 <footer>
   <div class="container-lg">

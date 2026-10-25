@@ -161,7 +161,7 @@ test('DASH-15-A: without the link in this browser, an honest way on and no remin
   await page.click('[data-pa-action="send-remind"]');
   await page.waitForTimeout(500);
   assert.equal(df.hits['/api/user/sends/snd_1/reinvite'] || 0, before, 'no reminder without a working link');
-  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw\./);
+  assert.match(await page.locator('[data-send-people="snd_1"]').innerText(), /Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw\./);
   await ctx.close();
 });
 
@@ -209,7 +209,7 @@ test('Firm sees the history but no audit-export buttons, and is told why', async
   assert.equal(await page.locator('#dh-export-csv').isVisible(), false);
   assert.equal(await page.locator('#dh-export-json').isVisible(), false);
   assert.equal(await page.locator('#dh-hist-load').isVisible(), true);
-  assert.match(await page.locator('#dh-export-note').innerText(), /hoort bij Business/);
+  assert.match(await page.locator('#dh-export-note').innerText(), /kan met Business/);
   await ctx.close();
 });
 

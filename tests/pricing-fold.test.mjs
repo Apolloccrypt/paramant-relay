@@ -249,9 +249,9 @@ test('the Dutch first screen at 390px carries the one offer, its button and Comm
   const page = await open(FOLD.width, FOLD.height, 'pricing');
   const seen = await measure(page, [
     ['h1', '^Prijzen$'],
-    ['what', 'Documenten laten tekenen en bestanden versturen die zichzelf wissen na het lezen'],
-    ['offer', '^Voor uw kantoor: 29 euro per maand\\.$'],
-    ['btw', 'Excl\\. btw\\. U betaalt €35,09 per maand, inclusief 21% btw\\.'],
+    ['what', 'Met Paramant laat je documenten ondertekenen en verstuur je bestanden die worden gewist nadat de ontvanger ze heeft geopend'],
+    ['offer', '^Voor je kantoor: 29 euro per maand\\.$'],
+    ['btw', 'Excl\\. btw\\. Je betaalt €35,09 per maand, inclusief 21% btw\\.'],
     ['community', 'Community is €0 per maand, voor altijd:'],
   ]);
   const cta = await page.evaluate(() => {

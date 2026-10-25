@@ -259,8 +259,8 @@
       var label = termLabel(term);
       if (term.ended) {
         return label
-          ? { name: label, rest: tr(' is afgelopen op ', ' ended on ') + day(term.at) + tr('. U zit nu op Community.', '. You are on Community now.'), renew: true }
-          : { name: 'Community', rest: tr(', gratis, voor altijd. Uw betaalde periode is afgelopen op ', ', free for good. Your paid term ended on ') + day(term.at) + '.', renew: true };
+          ? { name: label, rest: tr(' is afgelopen op ', ' ended on ') + day(term.at) + tr('. Je zit nu op Community.', '. You are on Community now.'), renew: true }
+          : { name: 'Community', rest: tr(', gratis, voor altijd. Je betaalde periode is afgelopen op ', ', free for good. Your paid term ended on ') + day(term.at) + '.', renew: true };
       }
       if (label) return { name: label, rest: tr(', loopt af op ', ', ends on ') + day(term.at) + tr('. Er wordt niets automatisch verlengd.', ', nothing renews automatically.'), renew: term.warn };
     }
@@ -312,16 +312,16 @@
         return (!best || t < best.t) ? { t: t } : best;
       }, null);
       show(quiet, false);
-      words(kicker, tr('Voor u', 'For you'));
+      words(kicker, tr('Voor jou', 'For you'));
       words(num, String(inbox.length));
       show(of, false);
-      words(cap, inbox.length === 1 ? tr('document wacht op uw handtekening', 'document is waiting for your signature') : tr('documenten wachten op uw handtekening', 'documents are waiting for your signature'));
-      words(sub, earliest ? tr('Het eerste kwam binnen op ', 'The first one arrived on ') + day(earliest.t) + '.' : tr('Door iemand anders naar u gestuurd.', 'Sent to you by someone else.'));
+      words(cap, inbox.length === 1 ? tr('document wacht op je handtekening', 'document is waiting for your signature') : tr('documenten wachten op je handtekening', 'documents are waiting for your signature'));
+      words(sub, earliest ? tr('Het eerste kwam binnen op ', 'The first one arrived on ') + day(earliest.t) + '.' : tr('Door iemand anders naar jou gestuurd.', 'Sent to you by someone else.'));
       show(read, true); show(cap, true); show(sub, true);
       // The account's own open requests move down into the strip: still worth a
       // glance, no longer the headline, and never a second big number arguing
       // with the first.
-      if (open && open.length) items.push([tr('Uw open verzoeken', 'Your open requests'), String(open.length)]);
+      if (open && open.length) items.push([tr('Je open verzoeken', 'Your open requests'), String(open.length)]);
       if (capped) items.push([tr('Handtekeningen over', 'Signatures left'), left + tr(' van ', ' of ') + limit]);
       strip(pick('hw-strip'), items);
       return;
@@ -367,7 +367,7 @@
 
     // Neither route answered. One line, no number, no raw error.
     show(read, false); show(cap, false); show(sub, false);
-    words(kicker, tr('Uw account', 'Your account'));
+    words(kicker, tr('Je account', 'Your account'));
     show(quiet, true);
     strip(pick('hw-strip'), items);
   }
@@ -599,7 +599,7 @@
       // Personalise only with the name the customer gave himself (the label
       // from signup), via textContent. The local-part of the address used to
       // stand here, which greeted a firm as "Your documents, info." or
-      // "Uw documenten, afzender." (acceptatie 3.1.1, taal 41). No name, no
+      // "Je documenten, afzender." (acceptatie 3.1.1, taal 41). No name, no
       // greeting: a plain "Your documents."
       var nameEl = inn.querySelector('[data-home-name]');
       if (nameEl) {

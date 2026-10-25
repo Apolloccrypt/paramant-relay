@@ -6,7 +6,7 @@ const LANG = (document.documentElement.lang || 'nl').slice(0, 2) === 'en' ? 'en'
 const T = {
   nl: {
     foreign: (host) => 'Deze link komt niet van ' + host + '. Daarom openen we hem hier niet.',
-    invalid: 'Deze link herkennen we niet. Kijk of u de hele link hebt geplakt.',
+    invalid: 'Deze link herkennen we niet. Kijk of je de hele link hebt geplakt.',
     importTitle: 'Sleutel laden...',
     importStatus: 'De sleutel uit de link wordt geladen...',
     dlTitle: 'Downloaden...',
@@ -14,17 +14,17 @@ const T = {
     dlFail: (st) => 'Downloaden is mislukt (HTTP ' + st + ').',
     decTitle: 'Ontsleutelen...',
     decStatus: 'Het bestand wordt ontsleuteld...',
-    decFail: 'De sleutel in de link past niet op dit bestand. Misschien is de link onderweg beschadigd of niet helemaal gekopieerd. Er is niets gewist. Open de link opnieuw, precies zoals u hem kreeg.',
+    decFail: 'De sleutel in de link past niet op dit bestand. Misschien is de link onderweg beschadigd of niet helemaal gekopieerd. Er is niets gewist. Open de link opnieuw, precies zoals je hem kreeg.',
     checking: 'Even kijken of het bestand er nog is...',
     readyMeta: (size, ttl) => [size ? 'Grootte ' + size : '', Number.isFinite(ttl) ? 'nog ' + leftNl(ttl) + ' beschikbaar' : ''].filter(Boolean).join(', ') + (size || Number.isFinite(ttl) ? '.' : ''),
     busy: 'Dit bestand wordt nu al gedownload, misschien op een ander apparaat. Probeer het over een minuut opnieuw.',
     stalled: 'De verbinding lag een minuut stil, dus de download is gestopt. Er is niets gewist. Probeer het opnieuw.',
     netFail: 'De download kwam niet helemaal binnen. Er is niets gewist. Probeer het opnieuw.',
     gone: {
-      downloaded: { title: 'Dit bestand is al gedownload en daarna gewist.', sub: 'Een link van Paramant werkt maar één keer. Na de download is het bestand voorgoed van onze server verwijderd. Was u dat niet zelf, neem dan contact op met de afzender.' },
+      downloaded: { title: 'Dit bestand is al gedownload en daarna gewist.', sub: 'Een link van Paramant werkt maar één keer. Na de download is het bestand voorgoed van onze server verwijderd. Was je dat niet zelf, neem dan contact op met de afzender.' },
       expired: { title: 'Deze link is verlopen.', sub: 'Het bestand is niet gedownload. Het stond maar een beperkte tijd klaar en is nu van onze server verwijderd. Vraag de afzender om het opnieuw te sturen.' },
-      lost: { title: 'Dit bestand is niet meer beschikbaar.', sub: 'Het is niet gedownload. Onze server is herstart of het bestand is verwijderd voordat u het kon ophalen. Vraag de afzender om het opnieuw te sturen. Onze excuses.' },
-      withdrawn: { title: 'De afzender heeft dit bestand ingetrokken.', sub: 'Het staat niet meer op onze server. Neem contact op met de afzender als u het toch nodig hebt.' },
+      lost: { title: 'Dit bestand is niet meer beschikbaar.', sub: 'Het is niet gedownload. Onze server is opnieuw opgestart of het bestand is verwijderd voordat je het kon ophalen. Vraag de afzender om het opnieuw te sturen. Onze excuses.' },
+      withdrawn: { title: 'De afzender heeft dit bestand ingetrokken.', sub: 'Het staat niet meer op onze server. Neem contact op met de afzender als je het toch nodig hebt.' },
       exhausted: { title: 'Deze link is te vaak geprobeerd.', sub: 'Na vijf pogingen zonder geslaagde download is het bestand voor de zekerheid gewist. Vraag de afzender om het opnieuw te sturen.' },
       unknown: { title: 'Deze link werkt niet meer.', sub: 'Hij is verlopen, al gebruikt of nooit uitgegeven. Vraag de afzender om het bestand opnieuw te sturen.' },
     },
@@ -34,14 +34,14 @@ const T = {
     opening: 'Het document wordt geopend...',
     done: 'Klaar.',
     pages: (n, shown) => n + (n === 1 ? ' pagina' : ' pagina\'s') + (n > shown ? ', eerste ' + shown + ' getoond' : ''),
-    haveFile: 'U hebt het bestand.',
+    haveFile: 'Je hebt het bestand.',
     pdfLine: (name, pc, size) => name + ' (' + pc + ', ' + size + ') is hier ' +
       'geopend in dit tabblad. Onze kopie is voorgoed vernietigd. ' +
-      'Wilt u het bewaren, sla het dan nu op.',
+      'Wil je het bewaren, sla het dan nu op.',
     save: 'Opslaan',
     pdfFallback: 'Het document opent hier niet. Het wordt opgeslagen...',
     saving: 'Bestand wordt opgeslagen...',
-    savedLine: (name, size) => name + ' (' + size + ') staat op uw apparaat. ' +
+    savedLine: (name, size) => name + ' (' + size + ') staat op je apparaat. ' +
       'Onze kopie is voorgoed vernietigd.',
     unknown: 'Onbekende fout',
   },
@@ -614,7 +614,7 @@ async function startDownload() {
         filename = metaName || LINK.name || 'download';
         // The seal says how big the file was. A sender that sealed fewer bytes
         // than that (the browser extension up to 1.0.1 sealed every attachment
-        // as 0 bytes, fase 1 EXT-13-A) must not end in "U hebt het bestand"
+        // as 0 bytes, fase 1 EXT-13-A) must not end in "Je hebt het bestand"
         // with an empty file on disk. Nothing is burned: the claim goes back.
         if (chunkMismatch || (sealedSize !== null && sealedSize !== total)) {
           sizeMismatch = { got: total, want: sealedSize };

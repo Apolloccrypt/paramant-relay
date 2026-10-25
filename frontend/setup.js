@@ -82,7 +82,7 @@ function validateStep(n) {
   }
   if (n === 4) {
     if (c.firstUserEmail && !EMAIL_RE.test(c.firstUserEmail)) {
-      return 'Het e-mailadres van de eerste gebruiker is niet geldig. Laat het leeg als u nu nog geen gebruiker wilt aanmaken.';
+      return 'Het e-mailadres van de eerste gebruiker is niet geldig. Laat het leeg als je nu nog geen gebruiker wilt aanmaken.';
     }
     return null; // first user is optional
   }
@@ -120,7 +120,7 @@ function dnsPreflight() {
         out.textContent = 'DNS OK: ' + domain + ' -> ' + (d.addresses || []).join(', ');
         out.style.color = '#0a7';
       } else {
-        out.textContent = 'DNS voor ' + domain + ' werkt nog niet. U kunt gewoon doorgaan en DNS later instellen.';
+        out.textContent = 'DNS voor ' + domain + ' werkt nog niet. Je kunt gewoon doorgaan en DNS later instellen.';
         out.style.color = '#a60';
       }
     })
@@ -182,7 +182,7 @@ function checkSetupMode() {
         if (main) {
           main.innerHTML =
             '<h1>Installatie is al klaar</h1>' +
-            '<p>Deze relay heeft al minstens één gebruiker, dus de eerste ' +
+            '<p>Deze server heeft al minstens één gebruiker, dus de eerste ' +
             'installatie is gesloten. <a href="/auth/login">Log in</a>.</p>';
         }
       }
@@ -194,7 +194,7 @@ function renderDone(res) {
   var body = $('#done-body');
   if (!body) { return; }
   var b = (res && res.body) || {};
-  var html = '<p>Uw relay is ingesteld en uw beheersleutel staat klaar. ' +
+  var html = '<p>Je server is ingesteld en je beheersleutel staat klaar. ' +
     '<strong>Kopieer hem nu</strong>: hij wordt maar één keer getoond.</p>';
   if (b.admin_api_key) {
     html += '<p style="font-family:monospace;background:#f5f7fa;border:1px solid #e0e0e0;padding:10px;word-break:break-all">' +
@@ -207,7 +207,7 @@ function renderDone(res) {
   if (b.next_step === 'restart_relay') {
     html += '<p class="hint">Er is een nieuwe <code>.env</code> geschreven' +
       (b.env_backed_up ? ' (de vorige staat als reservekopie in <code>.env.pre-setup</code>)' : '') +
-      '. Herstart de relay (<code>docker compose up -d</code>) om de compliance- en TLS-instellingen toe te passen.</p>';
+      '. Herstart de server (<code>docker compose up -d</code>) om de compliance- en TLS-instellingen toe te passen.</p>';
   }
   var healthHref = safeHref(b.health_url || '/all-systems-go');
   var dashHref = safeHref(b.dashboard_url || '/dashboard');
@@ -238,7 +238,7 @@ function applyConfig() {
   var setupToken = tokenInput ? String(tokenInput.value || '').trim() : '';
   if (!setupToken) {
     if (applyBtn) { applyBtn.disabled = false; }
-    if (status) { status.style.color = '#b00020'; status.textContent = 'Vul eerst de installatiecode in. De relay zet die bij de start in het bestand setup-token naast users.json.'; }
+    if (status) { status.style.color = '#b00020'; status.textContent = 'Vul eerst de installatiecode in. De server zet die bij de start in het bestand setup-token naast users.json.'; }
     if (tokenInput) { tokenInput.focus(); }
     return Promise.resolve();
   }
@@ -263,7 +263,7 @@ function applyConfig() {
       status.style.color = '#b00020';
       if (res.status >= 500) {
         status.textContent = 'Installatie mislukt (HTTP ' + res.status + '). ' +
-          ((res.body && res.body.error) ? res.body.error : 'Bekijk de logs van de relay: docker compose logs relay');
+          ((res.body && res.body.error) ? res.body.error : 'Bekijk de logs van de server: docker compose logs relay');
       } else {
         // 4xx: validation -- show message and let the user correct an earlier step.
         if (res.status === 401 && res.body && res.body.error === 'setup_token_required') {
@@ -272,14 +272,14 @@ function applyConfig() {
         }
         status.textContent = (res.body && res.body.error)
           ? res.body.error
-          : ('Controleer uw invoer (HTTP ' + res.status + ').');
+          : ('Controleer je invoer (HTTP ' + res.status + ').');
       }
     })
     .catch(function () {
       if (applyBtn) { applyBtn.disabled = false; }
       if (status) {
         status.style.color = '#b00020';
-        status.textContent = 'De relay is niet bereikbaar. Uw instellingen staan hierboven. U kunt ze voorlopig met de hand toepassen.';
+        status.textContent = 'De server is niet bereikbaar. Je instellingen staan hierboven. Je kunt ze voorlopig met de hand toepassen.';
       }
     });
 }

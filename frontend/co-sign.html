@@ -13,9 +13,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="signing">
-<meta name="description" content="Bekijk en onderteken een document dat iemand u stuurde. Het bestand en uw ondertekensleutel blijven in uw browser.">
+<meta name="description" content="Bekijk en onderteken een document dat iemand je stuurde. Het bestand en je ondertekensleutel blijven in je browser.">
 <meta property="og:title" content="Document medeondertekenen · Paramant">
-<meta property="og:description" content="Bekijk en onderteken een document dat iemand u stuurde. Het bestand en uw ondertekensleutel blijven in uw browser.">
+<meta property="og:description" content="Bekijk en onderteken een document dat iemand je stuurde. Het bestand en je ondertekensleutel blijven in je browser.">
 <meta property="og:url" content="https://paramant.app/co-sign">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-cosign.png">
@@ -24,7 +24,7 @@
 <meta property="og:image:alt" content="Document medeondertekenen: een ondertekend document met een gecontroleerde post-quantum stempel.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Document medeondertekenen · Paramant">
-<meta name="twitter:description" content="Bekijk en onderteken een document dat iemand u stuurde. Het bestand en uw ondertekensleutel blijven in uw browser.">
+<meta name="twitter:description" content="Bekijk en onderteken een document dat iemand je stuurde. Het bestand en je ondertekensleutel blijven in je browser.">
 <meta name="twitter:image" content="https://paramant.app/og-cosign.png">
 <meta name="robots" content="noindex,nofollow">
 <link rel="canonical" href="https://paramant.app/co-sign">
@@ -218,7 +218,7 @@ body.needs-login #sign-intro{display:none}
 
 <div class="step" id="step-loading">
   <h1>Document openen</h1>
-  <p class="sub">We halen het verzoek op. Onze server heeft het document zelf niet, alleen een vingerafdruk ervan en de plek waar u tekent.</p>
+  <p class="sub">We halen het verzoek op. Onze server heeft het document zelf niet, alleen een vingerafdruk ervan en de plek waar je tekent.</p>
   <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Laden...</div></div></div>
 </div>
 
@@ -231,13 +231,13 @@ body.needs-login #sign-intro{display:none}
 
 <div class="step" id="step-cosign">
   <h1 id="cosign-title">Document ondertekenen</h1>
-  <p class="sub" id="cosign-sub">Lees het document en zet uw handtekening.</p>
+  <p class="sub" id="cosign-sub">Lees het document en zet je handtekening.</p>
 
   <details class="how">
-    <summary>HOE DIT WERKT</summary>
+    <summary>Hoe dit werkt</summary>
     <div class="how-body">
-      <p>Openen en ondertekenen gebeurt op uw eigen apparaat. Onze server krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
-      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een post-quantum cryptografische handtekening (ML-DSA-65). Het is geen gekwalificeerde elektronische handtekening (QES) onder eIDAS. Vergelijk de vingerafdruk hieronder met die van het bestand dat u los ontving.</p>
+      <p>Openen en ondertekenen gebeurt op je eigen apparaat. Onze server krijgt versleutelde gegevens, je publieke sleutel, de handtekening en de plek van je velden. De leesbare inhoud van het document en je private sleutel krijgt hij nooit.</p>
+      <p><strong>Dit is geen gekwalificeerde handtekening onder eIDAS.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische handtekening met ML-DSA-65. ML-DSA-65 is een methode die ook bestand moet zijn tegen toekomstige quantumcomputers. Het is geen gekwalificeerde elektronische handtekening (QES) onder eIDAS. Vergelijk de vingerafdruk hieronder met die van het bestand dat je los ontving.</p>
     </div>
   </details>
 
@@ -268,12 +268,12 @@ body.needs-login #sign-intro{display:none}
   </div>
 
   <div class="card" id="review-card">
-    <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title" id="review-title">Bekijk wat u ondertekent</div></div>
+    <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title" id="review-title">Bekijk wat je ondertekent</div></div>
     <div class="card-body">
       <details class="how">
-        <summary>WAAR HET DOCUMENT VANDAAN KOMT</summary>
+        <summary>Waar het document vandaan komt</summary>
         <div class="how-body">
-          <p>Uw browser opent het versleutelde document. U kunt pas tekenen als de vingerafdruk klopt met het verzoek. Onze server krijgt de sleutel en de leesbare inhoud niet.</p>
+          <p>Je browser opent het versleutelde document. Je kunt pas tekenen als de vingerafdruk klopt met het verzoek. Onze server krijgt de sleutel en de leesbare inhoud niet.</p>
         </div>
       </details>
       <div class="banner" id="document-delivery-status">Het document wordt geladen...</div>
@@ -281,27 +281,27 @@ body.needs-login #sign-intro{display:none}
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
       <div class="requested-note" id="requested-note" hidden>
-        <span id="requested-note-text">De afzender heeft aangegeven waar u tekent</span>
+        <span id="requested-note-text">De afzender heeft aangegeven waar je tekent</span>
         <button class="btn" id="requested-note-go" type="button">Naar die plek</button>
       </div>
       <div class="doc-preview" id="doc-preview" hidden></div>
       <div id="appearance-editor" hidden>
         <fieldset class="ink-style" id="ink-style">
-          <legend>Uw handtekening</legend>
-          <label class="ink-choice"><input type="radio" name="ink-style" value="type" checked> Typ uw naam</label>
-          <label class="ink-choice"><input type="radio" name="ink-style" value="draw"> Teken met uw vinger of muis</label>
-          <div id="ink-type-pane"><input class="input ink-name" id="ink-name" maxlength="80" autocomplete="name" aria-label="Uw naam zoals die in de handtekening komt"></div>
-          <div id="ink-draw-pane" hidden><canvas id="ink-pad" class="ink-pad" aria-label="Teken hier uw handtekening"></canvas><button class="btn btn-outline" id="ink-clear" type="button">Wis tekening</button></div>
+          <legend>Je handtekening</legend>
+          <label class="ink-choice"><input type="radio" name="ink-style" value="type" checked> Typ je naam</label>
+          <label class="ink-choice"><input type="radio" name="ink-style" value="draw"> Teken met je vinger of muis</label>
+          <div id="ink-type-pane"><input class="input ink-name" id="ink-name" maxlength="80" autocomplete="name" aria-label="Je naam zoals die in de handtekening komt"></div>
+          <div id="ink-draw-pane" hidden><canvas id="ink-pad" class="ink-pad" aria-label="Teken hier je handtekening"></canvas><button class="btn btn-outline" id="ink-clear" type="button">Wis tekening</button></div>
         </fieldset>
-        <div class="appearance-tools" role="toolbar" aria-label="Zichtbare velden van uw handtekening">
+        <div class="appearance-tools" role="toolbar" aria-label="Zichtbare velden van je handtekening">
           <button class="btn btn-outline" id="appearance-seal" type="button">Plaats mijn handtekening</button>
           <button class="btn btn-outline" id="appearance-date" type="button">Plaats datum</button>
           <button class="btn btn-outline" id="appearance-clear" type="button">Wis mijn velden</button>
         </div>
-        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Paraaf op elke pagina (naast uw handtekening)</label>
+        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Paraaf op elke pagina (naast je handtekening)</label>
         <p class="appearance-help" id="appearance-allpages-required" hidden>De afzender vraagt een paraaf op elke pagina. Die staat al klaar.</p>
-        <p class="appearance-help">Uw paraaf komt in de marge van elke pagina, naast die van de andere ondertekenaars. Niemand tekent op uw plek.</p>
-        <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Ook deze plekken vallen onder uw handtekening.</p>
+        <p class="appearance-help">Je paraaf komt in de marge van elke pagina, naast die van de andere ondertekenaars. Niemand tekent op je plek.</p>
+        <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Ook deze plekken vallen onder je handtekening.</p>
       </div>
     </div>
   </div>
@@ -320,9 +320,9 @@ body.needs-login #sign-intro{display:none}
     <div class="card-head"><div class="dot"></div><div class="card-head-title" id="sign-title">Ondertekenen als <span id="me-label">ondertekenaar</span></div></div>
     <div class="card-body">
       <details class="how" id="sign-intro">
-        <summary>WAARMEE U TEKENT</summary>
+        <summary>Waarmee je tekent</summary>
         <div class="how-body">
-          <p>U tekent met een ondertekensleutel op uw eigen apparaat. Heeft u een passkey, dan bevestigt u met Face ID, Touch ID of een beveiligingssleutel. Zonder passkey bevestigt u met de code van 6 cijfers uit uw authenticator-app. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waar deze uitnodiging naartoe ging.</p>
+          <p>Je tekent met een ondertekensleutel op je eigen apparaat. Heb je een passkey, dan bevestig je met Face ID, Touch ID of een beveiligingssleutel. Zonder passkey bevestig je met de code van 6 cijfers uit je authenticator-app. De sleutel verlaat je apparaat nooit. De handtekening hoort bij het e-mailadres waar deze uitnodiging naartoe ging.</p>
         </div>
       </details>
       <div class="banner" id="sign-status" hidden></div>
@@ -334,7 +334,7 @@ body.needs-login #sign-intro{display:none}
            for this session — signing "like logging in again". -->
       <div class="banner" id="cs-pass-panel" hidden style="margin-top:12px">
         <p id="cs-pass-prompt" style="margin-bottom:10px"></p>
-        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Code van 6 cijfers" aria-label="Code uit uw authenticator-app" style="width:100%;padding:10px;border:1px solid var(--ink-hair);border-radius:var(--r-2);margin-bottom:8px;font-size:14px">
+        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Code van 6 cijfers" aria-label="Code uit je authenticator-app" style="width:100%;padding:10px;border:1px solid var(--ink-hair);border-radius:var(--r-2);margin-bottom:8px;font-size:14px">
         <p id="cs-pass-err" hidden style="color:var(--danger);font-size:13px;margin-bottom:8px"></p>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline" id="cs-pass-cancel" type="button">Annuleren</button>
@@ -348,8 +348,8 @@ body.needs-login #sign-intro{display:none}
 </div>
 
 <div class="step" id="step-done">
-  <h1>Uw handtekening is gezet</h1>
-  <p class="sub" id="done-sub">Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.</p>
+  <h1>Je handtekening is gezet</h1>
+  <p class="sub" id="done-sub">Zodra iedereen heeft getekend, opent dezelfde link uit je uitnodiging het complete document met alle handtekeningen.</p>
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Resultaat</div></div>
     <div class="card-body">
@@ -362,12 +362,12 @@ body.needs-login #sign-intro{display:none}
         <div class="how-body">
           <dl class="kv">
             <dt>Verzoek</dt><dd id="done-env-id">-</dd>
-            <dt>Vingerafdruk van uw sleutel</dt><dd id="done-pk">-</dd>
+            <dt>Vingerafdruk van je sleutel</dt><dd id="done-pk">-</dd>
           </dl>
         </div>
       </details>
       <div style="margin-top:14px">
-        <span class="tag green">Op uw apparaat ondertekend</span>
+        <span class="tag green">Op je apparaat ondertekend</span>
       </div>
       <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Pdf-kopie met zichtbare stempel downloaden</button>
       <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Bewijs downloaden (.psign)</a>
@@ -385,7 +385,7 @@ body.needs-login #sign-intro{display:none}
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
-<script src="/js/quota-upgrade.js?v=10" defer></script>
-<script type="module" src="/co-sign.js?v=46"></script>
+<script src="/js/quota-upgrade.js?v=11" defer></script>
+<script type="module" src="/co-sign.js?v=47"></script>
 </body>
 </html>

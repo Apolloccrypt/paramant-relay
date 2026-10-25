@@ -9,7 +9,7 @@ import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
 // The relay keys this site ships with. A multi-party receipt is only Paramant's
 // when its notary key is one of these; the key printed inside the receipt is
 // never trusted on its own, or any file could vouch for itself.
-import { anchorByFingerprint } from '/js/relay-trust-anchors.js?v=2';
+import { anchorByFingerprint } from '/js/relay-trust-anchors.js?v=3';
 import { embeddedFiles, looksLikePdf } from '/js/pdf-embedded.js?v=2';
 
 const RELAY_URL = 'https://relay.paramant.app';
@@ -69,9 +69,9 @@ const T = {
     embeddedTooLarge: 'Deze pdf bevat een bijlage die uitgepakt te groot is om hier te controleren. Die bijlage is niet bekeken. Controleer met het originele bestand zelf.',
     // Review #565, M1: a pdf whose visible pages say something else, with the
     // real signed original attached, verified with the full green banner.
-    embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekeningen zijn geldig, voor het origineel in deze pdf.</strong> Alleen dat origineel is gecontroleerd, niet de pagina\u2019s die u nu ziet. Die kunnen in theorie afwijken. Sla het origineel op en lees dat, dan weet u zeker wat er is getekend.</div>',
+    embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekeningen zijn geldig, voor het origineel in deze pdf.</strong> Alleen dat origineel is gecontroleerd, niet de pagina\u2019s die je nu ziet. Die kunnen in theorie afwijken. Sla het origineel op en lees dat, dan weet je zeker wat er is getekend.</div>',
     hashMismatch: 'de vingerafdruk klopt niet: dit is niet het document dat is ondertekend',
-    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. {pick}</strong> De handtekening in het .psign-bestand geldt voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Bij een pdf of afbeelding is dat de versie met de zegel erop, die u na het ondertekenen kreeg. Wat u koos, is niet wat er is ondertekend. Kies dat bestand en controleer opnieuw.</div>',
+    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. {pick}</strong> De handtekening in het .psign-bestand geldt voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Bij een pdf of afbeelding is dat de versie met de zegel erop, die je na het ondertekenen kreeg. Wat je koos, is niet wat er is ondertekend. Kies dat bestand en controleer opnieuw.</div>',
     partyNamesHead: 'Namen zoals de afzender ze opgaf (niet gecontroleerd; de handtekeningen zelf zijn wel gecontroleerd):',
     missingSignerPk: 'signer_public_key ontbreekt',
     missingEmailHash: 'party_email_hash ontbreekt (het ondertekende bericht is offline niet na te bouwen)',
@@ -84,7 +84,7 @@ const T = {
     missingDocHash: 'document_hash ontbreekt',
     hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. De pdf met de zichtbare handtekeningen en parafen (onder elke handtekening de regel "Paramant ParaSign · PQ …") is ook niet het origineel. Kies het originele bestand dat ter ondertekening is aangeboden.',
     missingParties: 'partijen ontbreken',
-    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> Het .psign-bestand is in orde, maar de handtekeningen gelden voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Wat u koos, is dus niet wat er is ondertekend. Kies het originele bestand dat ter ondertekening is aangeboden en controleer opnieuw. Bij &quot;Samen ondertekenen&quot; is dat de pdf met het zegel van de afzender, zoals de afzender die na zijn eigen handtekening kreeg; een pdf met de handtekeningen van iedereen is een leesbare kopie; die controleert hier alleen als het origineel erin is ingebed, zoals bij de complete pdf van Paramant.</div>',
+    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> Het .psign-bestand is in orde, maar de handtekeningen gelden voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Wat je koos, is dus niet wat er is ondertekend. Kies het originele bestand dat ter ondertekening is aangeboden en controleer opnieuw. Bij &quot;Samen ondertekenen&quot; is dat de pdf met het zegel van de afzender, zoals de afzender die na zijn eigen handtekening kreeg; een pdf met de handtekeningen van iedereen is een leesbare kopie; die controleert hier alleen als het origineel erin is ingebed, zoals bij de complete pdf van Paramant.</div>',
     lookupFailed: '<p class="ps-help">Het opzoeken lukte nu niet; Paramant gaf geen antwoord. De controle hierboven blijft gelden. Probeer het later opnieuw.</p>',
     lookupRetry: 'Opnieuw opzoeken',
     qesNote: '<p class="ps-help">Volgens dit bewijs staat er in de pdf ook een gekwalificeerde handtekening (PAdES) van {provider}, certificaat <code class="mono">{fp}</code>{when}. Die tweede handtekening controleert deze pagina niet: open de ondertekende pdf in een PAdES-lezer, zoals Adobe Acrobat of de EU-validatiedienst DSS.</p>',
@@ -95,7 +95,7 @@ const T = {
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>De handtekening klopt met dit document.</strong> Wie tekende, staat niet in de handtekening: de naam hieronder is niet gecontroleerd.</div>',
     fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekening klopt, maar dit bestand is aangepast.</strong> De gegevens over de ondertekenaar horen niet bij de sleutel die tekende. Vertrouw de naam in dit bestand niet.</div>',
     lookupBtn: 'Wie hoort bij deze sleutel? (vraagt het aan Paramant)',
-    lookupNote: 'De controle hierboven gebeurde helemaal in uw browser. Deze knop is de enige vraag aan Paramant: welke account bij deze sleutel hoort.',
+    lookupNote: 'De controle hierboven gebeurde helemaal in je browser. Deze knop is de enige vraag aan Paramant: welke account bij deze sleutel hoort.',
     partyIncomplete: '{who} heeft geen volledige handtekening',
     partyWho: 'partij {i}',
     partyAt: 'de partij op plaats {n} in het bewijs',
@@ -103,20 +103,20 @@ const T = {
     partyAppearanceInvalid: '{who}: de beschrijving van de zichtbare handtekening is beschadigd',
     partyInvalid: '{who}: handtekening ongeldig',
     partyError: '{who}: de handtekening of de sleutel is beschadigd en kan niet worden gelezen',
-    missingRelayPk: 'de ingebedde publieke sleutel van de relay ontbreekt',
+    missingRelayPk: 'de ingebedde publieke sleutel van de server ontbreekt',
     missingNotary: 'notarishandtekening ontbreekt',
-    relayPkMismatch: 'hash van de publieke sleutel van de relay klopt niet',
+    relayPkMismatch: 'hash van de publieke sleutel van de server klopt niet',
     notaryInvalid: 'notarishandtekening ongeldig',
-    notaryError: 'de notarishandtekening of de relaysleutel is beschadigd en kan niet worden gelezen',
+    notaryError: 'de notarishandtekening of de serversleutel is beschadigd en kan niet worden gelezen',
     relayUnknown: 'De serversleutel die dit bewijs bekrachtigt (vingerafdruk {fp}…) is geen sleutel van Paramant. Dit bewijs komt dus niet aantoonbaar van Paramant, ook al klopt het met zichzelf.',
-    verifyingLocal: 'Bezig met controleren in uw browser…',
+    verifyingLocal: 'Bezig met controleren in je browser…',
     verifyingRelay: 'Vingerafdruk maken op dit apparaat, daarna controleert onze server het bewijs…',
     verifyFailed: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span>Controle mislukt: {err}</div>',
     notLinked: '<p class="ps-help">Paramant kent geen account bij deze sleutel.</p>',
     noLabel: '<em>(geen naam)</em>',
     unverified: '<em>(niet geverifieerd)</em>',
     signedBy: '<p class="ps-help"><strong>Ondertekend door {label} ({email})</strong> &middot; {algo}</p>',
-    revoked: '<p class="ps-help">Deze sleutel is ingetrokken op {when}. Dit bewijs bevat geen ondertekend tijdstip, dus of er voor die datum is getekend, valt hieruit niet af te leiden. Vertrouw de handtekening alleen als u het tijdstip op een andere manier kunt aantonen.</p>',
+    revoked: '<p class="ps-help">Deze sleutel is ingetrokken op {when}. Dit bewijs bevat geen ondertekend tijdstip, dus of er voor die datum is getekend, valt hieruit niet af te leiden. Vertrouw de handtekening alleen als je het tijdstip op een andere manier kunt aantonen.</p>',
     revokedNotary: '<p class="ps-help">Deze sleutel is ingetrokken op {when}. Het tijdstip in dit oude bewijs is door onze server ondertekend; de handtekening telt als die van voor die datum is.</p>',
     revokedBanner: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Sleutel ingetrokken.</strong> De handtekening klopt wiskundig, maar de sleutel is ingetrokken. Zie hieronder.</div>',
     enrolled: '<p class="ps-help">Sleutel geregistreerd op {when}.</p>',

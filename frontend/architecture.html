@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F2F3F5;color:#0C1B2A;margin:0;padding:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Zo worden uw bestanden versleuteld · Architectuur · Paramant</title>
+<title>Zo worden je bestanden versleuteld · Architectuur · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
-<meta property="og:title" content="Zo worden uw bestanden versleuteld · Architectuur · Paramant">
-<meta property="og:description" content="Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
+<meta name="description" content="Stap voor stap in gewone taal: hoe je bestand in je browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
+<meta property="og:title" content="Zo worden je bestanden versleuteld · Architectuur · Paramant">
+<meta property="og:description" content="Stap voor stap in gewone taal: hoe je bestand in je browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
 <meta property="og:url" content="https://paramant.app/architecture">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Zo worden uw bestanden versleuteld · Architectuur · Paramant">
-<meta name="twitter:description" content="Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
+<meta name="twitter:title" content="Zo worden je bestanden versleuteld · Architectuur · Paramant">
+<meta name="twitter:description" content="Stap voor stap in gewone taal: hoe je bestand in je browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist.">
 <link rel="canonical" href="https://paramant.app/architecture">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/architecture">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/architecture">
@@ -274,7 +274,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/architecture#webpage",
       "url": "https://paramant.app/architecture",
-      "name": "Zo worden uw bestanden versleuteld · Architectuur · Paramant",
+      "name": "Zo worden je bestanden versleuteld · Architectuur · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -282,7 +282,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Stap voor stap in gewone taal: hoe uw bestand in uw browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist."
+      "description": "Stap voor stap in gewone taal: hoe je bestand in je browser wordt versleuteld, hoe het reist, waarom onze server het niet kan lezen en wanneer het wordt gewist."
     },
     {
       "@type": "Organization",
@@ -365,7 +365,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="page-hero-inner">
     <span class="eyebrow">ARCHITECTUUR</span>
     <h1>Zo werkt Paramant,<br>stap voor stap.</h1>
-    <p class="lede">Elke stap in gewone taal: hoe uw bestand wordt versleuteld, hoe het reist, waarom de relay (onze server die het bestand doorgeeft) het niet kan lezen en wat er gebeurt als de link wordt geopend. De cryptografische specificatie staat op <a href="/security">de beveiligingspagina</a>.</p>
+    <p class="lede">Hier lees je stap voor stap hoe je bestand wordt versleuteld, hoe het bij de ontvanger komt, waarom onze server het niet kan lezen en wat er gebeurt als de link wordt geopend. De technische details van de versleuteling staan op <a href="/security">de beveiligingspagina</a>.</p>
   </div>
 </section>
 
@@ -374,9 +374,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">01</div>
     <h2 class="section-title">De route</h2>
-    <p class="section-desc">Vier stappen. De sleutel verlaat de browsers nooit. De relay ziet alleen versleutelde tekst die hij niet kan lezen.</p>
+    <p class="section-desc">De route heeft vier stappen. De sleutel verlaat de browsers nooit. Onze server ziet alleen versleutelde tekst, en die kan hij niet lezen.</p>
 
-    <div class="arch-diagram" role="img" aria-label="Schema in vier stappen: de browser versleutelt, de relay bewaart de versleutelde tekst in RAM, de browser van de ontvanger ontsleutelt, daarna wordt de versleutelde tekst gewist">
+    <div class="arch-diagram" role="img" aria-label="Schema in vier stappen: de browser versleutelt, onze server bewaart de versleutelde tekst in het werkgeheugen (RAM), de browser van de ontvanger ontsleutelt, daarna wordt de versleutelde tekst gewist">
       <svg viewBox="0 0 860 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:480px">
         <!-- Stage boxes -->
         <!-- 1: YOUR BROWSER -->
@@ -395,10 +395,10 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
         <!-- 2: PARAMANT RELAY -->
         <rect x="230" y="40" width="180" height="140" rx="2" class="d-panel"/>
-        <text x="320" y="64" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">PARAMANT RELAY</text>
+        <text x="320" y="64" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">PARAMANT-SERVER</text>
         <rect x="250" y="76" width="140" height="52" rx="2" class="d-slot-bad"/>
         <text x="320" y="98" text-anchor="middle" font-size="9" class="d-bad">████████████</text>
-        <text x="320" y="114" text-anchor="middle" font-size="8" class="d-bad">onleesbare versleuteling</text>
+        <text x="320" y="114" text-anchor="middle" font-size="8" class="d-bad">onleesbaar versleuteld</text>
         <text x="320" y="146" text-anchor="middle" font-size="8.5" class="d-t">alleen RAM, niets op schijf</text>
         <text x="320" y="160" text-anchor="middle" font-size="8.5" class="d-t">geen sleutel, geen leesbare tekst</text>
 
@@ -438,7 +438,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>De sleutel bestaat alleen in browsers.</strong> De relay ontvangt versleutelde tekst, houdt die in RAM en geeft hem door. Hij heeft geen sleutel en kan het bestand niet lezen. Ook een volledig gekraakte relay ziet niets bruikbaars.</p>
+      <p><strong>De sleutel bestaat alleen in browsers.</strong> Onze server ontvangt versleutelde tekst, houdt die in het werkgeheugen (RAM) en geeft hem door. De server heeft geen sleutel en kan het bestand niet lezen. Ook iemand die de server volledig zou overnemen, vindt daar niets bruikbaars.</p>
     </div>
   </div>
 </section>
@@ -448,27 +448,27 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">02</div>
     <h2 class="section-title">Wat wij zien</h2>
-    <p class="section-desc">De meeste clouddiensten bewaren uw bestand, indexeren het en maken er een voorbeeld van. De relay van Paramant zit ertussen en ziet bijna niets. Dit is het verschil.</p>
+    <p class="section-desc">De meeste clouddiensten bewaren je bestand, doorzoeken het en maken er een voorbeeld van. De server van Paramant geeft je bestand alleen door en ziet er bijna niets van. Hieronder zie je het verschil.</p>
 
     <div class="compare-grid">
       <div class="compare-col compare-col--bad">
         <h3>Gewone cloudopslag</h3>
         <ul>
           <li>Leesbare inhoud (onversleuteld opgeslagen of door de aanbieder te ontsleutelen)</li>
-          <li>Bestandsnaam en metadata gelogd</li>
-          <li>Voorbeeldafbeelding gemaakt op de server</li>
-          <li>Op schijf geschreven: overleeft herstarts, vorderingen en datalekken</li>
-          <li>Toegangslogs gekoppeld aan inhoud</li>
-          <li>Valt onder wettelijke bevelen tot afgifte</li>
+          <li>Bestandsnaam en andere gegevens over het bestand worden vastgelegd</li>
+          <li>Er wordt op de server een voorbeeldafbeelding gemaakt</li>
+          <li>Op schijf opgeslagen: het bestand blijft bestaan na een herstart en kan worden opgevraagd of uitlekken</li>
+          <li>Logboeken van wie wat opende, gekoppeld aan de inhoud</li>
+          <li>Moet worden afgegeven bij een wettelijk bevel</li>
         </ul>
       </div>
       <div class="compare-col compare-col--good">
-        <h3>Relay van Paramant</h3>
+        <h3>Server van Paramant</h3>
         <ul>
           <li>Alleen versleutelde tekst: wij kunnen die niet lezen</li>
-          <li>Geen bestandsnaam, geen metadata</li>
-          <li>Geen voorbeeld mogelijk: onleesbare bytes</li>
-          <li>Alleen RAM: een herstart van de relay wist alles</li>
+          <li>Geen bestandsnaam en geen andere gegevens over het bestand</li>
+          <li>Geen voorbeeld mogelijk: de server heeft alleen onleesbare gegevens</li>
+          <li>Alleen in het werkgeheugen (RAM): een herstart van de server wist alles</li>
           <li>Niets af te geven: wij hebben geen leesbare tekst</li>
           <li>Valt onder de AVG, niet onder de Amerikaanse CLOUD Act</li>
         </ul>
@@ -476,7 +476,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
 
     <div class="arch-takeaway--navy">
-      <p><strong>Wettelijke afgifte is door de opbouw onmogelijk.</strong> Wij kunnen niet afgeven wat wij niet hebben. Een gerechtelijk bevel aan de relay levert op: versleutelde bytes, geen sleutel, geen leesbare tekst, geen bestandsnaam.</p>
+      <p><strong>Bij een wettelijk bevel kunnen wij de inhoud niet afgeven.</strong> Wij kunnen niet afgeven wat wij niet hebben. Een gerechtelijk bevel aan onze server levert alleen versleutelde gegevens op: geen sleutel, geen leesbare tekst en geen bestandsnaam.</p>
     </div>
   </div>
 </section>
@@ -486,7 +486,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">03</div>
     <h2 class="section-title">De # in de link</h2>
-    <p class="section-desc">Elke Paramant-link bestaat uit twee delen. De linkerhelft gaat naar de relay. De rechterhelft, het deel na <code style="font-family:var(--mono);font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code>, verlaat uw browser nooit. Dat is geen afspraak van Paramant. Zo werken browsers.</p>
+    <p class="section-desc">Elke Paramant-link bestaat uit twee delen. Het eerste deel gaat naar onze server. Het tweede deel, alles na het teken <code style="font-family:var(--mono);font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code>, verlaat je browser nooit. Dat regelt de browser zelf, en Paramant kan daar niets aan veranderen.</p>
 
     <div class="url-anatomy">
       <div class="url-display">
@@ -496,22 +496,22 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--blue"></span>
-            <strong style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt)">Naar de relay</strong>
+            <strong style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--cobalt)">Naar onze server</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het pad <code style="font-family:var(--mono);font-size:12px">/r/a8f3c92d</code> geeft aan welke blob moet worden opgehaald. De relay ziet dit en levert de bijbehorende versleutelde tekst.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het pad <code style="font-family:var(--mono);font-size:12px">/r/a8f3c92d</code> geeft aan welk versleuteld bestand moet worden opgehaald. Onze server ziet dit deel en levert de bijbehorende versleutelde tekst.</p>
         </div>
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--lime"></span>
             <strong style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--ok-ink)">Verlaat de browser nooit</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het fragment <code style="font-family:var(--mono);font-size:12px">#key=…</code> is de sleutel om te ontsleutelen. Browsers halen het fragment weg voordat ze iets over het netwerk versturen. Het gaat nooit naar een server, ook niet naar de onze.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het deel <code style="font-family:var(--mono);font-size:12px">#key=…</code> is de sleutel waarmee het bestand wordt ontsleuteld. Browsers halen dit deel weg voordat ze iets over het netwerk versturen. Het gaat nooit naar een server, ook niet naar de onze.</p>
         </div>
       </div>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>Dit is een browserstandaard, geen belofte.</strong> RFC 3986 legt vast dat URL-fragmenten alleen bij de client blijven. Ook als Paramant de sleutel zou willen loggen, zou de browser hem nooit versturen. De relay kan hem door de opbouw niet onderscheppen.</p>
+      <p><strong>Dit is vastgelegd in een internetstandaard.</strong> Volgens RFC 3986 blijft het deel van een link na de # in de browser. Ook als Paramant de sleutel zou willen vastleggen, zou de browser hem niet versturen. Onze server kan hem dus niet onderscheppen.</p>
     </div>
   </div>
 </section>
@@ -521,18 +521,18 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">04</div>
     <h2 class="section-title">Weg na lezen</h2>
-    <p class="section-desc">De versleutelde tekst bestaat precies één keer. De relay maakt het geheugenvak leeg na de laatste keer lezen die de link toestaat: één keer bij Community, tot 10 keer bij Firm en 100 keer bij Enterprise. Er is geen tweede kopie om op te halen.</p>
+    <p class="section-desc">Van de versleutelde tekst bestaat maar één exemplaar. Onze server wist die uit het geheugen na de laatste keer lezen die de link toestaat: één keer bij Community, tot 10 keer bij Firm en 100 keer bij Enterprise. Er is geen tweede kopie om op te halen.</p>
 
     <div class="lifecycle-grid">
       <div class="lifecycle-state">
         <div class="lifecycle-num">Stand 01</div>
         <div class="lifecycle-heading">Link verstuurd</div>
-        <div class="lifecycle-body">De versleutelde tekst staat in het RAM van de relay. De sleutel staat alleen in het URL-fragment op het klembord van de afzender. De relay wacht.</div>
+        <div class="lifecycle-body">De versleutelde tekst staat in het werkgeheugen van onze server. De sleutel zit alleen in het deel van de link na de #, op het klembord van de afzender. De server wacht tot de link wordt geopend.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--active">
         <div class="lifecycle-num">Stand 02: actief</div>
         <div class="lifecycle-heading">Link geopend</div>
-        <div class="lifecycle-body">De browser van de ontvanger haalt de versleutelde tekst op. De relay markeert het vak om direct te wissen. Het ontsleutelen gebeurt lokaal met de sleutel uit <code style="font-family:var(--mono);font-size:12px">#key=…</code>. Het bestand verschijnt in de browser.</div>
+        <div class="lifecycle-body">De browser van de ontvanger haalt de versleutelde tekst op. Onze server markeert die meteen om te wissen. De browser ontsleutelt het bestand op de computer van de ontvanger, met de sleutel uit <code style="font-family:var(--mono);font-size:12px">#key=…</code>. Daarna verschijnt het bestand in de browser.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--gone">
         <svg class="lifecycle-gone-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -541,12 +541,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         </svg>
         <div class="lifecycle-num">Stand 03: weg</div>
         <div class="lifecycle-heading">Gewist</div>
-        <div class="lifecycle-body">Geheugenvak leeggemaakt. Elk later verzoek voor dat ID krijgt HTTP 410 Gone. Geen herstel, geen nieuwe poging, nergens een kopie op schijf.</div>
+        <div class="lifecycle-body">Het geheugen is leeggemaakt. Wie de link daarna nog opent, krijgt de melding HTTP 410 Gone. Het bestand is niet te herstellen, een nieuwe poging helpt niet en er staat nergens een kopie op schijf.</div>
       </div>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>Stuurt u een link door die nog werkt, dan stuurt u het geheim door.</strong> Bij het Community-abonnement is weg-na-lezen een garantie voor eenmalig gebruik: zodra de link is geopend, is hij weg, voor de ontvanger en voor iedereen die een kopie van de URL onderschept. Een betaalde link is weg na de laatste keer lezen die hij toestaat, tot 10 keer bij Firm.</p>
+      <p><strong>Wie een werkende link doorstuurt, geeft ook de toegang tot het bestand door.</strong> Bij het Community-abonnement werkt een link precies één keer. Zodra hij is geopend, werkt hij niet meer, ook niet voor iemand die een kopie van de link heeft onderschept. Een betaalde link verdwijnt na de laatste keer lezen die hij toestaat, tot 10 keer bij Firm.</p>
     </div>
   </div>
 </section>
@@ -556,7 +556,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">05</div>
     <h2 class="section-title">Controleerbare geschiedenis</h2>
-    <p class="section-desc">Elke verzending wordt toegevoegd aan een Merkle-boom. De vingerafdruk van de wortel wordt gepubliceerd. Wie een oude regel wijzigt, verandert de wortel, en dat is openbaar zichtbaar en valt dus op.</p>
+    <p class="section-desc">Elke verzending wordt vastgelegd in een Merkle-boom. Dat is een opbouw waarin alle regels samen één vingerafdruk bovenaan opleveren, de wortel. Die vingerafdruk maken wij openbaar. Wie later een oude regel wijzigt, verandert ook de wortel, en dat kan iedereen zien.</p>
 
     <div class="arch-diagram" role="img" aria-label="Schema van een Merkle-boom: de hash van de wortel volgt uit vier gebeurtenissen in de bladeren">
       <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
@@ -608,7 +608,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>De wortel is de vingerafdruk van de hele boom.</strong> Wijzig één gebeurtenis in een blad, al is het één byte, en de hash van de wortel verandert. Omdat de wortel in de CT-log wordt gepubliceerd, valt elke latere vervalsing direct op. Het is hetzelfde principe als certificate transparency bij TLS.</p>
+      <p><strong>De wortel is de vingerafdruk van de hele boom.</strong> Verandert er één gebeurtenis, al is het maar één byte, dan verandert ook de hash van de wortel. Omdat de wortel openbaar in de CT-log staat, valt elke latere vervalsing direct op. Hetzelfde principe zit achter certificate transparency bij TLS, de beveiligde verbinding van websites.</p>
     </div>
   </div>
 </section>
@@ -618,12 +618,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">06</div>
     <h2 class="section-title">Waar het draait</h2>
-    <p class="section-desc">Eén rechtsgebied. Eén datacenter. Geen CDN dat uw bestanden opslaat. Geen Amerikaanse partij bewaart versleutelde tekst. De enige Amerikaanse subverwerker, Resend, verstuurt de e-mail onder de standaardcontractbepalingen, en die mail draagt soms sleutelmateriaal: bij versturen naar ontvangers op naam de link met het token en in een tweede mail de ophaalcode, samen genoeg om het bestand te openen; bij een ondertekenuitnodiging de helft van de documentsleutel. Daarvoor kan de CLOUD Act gelden.</p>
+    <p class="section-desc">Alles draait in één rechtsgebied en in één datacenter. Er is geen CDN dat je bestanden opslaat. Geen Amerikaanse partij bewaart versleutelde tekst. Onze e-mail gaat nu nog via Resend, een bedrijf in de Verenigde Staten. Dat is de enige partij buiten de EU die iets van je verzending te zien krijgt. Resend werkt voor ons onder de standaardcontractbepalingen. In een uitnodiging om te tekenen staat maar de helft van de sleutel; de andere helft krijgt de ontvanger pas als die is ingelogd. Met alleen de mail kan niemand het document openen. Bij versturen op naam geeft de afzender een code zelf door. Zonder die code kan niemand het bestand openen, ook wij niet. Voor de e-mail zelf kan de Amerikaanse CLOUD Act gelden. We stappen over naar een Nederlandse e-mailprovider.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
       <div style="font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NEURENBERG · DUITSLAND · EU</div>
 
-      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentrische cirkels met de locatie van de relay in Neurenberg, Duitsland">
+      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Kaartje met de locatie van onze server in Neurenberg, Duitsland">
         <!-- Concentric circles -->
         <circle cx="180" cy="140" r="130" class="loc-ring"/>
         <circle cx="180" cy="140" r="100" class="loc-ring"/>
@@ -651,7 +651,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
         <div style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:8px">US Cloud Act</div>
-        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Niet op de relay<br><span style="font-size:12px;color:var(--ink-dim)">wel op de e-mail via Resend (VS)</span></div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Niet op onze server<br><span style="font-size:12px;color:var(--ink-dim)">wel op de e-mail via Resend (VS)</span></div>
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
         <div style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--lime);margin-bottom:8px">Opslag</div>
@@ -666,7 +666,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">07</div>
     <h2 class="section-title">Geverifieerd versturen</h2>
-    <p class="section-desc">Elke verzending met Paramant hoort bij een account en wordt in de browser versleuteld. End-to-end, zonder dat de relay ooit een sleutel kan zien, is dat bij een eenmalige link en bij Samen; bij versturen naar ontvangers op naam gaat het token dat de sleutel uitpakt één keer langs de relay om te worden gemaild (uitzondering). De webapp Versturen voegt daar post-quantum sleuteluitwisseling, ML-DSA-65-handtekeningen van de afzender en herkomstbewijs in de CT-log aan toe. Er is geen anonieme of minder zekere variant.</p>
+    <p class="section-desc">Elke verzending met Paramant hoort bij een account en wordt in de browser versleuteld. Bij een eenmalige link en bij Samen is dat end-to-end: alleen afzender en ontvanger hebben de sleutel, en onze server krijgt die nooit te zien. Bij versturen naar ontvangers op naam is er een uitzondering. Daar gaat de link waarmee de sleutel wordt ontgrendeld één keer via onze server, omdat wij die per mail versturen. Het bestand opent pas met een tweede code, die de afzender zelf doorgeeft en die nooit bij ons komt. De webapp Versturen voegt daar drie dingen aan toe: een sleuteluitwisseling die bestand is tegen quantumcomputers, een ML-DSA-65-handtekening van de afzender en een bewijs van herkomst in het openbare logboek (de CT-log). Er is geen anonieme of minder beveiligde variant.</p>
 
     <table class="modes-table">
       <thead>
@@ -698,7 +698,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         </tr>
         <tr>
           <td>Bestand tegen quantumcomputers</td>
-          <td>Ja, ML-KEM-768 houdt HNDL-aanvallen (nu opslaan, later ontsleutelen) tegen</td>
+          <td>Ja. ML-KEM-768 beschermt tegen aanvallers die nu gegevens opslaan om ze later met een quantumcomputer te ontsleutelen (HNDL)</td>
         </tr>
         <tr>
           <td>Geschikt voor</td>
@@ -714,7 +714,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">08</div>
     <h2 class="section-title">Onderdelen</h2>
-    <p class="section-desc">De relay is één onderdeel. Daaromheen zitten officiële SDK's, twee browserextensies en de webapp Versturen. Elk onderdeel staat op een ander punt in de overstap naar wire format v1. Dit is de eerlijke stand van vandaag.</p>
+    <p class="section-desc">De server is één onderdeel. Daaromheen staan de officiële SDK's, twee extensies en de webapp Versturen. Elk onderdeel is op een ander punt in de overstap naar het nieuwe gegevensformaat, wire format v1. Hieronder staat per onderdeel hoe het er vandaag voor staat.</p>
 
     <table class="modes-table">
       <thead>
@@ -726,40 +726,40 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       </thead>
       <tbody>
         <tr>
-          <td><strong>Relay</strong></td>
-          <td>Node.js, Hetzner Neurenberg. Controleert binnenkomende v1-blobs, meldt via <code>/v2/capabilities</code> welke algoritmen echt geladen zijn en weigert elk ander algoritme-ID met HTTP 415.</td>
-          <td>Wire format v1. Het image bevat 3 KEM's en 17 handtekeningalgoritmen. De standaardmodus core laadt er twee, ML-KEM-768 en ML-DSA-65, en alleen die twee noemt het endpoint.</td>
+          <td><strong>Server</strong></td>
+          <td>Node.js, bij Hetzner in Neurenberg. Controleert binnenkomende v1-blobs (versleutelde bestanden in het v1-formaat). Meldt via <code>/v2/capabilities</code> welke algoritmen echt geladen zijn, en weigert elk ander algoritme met HTTP 415.</td>
+          <td>Wire format v1. Het image bevat 3 algoritmen voor sleuteluitwisseling (KEM's) en 17 handtekeningalgoritmen. In de standaardmodus, core, worden er twee geladen: ML-KEM-768 en ML-DSA-65. Alleen die twee meldt het endpoint.</td>
         </tr>
         <tr>
           <td><strong>sdk-py 3.0.0</strong></td>
-          <td>Python-SDK. Standaard ML-KEM-768 + ML-DSA-65. Stemt af via het capabilities-endpoint. Beschikbaar op <a href="https://pypi.org/project/paramant-sdk/">PyPI</a>: <code>pip install paramant-sdk</code>.</td>
+          <td>Python-SDK. Standaard ML-KEM-768 + ML-DSA-65. Vraagt via het capabilities-endpoint op welke algoritmen de server ondersteunt. Beschikbaar op <a href="https://pypi.org/project/paramant-sdk/">PyPI</a>: <code>pip install paramant-sdk</code>.</td>
           <td>Echte post-quantum (pqcrypto). Maakt v1-blobs.</td>
         </tr>
         <tr>
           <td><strong>sdk-js 3.0.0</strong></td>
-          <td>JavaScript/Node-SDK. Zelfde standaarden en afstemming als de Python-SDK. Beschikbaar op <a href="https://www.npmjs.com/package/paramant-sdk">npm</a>: <code>npm install paramant-sdk</code>.</td>
+          <td>JavaScript/Node-SDK. Dezelfde standaardalgoritmen en dezelfde afstemming als de Python-SDK. Beschikbaar op <a href="https://www.npmjs.com/package/paramant-sdk">npm</a>: <code>npm install paramant-sdk</code>.</td>
           <td>Echte post-quantum (@noble/post-quantum). Maakt v1-blobs.</td>
         </tr>
         <tr>
           <td><strong>Webapp Versturen</strong></td>
-          <td>Geverifieerde, geauthenticeerde verzendingen vanuit de browser.</td>
-          <td>Hybride ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, bij de client. Blob-indeling van voor v1. Overstap naar v1 is bezig.</td>
+          <td>Verzendingen vanuit de browser, door een ingelogde afzender van wie de identiteit is gecontroleerd.</td>
+          <td>Hybride ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, in de browser. Gebruikt nog de bestandsindeling van voor v1. De overstap naar v1 is bezig.</td>
         </tr>
         <tr>
           <td><strong>Chromium-extensie</strong></td>
           <td>Uploaden met de rechtermuisknop vanuit elk tabblad.</td>
-          <td>Versleutelt op uw eigen computer, maar met AES-256-GCM uit Web Crypto en de sleutel in het URL-fragment, niet met de ML-KEM-hybride. Geen sleuteluitwisseling, dus geen koppeling aan een bepaalde ontvanger. Een klaargezette ML-KEM-module staat ongebruikt in de code.</td>
+          <td>Versleutelt op je eigen computer, met AES-256-GCM uit Web Crypto. De sleutel staat in het deel van de link na de #. De ML-KEM-hybride wordt hier niet gebruikt. Er is geen sleuteluitwisseling, dus het bestand is niet aan een bepaalde ontvanger gekoppeld. Er staat al een ML-KEM-module in de code, maar die wordt nog niet gebruikt.</td>
         </tr>
         <tr>
           <td><strong>Outlook-invoegtoepassing</strong></td>
           <td>Versleutelt bijlagen in Outlook voordat ze worden verstuurd.</td>
-          <td>Zelfde route als de Chromium-extensie: AES-256-GCM in de invoegtoepassing, sleutel in het URL-fragment, geen sleuteluitwisseling. De overstap naar de ML-KEM-hybride is nog niet gedaan.</td>
+          <td>Werkt net als de Chromium-extensie: AES-256-GCM in de invoegtoepassing, de sleutel in het deel van de link na de #, en geen sleuteluitwisseling. De overstap naar de ML-KEM-hybride is nog niet gemaakt.</td>
         </tr>
       </tbody>
     </table>
 
     <div class="arch-takeaway">
-      <p><strong>De relay ziet nooit leesbare tekst, behalve bij de gehoste ondertekenceremonie op de <code>/v1</code>-API.</strong> Elke client in deze tabel versleutelt voordat hij uploadt, ook de twee extensies. De ceremonie is geen client in deze tabel: daar krijgt de relay de pdf zelf, omdat dat verzoek hem vraagt de ceremonie uit te voeren. Het verschil zit in de sleuteluitwisseling. De SDK's en de webapp koppelen het bestand aan de publieke sleutel van een ontvanger. De extensies en de in de browser versleutelde link zetten een symmetrische sleutel in het URL-fragment en koppelen die aan niemand. Iedereen met die link kan het bestand openen, dus de beveiliging zit in het kanaal waarover u hem verstuurt. Zie <a href="/crypto-agility#06">crypto-agility § 06</a> voor het wire format per client en de overstaptabel.</p>
+      <p><strong>Onze server ziet nooit leesbare tekst, behalve als je ondertekent via onze gehoste dienst op de <code>/v1</code>-API.</strong> Elk onderdeel in deze tabel versleutelt het bestand voordat het wordt geüpload, ook de twee extensies. Ondertekenen via de gehoste dienst staat niet in deze tabel. Daarbij krijgt onze server de pdf zelf, omdat hij dan zelf de ondertekening uitvoert. Het verschil tussen de onderdelen zit in de sleuteluitwisseling. De SDK's en de webapp koppelen het bestand aan de publieke sleutel van een ontvanger. De extensies en de link die in de browser wordt versleuteld, zetten een symmetrische sleutel in het deel van de link na de #, en koppelen die aan niemand. Iedereen met die link kan het bestand openen. Hoe veilig dat is, hangt dus af van de manier waarop je de link verstuurt. Op <a href="/crypto-agility#06">crypto-agility § 06</a> staat per onderdeel welk formaat het gebruikt, en hoe ver de overstap is.</p>
     </div>
   </div>
 </section>

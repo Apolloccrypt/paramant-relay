@@ -46,7 +46,7 @@ test('the fixed sentence says it is not the customer\'s fault, what to do now, a
   assert.match(sentence, /aan onze kant/, 'it must not read as the customer having done something wrong');
   assert.match(sentence, /Probeer het over een minuut opnieuw/, 'it must give the next step');
   assert.match(sentence, /privacy@paramant\.app/, 'it must name a route to a human');
-  assert.match(sentence, /het tijdstip en wat u deed/, 'it must say what to put in that mail');
+  assert.match(sentence, /het tijdstip en wat je deed/, 'it must say what to put in that mail');
 });
 
 test('every shape that is not a planned failure lands on the same sentence', () => {
@@ -61,9 +61,9 @@ test('every shape that is not a planned failure lands on the same sentence', () 
 });
 
 test('the three planned failures keep their own instruction', () => {
-  assert.match(errors.userFacingMessage({ code: 'totp_invalid' }), /code die uw app nu toont/);
+  assert.match(errors.userFacingMessage({ code: 'totp_invalid' }), /code die je app nu toont/);
   assert.match(errors.userFacingMessage({ code: 'totp_required' }), /Vul de code van 6 cijfers/);
-  assert.match(errors.userFacingMessage({ code: 'totp_unavailable' }), /authenticator-app aan uw account/);
+  assert.match(errors.userFacingMessage({ code: 'totp_unavailable' }), /authenticator-app aan je account/);
   assert.equal(errors.isKnownFailure({ code: 'nonesuch' }), false);
 });
 
@@ -95,7 +95,7 @@ test('a planned failure keeps its code and its words through reportFailure', () 
     console.error = original;
   }
   assert.equal(replacement.code, 'totp_invalid');
-  assert.match(replacement.message, /code die uw app nu toont/);
+  assert.match(replacement.message, /code die je app nu toont/);
 });
 
 // ── the callers, so the translator cannot be right and unused ────────────────

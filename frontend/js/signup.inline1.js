@@ -39,10 +39,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         errorDiv.textContent = nlEn('Er is al een account met dit e-mailadres. ', 'An account with this email already exists. ');
         errorDiv.append(a, '.');
       }
-      else if (e.status === 422) errorDiv.textContent = nlEn('Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat u blijvend leest.', 'We cannot use this email address for an account. Please use an address you will keep reading.');
+      else if (e.status === 422) errorDiv.textContent = nlEn('Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat je blijvend leest.', 'We cannot use this email address for an account. Please use an address you will keep reading.');
       else if (e.status === 429) errorDiv.textContent = nlEn('Te veel pogingen. Probeer het later opnieuw.', 'Too many attempts. Please try again later.');
       else errorDiv.textContent = (e.err && e.err.message) || nlEn('Er ging iets mis. Probeer het opnieuw.', 'Something went wrong. Please try again.');
-    } else { errorDiv.textContent = nlEn('Geen verbinding. Controleer uw internetverbinding.', 'No connection. Check your internet connection.'); }
+    } else { errorDiv.textContent = nlEn('Geen verbinding. Controleer je internetverbinding.', 'No connection. Check your internet connection.'); }
     errorDiv.classList.add('visible');
   }
 
@@ -51,7 +51,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     errorDiv.classList.remove('visible');
     const email = document.getElementById('email').value.trim();
     const label = document.getElementById('label').value.trim();
-    if (!email) { errorDiv.textContent = nlEn('Vul uw e-mailadres in.', 'Please enter your email address.'); errorDiv.classList.add('visible'); return; }
+    if (!email) { errorDiv.textContent = nlEn('Vul je e-mailadres in.', 'Please enter your email address.'); errorDiv.classList.add('visible'); return; }
     submitBtn.disabled = true;
     submitBtn.textContent = nlEn('Bezig met controleren…', 'Verifying…');
     try {
@@ -79,7 +79,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (!email) return;
     resendBtn.disabled = true;
     status.style.color = ''; status.textContent = nlEn('Bezig met versturen…', 'Sending…');
-    try { await doSignup(email, document.getElementById('label').value.trim()); status.textContent = nlEn('Verstuurd. Kijk opnieuw in uw inbox.', 'Sent. Check your inbox again.'); }
+    try { await doSignup(email, document.getElementById('label').value.trim()); status.textContent = nlEn('Verstuurd. Kijk opnieuw in je inbox.', 'Sent. Check your inbox again.'); }
     catch (_) { status.style.color = 'var(--danger, #b91c1c)'; status.textContent = nlEn('Opnieuw versturen lukte niet. Probeer het zo nog eens.', 'Could not resend. Try again in a moment.'); }
     finally { resendBtn.disabled = false; }
   });

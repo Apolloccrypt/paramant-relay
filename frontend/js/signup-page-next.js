@@ -13,9 +13,9 @@ if (next) {
   const note = document.getElementById('signup-next-note');
   if (note) {
     note.textContent = isPricingPath(next)
-      ? L('Eerst maakt u een gratis account. Daarna rekent u af: na het instellen gaat u terug naar het plan dat u koos.',
+      ? L('Eerst maak je een gratis account. Daarna reken je af: na het instellen ga je terug naar het plan dat je koos.',
         'First you make a free account. Then you pay: after the setup you go back to the plan you chose.')
-      : L('Na het instellen van uw account gaat u verder waar u was.',
+      : L('Na het instellen van je account ga je verder waar je was.',
         'After setting up your account you continue where you were.');
     note.hidden = false;
   }

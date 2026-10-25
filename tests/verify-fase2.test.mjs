@@ -104,7 +104,7 @@ for (const [label, lookup] of [
 // zonder het voorbehoud voor v1/v2 (die gaan langs de relay).
 test('verify.html NL/EN: geen verloopbelofte, offline met voorbehoud', () => {
   for (const [f, verlopen, offline] of [
-    ['verify.html', /De envelop is niet verlopen/, /oude envelop \(v1 of v2\) gaat langs de relay/],
+    ['verify.html', /De envelop is niet verlopen/, /oud bewijsbestand \(v1 of v2\) gaat langs onze server/],
     ['en/verify.html', /The envelope has not expired/, /old envelope \(v1 or v2\) goes past the relay/],
   ]) {
     const html = fs.readFileSync(path.join(ROOT, f), 'utf8');

@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kunt u niet inloggen? Zo lost u het op · Paramant</title>
+<title>Kun je niet inloggen? Zo los je het op · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:description" content="Een inlogcode die wordt geweigerd, een sessie die te snel verloopt, een klok die afwijkt. De meest voorkomende inlogproblemen bij Paramant, met de oplossing.">
-<meta name="twitter:title" content="Kunt u niet inloggen? Zo lost u het op · Paramant">
+<meta name="twitter:title" content="Kun je niet inloggen? Zo los je het op · Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Kunt u niet inloggen? Zo lost u het op · Paramant">
+<meta property="og:title" content="Kun je niet inloggen? Zo los je het op · Paramant">
 <meta property="og:description" content="Een inlogcode die wordt geweigerd, een sessie die te snel verloopt, een klok die afwijkt. De meest voorkomende inlogproblemen bij Paramant, met de oplossing.">
 <meta property="og:url" content="https://paramant.app/help/session-issues">
 <meta property="og:type" content="website">
@@ -146,7 +146,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/help/session-issues#webpage",
       "url": "https://paramant.app/help/session-issues",
-      "name": "Kunt u niet inloggen? Zo lost u het op · Paramant",
+      "name": "Kun je niet inloggen? Zo los je het op · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -262,33 +262,33 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Problemen met sessie en <em>inloggen</em>.</h1>
 
-  <p class="lead">De meeste inlogproblemen hebben maar een paar oorzaken. Zoek hieronder uw foutmelding op en volg de stappen.</p>
+  <p class="lead">De meeste inlogproblemen hebben maar een paar oorzaken. Zoek hieronder je foutmelding op en volg de stappen.</p>
 
   <h2>Veelvoorkomende problemen</h2>
 
   <div class="issue-block">
     <div class="issue-header">"Invalid TOTP code", terwijl de code goed lijkt</div>
     <div class="issue-body">
-      <p><strong>Meestal loopt de klok niet gelijk.</strong> TOTP-codes hangen af van de tijd. Loopt de klok van uw telefoon meer dan 30 seconden voor of achter, dan wordt elke code geweigerd.</p>
+      <p><strong>Meestal loopt de klok niet gelijk.</strong> TOTP-codes hangen af van de tijd. Loopt de klok van je telefoon meer dan 30 seconden voor of achter, dan wordt elke code geweigerd.</p>
       <p>Op een iPhone: Instellingen &rarr; Algemeen &rarr; Datum en tijd &rarr; zet <strong>Automatisch instellen</strong> uit en weer aan.<br>
       Op Android: Instellingen &rarr; Algemeen beheer &rarr; Datum en tijd &rarr; zet <strong>Automatische datum en tijd</strong> aan.</p>
-      <p><strong>Tweede mogelijkheid: de code is al gebruikt.</strong> Elke code van 30 seconden wordt maar één keer geaccepteerd. Wacht tot de volgende code verschijnt (let op de voortgangsring in uw authenticator-app) en vul die nieuwe code meteen in.</p>
+      <p><strong>Tweede mogelijkheid: de code is al gebruikt.</strong> Elke code van 30 seconden wordt maar één keer geaccepteerd. Wacht tot de volgende code verschijnt (let op de voortgangsring in je authenticator-app) en vul die nieuwe code meteen in.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">Een script of koppeling krijgt "Invalid API key"</div>
     <div class="issue-body">
-      <p>Dit gaat over de API, niet over inloggen: op de website logt u in met uw e-mailadres en een passkey of code, zonder sleutel. Controleer of de koppeling de volledige sleutel meestuurt (<code>pgp_</code> gevolgd door 64 tekens) in de <code>X-Api-Key</code>-header, zonder spaties aan het eind. U vindt de sleutel op <a href="/account">Account</a> onder <strong>Geavanceerde accountsleutel</strong>.</p>
-      <p>Gaat het om een <code>psk_live_</code>-sleutel voor de ParaSign-API, kijk dan op uw accountpagina of hij nog actief is, en maak daar zo nodig een nieuwe. Een nieuwe accountsleutel (<code>pgp_</code>) vraagt u aan via <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+      <p>Dit gaat over de API, niet over inloggen: op de website log je in met je e-mailadres en een passkey of code, zonder sleutel. Controleer of de koppeling de volledige sleutel meestuurt (<code>pgp_</code> gevolgd door 64 tekens) in de <code>X-Api-Key</code>-header, zonder spaties aan het eind. Je vindt de sleutel op <a href="/account">Account</a> onder <strong>Geavanceerde accountsleutel</strong>.</p>
+      <p>Gaat het om een <code>psk_live_</code>-sleutel voor de ParaSign-API, kijk dan op je accountpagina of hij nog actief is, en maak daar zo nodig een nieuwe. Een nieuwe accountsleutel (<code>pgp_</code>) vraag je aan via <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Session expired", opnieuw inloggen</div>
     <div class="issue-body">
-      <p>Een sessie loopt af na <strong>een uur zonder activiteit</strong>. Zolang u bezig bent, schuift dat uur mee, maar na <strong>twaalf uur</strong> loopt elke sessie af, hoe actief u ook was. Dat is bewust: Paramant verwerkt gevoelige bestanden en kent geen blijvende sessies. Ga terug naar <a href="/auth/login">paramant.app/auth/login</a> en log opnieuw in.</p>
-      <p>Wordt u vaak midden in uw werk uitgelogd? Gebruik dan eventueel de API vanuit een script in plaats van het webdashboard. Dan onderbreekt een verlopen sessie uw werk niet.</p>
+      <p>Een sessie loopt af na <strong>een uur zonder activiteit</strong>. Zolang je bezig bent, schuift dat uur mee, maar na <strong>twaalf uur</strong> loopt elke sessie af, hoe actief je ook was. Dat is bewust: Paramant verwerkt gevoelige bestanden en kent geen blijvende sessies. Ga terug naar <a href="/auth/login">paramant.app/auth/login</a> en log opnieuw in.</p>
+      <p>Word je vaak midden in je werk uitgelogd? Gebruik dan eventueel de API vanuit een script in plaats van het webdashboard. Dan onderbreekt een verlopen sessie je werk niet.</p>
     </div>
   </div>
 
@@ -308,30 +308,30 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="issue-block">
     <div class="issue-header">Na het inloggen blijft de pagina doorsturen</div>
     <div class="issue-body">
-      <p>Wis alle cookies van paramant.app. Misschien is het sessiecookie beschadigd. Sluit na het wissen het tabblad en open het opnieuw voordat u weer probeert in te loggen.</p>
+      <p>Wis alle cookies van paramant.app. Misschien is het sessiecookie beschadigd. Sluit na het wissen het tabblad en open het opnieuw voordat je weer probeert in te loggen.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Too many login attempts" (te veel inlogpogingen)</div>
     <div class="issue-body">
-      <p>Er is geen accountblokkade, dus een beheerder hoeft niets te deblokkeren. Wel geldt een grens per internetverbinding. Doet u meer dan <strong>5 pogingen vanaf één IP-adres</strong> binnen <strong>15 minuten</strong>, dan krijgt u een 429 als antwoord. Na die vijftien minuten begint de teller opnieuw. Iemand anders op uw netwerk kan hem laten aanslaan. Via een andere verbinding komt u meteen weer binnen.</p>
-      <p>Uw e-mailadres kan niet op slot worden gezet. Wel telt Paramant mislukte pogingen per e-mailadres. Alleen mislukte pogingen tellen mee, en zodra u inlogt staat de teller weer op nul. Pas na tien binnen vijftien minuten vraagt de volgende poging uw browser om een seconde of twee rekenwerk. U wordt dan niet geweigerd. Een vreemde die uw adres intypt, kan inloggen dus even trager maken, maar nooit onmogelijk. Wordt u na die vijftien minuten nog steeds geweigerd, mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> met het e-mailadres van uw account.</p>
+      <p>Er is geen accountblokkade, dus een beheerder hoeft niets te deblokkeren. Wel geldt een grens per internetverbinding. Doe je meer dan <strong>5 pogingen vanaf één IP-adres</strong> binnen <strong>15 minuten</strong>, dan krijg je een 429 als antwoord. Na die vijftien minuten begint de teller opnieuw. Ook iemand anders op je netwerk kan die grens bereiken. Via een andere verbinding kom je meteen weer binnen.</p>
+      <p>Je e-mailadres kan niet op slot worden gezet. Wel telt Paramant mislukte pogingen per e-mailadres. Alleen mislukte pogingen tellen mee, en zodra je inlogt staat de teller weer op nul. Pas na tien binnen vijftien minuten vraagt de volgende poging je browser om een seconde of twee rekenwerk. Je wordt dan niet geweigerd. Een vreemde die je adres intypt, kan inloggen dus even trager maken, maar nooit onmogelijk. Word je na die vijftien minuten nog steeds geweigerd, mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> met het e-mailadres van je account.</p>
     </div>
   </div>
 
   <hr class="divider">
 
-  <h3>Komt u er nog niet uit?</h3>
+  <h3>Kom je er nog niet uit?</h3>
 
   <div class="troubleshoot-item">
     <div class="q">Niets hiervan past en ik kan nog steeds niet inloggen.</div>
-    <div class="a">Kijk op <a href="/status">paramant.app/status</a> of er een storing is. Staat alles op groen, mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> met het e-mailadres van uw account en een beschrijving van de precieze foutmelding. Stuur als het kan een schermafbeelding mee.</div>
+    <div class="a">Kijk op <a href="/status">paramant.app/status</a> of er een storing is. Staat alles op groen, mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> met het e-mailadres van je account en een beschrijving van de precieze foutmelding. Stuur als het kan een schermafbeelding mee.</div>
   </div>
 
   <div class="troubleshoot-item">
     <div class="q">Ik kan er helemaal niet meer in: geen TOTP en geen back-upcodes.</div>
-    <div class="a">Zie <a href="/help/lost-authenticator">Authenticator-app kwijt</a> voor het volledige herstel van uw account.</div>
+    <div class="a">Zie <a href="/help/lost-authenticator">Authenticator-app kwijt</a> voor het volledige herstel van je account.</div>
   </div>
 
   <hr class="divider">
@@ -344,7 +344,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </a>
     <a href="/help/backup-codes" class="next-step-card">
       <h3>Back-upcodes</h3>
-      <p>Maak noodcodes voordat u ze nodig heeft.</p>
+      <p>Maak noodcodes voordat je ze nodig hebt.</p>
     </a>
   </div>
 

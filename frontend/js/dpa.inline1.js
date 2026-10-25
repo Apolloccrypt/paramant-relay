@@ -40,7 +40,7 @@
         btn.textContent = 'Overeenkomst ondertekenen';
       }
     } catch (e) {
-      showError('Netwerkfout. Controleer uw verbinding en probeer het opnieuw.');
+      showError('Netwerkfout. Controleer je verbinding en probeer het opnieuw.');
       btn.disabled = false;
       btn.textContent = 'Overeenkomst ondertekenen';
     }

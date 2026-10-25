@@ -299,7 +299,7 @@ test('the per-client algorithm register matches what each client does', () => {
   }
 
   // The browser-encrypted link. No key exchange at all.
-  const link = row('Send (browser-encrypted link)');
+  const link = row('Versturen (link, versleuteld in de browser)');
   if (link.kem !== 'n/a') problems.push(`register: the link path KEM is "${link.kem}"; that path does no key exchange`);
   if (link.sig !== 'n/a') problems.push(`register: the link path SIG is "${link.sig}"; that path signs nothing`);
   if (!link.wire.includes(FACTS.browserLink.cipher)) problems.push(`register: the link wire is "${link.wire}"; ${FACTS.browserLink.where} uses ${FACTS.browserLink.cipher}`);
@@ -307,7 +307,7 @@ test('the per-client algorithm register matches what each client does', () => {
 
   // The two extensions. Same shape as the link, and the register said otherwise
   // for as long as nothing read it.
-  for (const label of ['Chromium extension', 'Outlook add-in']) {
+  for (const label of ['Chromium-extensie', 'Outlook-invoegtoepassing']) {
     const ext = row(label);
     if (FACTS.extensions.hasKeyExchange) {
       if (ext.kem === 'n/a') problems.push(`register: ${label} KEM is n/a but ${FACTS.extensions.where} now negotiates a key`);

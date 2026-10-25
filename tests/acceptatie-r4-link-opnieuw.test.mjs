@@ -42,7 +42,7 @@ test('the page says the one advice; the dashboard note says the sender was asked
   // link that opens only the request; the sender is asked to resend.
   const dash = read('frontend/js/dashboard.js');
   const fn = dash.slice(dash.indexOf('function resendInvitation'), dash.indexOf('function wireDocumentFilters'));
-  assert.match(fn, /We hebben de afzender gevraagd u de uitnodiging opnieuw te sturen\./);
+  assert.match(fn, /We hebben de afzender gevraagd je de uitnodiging opnieuw te sturen\./);
   assert.match(fn, /We have asked the sender to send you the invitation again\./);
   assert.doesNotMatch(fn, /opent het verzoek, niet het document/);
   assert.doesNotMatch(fn, OLD);
@@ -58,7 +58,7 @@ test('the mail to the sender: one button to the resend action, else withdraw and
   assert.doesNotMatch(fn, /Link kopiëren/, 'no more copy-it-yourself as the way');
   // And the dashboard, where the resend happens, agrees.
   const dash = read('frontend/js/dashboard.js');
-  assert.match(dash, /Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw\./);
+  assert.match(dash, /Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw\./);
   assert.match(dash, /data-pa-action="document-resend-invite"/);
 });
 

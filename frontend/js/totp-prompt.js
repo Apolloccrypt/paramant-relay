@@ -18,7 +18,7 @@ export function promptTotp(prefix) {
   return new Promise((resolve) => {
     const panel = $('panel'), input = $('input');
     const errEl = $('err'), promptEl = $('prompt'), okBtn = $('confirm'), cancelBtn = $('cancel');
-    promptEl.textContent = L('Voer de code van 6 cijfers uit uw authenticator-app in om in deze browser te ondertekenen. U voert hem elke keer in als u hier tekent, net als bij opnieuw inloggen.', 'Enter the 6-digit code from your authenticator app to sign on this browser. You enter it each time you sign here, like signing in again.');
+    promptEl.textContent = L('Voer de code van 6 cijfers uit je authenticator-app in om in deze browser te ondertekenen. Je voert hem elke keer in als je hier tekent, net als bij opnieuw inloggen.', 'Enter the 6-digit code from your authenticator app to sign on this browser. You enter it each time you sign here, like signing in again.');
     input.value = '';
     errEl.hidden = true; errEl.textContent = '';
     panel.hidden = false;
@@ -32,7 +32,7 @@ export function promptTotp(prefix) {
     const fail = (m) => { errEl.textContent = m; errEl.hidden = false; };
     const onOk = () => {
       const v = (input.value || '').trim();
-      if (!/^\d{6}$/.test(v)) return fail(L('Voer de code van 6 cijfers uit uw authenticator-app in.', 'Enter the 6-digit code from your authenticator app.'));
+      if (!/^\d{6}$/.test(v)) return fail(L('Voer de code van 6 cijfers uit je authenticator-app in.', 'Enter the 6-digit code from your authenticator app.'));
       cleanup(); resolve(v);
     };
     const onCancel = () => { cleanup(); resolve(null); };

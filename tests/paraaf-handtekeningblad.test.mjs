@@ -90,7 +90,7 @@ test('the flow reached the bake', () => {
 test('choosing the sheet keeps "every page" on, usable, and says where the parafen go', () => {
   assert.equal(r.ui.stillTicked, true, 'the sheet must not switch "every page" off in silence');
   assert.equal(r.ui.boxUsable, true, 'the box stays visible and usable with a sheet');
-  assert.match(r.ui.tip, /elke pagina van het document krijgt uw paraaf/, r.ui.tip);
+  assert.match(r.ui.tip, /elke pagina van het document krijgt je paraaf/, r.ui.tip);
   assert.equal(r.ui.previewParafen, 3, 'the place step shows a paraaf on each of the three pages');
 });
 

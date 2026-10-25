@@ -263,13 +263,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Paramant op <em>IoT</em> en embedded apparaten.</h1>
 
-  <p class="lead">IoT-apparaten, PLC&#39;s, OT-gateways en single-board computers kunnen bestanden via Paramant versturen met alleen een vaste API-sleutel. Geen TOTP, geen handmatig inloggen, geen browser nodig.</p>
+  <p class="lead">IoT-apparaten, PLC&#39;s, OT-gateways en single-board computers kunnen bestanden via Paramant versturen met alleen een vaste API-sleutel. Een TOTP-code, handmatig inloggen of een browser is daarvoor niet nodig.</p>
 
   <h2>Hoe een machine zich aanmeldt</h2>
 
-  <p>Elk API-verzoek aan Paramant meldt zich aan met de header <code>X-Api-Key</code> met uw API-sleutel. De sleutel begint met <code>pgp_</code>, gevolgd door 64 hexadecimale tekens, en wijst uw account aan. Een <code>Authorization: Bearer</code>-header werkt niet voor een <code>pgp_</code>-sleutel: op deze routes leest de relay daar alleen kortlevende sessietokens (<code>pst_</code>) van het webdashboard uit. Zet de sleutel ook nooit in de URL; een verzoek met <code>?k=</code> wordt geweigerd. Voor machines is dat genoeg. Buiten het inloggen op het webdashboard wordt nergens om een TOTP-code gevraagd.</p>
+  <p>Elk API-verzoek aan Paramant meldt zich aan met de header <code>X-Api-Key</code> met je API-sleutel. De sleutel begint met <code>pgp_</code>, gevolgd door 64 hexadecimale tekens, en hoort bij je account. Een <code>Authorization: Bearer</code>-header werkt niet voor een <code>pgp_</code>-sleutel. Op deze routes leest de server in die header alleen de kortlevende sessiesleutels (<code>pst_</code>) van het webdashboard. Zet de sleutel ook nooit in de URL; een verzoek met <code>?k=</code> wordt geweigerd. Voor een machine is die sleutel genoeg. Paramant vraagt alleen om een TOTP-code als je inlogt op het webdashboard.</p>
 
-  <div class="tip"><p>Maak een <strong>eigen API-sleutel</strong> per apparaat of soort apparaat. Dan kunt u losse sleutels intrekken zonder dat andere koppelingen last hebben. Dashboard &rarr; API-sleutels &rarr; <strong>Nieuwe sleutel maken</strong>.</p></div>
+  <div class="tip"><p>Maak een <strong>eigen API-sleutel</strong> per apparaat of soort apparaat. Dan kun je losse sleutels intrekken zonder dat andere koppelingen last hebben. Dashboard &rarr; API-sleutels &rarr; <strong>Nieuwe sleutel maken</strong>.</p></div>
 
   <h2>Ondersteunde apparaten</h2>
 
@@ -290,13 +290,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2>Een bestand versturen vanaf een Linux-apparaat</h2>
 
-  <p>Er is geen route die een leesbaar bestand aanneemt: de relay krijgt alleen versleutelde bytes. Het apparaat versleutelt dus zelf, uploadt de versleutelde blob naar <code>POST /v2/inbound</code> en krijgt een <code>download_token</code> terug. Daarvan maakt het een link naar <code>/get</code>, met de sleutel achter het <code>#</code>, zodat de relay hem nooit ziet. Python 3 met het pakket <code>cryptography</code>:</p>
+  <p>De API neemt geen onversleutelde bestanden aan: de server krijgt alleen versleutelde gegevens. Het apparaat versleutelt het bestand dus zelf, uploadt het versleutelde resultaat naar <code>POST /v2/inbound</code> en krijgt een <code>download_token</code> terug. Daarvan maakt het een link naar <code>/get</code>, met de sleutel achter het <code>#</code>, zodat de server hem nooit ziet. Python 3 met het pakket <code>cryptography</code>:</p>
 
   <div class="code-block">import os, json, base64, hashlib, struct, urllib.request
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 API_KEY = os.environ["PARAMANT_API_KEY"]   # pgp_...
-RELAY   = "https://health.paramant.app"    # the sector your key belongs to
+Server   = "https://health.paramant.app"    # the sector your key belongs to
 SECTOR  = "health"
 PATH    = "/var/log/sensor-log.csv"        # one block: at most about 5 MB
 
@@ -310,17 +310,17 @@ sealed  = AESGCM(key).encrypt(iv, plain, None)
 body = json.dumps({"hash": hashlib.sha256(sealed).hexdigest(),
                    "payload": base64.b64encode(sealed).decode(),
                    "ttl_ms": 3600000}).encode()
-req = urllib.request.Request(RELAY + "/v2/inbound", data=body, method="POST",
+req = urllib.request.Request(Server + "/v2/inbound", data=body, method="POST",
       headers={"X-Api-Key": API_KEY, "Content-Type": "application/json"})
 token = json.load(urllib.request.urlopen(req))["download_token"]
 
-# 3. The link: the key travels after the #, the relay never sees it
+# 3. The link: the key travels after the #, the server never sees it
 frag = base64.urlsafe_b64encode(key + iv).rstrip(b"=").decode()
 print(f"https://paramant.app/get?t={token}&amp;r={SECTOR}#{frag}")</div>
 
-  <p>Geef de link via elk kanaal aan de ontvanger. Die opent hem in de browser; de pagina ontsleutelt het bestand en pas dan wordt het op de relay gewist. De link werkt één keer en vervalt na de <code>ttl_ms</code> die de relay terugmeldt (maximaal 1 uur op Community, 24 uur op Firm). Eén upload is één blok van hoogstens 5 MB; een groter bestand gaat in meerdere blokken, en dat doet de SDK voor u. Hoe het formaat in elkaar zit, staat in <a href="/docs/api.md">docs/api.md</a> onder "The share link".</p>
+  <p>Geef de link via elk kanaal aan de ontvanger. Die opent hem in de browser. De pagina ontsleutelt het bestand, en pas daarna wordt het op de server gewist. De link werkt één keer en vervalt na de <code>ttl_ms</code> die de server teruggeeft (maximaal 1 uur op Community, 24 uur op Firm). Eén upload is één blok van hoogstens 5 MB; een groter bestand gaat in meerdere blokken, en dat doet de SDK voor jou. Hoe het formaat in elkaar zit, staat in <a href="/docs/api.md">docs/api.md</a> onder "The share link".</p>
 
-  <div class="tip"><p>Bewaar de API-sleutel in het flashgeheugen of in een omgevingsvariabele, niet ingebakken in de firmware. Gebruik op de ESP32 NVS (Non-Volatile Storage) of een aparte partitie voor inloggegevens. Dan kunt u de sleutel vervangen zonder opnieuw te flashen.</p></div>
+  <div class="tip"><p>Bewaar de API-sleutel in het flashgeheugen of in een omgevingsvariabele, niet ingebakken in de firmware. Gebruik op de ESP32 NVS (Non-Volatile Storage) of een aparte partitie voor inloggegevens. Dan kun je de sleutel vervangen zonder opnieuw te flashen.</p></div>
 
   <h2>Sleutels vervangen op apparaten in gebruik</h2>
 
@@ -333,11 +333,11 @@ print(f"https://paramant.app/get?t={token}&amp;r={SECTOR}#{frag}")</div>
     <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Trek de oude sleutel in via het dashboard.</li>
   </ol>
 
-  <div class="warn"><p>Trek de oude sleutel pas in als u zeker weet dat de nieuwe werkt. Een ingetrokken sleutel werkt meteen niet meer. Er is geen overgangstijd.</p></div>
+  <div class="warn"><p>Trek de oude sleutel pas in als je zeker weet dat de nieuwe werkt. Een ingetrokken sleutel werkt meteen niet meer. Er is geen overgangstijd.</p></div>
 
   <h2>Limieten op verzoeken</h2>
 
-  <p>De limieten op verzoeken gelden per IP-adres, niet per API-sleutel: de nginx-configuratie in deze repository zet gewoon API-verkeer in een zone van <strong>60 verzoeken per minuut</strong> en uploads in een strengere (<code>nginx-selfhost.conf</code>). De grens die wel per sleutel geldt, gaat over ophalen, niet over uploaden: <strong>50 downloads per uur</strong> op Community en <strong>500 per uur</strong> op Firm (<code>outbound_per_hour</code> in <code>relay/lib/tiers.js</code>). Daarboven volgt een 429. Stuurt een sensor vaak gegevens, bundel de metingen dan in één bestand voordat u uploadt, in plaats van één bestand per meting. Een bestand mag op elk plan tot 500 MB zijn (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). Het reist in vaste blokken van 5 MB, dus één uploadverzoek draagt één blok.</p>
+  <p>De limieten op verzoeken gelden per IP-adres, niet per API-sleutel: de nginx-configuratie in onze broncode zet gewoon API-verkeer in een zone van <strong>60 verzoeken per minuut</strong> en uploads in een strengere (<code>nginx-selfhost.conf</code>). De grens die wel per sleutel geldt, gaat over ophalen, niet over uploaden: <strong>50 downloads per uur</strong> op Community en <strong>500 per uur</strong> op Firm (<code>outbound_per_hour</code> in <code>relay/lib/tiers.js</code>). Daarboven volgt een 429. Stuurt een sensor vaak gegevens, bundel de metingen dan in één bestand voordat je uploadt, in plaats van één bestand per meting. Een bestand mag op elk plan tot 500 MB zijn (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). Het wordt verstuurd in vaste blokken van 5 MB, één blok per uploadverzoek.</p>
 
   <hr class="divider">
 
@@ -354,8 +354,8 @@ print(f"https://paramant.app/get?t={token}&amp;r={SECTOR}#{frag}")</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">Kan ik de relay zelf hosten op een lokaal netwerk en er vanaf apparaten bij?</div>
-    <div class="a">Ja. Host een Paramant-relay op uw eigen netwerk en laat de apparaten naar uw interne hostnaam wijzen. Zie de <a href="/docs#self-hosting">handleiding voor zelf hosten</a> en <a href="/install-pi.sh">install-pi.sh</a> voor een relay op een Raspberry Pi.</div>
+    <div class="q">Kan ik de Paramant-server zelf draaien op een lokaal netwerk en er vanaf apparaten bij?</div>
+    <div class="a">Ja. Draai een Paramant-server op je eigen netwerk en laat de apparaten naar je interne hostnaam wijzen. Zie de <a href="/docs#self-hosting">handleiding voor zelf hosten</a> en <a href="/install-pi.sh">install-pi.sh</a> voor een server op een Raspberry Pi.</div>
   </div>
 
   <hr class="divider">

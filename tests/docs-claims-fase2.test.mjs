@@ -24,7 +24,7 @@ test('docs: /v1 bewaart de pdf zolang de envelope bestaat, en de docs zeggen dat
   const api = repo('relay/lib/parasign-open-api.js');
   assert.match(api, /store\.putBlob\(out\.id, pdf, ttlMs\)/, 'als /v1 de pdf niet meer bewaart, mag de tekst terug');
   for (const [rel, never, says] of [
-    ['frontend/docs.html', /nooit het document zelf/, /bewaart de relay ook de pdf zelf/],
+    ['frontend/docs.html', /nooit het document zelf/, /bewaart de server ook de pdf zelf/],
     ['frontend/en/docs.html', /never the document bytes/, /the relay also keeps the PDF itself/],
   ]) {
     const html = repo(rel);
@@ -159,7 +159,7 @@ test('changelog: de nieuwste release is die van CHANGELOG.md, en Gepland noemt n
 });
 
 test('all-systems-go: een 401 op /v2/health/deep is geen mislukte controle en nooit groen', async () => {
-  for (const [rel, up] of [['frontend/js/all-systems-go.inline1.js', 'De relay antwoordt'], ['frontend/js/all-systems-go.inline1.en.js', 'The relay is answering']]) {
+  for (const [rel, up] of [['frontend/js/all-systems-go.inline1.js', 'De server antwoordt'], ['frontend/js/all-systems-go.inline1.en.js', 'The relay is answering']]) {
     const els = {};
     const el = (id) => (els[id] ||= { id, className: '', innerHTML: '', textContent: '' });
     const calls = [];

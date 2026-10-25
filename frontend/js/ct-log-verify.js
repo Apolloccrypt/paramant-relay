@@ -23,7 +23,7 @@
 // tree. Without an outside witness a relay can show each visitor a different
 // tree; step 4 only catches that between two visits of the same browser.
 import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
-import { anchorByHost, hostOfRelayId } from '/js/relay-trust-anchors.js?v=2';
+import { anchorByHost, hostOfRelayId } from '/js/relay-trust-anchors.js?v=3';
 
 const enc = new TextEncoder();
 const toHex = (u8) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('');

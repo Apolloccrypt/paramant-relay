@@ -385,7 +385,7 @@ test('zonder bekend plafond weigert de precheck in het Nederlands, voor er iets 
     await page.locator('#btn-create-session').click();
     await page.waitForSelector('#step-over-limit.active', { timeout: 15000 });
     const line = await page.textContent('#over-limit-line');
-    assert.match(line, /Uw plan verstuurt naar 1 ontvanger tegelijk\. U noemde er 2\./);
+    assert.match(line, /Je plan verstuurt naar 1 ontvanger tegelijk\. Je noemde er 2\./);
     assert.equal(await page.getAttribute('#step-over-limit a.btn', 'href'), '/pricing');
     assert.equal(calls.inbound, 0, 'er is niets geüpload');
     assert.equal(calls.sends, 0);
@@ -399,16 +399,16 @@ test('Firm ziet het adresveld en de teller, in het Nederlands', async () => {
     assert.equal(await page.textContent('#ps-count'), '12 van 30');
     await ready(page);
     assert.equal(await page.textContent('#btn-create-session'), 'Verstuur naar 12 mensen');
-    assert.equal(await page.textContent('#ps-limit'), 'U stuurt naar maximaal 30 mensen tegelijk. Een link blijft maximaal 24 uur open. Een bestand mag tot 25 MB zijn.');
+    assert.equal(await page.textContent('#ps-limit'), 'Je stuurt naar maximaal 30 mensen tegelijk. Een link blijft maximaal 24 uur open. Een bestand mag tot 25 MB zijn.');
   } finally { await page.close(); }
 });
 
 test('Community ziet een slot en één knop naar Firm, in het Nederlands', async () => {
   const { page } = await openSender({ path: '/parashare', plan: COMMUNITY, precheck: () => ({ status: 200, body: { ok: true } }), inbound: 'ok' });
   try {
-    assert.equal(await page.textContent('#ps-limit'), 'U stuurt naar 1 persoon. Een link blijft maximaal 1 uur open. Een bestand mag tot 5 MB zijn.');
+    assert.equal(await page.textContent('#ps-limit'), 'Je stuurt naar 1 persoon. Een link blijft maximaal 1 uur open. Een bestand mag tot 5 MB zijn.');
     assert.equal(await page.textContent('#ps-upsell-line'),
-      'Met Firm stuurt u naar maximaal 30 mensen tegelijk, blijft een link 24 uur open en ziet u wie het heeft geopend.');
+      'Met Firm stuur je naar maximaal 30 mensen tegelijk, blijft een link 24 uur open en zie je wie het heeft geopend.');
     assert.equal(await page.textContent('#ps-upsell-btn'), 'Bekijk Firm');
     await page.locator('#ps-mode-group').click();
     assert.equal(await page.locator('#recipients-input').isVisible(), false);

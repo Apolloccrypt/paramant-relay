@@ -45,11 +45,11 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "Alles wat op de server staat: versleutelde overdrachten in RAM, versleutelde documentcapsules van Ondertekenen, accountgegevens (e-mailadres, plan), logs en de configuratie van de server.",
+        "nl": "Alles wat op onze servers staat: versleutelde bestanden die worden verstuurd (alleen in het werkgeheugen), versleutelde documenten die worden ondertekend, accountgegevens (e-mailadres en plan), logbestanden en de instellingen van de server.",
         "en": "Everything on the server: encrypted transfers in RAM, encrypted ParaSign document capsules, account data (email address, plan), logs and the server configuration."
       },
       "nooit": {
-        "nl": "Leesbare documenten of bestanden, en de sleutels van gebruikers: die worden in de browser gemaakt en komen niet op de server.",
+        "nl": "Leesbare documenten of bestanden, en de sleutels van gebruikers. Die sleutels worden in de browser gemaakt en komen niet op de server.",
         "en": "Readable documents or files, and users' keys: they are made in the browser and never reach the server."
       },
       "subverwerker": true,
@@ -83,11 +83,11 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "De DNS-records van paramant.app, en de opzoekingen van resolvers naar die naam.",
+        "nl": "De DNS-gegevens van paramant.app, die bepalen naar welke server die naam wijst. Bunny ziet ook de verzoeken waarmee die naam wordt opgezocht.",
         "en": "The DNS records of paramant.app, and resolvers' lookups of that name."
       },
       "nooit": {
-        "nl": "Pagina's, bestanden, documenten of sleutels: Bunny is hier geen CDN of proxy, er gaat geen verzoek doorheen.",
+        "nl": "Pagina's, bestanden, documenten of sleutels. We gebruiken Bunny alleen voor DNS. Het verkeer naar onze site loopt er niet doorheen.",
         "en": "Pages, files, documents or keys: Bunny is not a CDN or proxy here, no request passes through it."
       },
       "subverwerker": false,
@@ -160,7 +160,7 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "De hostnamen van paramant.app, voor het certificaat. Die zijn openbaar via Certificate Transparency.",
+        "nl": "De namen van onze servers onder paramant.app, die nodig zijn voor het beveiligingscertificaat. Die namen zijn toch al openbaar, via de openbare registers van certificaten (Certificate Transparency).",
         "en": "The hostnames of paramant.app, for the certificate. They are public through Certificate Transparency."
       },
       "nooit": {
@@ -198,7 +198,7 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "Het e-mailadres van de ontvanger, het onderwerp en het bericht met de link. Bij een ondertekenuitnodiging zit in die link de helft van de documentsleutel; de andere helft krijgt alleen de ingelogde ontvanger van de relay. Bij een verzending naar genoemde ontvangers ook de bestandsnaam die de afzender koos, de link met het token dat de ingepakte bestandssleutel uitpakt, en in een tweede mail de ophaalcode: samen openen die het bestand.",
+        "nl": "Het e-mailadres van de ontvanger, het onderwerp en het bericht met de link. In een uitnodiging om te tekenen staat maar de helft van de sleutel. De andere helft krijgt de ontvanger pas van onze server als die is ingelogd. Bij versturen naar ontvangers op naam krijgt Resend ook de bestandsnaam die de afzender koos en de link die samen met de ophaalcode het bestand opent. De ophaalcode komt in een tweede mail. Wie beide mails kan lezen, kan het bestand openen.",
         "en": "The recipient's email address, the subject and the message with the link. For a signing invite that link carries half of the document key; only the signed-in recipient gets the other half from the relay. For a send to named recipients also the file name the sender chose, the link with the token that unwraps the wrapped file key, and in a second email the pickup code: together those open the file."
       },
       "nooit": {
@@ -239,11 +239,11 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "Mail die mensen naar @paramant.app sturen, zoals privacy@paramant.app, met wat de afzender erin zet.",
+        "nl": "Mail die mensen naar een adres van @paramant.app sturen, zoals privacy@paramant.app, met alles wat de afzender erin zet.",
         "en": "Mail people send to @paramant.app, such as privacy@paramant.app, with whatever the sender puts in it."
       },
       "nooit": {
-        "nl": "Overdrachten, documenten of sleutels van de dienst: de relay praat niet met Proton.",
+        "nl": "Verstuurde bestanden, documenten of sleutels van de dienst. Onze server heeft geen verbinding met Proton.",
         "en": "Transfers, documents or keys of the service: the relay does not talk to Proton."
       },
       "subverwerker": false,
@@ -278,11 +278,11 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "Het bedrag, een omschrijving van het plan en betaalmetadata (accountId, product, plan, interval). Kaartgegevens voert de klant in op de pagina's van Mollie.",
+        "nl": "Het bedrag, een omschrijving van het plan en een paar gegevens bij de betaling: het accountnummer bij Paramant, het product, het plan en of er per maand of per jaar wordt betaald. Kaartgegevens vult de klant in op de pagina's van Mollie zelf.",
         "en": "The amount, a plan description and payment metadata (accountId, product, plan, interval). Card details are entered on Mollie's own pages."
       },
       "nooit": {
-        "nl": "Documenten, bestanden of sleutels, en geen e-mailadres zolang terugkerende betaling uit staat.",
+        "nl": "Documenten, bestanden of sleutels. Ook geen e-mailadres, zolang automatisch terugkerende betaling uit staat.",
         "en": "Documents, files or keys, and no email address while recurring billing is off."
       },
       "subverwerker": true,
@@ -316,11 +316,11 @@
       "moederbedrijf": "Microsoft Corporation",
       "moederbedrijf_land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
       "gegevens": {
-        "nl": "De openbare broncode, de CI-runs, en de namen van CI-geheimen. De admin leest de openbare GitHub-API zonder sleutel voor de statuspagina.",
+        "nl": "De openbare broncode, de automatische tests en het automatisch bouwen van de software dat daar draait (CI), en de namen van de geheime instellingen die daarbij horen. Voor de statuspagina leest ons beheerscherm de openbare GitHub-API, zonder sleutel.",
         "en": "The public source code, the CI runs, and the names of CI secrets. The admin reads the public GitHub API without a key for the status page."
       },
       "nooit": {
-        "nl": "Klantgegevens, documenten, bestanden of productiesleutels.",
+        "nl": "Klantgegevens, documenten, bestanden of de sleutels waarmee onze dienst draait.",
         "en": "Customer data, documents, files or production keys."
       },
       "subverwerker": false,
@@ -354,11 +354,11 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "De openbare images van de relay (gepubliceerd door CI). Productie haalt er het redis-image vandaan; de relay zelf wordt op de server gebouwd.",
+        "nl": "De openbare softwarepakketten (images) van onze server, die daar automatisch worden neergezet. Onze server haalt er het pakket voor de database Redis vandaan. De serversoftware zelf wordt op de server gebouwd.",
         "en": "The public relay images (published by CI). Production pulls the redis image from it; the relay itself is built on the server."
       },
       "nooit": {
-        "nl": "Klantgegevens, documenten, bestanden of productiesleutels.",
+        "nl": "Klantgegevens, documenten, bestanden of de sleutels waarmee onze dienst draait.",
         "en": "Customer data, documents, files or production keys."
       },
       "subverwerker": false,
@@ -392,11 +392,11 @@
       "moederbedrijf": "GitHub, Inc.",
       "moederbedrijf_land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
       "gegevens": {
-        "nl": "Verzoeken om pakketten bij elke build (npm ci), op de server en in CI.",
+        "nl": "Verzoeken om softwarepakketten, telkens als de software wordt gebouwd, op onze server en bij de automatische tests (CI).",
         "en": "Package requests on every build (npm ci), on the server and in CI."
       },
       "nooit": {
-        "nl": "Klantgegevens, documenten, bestanden of productiesleutels.",
+        "nl": "Klantgegevens, documenten, bestanden of de sleutels waarmee onze dienst draait.",
         "en": "Customer data, documents, files or production keys."
       },
       "subverwerker": false,
@@ -429,7 +429,7 @@
       "land": { "nl": "Onbekend", "en": "Unknown" },
       "moederbedrijf": null,
       "gegevens": {
-        "nl": "Geen. Een wekelijkse CI-taak haalt de openbare lijst met wegwerpdomeinen op; er gaat niets naartoe.",
+        "nl": "Niets. Eén keer per week haalt een automatische taak de openbare lijst met wegwerpdomeinen voor e-mail op. Er gaat niets naartoe.",
         "en": "None. A weekly CI job downloads the public list of disposable domains; nothing is sent to it."
       },
       "nooit": {
@@ -619,7 +619,7 @@
       "moederbedrijf": "Sinch AB",
       "moederbedrijf_land": { "nl": "Zweden", "en": "Sweden", "code": "SE" },
       "gegevens": {
-        "nl": "Zou dezelfde gegevens krijgen als Resend nu: adres, onderwerp, bericht met link.",
+        "nl": "Zou dezelfde gegevens krijgen als Resend nu: het e-mailadres, het onderwerp en het bericht met de link.",
         "en": "Would receive what Resend receives now: address, subject, message with link."
       },
       "nooit": {
@@ -658,7 +658,7 @@
       "moederbedrijf": "iliad SA",
       "moederbedrijf_land": { "nl": "Frankrijk", "en": "France", "code": "FR" },
       "gegevens": {
-        "nl": "Zou dezelfde gegevens krijgen als Resend nu: adres, onderwerp, bericht met link.",
+        "nl": "Zou dezelfde gegevens krijgen als Resend nu: het e-mailadres, het onderwerp en het bericht met de link.",
         "en": "Would receive what Resend receives now: address, subject, message with link."
       },
       "nooit": {
@@ -703,7 +703,7 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "Zou dezelfde gegevens krijgen als Resend nu: adres, onderwerp, bericht met link.",
+        "nl": "Zou dezelfde gegevens krijgen als Resend nu: het e-mailadres, het onderwerp en het bericht met de link.",
         "en": "Would receive what Resend receives now: address, subject, message with link."
       },
       "nooit": {
@@ -864,7 +864,7 @@
       "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
       "moederbedrijf": null,
       "moederbedrijf_land": null,
-      "gegevens": { "nl": "Niets: geen code roept het nog aan.", "en": "Nothing: no code calls it any more." },
+      "gegevens": { "nl": "Niets. Onze software gebruikt het niet meer.", "en": "Nothing: no code calls it any more." },
       "nooit": { "nl": "Klantgegevens, documenten of sleutels.", "en": "Customer data, documents or keys." },
       "subverwerker": false,
       "status": "uitgefaseerd",
@@ -896,7 +896,7 @@
       "land": { "nl": "zelf gehost", "en": "self-hosted", "code": null },
       "moederbedrijf": null,
       "moederbedrijf_land": null,
-      "gegevens": { "nl": "Niets: zelf gehoste software, draait niet.", "en": "Nothing: self-hosted software, not running." },
+      "gegevens": { "nl": "Niets. Dit was software op een eigen server, en die draait niet meer.", "en": "Nothing: self-hosted software, not running." },
       "nooit": { "nl": "Klantgegevens.", "en": "Customer data." },
       "subverwerker": false,
       "status": "uitgefaseerd",
@@ -931,7 +931,7 @@
       "land": { "nl": "zelf gehost", "en": "self-hosted", "code": null },
       "moederbedrijf": null,
       "moederbedrijf_land": null,
-      "gegevens": { "nl": "Niets: zelf gehoste software, draait niet.", "en": "Nothing: self-hosted software, not running." },
+      "gegevens": { "nl": "Niets. Dit was software op een eigen server, en die draait niet meer.", "en": "Nothing: self-hosted software, not running." },
       "nooit": { "nl": "Klantgegevens.", "en": "Customer data." },
       "subverwerker": false,
       "status": "uitgefaseerd",

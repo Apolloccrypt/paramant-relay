@@ -73,10 +73,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var login = document.getElementById('dh-error-login');
     var retry = document.getElementById('dh-error-retry');
     var says = kind === 'busy'
-      ? nlEn('Even te veel verzoeken tegelijk. Probeer het over een minuut opnieuw. U bent nog ingelogd.', 'Too many requests at once. Try again in a minute. You are still signed in.')
+      ? nlEn('Even te veel verzoeken tegelijk. Probeer het over een minuut opnieuw. Je bent nog ingelogd.', 'Too many requests at once. Try again in a minute. You are still signed in.')
       : kind === 'server'
-        ? nlEn('Uw overzicht laadt niet door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Your overview did not load because of a fault on our side. Nothing changed. Try again shortly.')
-        : nlEn('We konden uw overzicht niet laden. Controleer uw verbinding en probeer het opnieuw.', 'We could not load your overview. Check your connection and try again.');
+        ? nlEn('Je overzicht laadt niet door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Your overview did not load because of a fault on our side. Nothing changed. Try again shortly.')
+        : nlEn('We konden je overzicht niet laden. Controleer je verbinding en probeer het opnieuw.', 'We could not load your overview. Check your connection and try again.');
     if (text) text.textContent = says;
     if (errMsg) errMsg.textContent = '';
     if (login) login.hidden = true;
@@ -181,12 +181,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       var said = !term.ended && window.paPlanTerms && window.paPlanTerms.headline(data);
       line.textContent = term.ended
         ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
-        : said || (nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
+        : said || (nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, je verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
       line.hidden = false;
     }
     if (warn && term.warn && data.auto_renews !== true) {
       var text = warn.querySelector('[data-dh="term-warn"]');
-      if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
+      if (text) text.textContent = nlEn('Je plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;
     }
   }
@@ -199,18 +199,18 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // read what he bought.
   var PRODUCT_INCLUDES = {
     parasign: {
-      pro: nlEn('Ondertekenen: 100 handtekeningen per maand, en een koppeling met uw eigen systemen.', 'ParaSign: 100 signatures a month, and a connection you can plug into your own systems.'),
-      business: nlEn('Ondertekenen: 1.000 handtekeningen per maand, ondersteuning van een vast persoon die binnen één werkdag antwoordt, hulp bij de beveiligingsvragenlijsten van uw klanten, en een audittrail die u als bestand kunt exporteren.', 'ParaSign: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.'),
-      enterprise: nlEn('Ondertekenen: een eigen relay, een sectorrelay voor zorg, juridisch of financieel, een SLA met compensatie, een licentie om zelf te hosten en hulp bij audits.', 'ParaSign: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.')
+      pro: nlEn('Ondertekenen: 100 handtekeningen per maand, en een koppeling met je eigen systemen.', 'ParaSign: 100 signatures a month, and a connection you can plug into your own systems.'),
+      business: nlEn('Ondertekenen: 1.000 handtekeningen per maand, ondersteuning van een vast persoon die binnen één werkdag antwoordt, hulp bij de beveiligingsvragenlijsten van je klanten, en een overzicht van alle stappen bij het ondertekenen (een audittrail) dat je als bestand kunt downloaden.', 'ParaSign: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.'),
+      enterprise: nlEn('Ondertekenen: een eigen server, een aparte server voor zorg, juridisch of financieel, een SLA met compensatie, een licentie om zelf te hosten en hulp bij audits.', 'ParaSign: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.')
     },
     parasend: {
       // "and no rate limit" stood here until 2026-10-05 while tiers.js holds
       // Firm to 500 an hour (outbound_per_hour), betaaltest row 9. Every number
       // in these lines is pinned to tiers.js by tests/site-claims.test.mjs.
-      pro: nlEn('Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
+      pro: nlEn('Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat je verstuurde.', 'ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
       // The same ParaSend Pro, bought as part of Business (besluit 05-10).
-      pro_business: nlEn('Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat u verstuurde.', 'ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
-      enterprise: nlEn('Versturen: links die 7 dagen open blijven, tot 100 keer te openen, onbeperkt apparaten, een eigen relay, een getekende verwerkersovereenkomst en 99,95% beschikbaarheid.', 'ParaSend: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.')
+      pro_business: nlEn('Versturen: 500 verzendingen per maand en hooguit 500 per uur, tot 30 ontvangers per verzending, links die 24 uur open blijven, via de API tot 10 keer te openen, tot 50 geregistreerde apparaten, en een overzicht van wat je verstuurde.', 'ParaSend: 500 transfers a month and at most 500 an hour, up to 30 recipients per send, links that stay open 24 hours, up to 10 reads each through the API, up to 50 registered devices, and a record of what you sent.'),
+      enterprise: nlEn('Versturen: links die 7 dagen open blijven, tot 100 keer te openen, onbeperkt apparaten, een eigen server, een getekende verwerkersovereenkomst en 99,95% beschikbaarheid.', 'ParaSend: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.')
     }
   };
 
@@ -261,15 +261,15 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   var NOT_PAID = {
     canceled: {
       kicker: nlEn('Betaling geannuleerd', 'Payment cancelled'),
-      lede: nlEn('U heeft de betaling afgebroken. Er is niets afgeschreven en uw plan is niet veranderd.', 'You stopped the payment. Nothing has been charged and your plan has not changed.')
+      lede: nlEn('Je hebt de betaling afgebroken. Er is niets afgeschreven en je plan is niet veranderd.', 'You stopped the payment. Nothing has been charged and your plan has not changed.')
     },
     failed: {
       kicker: nlEn('Betaling mislukt', 'Payment failed'),
-      lede: nlEn('De betaling is niet gelukt. Er is niets afgeschreven en uw plan is niet veranderd.', 'The payment did not go through. Nothing has been charged and your plan has not changed.')
+      lede: nlEn('De betaling is niet gelukt. Er is niets afgeschreven en je plan is niet veranderd.', 'The payment did not go through. Nothing has been charged and your plan has not changed.')
     },
     expired: {
       kicker: nlEn('Betaling verlopen', 'Payment expired'),
-      lede: nlEn('De betaling is niet op tijd afgerond en is verlopen. Er is niets afgeschreven en uw plan is niet veranderd.', 'The payment was not completed in time and has expired. Nothing has been charged and your plan has not changed.')
+      lede: nlEn('De betaling is niet op tijd afgerond en is verlopen. Er is niets afgeschreven en je plan is niet veranderd.', 'The payment was not completed in time and has expired. Nothing has been charged and your plan has not changed.')
     }
   };
 
@@ -316,21 +316,21 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     // still on its way: wait for it.
     if (lastAccountIsPaid && (status === 'paid' || !status || status === 'unknown')) {
       if (kicker) kicker.textContent = nlEn('Betaling ontvangen', 'Payment received');
-      if (lede) lede.textContent = nlEn('Dank u. Uw plan is actief. Wat erbij hoort en tot wanneer het loopt, staat hieronder.', 'Thank you. Your plan is active. What it includes and how long it runs is below.');
+      if (lede) lede.textContent = nlEn('Dank je. Je plan is actief. Wat erbij hoort en tot wanneer het loopt, staat hieronder.', 'Thank you. Your plan is active. What it includes and how long it runs is below.');
       clearBillingParam();
       return;
     }
     if (tries > 0) {
-      if (kicker) kicker.textContent = nlEn('Uw betaling wordt bevestigd', 'Confirming your payment');
-      if (lede) lede.textContent = nlEn('U bent terug van uw bank. We wachten nog op de bevestiging van de betaling. Dat duurt meestal een paar seconden. Deze pagina werkt zichzelf bij.', 'You are back from your bank. We are waiting for the payment to be confirmed. That usually takes a few seconds. This page updates by itself.');
+      if (kicker) kicker.textContent = nlEn('Je betaling wordt bevestigd', 'Confirming your payment');
+      if (lede) lede.textContent = nlEn('Je bent terug van je bank. We wachten nog op de bevestiging van de betaling. Dat duurt meestal een paar seconden. Deze pagina werkt zichzelf bij.', 'You are back from your bank. We are waiting for the payment to be confirmed. That usually takes a few seconds. This page updates by itself.');
       window.setTimeout(function () { refreshAccount(tries - 1); }, RETURN_DELAY_MS);
       return;
     }
     if (kicker) kicker.textContent = nlEn('Betaling nog niet bevestigd', 'Payment not confirmed yet');
     if (status === 'paid') {
-      if (lede) lede.textContent = nlEn('Uw betaling is gelukt, maar uw plan staat er nog niet. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als het er dan nog niet staat.', 'Your payment went through, but your plan is not showing yet. Reload this page in a minute, and mail privacy@paramant.app if it still has not appeared.');
+      if (lede) lede.textContent = nlEn('Je betaling is gelukt, maar je plan staat er nog niet. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als het er dan nog niet staat.', 'Your payment went through, but your plan is not showing yet. Reload this page in a minute, and mail privacy@paramant.app if it still has not appeared.');
     } else {
-      if (lede) lede.textContent = nlEn('De betaaldienst heeft uw betaling nog niet afgerond. Gaat ze alsnog door, dan krijgt u het plan vanzelf. Breekt u haar af, dan wordt er niets afgeschreven. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als u twijfelt.', 'The payment provider has not finished your payment yet. If it still goes through, the plan is granted by itself. If you stop it, nothing is charged. Reload this page in a minute, and mail privacy@paramant.app if in doubt.');
+      if (lede) lede.textContent = nlEn('De betaaldienst heeft je betaling nog niet afgerond. Gaat ze alsnog door, dan krijg je het plan vanzelf. Breek je haar af, dan wordt er niets afgeschreven. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als je twijfelt.', 'The payment provider has not finished your payment yet. If it still goes through, the plan is granted by itself. If you stop it, nothing is charged. Reload this page in a minute, and mail privacy@paramant.app if in doubt.');
     }
     clearBillingParam();
   }
@@ -386,7 +386,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         if (copy) lines.push(copy);
       }
       if (!lines.length && planId !== 'community') {
-        lines.push(nlEn('Uw account staat op het ', 'Your account is on the ') + planName + nlEn('-plan, met de limieten van ', ' plan, with the ') + planName +
+        lines.push(nlEn('Je account staat op het ', 'Your account is on the ') + planName + nlEn('-plan, met de limieten van ', ' plan, with the ') + planName +
                    nlEn(' voor zowel Ondertekenen als Versturen.', ' limits on both ParaSign and ParaSend.'));
       }
       paid.hidden = isFree || !lines.length;
@@ -399,8 +399,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         if (foot) {
           var renewable = !window.paPlanTerms || !window.paPlanTerms.hasEnd || window.paPlanTerms.hasEnd(data);
           foot.textContent = renewable
-            ? nlEn('Facturen en verlengen vindt u onder ', 'Invoices and renewing are under ')
-            : nlEn('Facturen vindt u onder ', 'Invoices are under ');
+            ? nlEn('Facturen en verlengen vind je onder ', 'Invoices and renewing are under ')
+            : nlEn('Facturen vind je onder ', 'Invoices are under ');
         }
       }
     }
@@ -482,7 +482,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       show(section);
       if (list) {
         list.innerHTML = '<div class="dh-rowsay" role="status">'
-          + nlEn('We konden uw verzendingen nu niet laden. Er is niets veranderd. ', 'We could not load your sends just now. Nothing has changed; ')
+          + nlEn('We konden je verzendingen nu niet laden. Er is niets veranderd. ', 'We could not load your sends just now. Nothing has changed; ')
           + nlEn('Kies Vernieuwen om het opnieuw te proberen.</div>', 'use Refresh to try again.</div>');
       }
     }).then(function () {
@@ -602,7 +602,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return '';
     }).catch(function () { return ''; });
   }
-  var LINK_NOT_HERE_NL = 'De link van deze ontvanger staat niet in deze browser. Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw.';
+  var LINK_NOT_HERE_NL = 'De link van deze ontvanger staat niet in deze browser. Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw.';
   var LINK_NOT_HERE_EN = 'This recipient\'s link is not in this browser. Open the request in the browser you sent it from, or withdraw it and send it again.';
   function sayLinkNotHere(button) {
     var row = button && button.closest ? button.closest('.dh-send-person') : null;
@@ -795,7 +795,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   }
 
   // A request a signer refused is "Geweigerd" with the name, not "Geannuleerd":
-  // the mail tells the sender "in uw documenten ziet u wie" (acceptance r2, 2).
+  // the mail tells the sender "in je documenten zie je wie" (acceptance r2, 2).
   function declinedBy(doc) {
     var parties = doc && Array.isArray(doc.parties) ? doc.parties : [];
     for (var i = 0; i < parties.length; i++) if (parties[i] && parties[i].status === 'declined') return parties[i];
@@ -887,7 +887,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // thing IS; this says what it is waiting for. Without it a sender reads
   // "Waiting for signatures" and still has to open the row to learn on whom.
   function documentNext(doc, state, total, signed) {
-    if (state === 'completed') return nlEn('Door iedereen getekend. U kunt het bewijs downloaden.', 'Signed by everyone. The proof is yours to download.');
+    if (state === 'completed') return nlEn('Door iedereen getekend. Je kunt het bewijs downloaden.', 'Signed by everyone. The proof is yours to download.');
     if (state === 'cancelled') return nlEn('Ingetrokken. Niemand kan nog tekenen.', 'Withdrawn. Nobody can add a signature.');
     if (state === 'expired') return nlEn('Verlopen. Niemand kan nog tekenen; stuur zo nodig een nieuw verzoek.', 'Expired. Nobody can add a signature; send a new request if you still need one.');
     var parties = Array.isArray(doc.parties) ? doc.parties : [];
@@ -978,9 +978,9 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return esc(p.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? nlEn('getekend', 'signed') : p.status === 'declined' ? nlEn('geweigerd', 'declined') : p.status === 'viewed' ? nlEn('geopend', 'opened') : nlEn('wacht', 'waiting'));
     }).join('<br>') : signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed');
     var help = state === 'completed'
-      ? nlEn('Wij bewaren het bewijs, geen leesbare kopie van uw document. De pdf met alle handtekeningen maakt uw browser. Op het apparaat waarmee u verstuurde, opent hij meteen. Elders kiest u eerst uw originele bestand. Controleren doet u later met het .psign-bewijs en de complete pdf (daarin zit het origineel ingebed), of met het originele document.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the .psign proof with the complete PDF (the original is embedded in it) or the original document.')
+      ? nlEn('Wij bewaren het bewijs, geen leesbare kopie van je document. Je browser maakt de pdf met alle handtekeningen. Op het apparaat waarmee je het verzoek verstuurde, opent die pdf meteen. Op een ander apparaat kies je eerst je originele bestand. Later controleer je de handtekeningen met het .psign-bewijs en de complete pdf (het origineel zit daarin), of met het originele document.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the .psign proof with the complete PDF (the original is embedded in it) or the original document.')
       : state === 'cancelled' && declinedBy(doc)
-        ? nlEn('Een ondertekenaar heeft geweigerd te tekenen. Daarmee is dit verzoek gestopt; niemand kan er nog op tekenen. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', 'A signer declined to sign, so this request has stopped and nobody can sign it any more. To try again, send a new request.')
+        ? nlEn('Een ondertekenaar heeft geweigerd te tekenen. Daarmee is dit verzoek gestopt; niemand kan er nog op tekenen. Wil je het opnieuw proberen, stuur dan een nieuw verzoek.', 'A signer declined to sign, so this request has stopped and nobody can sign it any more. To try again, send a new request.')
       : state === 'expired'
         ? nlEn('Dit verzoek is verlopen. Niemand kan er nog op tekenen; gezette handtekeningen blijven in het auditlog. Stuur zo nodig een nieuw verzoek.', 'This request has expired. Nobody can sign it any more; signatures already given stay in the audit record. Send a new request if you still need one.')
       : state === 'cancelled'
@@ -1023,7 +1023,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return rec.links.filter(function (l) { return l && typeof l.url === 'string' && /^https?:\/\/[^#]+\/co-sign\?[^#]*#ks=v1\.[A-Za-z0-9_-]{43}$/.test(l.url); });
     }).catch(function () { return null; });
   }
-  var SIGNER_LINKS_NOT_HERE_NL = 'De volledige ondertekenlinks staan niet in deze browser. Open het verzoek in de browser waarmee u het verstuurde, of trek het in en stuur opnieuw.';
+  var SIGNER_LINKS_NOT_HERE_NL = 'De volledige ondertekenlinks staan niet in deze browser. Open het verzoek in de browser waarmee je het verstuurde, of trek het in en stuur opnieuw.';
   var SIGNER_LINKS_NOT_HERE_EN = 'The full signing links are not in this browser. Open the request in the browser you sent it from, or withdraw it and send it again.';
   var signerLinksReady = null;
   function signerLinksHtml(doc) {
@@ -1213,7 +1213,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       renderDocuments();
       openResendFromMail();
     }).catch(function () {
-      list.innerHTML = nlEn('<div class="dh-empty"><strong>We konden uw documenten nu niet laden</strong><span>Er is niets veranderd. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Opnieuw proberen</button></span></div>', '<div class="dh-empty"><strong>We could not load your documents just now</strong><span>Nothing has changed. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>');
+      list.innerHTML = nlEn('<div class="dh-empty"><strong>We konden je documenten nu niet laden</strong><span>Er is niets veranderd. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Opnieuw proberen</button></span></div>', '<div class="dh-empty"><strong>We could not load your documents just now</strong><span>Nothing has changed. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>');
     }).finally(function () {
       if (refresh) { refresh.disabled = false; refresh.textContent = nlEn('Vernieuwen', 'Refresh'); }
     });
@@ -1316,11 +1316,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       var note = document.createElement('p');
       note.className = 'dh-inbox-note';
       note.setAttribute('role', 'status');
-      note.textContent = nlEn('We hebben de afzender gevraagd u de uitnodiging opnieuw te sturen. Alleen de afzender heeft de sleutel van het document. De nieuwe mail heeft dezelfde link als de eerste en opent het document op elk apparaat.', 'We have asked the sender to send you the invitation again. Only the sender holds the document key. The new mail has the same link as the first one and opens the document on any device.');
+      note.textContent = nlEn('We hebben de afzender gevraagd je de uitnodiging opnieuw te sturen. Alleen de afzender heeft de sleutel van het document. De nieuwe mail heeft dezelfde link als de eerste en opent het document op elk apparaat.', 'We have asked the sender to send you the invitation again. Only the sender holds the document key. The new mail has the same link as the first one and opens the document on any device.');
       // This browser may hold the key half from the first invitation
       // (js/cosign-share-memory.js): then the first mail's link opens the
       // document here already.
-      if (heldShare(id)) note.textContent += ' ' + nlEn('In deze browser opent de link uit uw eerste uitnodiging het document nu al.', 'In this browser the link from your first invitation already opens the document.');
+      if (heldShare(id)) note.textContent += ' ' + nlEn('In deze browser opent de link uit je eerste uitnodiging het document nu al.', 'In this browser the link from your first invitation already opens the document.');
       var prev = button.parentNode && button.parentNode.querySelector('.dh-inbox-note');
       if (prev) prev.remove();
       if (button.parentNode) button.parentNode.appendChild(note);
@@ -1501,10 +1501,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (!worst) return null;
     var left = Math.max(0, worst.cap - worst.used);
     if (worst.pct >= 100) {
-      return nlEn('Uw tegoed van ' + worst.cap + ' ' + worst.nl + ' is op voor deze maand. Meer nodig?',
+      return nlEn('Je tegoed van ' + worst.cap + ' ' + worst.nl + ' is op voor deze maand. Heb je meer nodig?',
                   'Your ' + worst.cap + ' ' + worst.en + ' for this month are used up. Need more?');
     }
-    return nlEn('U heeft ' + worst.used + ' van uw ' + worst.cap + ' ' + worst.nl + ' deze maand gebruikt, nog ' + left + ' over. Bijna op. Meer nodig?',
+    return nlEn('Je hebt ' + worst.used + ' van je ' + worst.cap + ' ' + worst.nl + ' deze maand gebruikt, nog ' + left + ' over. Het is bijna op. Heb je meer nodig?',
                 'You have used ' + worst.used + ' of your ' + worst.cap + ' ' + worst.en + ' this month, ' + left + ' left. Almost used up. Need more?');
   }
   function loadUsage() {

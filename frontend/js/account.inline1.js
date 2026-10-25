@@ -43,7 +43,7 @@ function paAskSecondFactor(anchor, text, confirmLabel) {
       if (/^\d{6}$/.test(v)) return done({ totp: v });
       if (/^[A-Za-z0-9]{3,8}(-[A-Za-z0-9]{3,8}){1,3}$/.test(v)) return done({ backup_code: v.toUpperCase() });
       err.hidden = false;
-      err.textContent = nlEn('Vul de code van 6 cijfers uit uw authenticator-app in, of een back-upcode.', 'Enter the 6-digit code from your authenticator app, or a back-up code.');
+      err.textContent = nlEn('Vul de code van 6 cijfers uit je authenticator-app in, of een back-upcode.', 'Enter the 6-digit code from your authenticator app, or a back-up code.');
       input.focus();
     }
     ok.addEventListener('click', onOk);
@@ -63,7 +63,7 @@ function paSecondFactorError(status, body) {
   if (code === 'invalid_second_factor' || code === 'invalid_totp') return nlEn('Die code klopt niet. Er is niets veranderd.', 'That code did not match. Nothing changed.');
   if (code === 'second_factor_required') return nlEn('Vul eerst de code van 6 cijfers of een back-upcode in. Er is niets veranderd.', 'Enter the 6-digit code or a back-up code first. Nothing changed.');
   if (status === 429) return nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.');
-  if (status === 401) return nlEn('Uw sessie is verlopen. Log opnieuw in en probeer het nog eens. Er is niets veranderd.', 'Your session has expired. Sign in again and retry. Nothing changed.');
+  if (status === 401) return nlEn('Je sessie is verlopen. Log opnieuw in en probeer het nog eens. Er is niets veranderd.', 'Your session has expired. Sign in again and retry. Nothing changed.');
   if (status >= 500) return nlEn('Er is een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Something went wrong on our side. Nothing changed. Please try again shortly.');
   return nlEn('Dit is niet gelukt. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work. Nothing changed. Please try again shortly.');
 }
@@ -160,13 +160,13 @@ window.paSecondFactorError = paSecondFactorError;
       const res = await fetch('/api/user/account', { credentials: 'include' });
       if (!res.ok) {
         // Only a 401 means signed out. A 429 from an empty nginx bucket, or a
-        // 5xx, told a signed-in customer "U bent niet ingelogd" (hertest r2 R2-a).
+        // 5xx, told a signed-in customer "Je bent niet ingelogd" (hertest r2 R2-a).
         // 503 with authenticated:null (admin/server.js) is an outage, never "signed out".
         if (res.status === 401 || res.status === 403) { show('state-unauth'); return; }
         show('state-busy');
         if (res.status !== 429) {
           var bt = document.getElementById('acct-busy-text');
-          if (bt) bt.firstChild.textContent = nlEn('Door een storing bij ons laadt uw account even niet. U bent nog ingelogd. ', 'Your account will not load just now because of a fault on our side. You are still signed in. ');
+          if (bt) bt.firstChild.textContent = nlEn('Door een storing bij ons laadt je account even niet. Je bent nog ingelogd. ', 'Your account will not load just now because of a fault on our side. You are still signed in. ');
         }
         return;
       }
@@ -342,27 +342,27 @@ window.paSecondFactorError = paSecondFactorError;
       if (!res.ok) { alert(paSecondFactorError(res.status, body)); return null; }
       return body;
     } catch (e) {
-      alert(nlEn('Paramant is niet bereikbaar. Er is niets veranderd. Controleer uw verbinding en probeer het opnieuw.', 'We could not reach Paramant. Nothing changed. Check your connection and try again.'));
+      alert(nlEn('Paramant is niet bereikbaar. Er is niets veranderd. Controleer je verbinding en probeer het opnieuw.', 'We could not reach Paramant. Nothing changed. Check your connection and try again.'));
       return null;
     } finally { btn.disabled = false; }
   }
 
   document.getElementById('regen-backup').addEventListener('click', async function() {
     var data = await accountAction(this, '/api/user/account/backup-codes/regenerate', 'POST',
-      nlEn('Alle codes vernieuwen: de huidige back-upcodes vervallen. Bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Renew all codes: the current back-up codes stop working. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Alle codes vernieuwen: de huidige back-upcodes vervallen. Bevestig met de code van 6 cijfers uit je authenticator-app, of een back-upcode.', 'Renew all codes: the current back-up codes stop working. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
       nlEn('Codes vernieuwen', 'Renew codes'));
     if (data && Array.isArray(data.backup_codes)) {
-      alert(nlEn('Nieuwe codes:\n\n', 'New codes:\n\n') + data.backup_codes.join('\n') + nlEn('\n\nBewaar ze nu. U ziet ze hierna niet meer.', '\n\nSave these now. They will not be shown again.'));
+      alert(nlEn('Nieuwe codes:\n\n', 'New codes:\n\n') + data.backup_codes.join('\n') + nlEn('\n\nBewaar ze nu. Je ziet ze hierna niet meer.', '\n\nSave these now. They will not be shown again.'));
       loadAccount();
     }
   });
 
   document.getElementById('reset-totp').addEventListener('click', async function() {
     var data = await accountAction(this, '/api/user/account/totp/reset', 'POST',
-      nlEn('We sturen u een nieuwe instelmail. Uw huidige authenticator-app werkt daarna niet meer. Bevestig met de huidige code van 6 cijfers, of een back-upcode.', 'We send you a new setup email. Your current authenticator app stops working after that. Confirm with the current 6-digit code, or a back-up code.'),
+      nlEn('We sturen je een nieuwe instelmail. Je huidige authenticator-app werkt daarna niet meer. Bevestig met de huidige code van 6 cijfers, of een back-upcode.', 'We send you a new setup email. Your current authenticator app stops working after that. Confirm with the current 6-digit code, or a back-up code.'),
       nlEn('Instelmail sturen', 'Send setup email'));
     if (data) {
-      alert(nlEn('De instelmail is verstuurd. Kijk in uw inbox.', 'Setup email sent. Check your inbox.'));
+      alert(nlEn('De instelmail is verstuurd. Kijk in je inbox.', 'Setup email sent. Check your inbox.'));
       window.location = nlEn('/auth/login', '/en/auth/login');
     }
   });
@@ -388,7 +388,7 @@ window.paSecondFactorError = paSecondFactorError;
       if (st === 401) { show('state-unauth'); return; }
       alert(st === 429
         ? nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.')
-        : nlEn('Er is een storing bij ons. De andere sessies zijn nog actief en u bent nog ingelogd. Probeer het zo opnieuw.', 'Something went wrong on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
+        : nlEn('Er is een storing bij ons. De andere sessies zijn nog actief en je bent nog ingelogd. Probeer het zo opnieuw.', 'Something went wrong on our side. The other sessions are still active and you are still signed in. Please try again shortly.'));
       return;
     }
     alert(nlEn('De andere sessies zijn uitgelogd.', 'Other sessions signed out.'));
@@ -396,10 +396,10 @@ window.paSecondFactorError = paSecondFactorError;
   });
 
   document.getElementById('delete-account').addEventListener('click', async function() {
-    const answer = prompt(nlEn('Weet u het zeker? Typ DEACTIVEREN om uw account te deactiveren:', 'Are you sure? Type DEACTIVATE to deactivate your account:'));
+    const answer = prompt(nlEn('Weet je het zeker? Typ DEACTIVEREN om je account te deactiveren:', 'Are you sure? Type DEACTIVATE to deactivate your account:'));
     if (answer !== nlEn('DEACTIVEREN', 'DEACTIVATE')) return;
     var data = await accountAction(this, '/api/user/account', 'DELETE',
-      nlEn('Laatste stap: bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Last step: confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Laatste stap: bevestig met de code van 6 cijfers uit je authenticator-app, of een back-upcode.', 'Last step: confirm with the 6-digit code from your authenticator app, or a back-up code.'),
       nlEn('Account deactiveren', 'Deactivate account'));
     if (data) {
       try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
@@ -470,13 +470,13 @@ window.paSecondFactorError = paSecondFactorError;
         ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
         : said || (d.auto_renews
           ? nlEn('Wordt op ', 'Renews automatically on ') + when + nlEn(' automatisch verlengd. Opzeggen kan tot die dag.', '. You can cancel until that day.')
-          : nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
+          : nlEn('Betaald tot ', 'Paid until ') + when + nlEn('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, je verliest geen dag.', '. Nothing renews automatically. You can renew from today without losing a day.'));
       line.hidden = false;
     }
     // A plan that renews by itself needs no "renew or fall back" warning.
     if (warn && term.warn && !d.auto_renews) {
       var text = warn.querySelector('[data-term="text"]');
-      if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
+      if (text) text.textContent = nlEn('Je plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;
     }
   }
@@ -532,7 +532,7 @@ window.paSecondFactorError = paSecondFactorError;
         document.getElementById('billing-cancel-btn').classList.add('hidden');
       }
     } catch(err) {
-      document.getElementById('billing-loading').textContent = nlEn('We konden uw betaalstatus niet laden.', 'Could not load your billing status.');
+      document.getElementById('billing-loading').textContent = nlEn('We konden je betaalstatus niet laden.', 'Could not load your billing status.');
     }
   }
 
@@ -609,16 +609,16 @@ window.paSecondFactorError = paSecondFactorError;
       histEl.textContent = '';
       rows.forEach(function(e) { histEl.appendChild(historyRow(e)); });
     } catch(err) {
-      histEl.textContent = nlEn('We konden uw betaalgeschiedenis niet laden.', 'Could not load your billing history.');
+      histEl.textContent = nlEn('We konden je betaalgeschiedenis niet laden.', 'Could not load your billing history.');
     }
   }
 
   document.getElementById('billing-cancel-btn').addEventListener('click', async function() {
-    if (!confirm(nlEn('Uw plan opzeggen? U houdt toegang tot het einde van de betaalde periode.', 'Cancel your plan? You keep access until the end of your billing period.'))) return;
+    if (!confirm(nlEn('Je plan opzeggen? Je houdt toegang tot het einde van de betaalde periode.', 'Cancel your plan? You keep access until the end of your billing period.'))) return;
     const res = await fetch('/api/user/billing/cancel', { method: 'POST', credentials: 'include' });
     if (res.ok) {
       const d = await res.json();
-      alert(nlEn('Opzegging gepland. Uw plan gaat terug op ', 'Cancellation scheduled. Your plan downgrades on ') + paramantDate.day(d.scheduled_downgrade_at));
+      alert(nlEn('Opzegging gepland. Je plan gaat terug op ', 'Cancellation scheduled. Your plan downgrades on ') + paramantDate.day(d.scheduled_downgrade_at));
       loadBilling();
     } else {
       // 409 (one-off, nothing to cancel) and 503 (relay-main not reachable,
@@ -680,7 +680,7 @@ window.paSecondFactorError = paSecondFactorError;
         el.appendChild(row);
       });
     } catch (err) {
-      el.textContent = nlEn('We konden uw facturen niet laden.', 'Could not load your invoices.');
+      el.textContent = nlEn('We konden je facturen niet laden.', 'Could not load your invoices.');
     }
   }
 

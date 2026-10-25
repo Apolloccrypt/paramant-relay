@@ -38,9 +38,13 @@ test('SITE-30: /terms is niet absoluut en noemt de uitzonderingen (NL en EN)', (
   const en = tekst('frontend/en/terms.html');
   assert.doesNotMatch(nl, /Wij kunnen dus niet zien wat u verstuurt/);
   assert.doesNotMatch(en, /which means we cannot see what you send/);
-  assert.match(nl, /Daarop zijn drie uitzonderingen/);
+  assert.match(nl, /Daarop zijn twee uitzonderingen/);
   assert.match(nl, /versturen naar ontvangers op naam/);
-  assert.match(nl, /extensies voor Chromium en Outlook/);
+  // De extensies versleutelen in de extensie zelf (Web Crypto, AES-256-GCM,
+  // sleutel na de #), dus de NL-voorwaarden noemen ze niet meer als uitzondering.
+  // Gaat dat in de code ooit terug naar de server, dan moet de uitzondering terug.
+  assert.match(lees('extensions/shared/paramant-core.js'), /crypto\.subtle\.encrypt\(\{ name: 'AES-GCM'/, 'extensies versleutelen niet meer zelf: noem ze weer als uitzondering');
+  assert.doesNotMatch(nl, /versleutelen nu nog op onze server/);
   assert.match(en, /There are three exceptions/);
   assert.match(en, /sending to named recipients/);
   assert.match(en, /Chromium and Outlook extensions/);
@@ -49,7 +53,14 @@ test('SITE-30: /terms is niet absoluut en noemt de uitzonderingen (NL en EN)', (
 test('SITE-30: security, parasend, privacy, home en dpa noemen ontvangers op naam als uitzondering (NL en EN)', () => {
   const nl = ['security', 'parasend', 'privacy', 'index', 'dpa', 'rules'];
   for (const slug of nl) {
-    assert.match(tekst(`frontend/${slug}.html`), /ontvangers op naam|genoemde ontvangers/, `${slug}: noemt de uitzondering niet`);
+    // De Nederlandse homepage legt de uitzondering sinds 25-10-2026 niet meer
+    // zelf uit (besluit Mick): hij noemt Resend en verwijst naar /privacy, waar
+    // de uitzondering wel staat (die pagina staat hierboven in de lijst).
+    if (slug === 'index') {
+      assert.match(lees('frontend/index.html'), /data-partners-rollen>[^]*?Resend[^]*?href="\/privacy"/, 'index: noemt Resend niet meer met een verwijzing naar /privacy');
+    } else {
+      assert.match(tekst(`frontend/${slug}.html`), /ontvangers op naam|genoemde ontvangers/, `${slug}: noemt de uitzondering niet`);
+    }
     assert.match(tekst(`frontend/en/${slug}.html`), /named recipients/, `en/${slug}: noemt de uitzondering niet`);
   }
   assert.match(tekst('frontend/security.html'), /Versturen naar ontvangers op naam \(per e-mailadres\) is niet zero-knowledge/);

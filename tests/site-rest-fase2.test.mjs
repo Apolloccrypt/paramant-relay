@@ -116,7 +116,11 @@ test('SITE-30-A: the core principle on /security names the named-recipient send 
   const nlCore = nl.slice(nl.indexOf('tussenpersoon die niet vertrouwd hoeft te worden'), nl.indexOf('Waar de zero-knowledge-garantie nu geldt'));
   const enCore = en.slice(en.indexOf('untrusted intermediary'), en.indexOf('Where the zero-knowledge guarantee holds today'));
   assert.match(nlCore, /ontvangers op naam/);
-  assert.match(nlCore, /extensies/);
+  // De extensies versleutelen in de extensie zelf (extensions/shared/paramant-core.js,
+  // Web Crypto AES-256-GCM, sleutel na de #). De NL-kern noemt ze daarom niet meer
+  // als uitzondering; gaat dat in de code terug naar de server, dan moet het er weer in.
+  assert.match(rd('extensions/shared/paramant-core.js'), /crypto\.subtle\.encrypt\(\{ name: 'AES-GCM'/);
+  assert.doesNotMatch(nlCore, /nu nog op de server worden versleuteld/);
   assert.match(enCore, /named recipients/);
   assert.match(enCore, /extensions/);
 });
@@ -221,8 +225,8 @@ test('VREEMDE-09: de stap Ontvangers zegt maar een keer wie u toevoegt', () => {
 // dialoog zei "voor het tekenen", terwijl een uitnodiging verstuurd wordt.
 test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versturen een gratis account vraagt', () => {
   const cases = [
-    // 13-10-2026: de kop zegt het nu in een korte zin onder de knoppen, met hoofdletter.
-    ['index', '/sign?mode=invite', /versturen doet u met een gratis account/i, /Voor het versturen maakt u een gratis account/],
+    // 25-10-2026: de Nederlandse home heeft geen Probeer het zelf meer. De ene
+    // knop gaat naar /signup, dus de bezoeker begint met een gratis account.
     ['en/index', '/en/sign?mode=invite', /sending needs a free account/i, /To send it, you create a free one/],
   ];
   for (const [slug, href, hero, stage] of cases) {
@@ -247,7 +251,7 @@ test('VREEMDE-07: elke Probeer het zelf naar /sign?mode=invite zegt dat versture
 // en kijkt wat er werkelijk staat.
 test('HOME-DATUM: de voorbeeldrijen op de home gebruiken de datumnotatie van het dashboard, gerekend vanaf vandaag', () => {
   const cases = [
-    ['index', 'Gemaakt', 'Verstuurd', '[a-z]+', 'om'],
+    // De Nederlandse home heeft sinds 25-10-2026 geen voorbeeldrijen meer.
     ['en/index', 'Created', 'Sent', '[A-Z][a-z]+', 'at'],
   ];
   for (const [slug, made, sent, month, at] of cases) {

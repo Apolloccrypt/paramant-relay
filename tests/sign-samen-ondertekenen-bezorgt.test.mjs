@@ -117,7 +117,7 @@ test('Samen ondertekenen: lukt het meesturen niet, dan zegt het eindscherm dat e
   const r = await runCosign({ failUpload: true });
   assert.equal(r.seen.invites.length, 0, 'zonder document geen mail die niets opent');
   assert.equal(r.ui.resultHidden, false);
-  assert.match(r.ui.result, /Uw handtekening staat/);
+  assert.match(r.ui.result, /Je handtekening staat/);
   assert.match(r.ui.result, /te groot/);
   assert.match(r.ui.copy, /niet het document/);
   assert.deepEqual(r.errors, []);

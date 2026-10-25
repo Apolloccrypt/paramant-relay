@@ -170,7 +170,7 @@ const tabNext = {};
 
 test('1: uitgelogd op /pricing leidt Kies Firm naar een gratis account, met het plan in de weg terug', () => {
   assert.equal(nl.afterBuy, '/signup?next=' + encodeURIComponent('/pricing?koop=firm.firm.monthly'));
-  assert.match(nl.note, /Eerst maakt u een gratis account\. Daarna rekent u af/);
+  assert.match(nl.note, /Eerst maak je een gratis account\. Daarna reken je af/);
   assert.match(nl.noJsHref, /^\/signup\?next=\/pricing$/, 'zonder JS gaat de knop ook naar de aanmelding');
   assert.equal(en.afterBuy, '/en/signup?next=' + encodeURIComponent('/en/pricing?koop=firm.firm.monthly'));
   assert.match(en.note, /First you make a free account\. Then you pay/);
@@ -181,7 +181,7 @@ test('2: de aanmelding houdt de weg terug vast en stuurt na het instellen terug 
   assert.equal(en.loginLink, '/en/auth/login?next=' + encodeURIComponent('/en/pricing?koop=firm.firm.monthly'));
   assert.equal(nl.stored && nl.stored.path, '/pricing?koop=firm.firm.monthly');
   assert.ok(nl.welcome.shown, 'het welkomscherm biedt de weg terug');
-  assert.match(nl.welcome.text, /terug naar het plan dat u koos/);
+  assert.match(nl.welcome.text, /terug naar het plan dat je koos/);
   assert.equal(nl.welcome.href, '/pricing?koop=firm.firm.monthly');
   assert.equal(nl.landed, '/pricing', 'terug op /pricing, de keuze uit het adres gehaald');
   assert.match(nl.resume, /Klik op de knop hierboven om dit plan af te rekenen/);

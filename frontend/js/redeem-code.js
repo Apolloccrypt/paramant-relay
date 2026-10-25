@@ -47,10 +47,10 @@
   // The page's own language: Dutch on every page that declares <html lang="nl">,
   // English on the pages that still declare "en" (the copies under /en).
   var EN = document.documentElement.lang === 'en';
-  var BUSY = EN ? 'Checking your code...' : 'We controleren uw code...';
+  var BUSY = EN ? 'Checking your code...' : 'We controleren je code...';
   var NO_HELPER = EN ? 'This page did not load properly. Reload it and try again.' : 'Deze pagina laadde niet goed. Laad hem opnieuw en probeer het nog eens.';
   var OFFLINE = EN ? 'We could not reach the server. Please try again in a minute.' : 'We konden de server niet bereiken. Probeer het over een minuut opnieuw.';
-  var EMPTY = EN ? 'Enter your code first.' : 'Vul eerst uw code in.';
+  var EMPTY = EN ? 'Enter your code first.' : 'Vul eerst je code in.';
 
   /* The relay answers in both languages: `message` in English, `message_nl`
    * in Dutch. A Dutch page printed the English one word for word (fase 1,
@@ -125,7 +125,7 @@
       if (!out) return;
       busy(form, false);
       if (out.status === 200 && out.data.ok) {
-        say(form, pick(out.data) || (EN ? 'Your code is redeemed.' : 'Uw code is ingewisseld.'), 'info');
+        say(form, pick(out.data) || (EN ? 'Your code is redeemed.' : 'Je code is ingewisseld.'), 'info');
         if (input) input.value = '';
         /* The plan on this page is now out of date. Let whichever page we are
          * on refresh the block that shows it, without this file knowing which

@@ -74,7 +74,7 @@ const PASSKEY_CREATE_FALLBACK =
 function passkeyStartFailure(status, serverError, kind) {
   let text = kind === 'create' ? PASSKEY_CREATE_FALLBACK : PASSKEY_START_FALLBACK;
   if (serverError === 'invalid_email') {
-    text = nlEn('Dat e-mailadres lijkt niet compleet, dus we konden uw passkey niet opzoeken. ', 'That email address does not look complete, so we could not look up your passkey. ')
+    text = nlEn('Dat e-mailadres lijkt niet compleet, dus we konden je passkey niet opzoeken. ', 'That email address does not look complete, so we could not look up your passkey. ')
       + nlEn('Controleer het en probeer het opnieuw, of kies “Mijn passkey staat op een ander apparaat”.', 'Check it and try again, or use “My passkey is on another device”.');
   } else if (serverError === 'setup_token_required' || serverError === 'invalid_setup_token') {
     text = nlEn('Deze instellink is niet meer geldig. Vraag een nieuwe aan op de inlogpagina ', 'This setup link is no longer valid. Ask for a new one on the sign-in page ')
@@ -111,9 +111,9 @@ function passkeyAuthErrorMessage(e) {
     return nlEn('Inloggen met een passkey kon op deze site niet starten. Blijft dit gebeuren, neem dan contact met ons op.', 'Passkey sign-in could not start on this site. If this keeps happening, contact support.');
   }
   // NotAllowedError and anything else: ambiguous. Give the actionable options.
-  return nlEn('Er is op dit apparaat geen passkey gebruikt. Log hierboven in met uw e-mailadres en code, ', 'No passkey was used on this device. Sign in with your email and code above, ')
-    + nlEn('of tik op “Mijn passkey staat op een ander apparaat” om in te loggen met de passkey op uw telefoon. ', 'or tap “My passkey is on another device” to sign in with the passkey on your phone. ')
-    + nlEn('Heeft u zelf afgebroken? Probeer het dan gewoon opnieuw.', 'If you cancelled, just try again.');
+  return nlEn('Er is op dit apparaat geen passkey gebruikt. Log hierboven in met je e-mailadres en code, ', 'No passkey was used on this device. Sign in with your email and code above, ')
+    + nlEn('of tik op “Mijn passkey staat op een ander apparaat” om in te loggen met de passkey op je telefoon. ', 'or tap “My passkey is on another device” to sign in with the passkey on your phone. ')
+    + nlEn('Heb je zelf afgebroken? Probeer het dan gewoon opnieuw.', 'If you cancelled, just try again.');
 }
 
 // ── Registration: account-setup page (/auth/setup/<setup_token>) ─────────────
@@ -133,7 +133,7 @@ function wireSetupPasskey() {
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    setStatus(status, nlEn('Volg de stappen op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
+    setStatus(status, nlEn('Volg de stappen op je apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/register/options', { setup_token: setupToken });
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
@@ -181,7 +181,7 @@ function wireSetupPasskey() {
     const dlBtn = document.getElementById('passkey-download-codes');
     if (dlBtn) dlBtn.addEventListener('click', () => {
       const blob = new Blob([
-        nlEn('Paramant back-upcodes\nBewaar ze goed. Elke code werkt één keer om in te loggen als u uw passkey kwijt bent.\n\n', 'Paramant backup codes\nSave these; each can be used once to sign in if you lose your passkey.\n\n') + codes.join('\n') + '\n',
+        nlEn('Paramant back-upcodes\nBewaar ze goed. Elke code werkt één keer om in te loggen als je je passkey kwijt bent.\n\n', 'Paramant backup codes\nSave these; each can be used once to sign in if you lose your passkey.\n\n') + codes.join('\n') + '\n',
       ], { type: 'text/plain' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -235,9 +235,9 @@ function wireLoginPasskey() {
 
   btn.addEventListener('click', async () => {
     const email = (emailEl && emailEl.value || '').trim();
-    if (!email) { setStatus(status, nlEn('Vul eerst uw e-mailadres in.', 'Enter your email address first.'), true); if (emailEl) emailEl.focus(); return; }
+    if (!email) { setStatus(status, nlEn('Vul eerst je e-mailadres in.', 'Enter your email address first.'), true); if (emailEl) emailEl.focus(); return; }
     btn.disabled = true;
-    setStatus(status, nlEn('Volg de stappen op uw apparaat om in te loggen…', 'Follow your device prompt to sign in…'), false);
+    setStatus(status, nlEn('Volg de stappen op je apparaat om in te loggen…', 'Follow your device prompt to sign in…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/login/options', { email });
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error);
@@ -275,8 +275,8 @@ function wireLoginPasskey() {
 // and what the reader can do, by status.
 function loadFailText(status, nlWhat, enWhat) {
   if (status === 429) return nlEn(nlWhat + ' konden even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
-  if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
-  if (status >= 500) return nlEn(nlWhat + ' konden nu niet worden geladen door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  if (status === 401 || status === 403) return nlEn('Je sessie is verlopen. Log opnieuw in om je ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
+  if (status >= 500) return nlEn(nlWhat + ' konden nu niet worden geladen door een storing bij ons. Er is niets mis met je account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
   return nlEn(nlWhat + ' konden nu niet worden geladen. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
 }
 
@@ -291,11 +291,11 @@ function wireAccountPasskey() {
   async function refresh() {
     try {
       const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
-      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = loadFailText(r.status, 'Uw passkeys', 'your passkeys'); } return; }
+      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = loadFailText(r.status, 'Je passkeys', 'your passkeys'); } return; }
       const d = await r.json();
       const pk = d.passkeys || [];
       if (!pk.length) {
-        if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = nlEn('Nog geen passkey op uw account.', 'No passkey on your account yet.'); }
+        if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = nlEn('Nog geen passkey op je account.', 'No passkey on your account yet.'); }
         if (listEl) listEl.innerHTML = '';
         return;
       }
@@ -323,7 +323,7 @@ function wireAccountPasskey() {
     const ask = window.paAskSecondFactor;
     if (typeof ask !== 'function') return;
     const factor = await ask(b.closest('li') || b,
-      nlEn('Deze passkey verwijderen: daarna kunt u er niet meer mee inloggen. Bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Remove this passkey: you can no longer sign in with it afterwards. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Deze passkey verwijderen: daarna kun je er niet meer mee inloggen. Bevestig met de code van 6 cijfers uit je authenticator-app, of een back-upcode.', 'Remove this passkey: you can no longer sign in with it afterwards. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
       nlEn('Passkey verwijderen', 'Remove passkey'));
     if (!factor) return;
     b.disabled = true;
@@ -334,7 +334,7 @@ function wireAccountPasskey() {
       });
       const body = await r.json().catch(() => ({}));
       if (r.ok) {
-        setStatus(status, nlEn('Passkey verwijderd. U logt er niet meer mee in.', 'Passkey removed. It no longer signs you in.'), false);
+        setStatus(status, nlEn('Passkey verwijderd. Je logt er niet meer mee in.', 'Passkey removed. It no longer signs you in.'), false);
       } else if (r.status === 404) {
         setStatus(status, nlEn('Deze passkey bestaat niet meer, of verwijderen kan op deze server nog niet. Er is niets veranderd.', 'This passkey no longer exists, or removing is not available on this server yet. Nothing changed.'), true);
       } else {
@@ -357,15 +357,15 @@ function wireAccountPasskey() {
 
   btn.addEventListener('click', async () => {
     const totp = (totpEl && totpEl.value || '').trim();
-    if (!/^\d{6}$/.test(totp)) { setStatus(status, nlEn('Vul eerst uw huidige code van 6 cijfers in.', 'Enter your current 6-digit code first.'), true); if (totpEl) totpEl.focus(); return; }
+    if (!/^\d{6}$/.test(totp)) { setStatus(status, nlEn('Vul eerst je huidige code van 6 cijfers in.', 'Enter your current 6-digit code first.'), true); if (totpEl) totpEl.focus(); return; }
     btn.disabled = true;
-    setStatus(status, nlEn('Uw code wordt gecontroleerd…', 'Verifying your code…'), false);
+    setStatus(status, nlEn('Je code wordt gecontroleerd…', 'Verifying your code…'), false);
     try {
       const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
-      if (opt.status === 403) throw new Error(nlEn('Die code is niet geaccepteerd. Probeer de huidige code uit uw authenticator-app.', 'That code was not accepted. Try the current code from your authenticator app.'));
+      if (opt.status === 403) throw new Error(nlEn('Die code is niet geaccepteerd. Probeer de huidige code uit je authenticator-app.', 'That code was not accepted. Try the current code from your authenticator app.'));
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
 
-      setStatus(status, nlEn('Volg de stappen op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
+      setStatus(status, nlEn('Volg de stappen op je apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
       let attResp;
       try {
         attResp = await startRegistration({ optionsJSON: opt.data.options });
@@ -378,7 +378,7 @@ function wireAccountPasskey() {
       const ver = await postJSON('/api/user/account/webauthn/register/verify', { flowId: opt.data.flowId, response: attResp });
       if (!ver.ok) throw Object.assign(new Error(nlEn('De passkey kon niet worden vastgelegd. Probeer het opnieuw.', 'The passkey could not be saved. Try again.')), { techCode: (ver.data && ver.data.error ? ver.data.error : 'verification_failed') + ' (' + ver.status + ')' });
 
-      setStatus(status, nlEn('Passkey geactiveerd. U kunt er nu mee inloggen.', 'Passkey activated. You can now sign in with it.'), false);
+      setStatus(status, nlEn('Passkey geactiveerd. Je kunt er nu mee inloggen.', 'Passkey activated. You can now sign in with it.'), false);
       if (totpEl) totpEl.value = '';
       refresh();
     } catch (e) {
@@ -411,7 +411,7 @@ function wireDiscoverablePasskey() {
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    setStatus(status, nlEn('Uw browser toont een QR-code. Scan die met uw telefoon om in te loggen…', 'Your browser will show a QR code. Scan it with your phone to sign in…'), false);
+    setStatus(status, nlEn('Je browser toont een QR-code. Scan die met je telefoon om in te loggen…', 'Your browser will show a QR code. Scan it with your phone to sign in…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/login/discoverable/options', {});
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error);

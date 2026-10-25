@@ -47,7 +47,7 @@ async function open(route, next) {
 }
 
 const CASES = [
-  ['/auth/login', '/parashare', /Om te versturen heeft u een gratis account nodig/, /Gratis account maken/, '/signup?next=%2Fparashare'],
+  ['/auth/login', '/parashare', /Om te versturen heb je een gratis account nodig/, /Gratis account maken/, '/signup?next=%2Fparashare'],
   ['/en/auth/login', '/en/parashare', /To send a file you need a free account/, /Create a free account/, '/en/signup?next=%2Fen%2Fparashare'],
 ];
 
@@ -80,8 +80,12 @@ for (const [route, next, sentence, button, href] of CASES) {
 }
 
 test('the landing tile still says "met een gratis account" and still points at the send page', () => {
+  // The Dutch homepage (25 October 2026) has no send tile any more: its one
+  // button is "Probeer het gratis" and goes to /signup, so a visitor learns
+  // that it starts with a free account before any send page.
+  const nl = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.ok(nl.includes('<a class="hp-btn hp-btn-fill" href="/signup">Probeer het gratis</a>'), 'index.html: the one button no longer leads to a free account');
   for (const [file, href, note] of [
-    ['index.html', '/parashare', /Met een gratis account/],
     ['en/index.html', '/en/parashare', /With a free account/i],
   ]) {
     const html = fs.readFileSync(path.join(ROOT, file), 'utf8');

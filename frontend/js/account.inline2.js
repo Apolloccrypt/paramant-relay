@@ -18,8 +18,8 @@ function fmtTs(iso) {
 // and what the reader can do, by status.
 function loadFailText(status, nlWhat, enWhat) {
   if (status === 429) return nlEn(nlWhat + ' laden even niet: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
-  if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
-  if (status >= 500) return nlEn(nlWhat + ' laden nu niet door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  if (status === 401 || status === 403) return nlEn('Je sessie is verlopen. Log opnieuw in om je ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
+  if (status >= 500) return nlEn(nlWhat + ' laden nu niet door een storing bij ons. Er is niets mis met je account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
   return nlEn(nlWhat + ' laden nu niet. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
 }
 
@@ -29,13 +29,13 @@ async function loadEnrolledKeys() {
   try {
     const res = await fetch('/api/user/account/signing-key', { credentials: 'include' });
     if (!res.ok) {
-      emptyEl.textContent = loadFailText(res.status, 'Uw ondertekensleutels', 'your signing keys');
+      emptyEl.textContent = loadFailText(res.status, 'Je ondertekensleutels', 'your signing keys');
       return;
     }
     const data = await res.json();
     const keys = (data.keys || []);
     if (!keys.length) {
-      emptyEl.textContent = nlEn('U heeft geen vaste ondertekensleutel, en dat hoeft ook niet: u tekent met de code uit uw authenticator-app. Liever tekenen met uw passkey? Stel het hieronder in.', 'You have no stored signing key, and you do not need one: you sign with the code from your authenticator app. Rather sign with your passkey? Set it up below.');
+      emptyEl.textContent = nlEn('Je hebt geen vaste ondertekensleutel, en dat hoeft ook niet: je tekent met de code uit je authenticator-app. Liever tekenen met je passkey? Stel het hieronder in.', 'You have no stored signing key, and you do not need one: you sign with the code from your authenticator app. Rather sign with your passkey? Set it up below.');
       listEl.innerHTML = '';
       return;
     }
@@ -64,7 +64,7 @@ async function loadEnrolledKeys() {
       b.addEventListener('click', () => revokeKey(b.getAttribute('data-revoke')));
     });
   } catch (e) {
-    emptyEl.textContent = nlEn('We konden uw sleutels niet laden: ', 'Could not load your keys: ') + e.message;
+    emptyEl.textContent = nlEn('We konden je sleutels niet laden: ', 'Could not load your keys: ') + e.message;
   }
 }
 
@@ -74,7 +74,7 @@ function askRevokeTotp() {
     const input = document.getElementById('revoke-totp');
     const ok = document.getElementById('revoke-totp-confirm');
     const cancel = document.getElementById('revoke-totp-cancel');
-    if (!wrap || !input || !ok || !cancel) { resolve((window.prompt(nlEn('Vul de code van 6 cijfers uit uw authenticator-app in. Daarmee trekt u deze sleutel in.', 'Enter the 6-digit code from your authenticator app. That revokes this key.')) || '').trim()); return; }
+    if (!wrap || !input || !ok || !cancel) { resolve((window.prompt(nlEn('Vul de code van 6 cijfers uit je authenticator-app in. Daarmee trek je deze sleutel in.', 'Enter the 6-digit code from your authenticator app. That revokes this key.')) || '').trim()); return; }
     input.value = ''; wrap.hidden = false; input.focus();
     const done = (v) => { ok.removeEventListener('click', onOk); cancel.removeEventListener('click', onCancel); input.removeEventListener('keydown', onKey); wrap.hidden = true; resolve(v); };
     const onOk = () => { const t = (input.value || '').trim(); if (!/^\d{6}$/.test(t)) { input.focus(); return; } done(t); };
@@ -117,7 +117,7 @@ async function loadVaultStatus() {
   try {
     const list = await vaultList();
     if (!list.length) {
-      el.textContent = nlEn('Geen ondertekensleutel in deze browser. Niet nodig om te tekenen; wilt u er een, gebruik dan "Uw ondertekensleutel instellen" hieronder.', 'No signing key in this browser. You do not need one to sign; if you want one, use "Set up your signing key" below.');
+      el.textContent = nlEn('Geen ondertekensleutel in deze browser. Niet nodig om te tekenen; wil je er een, gebruik dan "Je ondertekensleutel instellen" hieronder.', 'No signing key in this browser. You do not need one to sign; if you want one, use "Set up your signing key" below.');
       return;
     }
     const fmt = e => (e.label ? e.label : nlEn('(geen label)', '(no label)')) + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';

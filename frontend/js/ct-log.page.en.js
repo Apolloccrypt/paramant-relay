@@ -228,7 +228,7 @@ function verifyHash() {
     return;
   }
   el.innerHTML = '<strong>' + esc('Found in the list at index {i}. Cryptographic check running…'.replace('{i}', idx)) + '</strong>' + details;
-  import('/js/ct-log-verify.js?v=1').then(function(m) {
+  import('/js/ct-log-verify.js?v=2').then(function(m) {
     return m.verifyEntry({ relay: RELAY, index: match.index, leafHash: match.leaf_hash });
   }).then(function(res) {
     if (run !== verifyRun) return;

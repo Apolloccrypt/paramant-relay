@@ -97,7 +97,7 @@
     // "Business tot 5 november, daarna Firm tot 6 december" twice on top of
     // each other (acceptatie 3.1.1 ronde 2, betalen punt 6).
     var text = name + t(' betaald tot ', ' paid until ') + day(head.until);
-    return text + t('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.',
+    return text + t('. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, je verliest geen dag.',
       '. Nothing renews automatically. You can renew from today without losing a day.');
   }
 

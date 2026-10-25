@@ -10,9 +10,9 @@
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/login">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/login">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app. U typt geen wachtwoord.">
+<meta name="description" content="Log in op je Paramant-account met een passkey of een code van 6 cijfers uit je authenticator-app. Je typt geen wachtwoord.">
 <meta property="og:title" content="Inloggen bij Paramant">
-<meta property="og:description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app.">
+<meta property="og:description" content="Log in op je Paramant-account met een passkey of een code van 6 cijfers uit je authenticator-app.">
 <meta property="og:url" content="https://paramant.app/auth/login">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -20,7 +20,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Inloggen bij Paramant">
-<meta name="twitter:description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app.">
+<meta name="twitter:description" content="Log in op je Paramant-account met een passkey of een code van 6 cijfers uit je authenticator-app.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -99,11 +99,11 @@
 <div class="auth-head">
   <div class="eyebrow"><span class="bar"></span>inloggen</div>
   <h1>Welkom <em>terug</em>.</h1>
-  <p class="auth-sub">Geen wachtwoord nodig: log in met uw passkey, of met een code van 6 cijfers uit uw authenticator-app.</p>
+  <p class="auth-sub">Geen wachtwoord nodig: log in met je passkey, of met een code van 6 cijfers uit je authenticator-app.</p>
 </div>
 
 <div id="login-context" class="auth-note auth-context" role="note" hidden>
-  <p><strong>Om te versturen heeft u een gratis account nodig.</strong> Uw bestand gaat in uw eigen browser op slot en alleen de ontvanger kan het openen. Een account maken is gratis en u heeft geen betaalkaart nodig. Heeft u al een account, log dan hieronder in.</p>
+  <p><strong>Om te versturen heb je een gratis account nodig.</strong> Je browser versleutelt het bestand, en alleen de ontvanger kan het openen. Een account maken is gratis en je hebt geen betaalkaart nodig. Heb je al een account, log dan hieronder in.</p>
   <a class="btn btn-primary mt-3" id="login-context-signup" href="/signup?next=/parashare">Gratis account maken</a>
 </div>
 
@@ -117,9 +117,9 @@
     <button type="button" class="btn btn-primary" id="passkey-login-btn">Inloggen met een passkey</button>
     <button type="button" class="btn btn-secondary" id="show-code-btn" aria-expanded="false" aria-controls="code-fields">Liever een code van 6 cijfers</button>
   </div>
-  <p class="auth-hint">Uw apparaat vraagt om Face ID, Touch ID, Windows Hello of een beveiligingssleutel. De sleutel blijft op het apparaat.</p>
+  <p class="auth-hint">Je apparaat vraagt om Face ID, Touch ID, Windows Hello of een beveiligingssleutel. Je passkey blijft op het apparaat.</p>
   <div id="code-fields" hidden>
-    <label for="totp" class="mt-3">Code van 6 cijfers uit uw authenticator-app</label>
+    <label for="totp" class="mt-3">Code van 6 cijfers uit je authenticator-app</label>
     <input type="text" id="totp" name="totp" inputmode="numeric"
            pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
            placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
@@ -134,14 +134,14 @@
 </form>
 
 <div id="sha1-notice" class="auth-note" hidden role="note">
-  <p><strong>U bent ingelogd.</strong> Tip voor later: uw authenticator-app (bijvoorbeeld Google Authenticator) maakt codes op de gewone, wat oudere manier. Dat werkt prima. Sommige andere apps beveiligen nog iets sterker. <a href="/help/authenticator-apps">Bekijk welke apps dat zijn</a>.</p>
+  <p><strong>Je bent ingelogd.</strong> Tip voor later: je authenticator-app (bijvoorbeeld Google Authenticator) maakt codes op de gebruikelijke, wat oudere manier. Dat werkt prima. Sommige andere apps gebruiken een nog iets sterkere methode. <a href="/help/authenticator-apps">Bekijk welke apps dat zijn</a>.</p>
   <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Verder</a>
   <p class="auth-note-sub" id="sha1-auto" aria-live="polite"></p>
 </div>
 
 <p class="footer-text auth-foot">
-  Authenticator-app kwijt? Met een back-upcode <a href="/auth/backup">logt u in</a> of <a href="/auth/request-reset">koppelt u een nieuwe app</a>.<br>
-  Back-upcodes ook kwijt? Mail vanaf het adres van uw account naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>. Dan herstelt support uw toegang. <a href="/help/lost-authenticator">Zo werkt het</a><br>
+  Authenticator-app kwijt? Met een back-upcode <a href="/auth/backup">log je in</a> of <a href="/auth/request-reset">koppel je een nieuwe app</a>.<br>
+  Back-upcodes ook kwijt? Mail vanaf het adres van je account naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>. Dan herstelt support je toegang. <a href="/help/lost-authenticator">Zo werkt het</a><br>
   Nog geen account? <a href="/signup">Account maken</a>
 </p>
 
@@ -154,8 +154,8 @@
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
-<script src="/js/auth-login.js?v=11"></script>
-<script type="module" src="/js/passkey.js?v=12"></script>
+<script src="/js/auth-login.js?v=12"></script>
+<script type="module" src="/js/passkey.js?v=13"></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/en/auth/login" hreflang="en" lang="en">This page in English</a></span>

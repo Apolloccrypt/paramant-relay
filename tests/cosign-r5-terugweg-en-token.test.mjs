@@ -197,7 +197,7 @@ test('A: is het tabblad met de uitnodiging dicht, dan zegt de pagina eerlijk dat
   const tab = await setupInNewTab(ctx);
   await tab.locator('#step-error.active').waitFor({ timeout: 15000 });
   const text = (await tab.locator('#step-error').innerText()).replace(/\s+/g, ' ');
-  assert.match(text, /Uw account staat klaar/);
+  assert.match(text, /Je account staat klaar/);
   assert.match(text, /Open de link uit de uitnodigingsmail nog een keer/);
   const u = new URL(tab.url());
   assert.equal(u.searchParams.get('env'), ENV_ID);

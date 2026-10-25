@@ -89,7 +89,7 @@ test('co-sign opens a link without the half with the remembered one, and remembe
   const remember = fn.indexOf('rememberShare(envId, partyIndex,');
   assert.ok(decrypt > 0 && remember > decrypt, 'the half is kept only after it proved to open the document');
   assert.match(src, /fetchAndOpenCapsule\(url, envId, partyIndex[,)]/);
-  assert.match(src, /de sleutel die deze browser bewaarde van uw eerste uitnodiging, en klopt met dit verzoek/);
+  assert.match(src, /de sleutel die deze browser bewaarde van je eerste uitnodiging, en klopt met dit verzoek/);
 });
 
 test('sign-out and another account wipe the halves, like the sender links', () => {
@@ -103,5 +103,5 @@ test('sign-out and another account wipe the halves, like the sender links', () =
 test('the dashboard says where the resent link opens the document', () => {
   const dash = read('frontend/js/dashboard.js');
   assert.match(dash, /if \(heldShare\(id\)\) note\.textContent/);
-  assert.match(dash, /In deze browser opent de link uit uw eerste uitnodiging het document nu al\./);
+  assert.match(dash, /In deze browser opent de link uit je eerste uitnodiging het document nu al\./);
 });

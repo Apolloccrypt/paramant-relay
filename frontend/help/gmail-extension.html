@@ -271,16 +271,16 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     Extensie voor Gmail
   </div>
 
-  <h1>Paramant voor <em>Gmail</em>: versleutelde bijlagen versturen zonder uw inbox te verlaten.</h1>
+  <h1>Paramant voor <em>Gmail</em>: versleutelde bijlagen versturen zonder je inbox te verlaten.</h1>
 
-  <p class="lead">De Paramant-extensie voor Chrome zet een knop in het opstelvenster van Gmail. U kiest een bestand. De extensie uploadt het naar Paramant en zet een link in uw e-mail die na het lezen vervalt. De webapp en de extensies wissen het bestand na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op Firm en 100 keer op Enterprise.</p>
+  <p class="lead">De Paramant-extensie voor Chrome zet een knop in het opstelvenster van Gmail. Je kiest een bestand. De extensie uploadt het naar Paramant en zet een link in je e-mail. Die link vervalt zodra de ontvanger het bestand heeft gedownload. Verstuur je via de website of een extensie, dan wordt het bestand na de eerste download gewist, op elk plan. Wie via de API verstuurt met een betaald plan, kan een link vaker laten downloaden: tot 10 keer op Firm en 100 keer op Enterprise.</p>
 
-  <h2>Voordat u begint</h2>
+  <h2>Voordat je begint</h2>
 
   <ul class="compat-list">
     <li><span class="dot dot-yes"></span><strong>Chrome of Chromium</strong>: versie 120 of nieuwer</li>
     <li><span class="dot dot-yes"></span><strong>Gmail in een browsertabblad</strong>: gmail.com of Google Workspace</li>
-    <li><span class="dot dot-yes"></span><strong>Paramant-account met een API-sleutel</strong>: <a href="/signup">maak een account</a> als u er nog geen heeft</li>
+    <li><span class="dot dot-yes"></span><strong>Paramant-account met een API-sleutel</strong>: <a href="/signup">maak een account</a> als je er nog geen hebt</li>
     <li><span class="dot dot-no"></span><strong>Firefox en Safari</strong>: niet ondersteund. Gebruik dan de <a href="/parashare">uploader op de website</a></li>
     <li><span class="dot dot-no"></span><strong>Gmail-app op de telefoon</strong>: extensies werken niet in mobiele apps</li>
   </ul>
@@ -291,9 +291,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Installeer de extensie</h2>
-      <p>De extensie staat nog niet in de Chrome Web Store. U laadt hem nu zelf, als uitgepakte extensie, uit de broncode op <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> (map <code>extensions/chromium</code>). Daar bouwt u hem met <code>npm ci</code> en <code>npm run build</code>. Open daarna in Chrome <code>chrome://extensions</code>, zet rechtsboven <strong>Ontwikkelaarsmodus</strong> aan, klik op <strong>Uitgepakte extensie laden</strong> en kies de map <code>dist</code>.</p>
-      <p>Het Paramant-pictogram verschijnt in de werkbalk van Chrome. Ziet u het niet, klik dan op het puzzelstukje in de werkbalk en zet Paramant vast.</p>
-      <div class="tip"><p>Is dit voor uw organisatie te omslachtig, gebruik dan de <a href="/parashare">uploader op de website</a>. Die doet hetzelfde zonder installatie. Zodra de extensie in de Chrome Web Store staat, zetten we dat hier.</p></div>
+      <p>De extensie staat nog niet in de Chrome Web Store. Je laadt hem nu zelf, als uitgepakte extensie, uit de broncode op <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> (map <code>extensions/chromium</code>). Daar bouw je hem met <code>npm ci</code> en <code>npm run build</code>. Open daarna in Chrome <code>chrome://extensions</code>, zet rechtsboven <strong>Ontwikkelaarsmodus</strong> aan, klik op <strong>Uitgepakte extensie laden</strong> en kies de map <code>dist</code>.</p>
+      <p>Het Paramant-pictogram verschijnt in de werkbalk van Chrome. Zie je het niet, klik dan op het puzzelstukje in de werkbalk en zet Paramant vast.</p>
+      <div class="tip"><p>Is dit voor je organisatie te omslachtig, gebruik dan de <a href="/parashare">uploader op de website</a>. Die doet hetzelfde zonder installatie. Zodra de extensie in de Chrome Web Store staat, zetten we dat hier.</p></div>
     </div>
   </div>
 
@@ -301,9 +301,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">2</div>
     <div class="step-body">
       <h2>Log in</h2>
-      <p>Klik op het Paramant-pictogram in de werkbalk. Het venster is in het Engels. Plak in het veld <strong>API key</strong> uw sleutel en klik op <strong>Sign in</strong>. Of kies <strong>Use TOTP instead</strong> en log in met uw e-mailadres en de zes cijfers uit uw authenticator-app.</p>
-      <p>De extensie bewaart de sleutel lokaal in de extensieopslag van Chrome. Hij gaat alleen naar de relais van Paramant (*.paramant.app), en alleen als u inlogt of een bestand uploadt. Na acht uur logt de extensie u vanzelf uit.</p>
-      <div class="tip"><p>Uw sleutel staat op <a href="/account">Account</a>, onder <strong>Geavanceerde accountsleutel</strong>. Hij begint met <code>pgp_</code>.</p></div>
+      <p>Klik op het Paramant-pictogram in de werkbalk. Het venster is in het Engels. Plak in het veld <strong>API key</strong> je sleutel en klik op <strong>Sign in</strong>. Of kies <strong>Use TOTP instead</strong> en log in met je e-mailadres en de zes cijfers uit je authenticator-app.</p>
+      <p>De extensie bewaart de sleutel lokaal in de extensieopslag van Chrome. Hij gaat alleen naar de servers van Paramant (*.paramant.app), en alleen als je inlogt of een bestand uploadt. Na acht uur logt de extensie je vanzelf uit.</p>
+      <div class="tip"><p>Je sleutel staat op <a href="/account">Account</a>, onder <strong>Geavanceerde accountsleutel</strong>. Hij begint met <code>pgp_</code>.</p></div>
     </div>
   </div>
 
@@ -311,7 +311,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>Controleer de verbinding</h2>
-      <p>Is de sleutel geldig, dan toont het venster <strong>Signed in</strong> met uw abonnement en hoe lang de sessie nog loopt. Ziet u <strong>Invalid API key</strong>, controleer dan of u de hele sleutel hebt gekopieerd: <code>pgp_</code> en 64 tekens, zonder spaties aan het eind. Ziet u <strong>Too many sign-in attempts</strong>, wacht dan een minuut.</p>
+      <p>Is de sleutel geldig, dan toont het venster <strong>Signed in</strong> met je abonnement en hoe lang de sessie nog loopt. Zie je <strong>Invalid API key</strong>, controleer dan of je de hele sleutel hebt gekopieerd: <code>pgp_</code> en 64 tekens, zonder spaties aan het eind. Zie je <strong>Too many sign-in attempts</strong>, wacht dan een minuut.</p>
     </div>
   </div>
 
@@ -329,8 +329,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">2</div>
     <div class="step-body">
       <h2>Klik op het Paramant-pictogram en kies een bestand</h2>
-      <p>Klik op <strong>Paramant</strong>. Er opent een venster om een bestand te kiezen. Kies het bestand dat u wilt versturen. De extensie versleutelt het in uw browser en uploadt het daarna. De voortgang ziet u in een balk bovenin het venster.</p>
-      <p>U kunt bestanden tot 500 MB versturen. Dat is de grens per bestand op elk plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). De extensie knipt het bestand in stukken en uploadt per stuk één vast blok van 5 MB. Die 5 MB is dus het formaat onderweg, niet de grootte van het bestand dat u mag versturen.</p>
+      <p>Klik op <strong>Paramant</strong>. Er opent een venster om een bestand te kiezen. Kies het bestand dat je wilt versturen. De extensie versleutelt het in je browser en uploadt het daarna. De voortgang zie je in een balk bovenin het venster.</p>
+      <p>Je kunt bestanden tot 500 MB versturen. Dat is de grens per bestand op elk plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). De extensie knipt het bestand in stukken van 5 MB en uploadt die een voor een. Die 5 MB zegt dus niets over hoe groot je bestand mag zijn.</p>
     </div>
   </div>
 
@@ -338,10 +338,10 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>De link wordt vanzelf ingevoegd</h2>
-      <p>Als de upload klaar is, zet de extensie op de plek van uw cursor een kader in uw e-mail. Daarin staan de bestandsnaam als link, de vervaldatum en de regel <em>Sent via paramant.app</em>. De link ziet er zo uit:</p>
+      <p>Als de upload klaar is, zet de extensie op de plek van je cursor een kader in je e-mail. Daarin staan de bestandsnaam als link, de vervaldatum en de regel <em>Sent via paramant.app</em>. De link ziet er zo uit:</p>
       <p style="font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:10px 14px;line-height:1.6;overflow-wrap:anywhere">https://paramant.app/get?t=...&amp;c=1&amp;r=...#k=...</p>
-      <p>Het deel na <code>#</code> is de sleutel. Die gaat nooit naar onze server. De bestandsnaam staat niet in de link, alleen in uw eigen e-mail.</p>
-      <p>Pas de tekst rond de link aan als dat nodig is en verstuur uw e-mail zoals altijd.</p>
+      <p>Het deel na <code>#</code> is de sleutel. Die gaat nooit naar onze server. De bestandsnaam staat niet in de link, alleen in je eigen e-mail.</p>
+      <p>Pas de tekst rond de link aan als dat nodig is en verstuur je e-mail zoals altijd.</p>
     </div>
   </div>
 
@@ -349,7 +349,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">4</div>
     <div class="step-body">
       <h2>De ontvanger downloadt het bestand</h2>
-      <p>Uw ontvanger heeft geen account nodig. Hij klikt op de link, ziet hoe lang het bestand nog klaarstaat, klikt op <strong>Bestand downloaden</strong> en krijgt het bestand met de oorspronkelijke naam. Direct na die eerste download worden link en bestand gewist, op elk plan. De extensie vraagt de relay nooit om een tweede keer lezen. Een tweede poging krijgt een 404.</p>
+      <p>Je ontvanger heeft geen account nodig. Hij klikt op de link, ziet hoe lang het bestand nog klaarstaat, klikt op <strong>Bestand downloaden</strong> en krijgt het bestand met de oorspronkelijke naam. Direct na die eerste download worden link en bestand gewist, op elk plan. De extensie maakt nooit een link die twee keer werkt. Wie de link daarna nog eens opent, krijgt de melding dat het bestand niet bestaat (404).</p>
     </div>
   </div>
 
@@ -357,10 +357,10 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <p>Klik op het Paramant-pictogram in de werkbalk en daarna op <strong>Settings</strong>:</p>
   <ul style="margin:12px 0 12px 20px;display:flex;flex-direction:column;gap:8px">
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Standaard geldigheid</strong>: hoe lang de link actief blijft als er niet wordt gedownload. Standaard is dat 24 uur. U kiest van 1 uur tot 7 dagen.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Standaard geldigheid</strong>: hoe lang de link actief blijft als er niet wordt gedownload. Standaard is dat 24 uur. Je kiest van 1 uur tot 7 dagen.</li>
     <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Vorm van de link</strong>: een opgemaakt kader, of een platte regel met de bestandsnaam en de volledige link. De platte regel is beter als het mailprogramma van de ontvanger geen HTML toont.</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Verzendgeschiedenis</strong>: in het venster van de extensie een lijst van recente uploads met naam, grootte en tijd. Alleen lokaal bewaard, zonder link of sleutel. Of een bestand al is opgehaald, ziet u daar niet.</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Relais</strong>: laat dit leeg. Een eigen relais (self-hosting) werkt met de extensie nog niet, want de ontvanger opent de link op paramant.app en die pagina haalt alleen op bij de relais van Paramant.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Verzendgeschiedenis</strong>: in het venster van de extensie een lijst van recente uploads met naam, grootte en tijd. Alleen lokaal bewaard, zonder link of sleutel. Of een bestand al is opgehaald, zie je daar niet.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Relais</strong>: laat dit veld leeg. Hier zou je een eigen server kunnen invullen (self-hosting), maar dat werkt met de extensie nog niet. De ontvanger opent de link namelijk op paramant.app, en die pagina haalt bestanden alleen op bij de servers van Paramant.</li>
   </ul>
 
   <hr class="divider">
@@ -374,7 +374,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">De extensie zegt "Sign in to Paramant" of "Invalid API key".</div>
-    <div class="a">Misschien is uw sessie van acht uur voorbij, of is uw sleutel ingetrokken of vervangen. Open het venster van de extensie, klik op <strong>Sign out</strong> en log opnieuw in. Uw huidige sleutel vindt u op <a href="/account">Account</a>, onder <strong>Geavanceerde accountsleutel</strong>.</div>
+    <div class="a">Misschien is je sessie van acht uur voorbij, of is je sleutel ingetrokken of vervangen. Open het venster van de extensie, klik op <strong>Sign out</strong> en log opnieuw in. Je huidige sleutel vind je op <a href="/account">Account</a>, onder <strong>Geavanceerde accountsleutel</strong>.</div>
   </div>
 
   <div class="troubleshoot-item">
@@ -384,7 +384,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">Het Chrome-beleid van mijn organisatie blokkeert extensies.</div>
-    <div class="a">Vraag uw IT-beheerder de Paramant-extensie toe te staan op basis van haar ID (te zien in Chrome &rarr; Extensies &rarr; Details). U kunt ook de <a href="/parashare">uploader op de website</a> of rechtstreeks de API gebruiken.</div>
+    <div class="a">Vraag je IT-beheerder de Paramant-extensie toe te staan op basis van haar ID (te zien in Chrome &rarr; Extensies &rarr; Details). Je kunt ook de <a href="/parashare">uploader op de website</a> of rechtstreeks de API gebruiken.</div>
   </div>
 
   <hr class="divider">

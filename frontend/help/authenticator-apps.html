@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Welke authenticator-app kiest u? · Paramant</title>
+<title>Welke authenticator-app kies je? · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:description" content="Elke gangbare authenticator-app werkt met Paramant, ook Google en Microsoft Authenticator. Wij raden een app met SHA-256 aan, zoals Aegis, Raivo of 1Password.">
-<meta name="twitter:title" content="Welke authenticator-app kiest u? · Paramant">
+<meta name="twitter:title" content="Welke authenticator-app kies je? · Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Welke authenticator-app kiest u? · Paramant">
+<meta property="og:title" content="Welke authenticator-app kies je? · Paramant">
 <meta property="og:description" content="Elke gangbare authenticator-app werkt met Paramant, ook Google en Microsoft Authenticator. Wij raden een app met SHA-256 aan, zoals Aegis, Raivo of 1Password.">
 <meta property="og:url" content="https://paramant.app/help/authenticator-apps">
 <meta property="og:type" content="website">
@@ -134,7 +134,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/help/authenticator-apps#webpage",
       "url": "https://paramant.app/help/authenticator-apps",
-      "name": "Welke authenticator-app kiest u? · Paramant",
+      "name": "Welke authenticator-app kies je? · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -252,18 +252,18 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <p class="lead">Elke gangbare authenticator-app werkt met Paramant. Een app met SHA-256 is het sterkst.</p>
 
   <h2>Waarom we SHA-256 aanraden</h2>
-  <p>De relay van Paramant accepteert codes met SHA-256 en met SHA-1, dus elke gangbare authenticator-app werkt. We raden SHA-256 aan omdat de tweede inlogstap dan dezelfde cryptografische standaard volgt als de rest van het transport, dat is gebouwd op post-quantum sleuteluitwisseling en FIPS 203-bouwstenen. HMAC-SHA1 is niet gekraakt en RFC 6238 gebruikt het als standaard, dus een app met SHA-1 is gewoon veilig. SHA-256 is alleen de sterkere en consequentere keuze.</p>
+  <p>Een authenticator-app rekent elke code uit met een vaste rekenmethode. De meeste apps gebruiken SHA-1, sommige het sterkere SHA-256. Paramant accepteert codes van allebei, dus elke gangbare authenticator-app werkt. We raden SHA-256 aan omdat het beter past bij de rest van onze beveiliging. Je bestanden worden versleuteld met sleutels die worden uitgewisseld volgens een methode die ook bestand is tegen toekomstige quantumcomputers (de standaard FIPS 203). HMAC-SHA1, de vorm van SHA-1 die deze apps gebruiken, is niet gekraakt. Het is ook de standaard in RFC 6238, de norm voor deze codes. Een app met SHA-1 is dus gewoon veilig. SHA-256 is alleen de sterkere keuze, die beter aansluit bij de rest.</p>
 
   <h2>Aanbevolen apps (SHA-256)</h2>
-  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS en Android, open source) en 2FAS ondersteunen allemaal SHA-256 voor TOTP. Elk van deze apps werkt met de QR-code op de instelpagina en geeft u de sterkste instelling.</p>
-  <div class="tip"><p>Twijfelt u welke u kiest? Aegis op Android en Raivo op iOS zijn open source, bewaren codes op het toestel zelf en hebben geen cloud nodig. 1Password en Bitwarden zijn een goede keuze als u al een wachtwoordbeheerder gebruikt.</p></div>
+  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS en Android, open source) en 2FAS ondersteunen allemaal SHA-256 voor TOTP. Elk van deze apps werkt met de QR-code op de instelpagina en geeft je de sterkste instelling.</p>
+  <div class="tip"><p>Twijfel je welke je kiest? Aegis op Android en Raivo op iOS zijn open source, bewaren codes op het toestel zelf en hebben geen cloud nodig. 1Password en Bitwarden zijn een goede keuze als je al een wachtwoordbeheerder gebruikt.</p></div>
 
   <h2>Werkt ook (SHA-1)</h2>
   <p>Google Authenticator, Microsoft Authenticator en de authenticator in iCloud-sleutelhanger gebruiken SHA-1 voor TOTP. Paramant accepteert codes met SHA-1, dus deze apps werken prima. Voor de sterkste instelling raden we toch een van de SHA-256-apps hierboven aan.</p>
-  <div class="tip"><p>Gebruikt u al Google Authenticator? Die blijft werken. Overstappen op een SHA-256-app zoals Raivo of Aegis is een kleine verbetering, geen verplichting.</p></div>
+  <div class="tip"><p>Gebruik je al Google Authenticator? Die blijft werken. Overstappen op een SHA-256-app zoals Raivo of Aegis is een kleine verbetering, geen verplichting.</p></div>
 
   <h2>Overstappen op een SHA-256-app</h2>
-  <p>Google Authenticator werkt met Paramant. Voor de sterkste instelling kunt u die houden voor uw andere diensten en een SHA-256-app (Aegis op Android, Raivo op iOS) speciaal voor Paramant toevoegen. U kunt gerust meerdere authenticator-apps op één toestel hebben. Veel mensen doen dat.</p>
+  <p>Google Authenticator werkt met Paramant. Voor de sterkste instelling kun je die houden voor je andere diensten en een SHA-256-app (Aegis op Android, Raivo op iOS) speciaal voor Paramant toevoegen. Je kunt gerust meerdere authenticator-apps op één toestel hebben. Veel mensen doen dat.</p>
 
   <hr class="divider">
 
@@ -271,7 +271,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="next-steps">
     <a href="/auth/setup" class="next-step-card">
       <h3>Authenticator-app instellen</h3>
-      <p>Scan de QR-code en bevestig uw eerste code.</p>
+      <p>Scan de QR-code en bevestig je eerste code.</p>
     </a>
     <a href="/security" class="next-step-card">
       <h3>Overzicht beveiliging</h3>

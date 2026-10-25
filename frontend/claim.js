@@ -22,7 +22,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
 
   if (!/^[a-f0-9]{64}$/.test(token)) {
     revealBtn.disabled = true;
-    showError(nlEn('Deze link is onvolledig of klopt niet. Gebruik precies de link uit uw mail.', 'This claim link is missing or malformed. Use the exact link from your email.'));
+    showError(nlEn('Deze link is onvolledig of klopt niet. Gebruik precies de link uit je mail.', 'This claim link is missing or malformed. Use the exact link from your email.'));
     return;
   }
 

@@ -7,7 +7,7 @@
 <!-- Belt and braces on top of the nginx header: the token IS the secret and it
      sits in this page's URL, so nothing may carry it off in a Referer. -->
 <meta name="referrer" content="no-referrer">
-<title>Er staat een bestand voor u klaar &middot; Paramant</title>
+<title>Er staat een bestand voor jou klaar &middot; Paramant</title>
 <link rel="canonical" href="https://paramant.app/ophalen">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/ophalen">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/ophalen">
@@ -80,15 +80,15 @@
   <div class="card">
     <div id="step-empty" hidden>
       <h1>Er staat nog niets klaar</h1>
-      <p>Deze pagina opent vanzelf via de link die u kreeg.</p>
+      <p>Deze pagina opent vanzelf via de link die je kreeg.</p>
       <a class="button" href="/parasend">Zelf iets versturen</a>
     </div>
 
     <div id="step-start">
-      <h1>Er staat een bestand voor u klaar</h1>
-      <p>Deze link is alleen voor u en werkt één keer.</p>
-      <p>We sturen eerst een korte code naar het mailadres waarop u deze link kreeg.
-         Zo weten we zeker dat u het bent.</p>
+      <h1>Er staat een bestand voor jou klaar</h1>
+      <p>Deze link is alleen voor jou en werkt één keer.</p>
+      <p>We sturen eerst een korte code naar het mailadres waarop je deze link kreeg.
+         Zo weten we zeker dat je het bent.</p>
       <button type="button" id="ask">Stuur mij de code</button>
       <div class="say" id="start-say" role="status"></div>
     </div>
@@ -103,18 +103,18 @@
       <button type="button" id="open">Bestand openen</button>
       <div class="say" id="code-say" role="status"></div>
       <div class="note muted">
-        Niet ontvangen? Kijk in uw map met ongewenste mail, of
+        Niet ontvangen? Kijk in je map met ongewenste mail, of
         <a href="#" id="again">stuur een nieuwe code</a>. Een nieuwe code vervangt de oude.
       </div>
     </div>
 
     <div id="step-done" hidden>
-      <h1>Uw bestand wordt gedownload</h1>
-      <p id="done-line">Gebeurt er niets, dan heeft uw browser het misschien tegengehouden.</p>
+      <h1>Je bestand wordt gedownload</h1>
+      <p id="done-line">Gebeurt er niets, dan heeft je browser het misschien tegengehouden.</p>
       <button type="button" id="again-download" hidden>Opnieuw downloaden</button>
       <div class="note muted">
         Deze link is nu gebruikt. Hij opent geen tweede keer. Zo weet de afzender
-        dat het bestand bij u is aangekomen en bij niemand anders.
+        dat het bestand bij jou is aangekomen en bij niemand anders.
       </div>
     </div>
 
@@ -122,14 +122,14 @@
       <h1 id="stop-title">Deze link werkt niet</h1>
       <p id="stop-line"></p>
       <div class="note muted">
-        Klopt dit volgens u niet? Vraag de afzender dan om een nieuwe
-        link. De afzender kan zien of u het bestand hebt opgehaald.
+        Klopt dit volgens jou niet? Vraag de afzender dan om een nieuwe
+        link. De afzender kan zien of je het bestand hebt opgehaald.
       </div>
     </div>
   </div>
 </main>
 <p class="lang-switch"><a id="lang-switch-link" href="/en/ontvang" hreflang="en" lang="en">This page in English</a></p>
 <script src="/js/send-wrap.js?v=1"></script>
-<script src="/js/ophalen.page.js?v=6"></script>
+<script src="/js/ophalen.page.js?v=7"></script>
 </body>
 </html>

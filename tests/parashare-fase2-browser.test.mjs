@@ -191,7 +191,7 @@ test('rule 3: the send-to-people end screen does not claim we never had the key'
   assert.equal(await page.locator('#done-details-live').isVisible(), false);
   assert.equal(await page.locator('#done-details-named').isVisible(), true);
   const named = await page.locator('#done-details-named').textContent();
-  assert.match(named, /geen zero-knowledge/);
-  assert.doesNotMatch(named, /nooit gehad|controlecode die u aan elkaar voorlas/);
+  assert.match(named, /(geen|niet) zero-knowledge/);
+  assert.doesNotMatch(named, /nooit gehad|controlecode die (u|je) aan elkaar voorlas/);
   await page.close();
 });

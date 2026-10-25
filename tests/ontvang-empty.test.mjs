@@ -64,7 +64,7 @@ async function visibleActions(page) {
 // its own exact sentences; the Dutch page may not show the English alarm words
 // either.
 const LANGS = [
-  { name: 'nl', pre: '', empty: /Er staat nog niets klaar/, opens: /Deze pagina opent vanzelf via de link die u kreeg\./,
+  { name: 'nl', pre: '', empty: /Er staat nog niets klaar/, opens: /Deze pagina opent vanzelf via de link die je kreeg\./,
     alarm: /Ontvangen is mislukt|ongeldig of onvolledig|werkt niet|Opnieuw proberen|Transfer failed|Invalid or missing|cannot be used|Try again|mislukt|Probeer het opnieuw/i, button: 'Zelf iets versturen',
     invalid: /Deze link is ongeldig of onvolledig/, stop: /Deze link werkt niet/ },
   { name: 'en', pre: '/en', empty: /Nothing to pick up yet/, opens: /This page opens by itself from the link you were sent\./,

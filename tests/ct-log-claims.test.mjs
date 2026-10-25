@@ -76,7 +76,7 @@ test('downloads and /v2/ack are described as the private audit chain, because th
       `${p} still says the CT log proves delivery`);
     assert.doesNotMatch(v, /Merkle-bewijs per transactie|per-transaction Merkle proof/i, `${p} still promises a proof per transaction`);
   }
-  assert.match(visible(read('frontend/docs.html')), /\/v2\/ack Aflevering bevestigen; vastgelegd in de privé-auditketen van uw sleutel, niet in de CT-log/);
+  assert.match(visible(read('frontend/docs.html')), /\/v2\/ack Aflevering bevestigen; vastgelegd in de privé-auditketen van je sleutel, niet in de CT-log/);
   assert.match(visible(read('frontend/en/docs.html')), /\/v2\/ack Confirm delivery; recorded in your key’s private audit chain, not in the CT log/);
 });
 
@@ -110,15 +110,15 @@ test('/ct-log says "verified" only on the path that ran the cryptographic check'
 
 test('/verify says what the inclusion check proves, not that the entry is in the public log now', () => {
   const src = read('frontend/js/receipt-verify.js');
-  assert.doesNotMatch(src, /staat echt in het openbare transparantielogboek|really is in the public transparency log/);
-  assert.match(src, /de relay heeft toen ondertekend dat deze regel in zijn transparantielogboek stond/);
+  assert.doesNotMatch(src, /staat echt in het openbare (transparantie)?logboek|really is in the public transparency log/);
+  assert.match(src, /de server heeft destijds ondertekend dat deze regel in zijn openbare logboek stond/);
   assert.match(src, /the relay signed at the time that this entry was in its transparency log/);
   // And the reason the stronger sentence is not allowed: the check folds the
   // receipt's own path to the receipt's own root, with no network call.
   const fn = src.slice(src.indexOf('export function verifyReceipt'), src.indexOf('// Visible text in both languages'));
   assert.doesNotMatch(fn, /fetch\(/, 'verifyReceipt now fetches the log: the page may say more again');
   for (const p of ['frontend/verify.html', 'frontend/en/verify.html']) {
-    assert.doesNotMatch(visible(read(p)), /staat echt in het openbare transparantielogboek|really sits in the public transparency log/, p);
+    assert.doesNotMatch(visible(read(p)), /staat echt in het openbare (transparantie)?logboek|really sits in the public transparency log/, p);
   }
 });
 

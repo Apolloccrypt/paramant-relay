@@ -94,7 +94,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     });
 
     if (!res.ok) {
-      errorDiv.textContent = nlEn('Deze code werd niet geaccepteerd. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That code was not accepted. Codes change every 30 seconds, so use the one your app is showing right now.');
+      errorDiv.textContent = nlEn('Deze code werd niet geaccepteerd. De code verandert elke 30 seconden, dus gebruik de code die je app nu toont.', 'That code was not accepted. Codes change every 30 seconds, so use the one your app is showing right now.');
       errorDiv.classList.add('visible');
       return;
     }
@@ -112,7 +112,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     // so an empty set here means a genuine relay/activation failure, not the old
     // reload race. Surface a real error instead of a silent empty success screen.
     if (!Array.isArray(backupCodes) || backupCodes.length === 0) {
-      errorDiv.innerHTML = nlEn('Uw authenticator-app is gekoppeld, dus u kunt inloggen. Uw back-upcodes kwamen niet door, meestal is dat tijdelijk. Mail <a href="mailto:hello@paramant.app?subject=Instellen%20onvolledig%20-%20back-upcodes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> met als onderwerp <code>Instellen onvolledig</code>, dan maken wij een nieuwe set.', 'Your authenticator app is linked, so you can sign in. Your backup codes did not come through, which is usually temporary. Mail <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with the subject <code>Setup incomplete</code> and we issue a new set.');
+      errorDiv.innerHTML = nlEn('Je authenticator-app is gekoppeld, dus je kunt inloggen. Je back-upcodes kwamen niet door, meestal is dat tijdelijk. Mail <a href="mailto:hello@paramant.app?subject=Instellen%20onvolledig%20-%20back-upcodes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> met als onderwerp <code>Instellen onvolledig</code>, dan maken wij een nieuwe set.', 'Your authenticator app is linked, so you can sign in. Your backup codes did not come through, which is usually temporary. Mail <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with the subject <code>Setup incomplete</code> and we issue a new set.');
       errorDiv.classList.add('visible');
       return;
     }

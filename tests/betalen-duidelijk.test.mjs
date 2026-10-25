@@ -91,7 +91,7 @@ async function dashboardReturn(prefix, me, payment) {
 }
 
 const NOT_PAID = {
-  nl: { canceled: 'Betaling geannuleerd', failed: 'Betaling mislukt', expired: 'Betaling verlopen', nothing: /Er is niets afgeschreven en uw plan is niet veranderd\./, retry: 'Opnieuw betalen', pricing: '/pricing', confirming: /wordt bevestigd|vanzelf/ },
+  nl: { canceled: 'Betaling geannuleerd', failed: 'Betaling mislukt', expired: 'Betaling verlopen', nothing: /Er is niets afgeschreven en je plan is niet veranderd\./, retry: 'Opnieuw betalen', pricing: '/pricing', confirming: /wordt bevestigd|vanzelf/ },
   en: { canceled: 'Payment cancelled', failed: 'Payment failed', expired: 'Payment expired', nothing: /Nothing has been charged and your plan has not changed\./, retry: 'Pay again', pricing: '/en/pricing', confirming: /Confirming|by itself/ },
 };
 for (const [lang, prefix] of [['nl', ''], ['en', '/en']]) {
@@ -164,7 +164,7 @@ for (const [lang, prefix] of [['nl', ''], ['en', '/en']]) {
   // "daarna Firm" sentence stood twice on top of each other).
   ok(`${lang} account: one truth after the upgrade, Business first, then Firm`,
     s.line === (lang === 'nl'
-      ? `Business betaald tot ${day(BIZ_END, 'nl')}. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.`
+      ? `Business betaald tot ${day(BIZ_END, 'nl')}. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, je verliest geen dag.`
       : `Business paid until ${day(BIZ_END, 'en')}. Nothing renews automatically. You can renew from today without losing a day.`), s.line);
   ok(`${lang} account: "then Firm" stands once on the page`,
     (s.sectionText.match(lang === 'nl' ? /daarna Firm/g : /then Firm/g) || []).length === 1, s.sectionText.slice(0, 600));
@@ -222,7 +222,7 @@ for (const [lang, from, login] of [['en', '/en/pricing', '/en/signup'], ['nl', '
   await page.setContent('<!DOCTYPE html><html lang="nl"><head></head><body></body></html>');
   await page.addScriptTag({ path: path.join(ROOT, 'js', 'quota-upgrade.js') });
   const card = await page.evaluate(() => window.paQuotaUpgrade.html({ error: 'monthly_sign_quota_reached', plan: 'pro', limit: 100, used: 100, reset_date: '2026-11-01' }));
-  ok('nl 402 at 101: counts signatures', card.includes('U heeft alle 100 handtekeningen van uw plan voor deze maand gebruikt.'), card);
+  ok('nl 402 at 101: counts signatures', card.includes('Je hebt alle 100 handtekeningen van je plan voor deze maand gebruikt.'), card);
   ok('nl 402 at 101: never transfers', !/verzendingen/.test(card), card);
   ok('nl 402 at 101: names Business and the way to it on a Dutch page', /Business \(EUR 299\/maand excl\. btw\) voor 1\.000 handtekeningen/.test(card) && card.includes('mailto:privacy@paramant.app'), card);
   ok('nl 402 at 101: no button to a Dutch /pricing that sells no Business', !/href="\/pricing"/.test(card), card);

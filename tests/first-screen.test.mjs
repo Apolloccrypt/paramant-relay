@@ -162,25 +162,16 @@ const measure = (page, claims) => page.evaluate((specs) => {
 // proof the right element was measured; the geometry is the assertion.
 const PAGES = [
   {
-    // The Dutch homepage (5 October 2026). Mick: "Moet meteen die dashboard
-    // zijn voor users maar dan niet ingelogd, waardoor je meteen ziet wat het
-    // kan, waarvoor en de feel hebt." So the first screen IS the demo
-    // dashboard: its "Voorbeeld" bar, the title line inside it that says what
-    // it is for, the price in one line, its two actions, and the start of the
-    // register. There is no hero above it any more (the 23 September headline
-    // retired with it; the price and the free plan stay on the first screen).
+    // The Dutch homepage (25 October 2026). Mick found the demo dashboard a
+    // justification instead of a homepage. The yardstick is BeerWeer: one
+    // question, one answer, one sentence, one button. The first screen is
+    // exactly that; the tiles, the table and the price follow under it.
     slug: '/',
     claims: [
-      // 13 October 2026 (Mick: "te letterlijk, typisch ai"): the yellow badge
-      // and the sentence explaining the demo are gone; the title is one plain
-      // line with one line under it, and the price and the account sit small.
-      { name: 'the title line inside the dashboard', css: '[data-home="out"] .wp-demo-top h1', text: 'Dossiers veilig versturen en contracten laten tekenen' },
-      { name: 'what the code does, in one line', css: '[data-home="out"] .wp-demo-top p.hero-line', text: 'versleuteld' },
-      { name: 'the account and the one offer', css: '[data-home="out"] .wp-demo-top p.hero-note', text: 'gratis account', also: ['Voor uw kantoor: 29 euro per maand'] },
-      { name: 'the primary action, Account maken', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-fill', href: '/signup', text: 'Account maken' },
-      { name: 'the second action, Probeer het zelf', css: '[data-home="out"] .wp-demo-top .home-actions a.hp-btn-line', href: '/sign?mode=invite', text: 'Probeer het zelf' },
-      { name: 'the start of the register', css: '[data-home="out"] .wp-demo-top .wp-demo-hi', text: 'Uw documenten' },
-      { name: 'the one mark that this is an example', css: '[data-home="out"] .wp-demo-top .wp-demo-tag', text: 'Voorbeeld' },
+      { name: 'the question', css: '[data-home="out"] .hx h1', text: 'Wie kan je bestand openen?' },
+      { name: 'the answer', css: '[data-home="out"] .hx p.hx-answer', text: 'Jij en de ontvanger. Wij niet' },
+      { name: 'what it does, in one line', css: '[data-home="out"] .hx p.hero-line', text: 'alleen de ontvanger kan openen' },
+      { name: 'the one button, Probeer het gratis', css: '[data-home="out"] .hx .home-actions a.hp-btn-fill', href: '/signup', text: 'Probeer het gratis' },
     ],
   },
   {
@@ -324,7 +315,7 @@ const PAGES = [
     claims: [
       // The one line on a reference page written for the person who decides
       // rather than the person who integrates.
-      { name: 'the line for the buyer', css: 'p.docs-buyer', text: 'Overweegt u Paramant?' },
+      { name: 'the line for the buyer', css: 'p.docs-buyer', text: 'Overweeg je Paramant?' },
       { name: 'the first button', css: '.docs-hero-actions a.docs-hero-btn', nth: 0, href: '#quickstart' },
       { name: 'the second button', css: '.docs-hero-actions a.docs-hero-btn', nth: 1, href: '/pricing' },
     ],
@@ -344,7 +335,7 @@ const PAGES = [
     // Three questions, three answers, no scrolling. An answer whose last line
     // is cut off is a page that has not answered.
     claims: [
-      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Om te ondertekenen heeft u een account nodig' },
+      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Om te ondertekenen heb je een account nodig' },
       { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is gratis' },
       // The third answer is where the page says the documents live in Germany,
       // which is the answer the buyer this page was rewritten for came to read.
@@ -358,7 +349,7 @@ const PAGES = [
     slug: '/download',
     claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'niet meer onderhouden' },
-      { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'De laatste build is van maart 2026' },
+      { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'De laatste versie is gemaakt in maart 2026' },
       // "Open de webapp" opens the web app, not the home page (fase 1, SENDNAME-49-A).
       { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/parashare' },
       { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },

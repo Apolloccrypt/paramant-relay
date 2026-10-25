@@ -189,7 +189,7 @@
   function refusalText(body) {
     if (body.error !== 'other_plan_running') {
       return NL
-        ? 'U kunt dit plan nu niet kopen. Er is niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
+        ? 'Je kunt dit plan nu niet kopen. Er is niets afgeschreven. Wil je van plan wisselen? Mail dan privacy@paramant.app.'
         : (body.message || 'This plan cannot be bought right now. Nothing has been charged. To change plans, mail privacy@paramant.app.');
     }
     if (!NL && body.message) return body.message;
@@ -204,7 +204,7 @@
       }
     }
     return NL
-      ? 'U heeft al ' + plan.trim() + until + '. Dit plan zou ernaast lopen, en dan betaalt u dezelfde weken twee keer. Daarom is er geen betaling gestart en niets afgeschreven. Wilt u van plan wisselen? Mail dan privacy@paramant.app.'
+      ? 'Je hebt al ' + plan.trim() + until + '. Dit plan zou ernaast lopen, en dan betaal je dezelfde weken twee keer. Daarom is er geen betaling gestart en niets afgeschreven. Wil je van plan wisselen? Mail dan privacy@paramant.app.'
       : 'You already have ' + plan.trim() + until + '. This plan would run alongside it and you would pay twice for the same weeks, so no payment was started. To change plans, mail privacy@paramant.app.';
   }
 
@@ -250,7 +250,7 @@
           return;
         }
         showError(btn, NL
-          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw. Lukt het weer niet? Mail privacy@paramant.app, dan lossen we het op.'
+          ? 'Het afrekenen is niet gelukt. Er is niets afgeschreven. Probeer het opnieuw. Lukt het weer niet? Mail dan privacy@paramant.app, dan lossen we het op.'
           : 'Could not start checkout. Nothing has been charged. ' +
             'Please try again, or mail privacy@paramant.app and we will sort it out.');
       });
@@ -274,7 +274,7 @@
       say.setAttribute('role', 'status');
       say.id = 'billing-resume-note';
       say.style.cssText = 'margin-top:.6rem;font-size:.85rem;color:#334155';
-      say.textContent = NL ? 'Uw account staat klaar. Klik op de knop hierboven om dit plan af te rekenen.'
+      say.textContent = NL ? 'Je account staat klaar. Klik op de knop hierboven om dit plan af te rekenen.'
         : 'Your account is ready. Click the button above to pay for this plan.';
       if (chosen.parentNode) chosen.parentNode.insertBefore(say, chosen.nextSibling);
       try { chosen.scrollIntoView({ block: 'center' }); chosen.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
@@ -286,7 +286,7 @@
       var note = document.createElement('div');
       note.setAttribute('role', 'status');
       note.style.cssText = 'margin-top:.6rem;font-size:.85rem;color:#334155';
-      note.textContent = NL ? 'We gaan verder waar u was.' : 'Picking up where you left off.';
+      note.textContent = NL ? 'We gaan verder waar je was.' : 'Picking up where you left off.';
       if (target.parentNode) target.parentNode.insertBefore(note, target.nextSibling);
       target.click();
     }

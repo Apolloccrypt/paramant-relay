@@ -64,14 +64,14 @@
     var percent = cap == null ? 0 : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
     var bar = byId('sign-bar'); bar.style.width = percent + '%'; bar.className = percent >= 80 ? 'warn' : '';
     var note = byId('usage-note');
-    note.textContent = cap == null ? 'We kunnen uw maandtegoed nu niet ophalen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
+    note.textContent = cap == null ? 'We kunnen je maandtegoed nu niet ophalen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
     // At 80% the bar turns orange, and an orange bar alone tells nobody what
     // to do about it. The warning names the way up. It lived in dead code on
     // /dashboard and was never shown (fase 1, DASH-27-N).
     if (cap != null && percent >= 80) {
       note.appendChild(document.createTextNode(percent >= 100
-        ? ' Uw tegoed is op. Meer nodig? '
-        : ' Bijna op. Meer nodig? '));
+        ? ' Je tegoed is op. Heb je meer nodig? '
+        : ' Je tegoed is bijna op. Heb je meer nodig? '));
       var up = document.createElement('a');
       up.href = '/pricing';
       up.id = 'usage-upgrade';
@@ -83,7 +83,7 @@
 
   function renderActivity(events) {
     var host = byId('activity');
-    if (!events.length) { host.innerHTML = '<div class="empty">Nog geen activiteit bij Ondertekenen. Maak via de API een ondertekenverzoek aan, dan ziet u het hier.</div>'; return; }
+    if (!events.length) { host.innerHTML = '<div class="empty">Er is nog geen activiteit bij Ondertekenen. Maak via de API een ondertekenverzoek aan, dan zie je het hier.</div>'; return; }
     host.innerHTML = events.slice(0, 20).map(function (event) {
       return '<div class="event"><time>' + esc(formatTime(event.ts)) + '</time><span>' + esc(event.event_type || 'parasign_event') + '</span></div>';
     }).join('');
@@ -91,7 +91,7 @@
 
   function renderKeys(keys) {
     var host = byId('psk-keys');
-    if (!keys || !keys.length) { host.innerHTML = '<div class="empty">Nog geen API-sleutel voor Ondertekenen. Maak er een aan om uw eerste toepassing te koppelen.</div>'; return; }
+    if (!keys || !keys.length) { host.innerHTML = '<div class="empty">Je hebt nog geen API-sleutel voor Ondertekenen. Maak er een aan om je eerste toepassing te koppelen.</div>'; return; }
     host.innerHTML = keys.map(function (key) {
       var active = key.active !== false;
       var id = key.kid || '';
@@ -103,7 +103,7 @@
     return json(API).then(function (data) { renderKeys(data.keys || []); }).catch(function (error) {
       // 403 is an answer, not a failure: this account has no ParaSign API.
       if (error && error.status === 403) {
-        byId('psk-keys').innerHTML = '<div class="empty">Uw account heeft geen toegang tot de API voor Ondertekenen. Die hoort bij een betaald ParaSign-abonnement.</div>';
+        byId('psk-keys').innerHTML = '<div class="empty">Je account heeft geen toegang tot de API voor Ondertekenen. Die hoort bij een betaald ParaSign-abonnement.</div>';
         return;
       }
       byId('psk-keys').innerHTML = '<div class="empty">We konden de API-sleutels niet ophalen. ' + esc(error.message) + '</div>';
@@ -118,7 +118,7 @@
       var note = byId('usage-note');
       if (!note) return;
       note.textContent = error && error.status === 404
-        ? 'Het verbruik per maand staat voor uw account op het dashboard. '
+        ? 'Het verbruik per maand staat voor je account op het dashboard. '
         : 'Het verbruik kon nu niet worden geladen. ';
       var link = document.createElement('a');
       link.href = '/dashboard'; link.textContent = 'Naar het dashboard';
@@ -155,7 +155,7 @@
       byId('psk-meta').textContent = 'Sleutel ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · abonnement ' + (data.plan_parasign || snapTier || '--');
       showView('secret'); loadKeys();
     }).catch(function (failure) {
-      error.textContent = failure.status === 403 ? 'Uw account heeft geen toegang tot de API voor Ondertekenen. Controleer uw abonnement of vraag een beheerder om toegang.' : 'De sleutel maken lukte niet. ' + failure.message;
+      error.textContent = failure.status === 403 ? 'Je account heeft geen toegang tot de API voor Ondertekenen. Controleer je abonnement of vraag een beheerder om toegang.' : 'De sleutel maken lukte niet. ' + failure.message;
       error.hidden = false;
     }).finally(function () { button.disabled = false; button.textContent = 'Sleutel maken'; });
   }

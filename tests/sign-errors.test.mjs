@@ -201,7 +201,7 @@ test('403 signer_not_enrolled: said as it is, and one button links a key and sig
   await clickPage(page, 0, 0.5, 0.8);
   const res = await signAndDownload(page);
   assert.ok(res.error, 'the first attempt is refused');
-  assert.match(res.error, /niet aan uw account gekoppeld/);
+  assert.match(res.error, /niet aan je account gekoppeld/);
   assert.doesNotMatch(res.error, /al gebruikt of verlopen/);
   assert.doesNotMatch(res.error, PASSKEY_TEXT);
   await page.click('#ds-relink-key');
@@ -362,7 +362,7 @@ test('a saved template does not switch "every page" on for the next document', a
 
 // ── 8. a paying customer sees his plan ─────────────────────────────────────
 for (const [label, me, re] of [
-  ['Firm (pro)', { plan: 'community', plan_parasign: 'pro', paid_until_parasign: '2099-01-01T00:00:00Z' }, /Uw plan: Firm/],
+  ['Firm (pro)', { plan: 'community', plan_parasign: 'pro', paid_until_parasign: '2099-01-01T00:00:00Z' }, /Je plan: Firm/],
   ['expired pro', { plan: 'community', plan_parasign: 'pro', paid_until_parasign: '2001-01-01T00:00:00Z' }, /Altijd gratis/],
   ['community', { plan: 'community', plan_parasign: null }, /Altijd gratis/],
 ]) {

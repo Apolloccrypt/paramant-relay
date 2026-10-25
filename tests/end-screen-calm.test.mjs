@@ -208,7 +208,7 @@ for (const P of [
   { path: '/en/parashare', once: /Works once, until \d{1,2} \w+ \d{4} at \d{2}:\d{2}( \([^)]+\))?/,
     canNow: /can now download/i, compared: /compared the code with/ },
   { path: '/parashare', once: /Werkt één keer, tot \d{1,2} \w+ \d{4} om \d{2}:\d{2}( \([^)]+\))?/,
-    canNow: /can now download|kan nu downloaden|kan het nu downloaden/i, compared: /met wie u de controlecode vergeleek/ },
+    canNow: /can now download|kan nu downloaden|kan het nu downloaden/i, compared: /met wie je de controlecode vergeleek/ },
 ]) {
 {
   const page = await browser.newPage({ viewport: PHONE });
@@ -277,7 +277,7 @@ for (const P of [
 // The receiving pages speak Dutch on their own path and keep the original
 // English under /en, and both are held to the same calm end screen.
 const GLANGS = [
-  { pre: '', saved: /staat op uw apparaat/, gone: /voorgoed vernietigd/, have: /U hebt het bestand\./,
+  { pre: '', saved: /staat op je apparaat/, gone: /voorgoed vernietigd/, have: /Je hebt het bestand\./,
     onePage: /1 pagina/, openHere: /is hier geopend in dit tabblad/, save: 'Opslaan' },
   { pre: '/en', saved: /is saved on your device/, gone: /permanently destroyed/, have: /You have the file\./,
     onePage: /1 page/, openHere: /is open here in this tab/, save: 'Save' },

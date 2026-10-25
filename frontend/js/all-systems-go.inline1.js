@@ -11,10 +11,10 @@
     dot.className = 'asg-dot-lg asg-overall-' + overall;
     if (overall === 'green') {
       dot.innerHTML = '&#10003;'; title.textContent = 'Alles werkt';
-      sub.textContent = 'Uw relay ' + esc(data.version||'') + ' is gezond en klaar voor gebruik.';
+      sub.textContent = 'Je server ' + esc(data.version||'') + ' is gezond en klaar voor gebruik.';
     } else if (overall === 'yellow') {
       dot.innerHTML = '!'; title.textContent = 'Actief, met waarschuwingen';
-      sub.textContent = 'De relay draait. Een paar controles hieronder vragen aandacht.';
+      sub.textContent = 'De server draait. Een paar controles hieronder vragen aandacht.';
     } else {
       dot.innerHTML = '&times;'; title.textContent = 'Aandacht nodig';
       sub.textContent = 'Een of meer controles zijn mislukt. Zie de details hieronder.';
@@ -29,12 +29,12 @@
         '</div>';
     }).join('');
     document.getElementById('asg-meta').textContent =
-      'Relay ' + esc(data.version||'?') + ' / sector ' + esc(data.sector||'?') + ' · bijgewerkt ' + new Date().toLocaleTimeString('nl-NL');
+      'Server ' + esc(data.version||'?') + ' / sector ' + esc(data.sector||'?') + ' · bijgewerkt ' + new Date().toLocaleTimeString('nl-NL');
   }
 
-  var T_UP = 'De relay antwoordt';
-  var T_DOWN = 'De relay antwoordt niet op /health';
-  var T_SUB = 'De uitgebreide controle (opslag, sleutels, TLS) is alleen zichtbaar voor de beheerder van deze relay. Openbaar te zien is alleen of de relay antwoordt.';
+  var T_UP = 'De server antwoordt';
+  var T_DOWN = 'De server antwoordt niet op /health';
+  var T_SUB = 'De uitgebreide controle (opslag, sleutels, TLS) is alleen zichtbaar voor de beheerder van deze server. Openbaar te zien is alleen of de server antwoordt.';
   var T_AT = ' · bijgewerkt ';
   var T_LOC = 'nl-NL';
 
@@ -52,7 +52,7 @@
         document.getElementById('overall-sub').textContent = T_SUB;
         document.getElementById('checks').innerHTML = '';
         document.getElementById('asg-meta').textContent = h && h.ok
-          ? 'Relay ' + esc(h.version||'?') + ' / sector ' + esc(h.sector||'?') + T_AT + new Date().toLocaleTimeString(T_LOC)
+          ? 'Server ' + esc(h.version||'?') + ' / sector ' + esc(h.sector||'?') + T_AT + new Date().toLocaleTimeString(T_LOC)
           : '';
       });
   }
@@ -67,7 +67,7 @@
         return r.json().then(render);
       })
       .catch(function(){
-        document.getElementById('overall-title').textContent = 'De relay is niet bereikbaar';
+        document.getElementById('overall-title').textContent = 'De server is niet bereikbaar';
         document.getElementById('overall-sub').textContent = 'Het endpoint /v2/health/deep gaf geen antwoord.';
         document.getElementById('overall-dot').className = 'asg-dot-lg asg-overall-red';
         document.getElementById('overall-dot').innerHTML = '&times;';

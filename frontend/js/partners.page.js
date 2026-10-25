@@ -30,12 +30,12 @@
     krijgt: 'Krijgt', nooit: 'Krijgt nooit', sub: 'Subverwerker (AVG)',
     ja: 'Ja', nee: 'Nee', dpa: 'Verwerkersovereenkomst', geenDpa: 'Geen openbare link',
     sinds: 'sinds', tot: 'sinds', datumOnbekend: 'datum onbekend', juridisch: 'Juridische naam onbekend',
-    fout: 'De lijst kon niet geladen worden. Het bestand zelf staat op ',
+    fout: 'De lijst kon niet worden geladen. Je kunt het bestand zelf openen op ',
     groepen: { 'actief': 'Actief', 'in-code-niet-actief': 'In voorbereiding', 'uitgefaseerd': 'Uitgefaseerd' },
     uitleg: {
-      'actief': 'Productie gebruikt deze partijen vandaag.',
-      'in-code-niet-actief': 'De code kent ze, maar productie heeft er geen sleutels voor. Ze krijgen niets.',
-      'uitgefaseerd': 'Niet meer in gebruik. Staat er nog een oude sleutel op de server, dan staat die met een opruimdatum in het bestand.'
+      'actief': 'Deze partijen gebruiken we nu voor de dienst.',
+      'in-code-niet-actief': 'Onze software kan met deze partijen samenwerken, maar we hebben ze niet aangezet. Ze krijgen geen gegevens van ons.',
+      'uitgefaseerd': 'Deze partijen gebruiken we niet meer. Staat er op onze server nog een oude toegangssleutel voor een van hen, dan staat in /partners.json de datum waarop we die uiterlijk verwijderen.'
     },
     maanden: ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
   };

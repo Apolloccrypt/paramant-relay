@@ -62,8 +62,8 @@
   var T = {
     nl: {
       sending: 'De code wordt verstuurd...',
-      mailbox: 'uw mailbox',
-      noReachConn: 'Paramant is niet bereikbaar. Controleer uw verbinding en probeer het opnieuw.',
+      mailbox: 'je mailbox',
+      noReachConn: 'Paramant is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
       sixDigits: 'De code heeft zes cijfers.',
       checking: 'Even controleren...',
       lastTry: 'Die code klopt niet, en dat was de laatste poging.',
@@ -74,7 +74,7 @@
         + 'Vraag de afzender om een nieuwe link.',
       noReach: 'Paramant is niet bereikbaar. Probeer het opnieuw.',
       saved: function (naam) { return 'Opgeslagen als ' + naam + '. Gebeurt er niets, '
-        + 'dan heeft uw browser het misschien tegengehouden.'; }
+        + 'dan heeft je browser het misschien tegengehouden.'; }
     },
     en: {
       sending: 'Sending the code...',
@@ -117,21 +117,21 @@
   var WORDS_NL = {
     unknown_token: ['Deze link werkt niet',
       'We herkennen deze link niet. Misschien is hij niet helemaal gekopieerd uit de e-mail.'],
-    already_collected: ['U hebt dit bestand al opgehaald',
-      'Deze link werkt \u00e9\u00e9n keer en is al gebruikt. Heeft u het bestand nog nodig? Vraag de afzender dan om het opnieuw te sturen.'],
+    already_collected: ['Je hebt dit bestand al opgehaald',
+      'Deze link werkt \u00e9\u00e9n keer en is al gebruikt. Heb je het bestand nog nodig? Vraag de afzender dan om het opnieuw te sturen.'],
     revoked: ['De afzender heeft deze link ingetrokken',
-      'De afzender heeft deze link teruggenomen. Hoort u hem wel te hebben? Vraag het dan na bij de afzender.'],
+      'De afzender heeft deze link teruggenomen. Hoor je hem wel te hebben? Vraag het dan na bij de afzender.'],
     expired: ['Dit bestand is niet meer beschikbaar',
       'De termijn die de afzender koos is voorbij en het bestand is verwijderd. Vraag de afzender om het opnieuw te sturen.'],
     too_many_codes: ['Voor deze link zijn te veel codes aangevraagd',
-      'Voor uw eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
+      'Voor je eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
     too_many_tries: ['Te vaak een verkeerde code',
-      'Voor uw eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
+      'Voor je eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
     code_not_sent: ['We konden de code niet versturen',
-      'De code is niet verstuurd, dus er staat niets in uw mailbox. '
+      'De code is niet verstuurd, dus er staat niets in je mailbox. '
       + 'Probeer het over een minuut opnieuw.'],
     pickup_failed: ['Er ging bij ons iets mis',
-      'Dat ligt niet aan u. Probeer het over een minuut opnieuw.'],
+      'Dat ligt niet aan jou. Probeer het over een minuut opnieuw.'],
   };
   var WORDS = LANG === 'en' ? WORDS_EN : WORDS_NL;
 

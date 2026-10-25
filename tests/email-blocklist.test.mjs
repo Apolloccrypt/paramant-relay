@@ -130,7 +130,7 @@ test('elke externe bron staat in deploy/partners.json als actieve blocklist-bron
       const p = partners.partijen.find((x) => x.rol === 'blocklist-bron' && (x.hosts || []).includes(host));
       if (!p) { fout.push(`${b.naam}: geen blocklist-bron in partners.json met host ${host}`); continue; }
       if (p.status !== 'actief') fout.push(`${b.naam}: ${p.id} staat op ${p.status}`);
-      if (!/^geen\b/i.test(p.gegevens.nl)) fout.push(`${p.id}: een blocklist-bron krijgt geen gegevens; gegevens.nl moet met "Geen" beginnen`);
+      if (!/^(geen|niets)\b/i.test(p.gegevens.nl)) fout.push(`${p.id}: een blocklist-bron krijgt geen gegevens; gegevens.nl moet met "Geen" of "Niets" beginnen`);
       if (!(p.code || []).includes('scripts/update-email-blocklist.mjs')) fout.push(`${p.id}: code noemt het updatescript niet`);
     }
   }

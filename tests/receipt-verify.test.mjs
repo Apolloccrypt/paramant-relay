@@ -193,7 +193,7 @@ test('the page ships the relay key it needs, so no key has to be pasted', async 
   const { context, page } = await offlinePage(browser, ORIGIN);
   const pinned = await page.evaluate(async () => {
     // The URL the page itself loads, so it comes from the module map while offline.
-    const mod = await import('/js/relay-trust-anchors.js?v=2');
+    const mod = await import('/js/relay-trust-anchors.js?v=3');
     const anchor = mod.defaultAnchor();
     return { key: anchor && anchor.key, fingerprint: anchor && anchor.fingerprint, host: anchor && anchor.host };
   });
@@ -238,14 +238,14 @@ test('NL: een echt ontvangstbewijs wordt offline bevestigd, in het Nederlands', 
   assert.doesNotMatch(text, /Dit ontvangstbewijs is echt/,
     'an unrecognised signer must never be presented as a Paramant receipt');
   assert.match(text, /Het ontvangstbewijs gaat over dit bestand en geen ander/);
-  assert.match(text, /Het bewijs van opname klopt: de relay heeft toen ondertekend dat deze regel in zijn transparantielogboek stond/);
+  assert.match(text, /Het bewijs van opname klopt: de server heeft destijds ondertekend dat deze regel in zijn openbare logboek stond/);
   assert.match(text, /De handtekening klopt, dus/);
   assert.match(text, /Het logboek zelf is op dat moment ook ondertekend/);
   assert.match(text, /Het is ondertekend met een sleutel die deze pagina niet kent/);
   assert.match(text, /overgedragen op 1 september 2026 om 14:22 UTC/);
   assert.ok(text.includes(fixture.blobHash), 'the fingerprint of the file must be on screen in full');
   assert.match(text, /vernietigde zijn kopie van het bestand/);
-  assert.match(text, /Volgens het bewijs is het regel 5 in het logboek van de relay, dat op dat moment 5 regels telde/);
+  assert.match(text, /Volgens het bewijs is het regel 5 in het logboek van de server, dat op dat moment 5 regels telde/);
   assert.doesNotMatch(text, /handtekening geldig|valid: true|blob_hash:/i);
   assert.doesNotMatch(text, /This receipt|The signature|What was checked/,
     'the Dutch page may not fall back to English sentences');

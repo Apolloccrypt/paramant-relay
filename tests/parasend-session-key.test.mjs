@@ -680,7 +680,7 @@ test('a token that expires during a long session is replaced, before and after t
 test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => {
   assert.match(PS_HTML_NL, /<html lang="nl">/, 'de Nederlandse pagina moet lang="nl" dragen, anders spreekt de code Engels');
   // Mick 05-10: taalronde
-  assert.ok(PS_HTML_NL.includes('We konden u niet aanmelden. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
+  assert.ok(PS_HTML_NL.includes('We konden je niet aanmelden. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
     'de banner noemt het ene dat u kunt doen en het ene adres om te mailen');
   const bannerAt = PS_HTML_NL.indexOf('id="ps-key-error"');
   const banner = PS_HTML_NL.slice(bannerAt, bannerAt + 900);
@@ -703,10 +703,10 @@ test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => 
   assert.match(PS_HTML_NL, /<span class="ps-step-label">3 &middot; Vergelijken<\/span>/, 'de stepper noemt dezelfde stap zo');
 
   const run = await loadPage({ keyResponses: [ok200], lang: 'nl' });
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'U bent ingelogd; we versturen namens uw account.');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Je bent ingelogd; we versturen namens je account.');
   const leeg = await loadPage({ keyResponses: [{ status: 500, body: {} }], lang: 'nl' });
   evalIn(leeg, 'expandApiKeyCard()');
-  assert.equal(leeg.getElementById('key-status').textContent, 'Vul uw API-sleutel in om verder te gaan',
+  assert.equal(leeg.getElementById('key-status').textContent, 'Vul je API-sleutel in om verder te gaan',
     'een leeg veld krijgt een uitnodiging, geen oordeel');
 });
 

@@ -151,7 +151,7 @@
   <div class="container">
     <div class="eyebrow"><span class="bar"></span>gereedschap</div>
     <h1 class="hero-h1">Los te gebruiken, <em>zonder account.</em></h1>
-    <p class="lede" style="max-width:720px">Een deel van Paramant is gewoon gereedschap: u opent een pagina, doet wat u kwam doen, en sluit hem weer.</p>
+    <p class="lede" style="max-width:720px">Een deel van Paramant is gewoon gereedschap: je opent een pagina, doet wat je kwam doen, en sluit hem weer.</p>
   </div>
 </section>
 
@@ -168,12 +168,12 @@
       <div class="tool-card">
         <div class="tool-note">werkt meteen</div>
         <h3>Een bestand op slot zetten</h3>
-        <p>Kies een bestand en een wachtwoord. Uw browser maakt er een gesloten bestand van dat alleen met dat wachtwoord weer opengaat.</p>
-        <p class="edge">Het bestand en het wachtwoord blijven op uw eigen apparaat. Wij krijgen ze niet, dus wij kunnen het wachtwoord ook niet voor u herstellen. Raakt u het kwijt, dan is het bestand weg.</p>
+        <p>Kies een bestand en een wachtwoord. Je browser maakt er een gesloten bestand van dat alleen met dat wachtwoord weer opengaat.</p>
+        <p class="edge">Het bestand en het wachtwoord blijven op je eigen apparaat. Wij krijgen ze niet, dus wij kunnen het wachtwoord ook niet voor jou herstellen. Raak je het kwijt, dan is het bestand weg.</p>
         <a href="/vault" class="btn btn-primary">Een bestand op slot zetten</a>
         <details class="tool-tech">
           <summary>De techniek</summary>
-          <div class="tool-tech-body">AES-256-GCM. De sleutel komt uit uw wachtwoord met PBKDF2-SHA-256 over 600.000 rondes, met een willekeurige salt en nonce. Het aantal rondes staat in het bestand zelf, zodat oudere bestanden open blijven gaan. De pagina doet geen enkel netwerkverzoek.</div>
+          <div class="tool-tech-body">AES-256-GCM. De sleutel komt uit je wachtwoord met PBKDF2-SHA-256 over 600.000 rondes, met een willekeurige salt en nonce. Het aantal rondes staat in het bestand zelf, zodat oudere bestanden open blijven gaan. De pagina doet geen enkel netwerkverzoek.</div>
         </details>
       </div>
 
@@ -181,11 +181,11 @@
         <div class="tool-note">werkt meteen</div>
         <h3>Een handtekening of een ontvangstbewijs controleren</h3>
         <p>Leg een ondertekend document naast zijn handtekeningbestand, of open het ontvangstbewijs van een verzending. De pagina rekent na of het klopt.</p>
-        <p class="edge">Het narekenen gebeurt in uw browser, ook zonder verbinding. Eén uitzondering: handtekeningen uit het oude formaat kunnen alleen door de server gecontroleerd worden, en daar is een sleutel voor nodig. De pagina zegt zelf wanneer dat zo is.</p>
+        <p class="edge">Het narekenen gebeurt in je browser, ook zonder verbinding. Er is één uitzondering. Een handtekening in het oude formaat kan alleen onze server controleren, en daarvoor is een sleutel nodig. De pagina zegt zelf wanneer dat zo is.</p>
         <a href="/verify" class="btn btn-primary">Iets controleren</a>
         <details class="tool-tech">
           <summary>De techniek</summary>
-          <div class="tool-tech-body">Voor het huidige formaat wordt SHA3-256 over uw document berekend, daarna de ML-DSA-65-handtekening over die hash gecontroleerd, en daarna de geldigheidsduur. Een ontvangstbewijs wordt getoetst tegen sleutels die in de pagina zelf staan. In beide gevallen gaat er geen enkel verzoek de deur uit.</div>
+          <div class="tool-tech-body">Voor het huidige formaat wordt SHA3-256 over je document berekend, daarna de ML-DSA-65-handtekening over die hash gecontroleerd, en daarna de geldigheidsduur. Een ontvangstbewijs wordt getoetst tegen sleutels die in de pagina zelf staan. In beide gevallen gaat er geen enkel verzoek de deur uit.</div>
         </details>
       </div>
 
@@ -193,19 +193,19 @@
         <div class="tool-note">werkt meteen</div>
         <h3>Het openbare logboek lezen</h3>
         <p>Elke registratie van een publieke sleutel wordt toegevoegd aan een logboek dat alleen kan groeien, en dat iedereen mag inzien.</p>
-        <p class="edge">U ziet hashes en tijdstippen. Documenten, bestandsnamen en namen van mensen staan er niet in, en zijn er ook niet uit af te leiden.</p>
+        <p class="edge">Je ziet hashes en tijdstippen. Documenten, bestandsnamen en namen van mensen staan er niet in, en zijn er ook niet uit af te leiden.</p>
         <a href="/ct-log" class="btn btn-primary">Het logboek openen</a>
         <details class="tool-tech">
           <summary>De techniek</summary>
-          <div class="tool-tech-body">Een Merkle-boom die op schijf staat en een herstart overleeft. De openbare weergave rondt tijdstippen af op het uur. Op 5 september 2026 stonden er 891 regels in.</div>
+          <div class="tool-tech-body">Het logboek is een Merkle-boom: een opbouw waarin elke nieuwe regel vastzit aan alle regels ervoor. Het staat op schijf en blijft bewaard als de server opnieuw opstart. De openbare weergave rondt tijdstippen af op het uur. Op 5 september 2026 stonden er 891 regels in.</div>
         </details>
       </div>
 
       <div class="tool-card">
-        <div class="tool-note">u heeft een link nodig</div>
-        <h3>Een bestand ophalen dat iemand u stuurde</h3>
-        <p>Heeft iemand u een Paramant-link gestuurd, dan haalt u het bestand hier op en maakt uw browser het weer open.</p>
-        <p class="edge">Hier kunt u niets zelf beginnen. Zonder link van een afzender valt er niets op te halen. Een link uit de webapp gaat één keer open; daarna is onze kopie er niet meer.</p>
+        <div class="tool-note">je hebt een link nodig</div>
+        <h3>Een bestand ophalen dat iemand je stuurde</h3>
+        <p>Heeft iemand je een Paramant-link gestuurd, dan haal je het bestand hier op en maakt je browser het weer open.</p>
+        <p class="edge">Op deze pagina kun je zelf niets starten: zonder link van een afzender is er niets op te halen. Een link uit de webapp gaat één keer open. Daarna hebben wij geen kopie meer.</p>
         <a href="/get" class="btn btn-primary">Een link openen</a>
         <details class="tool-tech">
           <summary>De techniek</summary>
@@ -223,17 +223,17 @@
     <div class="marker">
       <div class="num">02</div>
       <h2>Hier is wel een account voor nodig.</h2>
-      <div class="tag">gratis account<br>eerlijk vooraf</div>
+      <div class="tag">gratis account<br>vooraf gezegd</div>
     </div>
 
-    <p style="max-width:70ch;font-size:var(--text-base);color:var(--ink);line-height:1.75">Deze twee vragen een account. Een account kost niets: het Community-plan is gratis en blijft gratis. Het staat hier zodat u het weet voordat u een bestand kiest, in plaats van erna. Beide knoppen gaan daarom eerst naar het aanmeldscherm, en daarna vanzelf door naar het gereedschap.</p>
+    <p style="max-width:70ch;font-size:var(--text-base);color:var(--ink);line-height:1.75">Deze twee vragen een account. Een account kost niets: het Community-plan is gratis en blijft gratis. Het staat hier zodat je het weet voordat je een bestand kiest, in plaats van erna. Beide knoppen gaan daarom eerst naar het aanmeldscherm, en daarna vanzelf door naar het gereedschap.</p>
 
     <div class="tool-grid">
 
       <div class="tool-card">
         <div class="tool-note">account nodig</div>
         <h3>Een document laten ondertekenen</h3>
-        <p>Zet een PDF klaar, plaats uw handtekening en onderteken hem, of stuur het document naar de mensen die moeten tekenen.</p>
+        <p>Zet een PDF klaar, plaats je handtekening en onderteken hem, of stuur het document naar de mensen die moeten tekenen.</p>
         <p class="edge">Het klaarzetten en het plaatsen van de handtekening kan zonder aan te melden, het ondertekenen zelf niet. Het Community-plan geeft twee handtekeningen per maand.</p>
         <a href="/auth/login?next=/sign" class="btn btn-secondary">Eerst aanmelden, dan ondertekenen</a>
       </div>
@@ -241,8 +241,8 @@
       <div class="tool-card">
         <div class="tool-note">account nodig</div>
         <h3>Een bestand veilig versturen</h3>
-        <p>Versleutel een bestand in uw browser en geef het live over aan de ontvanger, of laat het achter op een link die vanzelf vervalt.</p>
-        <p class="edge">Deze pagina vraagt eerst om aanmelden, dus zonder account komt u er niet in. Het Community-plan geeft vijftig verzendingen per maand. Bij een live overdracht mag een bestand 500 MB zijn; een eenmalige link is een enkel verzegeld blok en gaat tot 5 MB per bestand.</p>
+        <p>Versleutel een bestand in je browser en geef het live over aan de ontvanger, of laat het achter op een link die vanzelf vervalt.</p>
+        <p class="edge">Deze pagina vraagt eerst om aanmelden, dus zonder account kom je er niet in. Het Community-plan geeft vijftig verzendingen per maand. Bij een live overdracht mag een bestand 500 MB zijn; via een eenmalige link gaat het bestand mee als één versleuteld pakket, en dat mag tot 5 MB zijn.</p>
         <a href="/auth/login?next=/parashare" class="btn btn-secondary">Eerst aanmelden, dan versturen</a>
       </div>
 
@@ -269,11 +269,11 @@
       </div>
       <div class="ladder-step">
         <div class="ladder-name">De maandelijkse meting</div>
-        <p>Vanaf 250 euro per maand meet ik elke maand op dezelfde manier wat uw site of app naar buiten stuurt, en wat daarin veranderd is sinds vorige maand. <a href="mailto:info@paramant.app?subject=De%20maandelijkse%20meting">Vraag ernaar</a>.</p>
+        <p>Vanaf 250 euro per maand meet ik elke maand op dezelfde manier wat je site of app naar buiten stuurt, en wat daarin veranderd is sinds vorige maand. <a href="mailto:info@paramant.app?subject=De%20maandelijkse%20meting">Vraag ernaar</a>.</p>
       </div>
       <div class="ladder-step">
         <div class="ladder-name">Onderzoek op maat</div>
-        <p>Eén vraag, één onderzoek, een vaste prijs die vooraf vastligt. <a href="mailto:info@paramant.app?subject=Onderzoek%20op%20maat">Vraag ernaar</a>.</p>
+        <p>Je stelt één vraag en ik doe daar één onderzoek naar, voor een prijs die vooraf vastligt. <a href="mailto:info@paramant.app?subject=Onderzoek%20op%20maat">Vraag ernaar</a>.</p>
       </div>
     </div>
   </div>

@@ -557,7 +557,7 @@ function showParaafOverTextNotice(pagesOver) {
     }
     const list = pagesOver.length > 8 ? pagesOver.slice(0, 8).join(', ') + ' …' : pagesOver.join(', ');
     el.textContent = (pagesOver.length === 1 ? L('Op pagina ', 'On page ') : L("Op pagina's ", 'On pages ')) + list
-      + L(' is in de marge geen vrije plek: de paraaf komt daar over de tekst (rood omlijnd). Wilt u dat niet, zet dan "Onderteken elke pagina" uit.',
+      + L(' is in de marge geen vrije plek: de paraaf komt daar over de tekst (rood omlijnd). Wil je dat niet, zet dan "Onderteken elke pagina" uit.',
           ' the margin has no free spot: the initials go over the text there (outlined in red). If you do not want that, switch off "Sign every page".');
   }
 }
@@ -619,10 +619,10 @@ function limitMessage(e) {
     const d = e.data || {};
     const needed = Number(d.needed), room = Number(d.room);
     if (Number.isFinite(needed) && Number.isFinite(room)) {
-      return L(`Dit verzoek vraagt ${needed} handtekening${needed === 1 ? '' : 'en'} en uw plan heeft deze maand nog ruimte voor ${room}. Er is niets aangemaakt of verstuurd. Kies minder ondertekenaars, wacht tot open verzoeken klaar zijn of verhoog uw plan.`,
+      return L(`Dit verzoek vraagt ${needed} handtekening${needed === 1 ? '' : 'en'} en je plan heeft deze maand nog ruimte voor ${room}. Er is niets aangemaakt of verstuurd. Kies minder ondertekenaars, wacht tot open verzoeken klaar zijn of verhoog je plan.`,
         `This request needs ${needed} signature${needed === 1 ? '' : 's'} and your plan has room for ${room} this month. Nothing has been created or sent. Choose fewer signers, wait for open requests to finish, or upgrade your plan.`);
     }
-    return L('Uw plan heeft deze maand niet genoeg handtekeningen meer voor dit verzoek. Er is niets aangemaakt of verstuurd.', 'Your plan does not have enough signatures left this month for this request. Nothing has been created or sent.');
+    return L('Je plan heeft deze maand niet genoeg handtekeningen meer voor dit verzoek. Er is niets aangemaakt of verstuurd.', 'Your plan does not have enough signatures left this month for this request. Nothing has been created or sent.');
   }
   // A document over the limit: the server says the limit and, for a request,
   // that the empty request was withdrawn again (admin/server.js).
@@ -658,18 +658,18 @@ function applyModeCopy(mode) {
   const set = (sel, text) => { const el = document.querySelector(sel); if (el && text) el.textContent = text; };
   if (mode === 'invite') {
     set('#step-doc h2', L('Kies het document dat anderen moeten tekenen', 'Choose the document others need to sign'));
-    set('#step-doc .ds-sub', L('ParaSign werkt met pdf-bestanden. Kies een pdf; daarna wijst u aan waar getekend moet worden. Het bestand blijft in deze browser tot u het versleuteld verstuurt.', 'ParaSign works with PDF files. Choose a PDF; next you point out where to sign. The file stays in this browser until you send it encrypted.'));
+    set('#step-doc .ds-sub', L('ParaSign werkt met pdf-bestanden. Kies een pdf; daarna wijs je aan waar getekend moet worden. Het bestand blijft in deze browser tot je het versleuteld verstuurt.', 'ParaSign works with PDF files. Choose a PDF; next you point out where to sign. The file stays in this browser until you send it encrypted.'));
     set('#step-recipients h2', L('Wie moet er tekenen?', 'Who needs to sign?'));
     // The stepper tab says it the same way (hertest r2: it still read
     // "Medeondertekenaars" while the sender signs nothing here).
     set('.ds-stepper li[data-step="recipients"]', L('Ondertekenaars', 'Signers'));
-    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet tekenen. Ieder krijgt een eigen uitnodiging per e-mail. Het document opent na inloggen met dat e-mailadres. U hoeft daarna niets meer te sturen.', 'Add everyone who needs to sign. Each person gets their own invitation by email. The document opens once they sign in with that address. There is nothing more for you to send.'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet tekenen. Ieder krijgt een eigen uitnodiging per e-mail. Het document opent na inloggen met dat e-mailadres. Je hoeft daarna niets meer te sturen.', 'Add everyone who needs to sign. Each person gets their own invitation by email. The document opens once they sign in with that address. There is nothing more for you to send.'));
   } else {
-    set('#step-doc h2', L('Kies het document dat u wilt ondertekenen', 'Choose the document you want to sign'));
-    set('#step-doc .ds-sub', L('ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.', 'ParaSign signs PDF files. Choose a PDF and put your stamp on a page of your choice. The file stays in this browser.'));
+    set('#step-doc h2', L('Kies het document dat je wilt ondertekenen', 'Choose the document you want to sign'));
+    set('#step-doc .ds-sub', L('ParaSign ondertekent pdf-bestanden. Kies een pdf en zet je stempel op een pagina naar keuze. Het bestand blijft in deze browser.', 'ParaSign signs PDF files. Choose a PDF and put your stamp on a page of your choice. The file stays in this browser.'));
     set('#step-recipients h2', L('Medeondertekenaars toevoegen (optioneel)', 'Add co-signers (optional)'));
     set('.ds-stepper li[data-step="recipients"]', L('Medeondertekenaars', 'Co-signers'));
-    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. U tekent eerst. Daarna krijgt ieder een eigen uitnodiging per e-mail. Het document met uw handtekening opent na inloggen met dat e-mailadres.', 'Add everyone who needs to co-sign. You sign first. Then each person gets their own invitation by email. The document with your signature opens once they sign in with that address.'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. Je tekent eerst. Daarna krijgt ieder een eigen uitnodiging per e-mail. Het document met je handtekening opent na inloggen met dat e-mailadres.', 'Add everyone who needs to co-sign. You sign first. Then each person gets their own invitation by email. The document with your signature opens once they sign in with that address.'));
   }
 }
 
@@ -777,7 +777,7 @@ async function partyRequests(base, { bytes = state.doc && state.doc.bytes, count
 function paraafCoveredNotice() {
   const pages = state.paraafCoveredPages || [];
   if (!pages.length) return '';
-  return L('Let op: op ' + pageListText(pages, false) + ' is in de marge geen vrije plek voor alle parafen. Daar staat een paraaf over de tekst. Wilt u dat niet, maak dan de marge van het document ruimer of vraag geen paraaf op elke pagina.',
+  return L('Let op: op ' + pageListText(pages, false) + ' is in de marge geen vrije plek voor alle parafen. Daar staat een paraaf over de tekst. Wil je dat niet, maak dan de marge van het document ruimer of vraag geen paraaf op elke pagina.',
     'Note: on ' + pageListText(pages, true) + ' the margin has no free spot for every paraaf, so a paraaf lies over the text there. If you do not want that, widen the document margin or do not ask for initials on every page.');
 }
 
@@ -890,7 +890,7 @@ function tooLargeToShare(bytes) {
   const n = bytes ? bytes.length : 0;
   if (n <= SHARE_MAX_BYTES) return null;
   const mb = (n / (1024 * 1024)).toFixed(1).replace('.', EN ? '.' : ',');
-  const e = new Error(L('Dit document is ' + mb + ' MB. Versleuteld meesturen met een verzoek kan tot 5 MB. Maak de pdf kleiner (bijvoorbeeld opnieuw scannen op 150 dpi, of de functie pdf verkleinen van uw pdf-programma) en probeer het daarna opnieuw. Er is nog niets aangemaakt of verstuurd.',
+  const e = new Error(L('Dit document is ' + mb + ' MB. Versleuteld meesturen met een verzoek kan tot 5 MB. Maak de pdf kleiner (bijvoorbeeld opnieuw scannen op 150 dpi, of de functie pdf verkleinen van je pdf-programma) en probeer het daarna opnieuw. Er is nog niets aangemaakt of verstuurd.',
     'This document is ' + mb + ' MB. Sending it encrypted with a request works up to 5 MB. Make the PDF smaller (for example rescan at 150 dpi, or use the reduce-size function of your PDF app) and try again. Nothing has been created or sent yet.'));
   e.code = 'document_too_large';
   return e;
@@ -1146,7 +1146,7 @@ async function onDocChosen(file) {
   if (!looksPdf) {
     const what = describeFileType(bytes, file.name);
     showDocError((what ? L('Dit is ', 'This is ') + what + L(', geen pdf. ', ', not a PDF. ') : L('Dit bestand is geen pdf. ', 'This file is not a PDF. '))
-      + L('ParaSign ondertekent alleen pdf. Zet uw bestand eerst om naar pdf: exporteer het, of druk het af als pdf.', 'ParaSign signs PDF only. Convert your file to PDF first: export it, or print it to PDF.'));
+      + L('ParaSign ondertekent alleen pdf. Zet je bestand eerst om naar pdf: exporteer het, of druk het af als pdf.', 'ParaSign signs PDF only. Convert your file to PDF first: export it, or print it to PDF.'));
     return;
   }
   state.doc = { bytes, name: file.name, size: file.size };
@@ -1218,11 +1218,11 @@ async function onDocChosen(file) {
       // into an encrypted PDF needs its password and breaks the author's lock),
       // so both get the hash route, said honestly.
       if (isPdf && e && e.name === 'PasswordException') {
-        toHashOnly(L('Deze pdf is beveiligd met een wachtwoord. Een zichtbare handtekening kan er daarom niet op. U ondertekent een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, sla de pdf dan eerst zonder wachtwoord op (bijvoorbeeld met Afdrukken naar pdf) en kies dat bestand.', 'This PDF is protected with a password, so it cannot carry a visible signature. You sign a fingerprint of the file, and the proof belongs to exactly this file. For a visible signature, save the PDF without a password first (for example with Print to PDF) and pick that file.'));
+        toHashOnly(L('Deze pdf is beveiligd met een wachtwoord. Een zichtbare handtekening kan er daarom niet op. Je ondertekent een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wil je een zichtbare handtekening, sla de pdf dan eerst zonder wachtwoord op (bijvoorbeeld met Afdrukken naar pdf) en kies dat bestand.', 'This PDF is protected with a password, so it cannot carry a visible signature. You sign a fingerprint of the file, and the proof belongs to exactly this file. For a visible signature, save the PDF without a password first (for example with Print to PDF) and pick that file.'));
       } else if (isPdf && e && e.code === 'pdf_encrypted') {
-        toHashOnly(L('Deze pdf is beveiligd: de maker heeft wijzigen geblokkeerd. Een zichtbare handtekening zou het bestand wijzigen. Daarom ondertekent u een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wilt u een zichtbare handtekening, vraag de afzender dan om een versie zonder beveiliging.', 'This PDF is protected: its author blocked changes. A visible signature would change the file, so you sign a fingerprint of it. The proof belongs to exactly this file. For a visible signature, ask the sender for a version without the protection.'));
+        toHashOnly(L('Deze pdf is beveiligd: de maker heeft wijzigen geblokkeerd. Een zichtbare handtekening zou het bestand wijzigen. Daarom onderteken je een vingerafdruk van het bestand, en het bewijs hoort bij precies dit bestand. Wil je een zichtbare handtekening, vraag de afzender dan om een versie zonder beveiliging.', 'This PDF is protected: its author blocked changes. A visible signature would change the file, so you sign a fingerprint of it. The proof belongs to exactly this file. For a visible signature, ask the sender for a version without the protection.'));
       } else {
-        toHashOnly(L('Dit bestand kon niet worden geopend als ', 'This file could not be opened as a ') + kind + L(' (het lijkt beschadigd of onvolledig). U ondertekent daarom een vingerafdruk van het bestand, zonder zichtbare handtekening.', ' (it looks corrupt or incomplete). So you sign a fingerprint of the file, without a visible signature.'));
+        toHashOnly(L('Dit bestand kon niet worden geopend als ', 'This file could not be opened as a ') + kind + L(' (het lijkt beschadigd of onvolledig). Je ondertekent daarom een vingerafdruk van het bestand, zonder zichtbare handtekening.', ' (it looks corrupt or incomplete). So you sign a fingerprint of the file, without a visible signature.'));
       }
     }
   } else {
@@ -1256,7 +1256,7 @@ function applyPlaceChromeForMode() {
   const hint = $('ds-place-hint');
   const tools = $('ds-invite-tools');
   if (tools) tools.hidden = !invite;
-  if (heading) heading.textContent = invite ? L('Wijs aan waar zij tekenen', 'Show where they sign') : L('Plaats uw handtekening', 'Place your signature');
+  if (heading) heading.textContent = invite ? L('Wijs aan waar zij tekenen', 'Show where they sign') : L('Plaats je handtekening', 'Place your signature');
   if (subline && subline.firstChild) {
     subline.firstChild.textContent = invite
       ? L('Tik waar de andere partij tekent. Die kan het vak nog verplaatsen. ', 'Tap where the other party signs. They can still move the box. ')
@@ -1264,7 +1264,7 @@ function applyPlaceChromeForMode() {
   }
   if (hint) {
     hint.textContent = invite
-      ? L('Optioneel: u kunt ook verder zonder een plek aan te wijzen.', 'Optional: you can continue without asking for a spot.')
+      ? L('Optioneel: je kunt ook verder zonder een plek aan te wijzen.', 'Optional: you can continue without asking for a spot.')
       : L('Klik op een pagina om de stempel te plaatsen.', 'Click a page to drop the signature stamp.');
   }
   const invPar = $('ds-invite-paraaf');
@@ -1596,7 +1596,7 @@ function applyPlacementTemplate() {
   // on every page of a contract nobody asked for (retest T1-11).
   reflowGhostStamps();
   $('ds-place-continue').disabled = false;
-  setPlaceHint(L('Uw opgeslagen positie is toegepast. Klik op een pagina om hem te verplaatsen.', 'Applied your saved signature position. Click a page to move it.'));
+  setPlaceHint(L('Je opgeslagen positie is toegepast. Klik op een pagina om hem te verplaatsen.', 'Applied your saved signature position. Click a page to move it.'));
 }
 
 // Toggle the sign-every-page mode; re-render ghosts and persist the choice.
@@ -1621,7 +1621,7 @@ function buildSignatureSheetPreview() {
   preview.innerHTML =
     L('<div class="ds-sheet-page-tag">Extra laatste pagina ', '<div class="ds-sheet-page-tag">Extra final page ') + finalPage + '</div>' +
     L('<h3 class="ds-sheet-title">ParaSign-handtekeningblad</h3>', '<h3 class="ds-sheet-title">ParaSign signature sheet</h3>') +
-    L('<p class="ds-sheet-sub">Deze pagina komt achter het brondocument als u ondertekent.</p>', '<p class="ds-sheet-sub">This page will be appended behind the source document when you sign.</p>') +
+    L('<p class="ds-sheet-sub">Deze pagina komt achter het brondocument als je ondertekent.</p>', '<p class="ds-sheet-sub">This page will be appended behind the source document when you sign.</p>') +
     '<dl class="ds-sheet-fields">' +
       L('<dt>Bronbestand</dt><dd>', '<dt>Source file</dt><dd>') + escapeHtml(state.doc.name) + '</dd>' +
       L("<dt>Pagina's bron</dt><dd>", '<dt>Source pages</dt><dd>') + escapeHtml(String(state.pdfPageCount || 0)) + '</dd>' +
@@ -1662,11 +1662,11 @@ function updateSignatureSheetControls() {
   const tip = $('ds-seal-tip');
   if (tip) tip.textContent = sheetOnly
     ? (state.stampAllPages
-      ? L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. Uw handtekening staat op dat blad; elke pagina van het document krijgt uw paraaf in een vrije hoek van de marge.", 'Adds one final page with your seal and source details. Your signature is on that sheet; every page of the document gets your initials in a free margin corner.')
-      : L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. De oorspronkelijke pagina's krijgen geen stempel.", 'Adds one final page with your seal and source details. The original pages remain unstamped.'))
+      ? L("Voegt één laatste pagina toe met je stempel en de gegevens van de bron. Je handtekening staat op dat blad; elke pagina van het document krijgt je paraaf in een vrije hoek van de marge.", 'Adds one final page with your seal and source details. Your signature is on that sheet; every page of the document gets your initials in a free margin corner.')
+      : L("Voegt één laatste pagina toe met je stempel en de gegevens van de bron. De oorspronkelijke pagina's krijgen geen stempel.", 'Adds one final page with your seal and source details. The original pages remain unstamped.'))
     : withSheet
       ? L('Houdt de geplaatste stempel in het document en voegt één laatste pagina toe met de stempel en de gegevens van de bron.', 'Keeps the placed seal in the document and adds one final page with the seal and source details.')
-      : L("Op de andere pagina's komt een kleine paraaf op een vrije plek in de marge. Is die er op een pagina niet, dan staat de paraaf daar over de tekst en ziet u dat hier in rood. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).", 'The other pages get small initials in a free spot of the margin. Where a page has none, the initials go over the text there and you see that here in red. Position and scale are remembered for next time (never your name or signature image).');
+      : L("Op de andere pagina's komt een kleine paraaf op een vrije plek in de marge. Is die er op een pagina niet, dan staat de paraaf daar over de tekst en zie je dat hier in rood. Positie en grootte worden onthouden voor de volgende keer (nooit je naam of handtekening).", 'The other pages get small initials in a free spot of the margin. Where a page has none, the initials go over the text there and you see that here in red. Position and scale are remembered for next time (never your name or signature image).');
   const hint = $('ds-place-hint');
   if (hint && sheetOnly) hint.textContent = L('Voorbeeld hieronder: pagina ', 'Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt als laatste pagina aan de pdf toegevoegd.', ' will be added as the final PDF page.');
   else if (hint && withSheet) hint.textContent = L('De geplaatste stempel blijft hier. Voorbeeld hieronder: ook pagina ', 'The placed seal stays here. Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt toegevoegd.', ' will also be added.');
@@ -1748,7 +1748,7 @@ function editToolPrompt(tool) {
     date: L('Datum staat aan. Klik op de pdf waar de datum moet komen.', 'Date tool active. Click the PDF where the date should appear.'),
     highlight: L('Markeren staat aan. Klik op de pdf en sleep of vergroot daarna de markering.', 'Highlight tool active. Click the PDF, then drag and resize the highlight.'),
     note: L('Notitie staat aan. Klik op de pdf waar de notitie moet komen.', 'Note tool active. Click the PDF where the note should appear.'),
-    pen: L('Tekenen staat aan. Teken waar u wilt op de pdf. Stempels en andere objecten blijven zichtbaar maar houden de pen niet tegen.', 'Draw tool active. Draw anywhere on the PDF. Seals and existing objects stay visible but cannot block the pen.'),
+    pen: L('Tekenen staat aan. Teken waar je wilt op de pdf. Stempels en andere objecten blijven zichtbaar maar houden de pen niet tegen.', 'Draw tool active. Draw anywhere on the PDF. Seals and existing objects stay visible but cannot block the pen.'),
   }[tool] || '';
 }
 
@@ -2306,7 +2306,7 @@ function wirePageTools() {
     splitBtn.addEventListener('click', () => {
       runPageOp(async (PDFLib, Ops) => {
         const n = await Ops.pageCount(PDFLib, state.doc.bytes);
-        const raw = prompt(L("Welke pagina's wilt u als nieuwe pdf exporteren? (bijv. 3 of 2-5, van ", 'Export which pages as a new PDF? (e.g. 3 or 2-5, of ') + n + L(' in totaal)', ' total)'));
+        const raw = prompt(L("Welke pagina's wil je als nieuwe pdf exporteren? (bijv. 3 of 2-5, van ", 'Export which pages as a new PDF? (e.g. 3 or 2-5, of ') + n + L(' in totaal)', ' total)'));
         if (raw === null) return null;
         const r = Ops.parsePageRange(raw, n);
         if (!r) { setPlaceHint(L('Dat paginabereik is niet te lezen.', 'Could not read that page range.')); return null; }
@@ -2446,7 +2446,7 @@ function onPlaceClick(e) {
     // Nothing of the requester's is stamped into this document: this box is a
     // request the other party may move, so no ghosts and no saved template.
     $('ds-place-hint').textContent =
-      L('U vraagt om een handtekening op pagina ', 'You are asking for a signature on page ') + (wrap._pdfPage.index + 1) + L('. Tik op een andere plek om het vak te verplaatsen.', '. Tap another spot to move the box.');
+      L('Je vraagt om een handtekening op pagina ', 'You are asking for a signature on page ') + (wrap._pdfPage.index + 1) + L('. Tik op een andere plek om het vak te verplaatsen.', '. Tap another spot to move the box.');
     // On the text itself: say what will happen (/co-sign then uses a
     // signature sheet after the last page rather than sign over the text).
     const tb = textBoxesIfReady(state.doc.bytes);
@@ -2460,7 +2460,7 @@ function onPlaceClick(e) {
         if (w > 0 && h > 0) area += w * h;
       }
       if (area > 0.15 * st.w * st.h) {
-        $('ds-place-hint').textContent = L('Dit vak ligt op de tekst. Dan tekent iedereen op een apart handtekeningblad achter het document. Kies een lege plek als u wilt dat ze op deze pagina tekenen.', 'This box lies on the text. Everyone then signs on a separate signature sheet after the document. Pick an empty spot if you want them to sign on this page.');
+        $('ds-place-hint').textContent = L('Dit vak ligt op de tekst. Dan tekent iedereen op een apart handtekeningblad achter het document. Kies een lege plek als je wilt dat ze op deze pagina tekenen.', 'This box lies on the text. Everyone then signs on a separate signature sheet after the document. Pick an empty spot if you want them to sign on this page.');
       }
     }
     const btn = $('ds-invite-place'); if (btn) btn.textContent = L('Verplaats het handtekeningvak', 'Move the signature box');
@@ -2589,7 +2589,7 @@ function showStampOverTextNotice(page) {
       el.setAttribute('role', 'alert');
       anchor.insertAdjacentElement('afterend', el);
     }
-    el.textContent = L('Uw handtekening ligt op pagina ', 'Your signature lies on page ') + page
+    el.textContent = L('Je handtekening ligt op pagina ', 'Your signature lies on page ') + page
       + L(' over tekst of een afbeelding. Kies bij Plaatsen een vrije plek of een apart handtekeningblad als die leesbaar moet blijven.',
           ' over text or an image. At Place, pick a free spot or a separate signature sheet if that needs to stay readable.');
   }
@@ -2820,7 +2820,7 @@ async function showSigningIdentity() {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
     el.className = 'ds-hint';
-    el.innerHTML = L('U ondertekent met uw ondertekensleutel, die u ontgrendelt met Face ID, Touch ID of een beveiligingssleutel. ', 'You\'ll sign with your signing key, unlocked with Face ID / Touch ID / a security key. ') +
+    el.innerHTML = L('Je ondertekent met je ondertekensleutel, die je ontgrendelt met Face ID, Touch ID of een beveiligingssleutel. ', 'You\'ll sign with your signing key, unlocked with Face ID / Touch ID / a security key. ') +
       L('Vingerafdruk van de sleutel: <code>', 'Key fingerprint <code>') + escapeHtml(k.fingerprint) + '</code>.';
   } catch (e) {
     el.className = 'ds-hint';
@@ -2836,15 +2836,15 @@ async function showSigningIdentity() {
         } else passkeys = 0;
       } catch { passkeys = null; }
       if (passkeys === 0) {
-        el.textContent = L('U ondertekent met de code uit uw authenticator-app.', 'You\'ll sign with the code from your authenticator app.');
+        el.textContent = L('Je ondertekent met de code uit je authenticator-app.', 'You\'ll sign with the code from your authenticator app.');
         return;
       }
       const elsewhere = await serverHasSigningKey();
       el.innerHTML = (elsewhere
-        ? L('U ondertekent met de passkey waarmee u inlogt. Een ondertekensleutel staat in de browser waarin u hem maakt, dus dit apparaat maakt er een aan de eerste keer dat u tekent: één tik met Face ID of Touch ID. Geen passkey hier? Dan kunt u tekenen met de code uit uw authenticator-app.', 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign, one Face ID / Touch ID tap. No passkey here? You can sign with your authenticator code instead.')
-        : L('U ondertekent met de passkey waarmee u inlogt. Dit apparaat maakt uw ondertekensleutel aan met één tik, de eerste keer dat u tekent. Geen passkey hier? Dan kunt u tekenen met de code uit uw authenticator-app.', 'You\'ll sign with your sign-in passkey, this device sets up your signing key with one tap the first time you sign. No passkey here? You can sign with your authenticator code instead.'));
+        ? L('Je ondertekent met de passkey waarmee je inlogt. Een ondertekensleutel staat in de browser waarin je hem maakt, dus dit apparaat maakt er een aan de eerste keer dat je tekent: één tik met Face ID of Touch ID. Geen passkey hier? Dan kun je tekenen met de code uit je authenticator-app.', 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign, one Face ID / Touch ID tap. No passkey here? You can sign with your authenticator code instead.')
+        : L('Je ondertekent met de passkey waarmee je inlogt. Dit apparaat maakt je ondertekensleutel aan met één tik, de eerste keer dat je tekent. Geen passkey hier? Dan kun je tekenen met de code uit je authenticator-app.', 'You\'ll sign with your sign-in passkey, this device sets up your signing key with one tap the first time you sign. No passkey here? You can sign with your authenticator code instead.'));
     } else {
-      el.textContent = readableError(e, L('Uw ondertekensleutel kon niet worden gecontroleerd.', 'Could not check your signing key.'));
+      el.textContent = readableError(e, L('Je ondertekensleutel kon niet worden gecontroleerd.', 'Could not check your signing key.'));
     }
   }
 }
@@ -2924,7 +2924,7 @@ function initDrawCanvas() {
   function start(ev) {
     ev.preventDefault();
     exportGeneration++;
-    if (drawStatus) drawStatus.textContent = L('U tekent. De lijn hierboven volgt uw aanwijzer.', 'Drawing. The line above follows your pointer.');
+    if (drawStatus) drawStatus.textContent = L('Je tekent. De lijn hierboven volgt je aanwijzer.', 'Drawing. The line above follows your pointer.');
     // Capture the pointer: a stroke that briefly leaves the canvas (normal at
     // writing speed) keeps drawing instead of being cut off mid-letter.
     try { cv.setPointerCapture(ev.pointerId); } catch {}
@@ -3028,7 +3028,7 @@ function initDrawCanvas() {
     exportGeneration++;
     paint(); ink = null; clearSig();
     refreshVisibleSealPreviews();
-    if (drawStatus) drawStatus.textContent = L('Gewist. Uw lijn verschijnt hier terwijl u tekent.', 'Cleared. Your line appears here while you draw.');
+    if (drawStatus) drawStatus.textContent = L('Gewist. Je lijn verschijnt hier terwijl je tekent.', 'Cleared. Your line appears here while you draw.');
   });
 }
 
@@ -3049,7 +3049,7 @@ function initImageUpload() {
     // accepted here and then failed in the bake, after the code.
     const mime = guessMimeFromMagic(bytes);
     if (mime !== 'image/png' && mime !== 'image/jpeg') {
-      alert(L('Dit bestand is geen PNG- of JPG-afbeelding. Kies een PNG of JPG van uw handtekening.', 'This file is not a PNG or JPG image. Pick a PNG or JPG of your signature.'));
+      alert(L('Dit bestand is geen PNG- of JPG-afbeelding. Kies een PNG of JPG van je handtekening.', 'This file is not a PNG or JPG image. Pick a PNG or JPG of your signature.'));
       inp.value = '';
       return;
     }
@@ -3115,14 +3115,14 @@ function fillReview() {
                                          L('Geüploade afbeelding (', 'Uploaded image (') + formatSize(state.signer.sigImageBytes.length) + ' ' + state.signer.sigImageType.toUpperCase() + ')';
   // Signing key: always the account's passkey-protected ML-DSA-65 key. The
   // fingerprint is filled async (public vault metadata, no unlock) below.
-  $('ds-review-key-src').textContent = L('Uw ondertekensleutel (ML-DSA-65)', 'Your signing key (ML-DSA-65)');
+  $('ds-review-key-src').textContent = L('Je ondertekensleutel (ML-DSA-65)', 'Your signing key (ML-DSA-65)');
 
   // Recipients summary. Multi-party envelopes are created same-origin via your
   // logged-in session (no manual API key); each recipient signs at /co-sign
   // with their own passkey.
   const recCell = $('ds-review-recipients');
   if (state.recipients.length === 0) {
-    recCell.textContent = L('Geen, alleen uw eigen handtekening', 'None - personal signature only');
+    recCell.textContent = L('Geen, alleen je eigen handtekening', 'None - personal signature only');
   } else {
     const list = state.recipients.map(r => r.label + (r.email ? ' (' + r.email + ')' : '')).join(', ');
     recCell.innerHTML = state.recipients.length + (state.recipients.length === 1 ? L(' medeondertekenaar', ' co-signer') : L(' medeondertekenaars', ' co-signers')) + ': ' + escapeHtml(list);
@@ -3139,7 +3139,7 @@ function fillReview() {
   if (docHashLabel) docHashLabel.textContent = state.mode === 'pdf'
     ? L('SHA3-256 van het origineel (de handtekening komt op de versie met de zegel)', 'SHA3-256 of the original (the signature goes on the version with the seal)')
     : L('SHA3-256 van het document', 'Document SHA3-256');
-  $('ds-proof-fp').textContent = L('(vingerafdruk van uw ondertekensleutel)', '(your signing key fingerprint)');   // filled async below
+  $('ds-proof-fp').textContent = L('(vingerafdruk van je ondertekensleutel)', '(your signing key fingerprint)');   // filled async below
   $('ds-proof-version').textContent = 'parasign-doc-3 (recipe_version 3)';
 
   // Envelope-structure preview — the v3 .psign receipt (parasign-doc-3). The
@@ -3203,17 +3203,17 @@ async function fillReviewKeyFingerprint() {
   // Same as showSigningIdentity: signed out there is no key to read, and
   // '(unavailable)' would read as a fault rather than as a missing session.
   if (sessionState === 'out') {
-    const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = L('(nadat u bent ingelogd)', '(after you sign in)');
+    const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = L('(nadat je bent ingelogd)', '(after you sign in)');
     return;
   }
   try {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
     const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = k.fingerprint;
-    const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = L('Uw ondertekensleutel (', 'Your signing key (') + k.fingerprint + ')';
+    const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = L('Je ondertekensleutel (', 'Your signing key (') + k.fingerprint + ')';
   } catch (e) {
     const fpEl = $('ds-proof-fp');
-    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? L('(wordt aangemaakt met één tik op uw passkey als u tekent)', '(set up with one passkey tap when you sign)') : L('(niet beschikbaar)', '(unavailable)');
+    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? L('(wordt aangemaakt met één tik op je passkey als je tekent)', '(set up with one passkey tap when you sign)') : L('(niet beschikbaar)', '(unavailable)');
   }
 }
 
@@ -4085,7 +4085,7 @@ async function doSign() {
     // The signing key is the account's PASSKEY-protected ML-DSA-65 key. Read ONLY
     // its public half from vault metadata here (for the stamp fingerprint); the
     // secret is unlocked solely by the per-document PRF activation below.
-    status(L('Uw ondertekensleutel wordt gezocht...', 'Locating your signing key...'));
+    status(L('Je ondertekensleutel wordt gezocht...', 'Locating your signing key...'));
     // Resolve the account's signing key, or set one up inline. Happy path is one
     // passkey tap (PRF). If one-tap passkey signing isn't available — the provider
     // can't do PRF (e.g. Proton Pass), or there's no passkey at all — we fall back
@@ -4103,7 +4103,7 @@ async function doSign() {
       if (!e || !TOTP_FALLBACK_CODES.includes(e.code)) throw e;
       const code = await promptTotp('ds-pass');
       if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
-      status(L('Uw ondertekensleutel wordt aangemaakt…', 'Setting up your signing key…'));
+      status(L('Je ondertekensleutel wordt aangemaakt…', 'Setting up your signing key…'));
       const _enrol = await enrolEphemeralSigningKeyWithTotp({ label: state.signer.name || 'Signing key', totp: code, onStatus: status });
       signKey = _enrol.signKey;
       ephemeralSigner = _enrol.signer;
@@ -4200,7 +4200,7 @@ async function doSign() {
       signer.dispose();   // zeroize — the secret never outlives this block
     }
 
-    status(L('Uw handtekening wordt vastgelegd...', 'Recording your signature...'));
+    status(L('Je handtekening wordt vastgelegd...', 'Recording your signature...'));
     if (trail) trail.step('send', 'now');
     const submitted = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance });
     if (trail) {
@@ -4287,27 +4287,27 @@ async function doSign() {
     if (e && e.status === 401) { showSessionLost($('ds-sign-status')); $('ds-sign-now').disabled = false; return; }
     let msg;
     if (e && e.status === 401) msg = L('Log in om documenten te ondertekenen. Kom daarna hier terug.', 'Sign in to sign documents, then come back here.');
-    else if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, inloggen met passkey) en onderteken daarna. De passkey waarmee u inlogt wordt uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then sign, your sign-in passkey becomes your signing key.');
+    else if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan je account (Account, inloggen met passkey) en onderteken daarna. De passkey waarmee je inlogt wordt je ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then sign, your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
-    else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of verlopen. Tik nogmaals op Dit document ondertekenen.', 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.');
-    else if (e && e.code === 'cancelled') msg = L('Ondertekenen geannuleerd. Tik op Dit document ondertekenen als u klaar bent.', 'Signing cancelled. Tap Sign now when you’re ready.');
+    else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met je passkey is geannuleerd of verlopen. Tik nogmaals op Dit document ondertekenen.', 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.');
+    else if (e && e.code === 'cancelled') msg = L('Ondertekenen geannuleerd. Tik op Dit document ondertekenen als je klaar bent.', 'Signing cancelled. Tap Sign now when you’re ready.');
     else if (e && e.code === 'totp_locked') msg = e.message;
     else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = L('Die code uit de authenticator-app klopte niet. Tik op Dit document ondertekenen en voer de huidige code van 6 cijfers in.', 'That authenticator code didn’t match. Tap Sign now and enter the current 6-digit code.');
-    else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op uw account (Account, tweestapsverificatie) en onderteken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
+    else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op je account (Account, tweestapsverificatie) en onderteken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
     // Already translated by the signer (js/error-message.js): the message on
     // this error is our own vetted sentence with a next step, never the wire's
     // "http_502" or a browser's TypeError text. The detail is in the console.
     else if (e && (e.code === 'service_error' || e.code === 'document_too_large')) msg = e.message;
     else if (e && e.code === 'bake_failed') msg = e.bakeKind === 'encrypted'
-      ? L('Deze pdf is beveiligd tegen wijzigen, dus er kan geen zichtbare handtekening op. Er is niets ondertekend. Kies het bestand opnieuw. U ondertekent dan een vingerafdruk van het bestand, zonder zichtbare stempel.', 'This PDF is protected against changes, so it cannot carry a visible signature. Nothing was signed. Pick the file again. You then sign a fingerprint of the file, without a visible stamp.')
+      ? L('Deze pdf is beveiligd tegen wijzigen, dus er kan geen zichtbare handtekening op. Er is niets ondertekend. Kies het bestand opnieuw. Je ondertekent dan een vingerafdruk van het bestand, zonder zichtbare stempel.', 'This PDF is protected against changes, so it cannot carry a visible signature. Nothing was signed. Pick the file again. You then sign a fingerprint of the file, without a visible stamp.')
       : e.bakeKind === 'image'
-        ? L('Uw handtekeningafbeelding kon niet in de pdf worden gezet: het is geen geldige PNG of JPG. Er is niets ondertekend. Ga terug, kies de afbeelding opnieuw of teken uw handtekening, en onderteken daarna.', 'Your signature image could not be placed in the PDF: it is not a valid PNG or JPG. Nothing was signed. Go back, pick the image again or draw your signature, then sign.')
-        : L('De zichtbare handtekening kon niet in deze pdf worden gezet. Er is niets ondertekend, en aan uw passkey ligt het niet. Kies bij Plaatsen voor een apart handtekeningblad, of sla de pdf opnieuw op met Afdrukken naar pdf en probeer het nog eens.', 'The visible signature could not be placed in this PDF. Nothing was signed, and your passkey is not the problem. At Place, choose a separate signature sheet, or save the PDF again with Print to PDF and try once more.');
+        ? L('Je handtekeningafbeelding kon niet in de pdf worden gezet: het is geen geldige PNG of JPG. Er is niets ondertekend. Ga terug, kies de afbeelding opnieuw of teken je handtekening, en onderteken daarna.', 'Your signature image could not be placed in the PDF: it is not a valid PNG or JPG. Nothing was signed. Go back, pick the image again or draw your signature, then sign.')
+        : L('De zichtbare handtekening kon niet in deze pdf worden gezet. Er is niets ondertekend, en aan je passkey ligt het niet. Kies bij Plaatsen voor een apart handtekeningblad, of sla de pdf opnieuw op met Afdrukken naar pdf en probeer het nog eens.', 'The visible signature could not be placed in this PDF. Nothing was signed, and your passkey is not the problem. At Place, choose a separate signature sheet, or save the PDF again with Print to PDF and try once more.');
     else if (isSignerNotEnrolled(e)) msg = 'relink';
-    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = L('Met uw passkey kunt u hier niet met één tik ondertekenen. Tik op Dit document ondertekenen om met de code uit uw authenticator-app te tekenen.', 'Your passkey can’t do one-tap signing here. Tap Sign now to sign with your authenticator code instead.');
+    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = L('Met je passkey kun je hier niet met één tik ondertekenen. Tik op Dit document ondertekenen om met de code uit je authenticator-app te tekenen.', 'Your passkey can’t do one-tap signing here. Tap Sign now to sign with your authenticator code instead.');
     else if (e && (e.status === 403 || e.status === 409 || e.status === 410)) msg = L('Die toestemming om te ondertekenen is al gebruikt of verlopen. Tik op Dit document ondertekenen om opnieuw te beginnen.', 'That signing authorization was already used or has expired. Tap Sign now to start a fresh one.');
     else if (e && e.status) msg = L('Ondertekenen lukt nu niet (serverfout ', 'Signing could not be completed right now (server error ') + e.status + L('). Probeer het zo nog eens.', '). Please try again in a moment.');
-    else if (isWebAuthnError(e)) msg = L('Uw passkey kon het ondertekenen in deze browser niet afronden. Tik nogmaals op Dit document ondertekenen. Blijft het mislukken, probeer dan een andere browser of de passkey op uw telefoon.', 'Your passkey could not complete signing on this browser. Tap Sign now to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');
+    else if (isWebAuthnError(e)) msg = L('Je passkey kon het ondertekenen in deze browser niet afronden. Tik nogmaals op Dit document ondertekenen. Blijft het mislukken, probeer dan een andere browser of de passkey op je telefoon.', 'Your passkey could not complete signing on this browser. Tap Sign now to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');
     else {
       try { console.error('[paramant] sign failed', e); } catch (_) { /* no console */ }
       msg = L('Ondertekenen is niet gelukt door een onverwachte fout op deze pagina. Er is niets ondertekend. Laad de pagina opnieuw en probeer het nog eens; blijft het misgaan, mail dan info@paramant.app met het tijdstip.', 'Signing did not work because of an unexpected error on this page. Nothing was signed. Reload the page and try again; if it keeps failing, email info@paramant.app with the time it happened.');
@@ -4318,7 +4318,7 @@ async function doSign() {
       // same browser). Starting over picks the same key again, forever, so the
       // way out is a new key, linked now (test-3 report, point 4).
       const st = $('ds-sign-status');
-      st.textContent = L('De ondertekensleutel in deze browser is niet aan uw account gekoppeld, bijvoorbeeld omdat het koppelen eerder halverwege stopte of omdat hier ook een ander account tekent. Koppel opnieuw: deze browser maakt een nieuwe sleutel en koppelt die met één bevestiging aan uw account. Er is nog niets ondertekend, en wat u eerder ondertekende blijft geldig. ', 'The signing key in this browser is not linked to your account, for example because linking stopped halfway earlier or because another account also signs here. Link again: this browser makes a new key and links it to your account with one confirmation. Nothing has been signed yet, and what you signed before stays valid. ');
+      st.textContent = L('De ondertekensleutel in deze browser is niet aan je account gekoppeld, bijvoorbeeld omdat het koppelen eerder halverwege stopte of omdat hier ook een ander account tekent. Koppel opnieuw: deze browser maakt een nieuwe sleutel en koppelt die met één bevestiging aan je account. Er is nog niets ondertekend, en wat je eerder ondertekende blijft geldig. ', 'The signing key in this browser is not linked to your account, for example because linking stopped halfway earlier or because another account also signs here. Link again: this browser makes a new key and links it to your account with one confirmation. Nothing has been signed yet, and what you signed before stays valid. ');
       const b = document.createElement('button');
       b.type = 'button'; b.id = 'ds-relink-key'; b.className = 'btn btn-primary';
       b.textContent = L('Sleutel opnieuw koppelen', 'Link the key again');
@@ -4386,7 +4386,7 @@ async function addQualifiedSignature(pdfBytes) {
       }),
     });
   } catch {
-    line.textContent = L('De gekwalificeerde handtekening kon niet worden aangevraagd. Uw ParaSign-handtekening blijft geldig.', 'The qualified signature could not be requested. Your ParaSign signature is unaffected.');
+    line.textContent = L('De gekwalificeerde handtekening kon niet worden aangevraagd. Je ParaSign-handtekening blijft geldig.', 'The qualified signature could not be requested. Your ParaSign signature is unaffected.');
     return;
   }
   let body = null;
@@ -4405,7 +4405,7 @@ async function addQualifiedSignature(pdfBytes) {
     return;
   }
   if (!res.ok || !body || !body.document) {
-    line.textContent = L('De aanbieder gaf geen gekwalificeerde handtekening terug. Uw ParaSign-handtekening blijft geldig.', 'The provider did not return a qualified signature. Your ParaSign signature is unaffected.');
+    line.textContent = L('De aanbieder gaf geen gekwalificeerde handtekening terug. Je ParaSign-handtekening blijft geldig.', 'The provider did not return a qualified signature. Your ParaSign signature is unaffected.');
     return;
   }
 
@@ -4461,7 +4461,7 @@ function renderTotpSha1Note(afterEl) {
   note.className = 'ds-note';
   note.setAttribute('role', 'note');
   const p = document.createElement('p');
-  p.innerHTML = L('Ondertekend. Uw authenticator-app gebruikt SHA-1. Het sterkst is een app met SHA-256, zoals Raivo (iOS) of Aegis (Android). <a href="/help/authenticator-apps">Bekijk de lijst met apps</a>.', 'Signed. Your authenticator app uses SHA-1. For the strongest setup, switch to a SHA-256 app such as Raivo (iOS) or Aegis (Android). <a href="/help/authenticator-apps">See the app list</a>.');
+  p.innerHTML = L('Ondertekend. Je authenticator-app gebruikt SHA-1. Het sterkst is een app met SHA-256, zoals Raivo (iOS) of Aegis (Android). <a href="/help/authenticator-apps">Bekijk de lijst met apps</a>.', 'Signed. Your authenticator app uses SHA-1. For the strongest setup, switch to a SHA-256 app such as Raivo (iOS) or Aegis (Android). <a href="/help/authenticator-apps">See the app list</a>.');
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'ds-note-dismiss';
@@ -4525,11 +4525,11 @@ function showDone() {
   paDone().fill('step-done', {
     title: L('Ondertekend.', 'Signed.'),
     line: r.stampedBytes
-      ? L('Uw handtekening staat op ', 'Your signature is on ') + signedName + '. ' + togetherNote + soloNote + L('Bewaar nu beide bestanden en houd ze bij elkaar, ', 'Save both files now and keep them together, ') +
-        L('want wij bewaren geen kopie die u later kunt ophalen.', 'because we do not hold a copy you could come back for.')
-      : L('Uw handtekening geldt voor ', 'Your signature covers ') + signedName + L(', dat precies blijft zoals het was. ', ', which is left exactly as it was. ') + soloNote +
+      ? L('Je handtekening staat op ', 'Your signature is on ') + signedName + '. ' + togetherNote + soloNote + L('Bewaar nu beide bestanden en houd ze bij elkaar, ', 'Save both files now and keep them together, ') +
+        L('want wij bewaren geen kopie die je later kunt ophalen.', 'because we do not hold a copy you could come back for.')
+      : L('Je handtekening geldt voor ', 'Your signature covers ') + signedName + L(', dat precies blijft zoals het was. ', ', which is left exactly as it was. ') + soloNote +
         L('Bewaar nu het bewijsbestand bij het document, want wij bewaren geen kopie ', 'Save the proof file now and keep it with the document, because we do not hold a copy ') +
-        L('die u later kunt ophalen.', 'you could come back for.'),
+        L('die je later kunt ophalen.', 'you could come back for.'),
   });
 
   if (state.totpSha1) renderTotpSha1Note($('ds-done-line'));
@@ -4573,7 +4573,7 @@ function showDone() {
     if (r.stampedBytes) {
       const li1 = document.createElement('li');
       const what = state.mode === 'pdf' ? L('getekende pdf', 'signed PDF') : L('getekende afbeelding', 'signed image');
-      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(signedDocName())}</span><span class="ds-usage-files-note">${L(`de ${what} met uw zichtbare Paramant-stempel erin`, `the ${what} with your visible Paramant seal baked in`)}</span>`;
+      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(signedDocName())}</span><span class="ds-usage-files-note">${L(`de ${what} met je zichtbare Paramant-stempel erin`, `the ${what} with your visible Paramant seal baked in`)}</span>`;
       filesList.appendChild(li1);
     } else {
       const li1 = document.createElement('li');
@@ -4581,7 +4581,7 @@ function showDone() {
       filesList.appendChild(li1);
     }
     const li2 = document.createElement('li');
-    li2.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(psignName)}</span><span class="ds-usage-files-note">${L('het bewijs: de handtekening, uw publieke sleutel en wat er ondertekend is', 'the proof: the signature, your public key and what was signed')}</span>`;
+    li2.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(psignName)}</span><span class="ds-usage-files-note">${L('het bewijs: de handtekening, je publieke sleutel en wat er ondertekend is', 'the proof: the signature, your public key and what was signed')}</span>`;
     filesList.appendChild(li2);
   }
   const notaryLine = $('ds-usage-notary-line');
@@ -4644,8 +4644,8 @@ function showDoneInvite(r) {
     line: emailPartial
       ? L('Sommige uitnodigingen zijn niet bezorgd. Probeer het hieronder opnieuw, of stuur wie geen mail kreeg zelf de link hieronder.', 'Some invitations were not delivered. Retry below, or send anyone who got no mail their link below yourself.')
       : emailOk
-        ? L('Iedereen heeft een eigen link gekregen. U hoeft niets meer te sturen. U krijgt bericht bij elke handtekening, en aan het eind het complete document.', 'Everyone has their own link now. There is nothing more to send. You hear about every signature, and get the complete document at the end.')
-        : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
+        ? L('Iedereen heeft een eigen link gekregen. Je hoeft niets meer te sturen. Je krijgt bericht bij elke handtekening, en aan het eind het complete document.', 'Everyone has their own link now. There is nothing more to send. You hear about every signature, and get the complete document at the end.')
+        : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals je wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
   ['ds-dl-pdf', 'ds-dl-psign'].forEach(id => { const el = $(id); if (el) el.hidden = true; });
@@ -4712,7 +4712,7 @@ function renderPartyLinks(mp) {
     copyLine.textContent = state.cosignShareError
       ? L('Deze links openen het verzoek, maar niet het document: dat kon niet worden meegestuurd. Stuur iedereen zelf de getekende pdf (Getekende pdf downloaden). Op de eigen pagina kiest ieder dat bestand en tekent dan.', 'These links open the request, but not the document: it could not be sent along. Send everyone the signed PDF yourself (Download signed PDF). On their own page each person chooses that file and then signs.')
       : (state.inviteDelivery?.ok
-        ? L('Wilt u iemand de link toch zelf sturen? Elke link opent het document na inloggen, en is alleen voor die ene persoon.', 'Want to send someone the link yourself after all? Each link opens the document after sign-in, and is for that one person only.')
+        ? L('Wil je iemand de link toch zelf sturen? Elke link opent het document na inloggen, en is alleen voor die ene persoon.', 'Want to send someone the link yourself after all? Each link opens the document after sign-in, and is for that one person only.')
         : L('Elke link opent het document na inloggen, en is alleen voor die ene persoon.', 'Each link opens the document after sign-in, and is for that one person only.'));
   }
   const covered = paraafCoveredNotice();
@@ -4728,7 +4728,7 @@ function renderPartyLinks(mp) {
   if (result) {
     if (state.cosignShareError) {
       result.hidden = false; result.className = 'ds-banner err';
-      result.textContent = L('Uw handtekening staat. Alleen het document kon niet versleuteld worden meegestuurd: ', 'Your signature stands. Only the document could not be sent along encrypted: ') + state.cosignShareError + L(' Er is daarom geen e-mail verstuurd.', ' No email was sent for that reason.');
+      result.textContent = L('Je handtekening staat. Alleen het document kon niet versleuteld worden meegestuurd: ', 'Your signature stands. Only the document could not be sent along encrypted: ') + state.cosignShareError + L(' Er is daarom geen e-mail verstuurd.', ' No email was sent for that reason.');
     } else if (state.deliveryMode === 'copy') {
       result.hidden = false; result.className = 'ds-banner';
       result.textContent = L('Er is geen e-mail verstuurd. Stuur iedereen zelf de eigen link.', 'No email was sent. Send each person their link yourself.');
@@ -5074,7 +5074,7 @@ function showSessionLost(el) {
   if (!el) return;
   el.hidden = false;
   el.className = 'ds-banner err';
-  el.textContent = L('U bent uitgelogd. Log opnieuw in. Uw document, de plek en de ontvangers blijven in deze browser en staan daarna weer klaar. ', 'You were signed out. Sign in again. Your document, the spot and the recipients stay in this browser and are ready again afterwards. ');
+  el.textContent = L('Je bent uitgelogd. Log opnieuw in. Je document, de plek en de ontvangers blijven in deze browser en staan daarna weer klaar. ', 'You were signed out. Sign in again. Your document, the spot and the recipients stay in this browser and are ready again afterwards. ');
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'btn btn-primary'; b.id = 'ds-signin-keep';
   b.textContent = L('Inloggen en verdergaan', 'Sign in and continue');
@@ -5118,7 +5118,7 @@ async function restoreDraft(draft) {
   { const el = $('ds-invite-message'); if (el) el.value = state.inviteMessage; }
   { const el = document.querySelector('input[name="ds-delivery-mode"][value="' + state.deliveryMode + '"]'); if (el) el.checked = true; }
   if (m.signerName && $('ds-signer-name')) { $('ds-signer-name').value = m.signerName; $('ds-signer-name').dispatchEvent(new Event('input', { bubbles: true })); }
-  const back = L('Welkom terug. Uw document, de plek en de ontvangers staan er nog.', 'Welcome back. Your document, the spot and the recipients are still here.');
+  const back = L('Welkom terug. Je document, de plek en de ontvangers staan er nog.', 'Welcome back. Your document, the spot and the recipients are still here.');
   const wasLater = ['step-recipients', 'step-identity', 'step-sign'].includes(m.step);
   if (wasLater && m.mode !== 'alone') {
     enterRecipients();
@@ -5149,7 +5149,7 @@ async function offerDraftAfterSignIn() {
   if (!host || host.hidden) return;
   const box = document.createElement('div');
   box.className = 'ds-banner'; box.id = 'ds-draft-offer';
-  box.textContent = L('U was bezig met ', 'You were working on ') + '"' + (draft.meta.docName || 'document') + '". ';
+  box.textContent = L('Je was bezig met ', 'You were working on ') + '"' + (draft.meta.docName || 'document') + '". ';
   const go = document.createElement('button');
   go.type = 'button'; go.className = 'btn btn-primary'; go.textContent = L('Verdergaan', 'Continue');
   go.addEventListener('click', () => { box.remove(); restoreDraft(draft); });
@@ -5251,10 +5251,10 @@ async function sendAfterAllowanceCheck() {
   const need = state.recipients.length;
   const left = await senderSignsLeft();
   if (left !== null && left < need) {
-    showRecipientsHint(L('U heeft deze maand nog ', 'You have ') + left
+    showRecipientsHint(L('Je hebt deze maand nog ', 'You have ') + left
       + L(left === 1 ? ' handtekening over' : ' handtekeningen over', left === 1 ? ' signature left this month' : ' signatures left this month')
       + L(', en dit verzoek vraagt er ', ', and this request needs ') + need
-      + L('. Elke handtekening telt mee, dus zo kan dit verzoek niet weg. Verhoog uw plan op /pricing, nodig minder mensen uit, of verstuur het na het begin van de volgende maand.', '. Every signature counts, so this request cannot go out like this. Upgrade your plan on /pricing, invite fewer people, or send it after the start of next month.'), true);
+      + L('. Elke handtekening telt mee, dus zo kan dit verzoek niet weg. Verhoog je plan op /pricing, nodig minder mensen uit, of verstuur het na het begin van de volgende maand.', '. Every signature counts, so this request cannot go out like this. Upgrade your plan on /pricing, invite fewer people, or send it after the start of next month.'), true);
     return;
   }
   sendForSignature();
@@ -5269,7 +5269,7 @@ function applySessionToSendButton() {
   cont.textContent = L('Inloggen om te versturen', 'Sign in to send');
   cont.disabled = false;
   if (!$('step-recipients').hidden) {
-    showRecipientsHint(L('Uw document is niet geüpload en blijft in deze browser. Na het inloggen staan het document, de plek en de ontvangers weer klaar.', 'Your document has not been uploaded and stays in this browser. After you sign in, the document, the spot and the recipients are ready again.'), false);
+    showRecipientsHint(L('Je document is niet geüpload en blijft in deze browser. Na het inloggen staan het document, de plek en de ontvangers weer klaar.', 'Your document has not been uploaded and stays in this browser. After you sign in, the document, the spot and the recipients are ready again.'), false);
   }
 }
 
@@ -5374,10 +5374,10 @@ async function showOwnPlan() {
   const tier = me && paidTierOf(me);
   if (!tier) return;
   const b = document.createElement('b');
-  b.textContent = L('Uw plan: ', 'Your plan: ') + (PLAN_NAMES[tier] || tier);
+  b.textContent = L('Je plan: ', 'Your plan: ') + (PLAN_NAMES[tier] || tier);
   li.textContent = '';
   li.appendChild(b);
-  li.appendChild(document.createTextNode(L(' · uw handtekeningen vallen onder dit plan', ' · your signatures are covered by this plan')));
+  li.appendChild(document.createTextNode(L(' · je handtekeningen vallen onder dit plan', ' · your signatures are covered by this plan')));
 }
 
 // What the finished proof does and does not say. An open-mode envelope has no

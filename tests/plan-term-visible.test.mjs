@@ -151,7 +151,7 @@ async function dashboard(paidUntil, prefix = '') {
 const COPY = {
   nl: {
     lang: 'nl',
-    ends: (d) => `Firm betaald tot ${d}. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.`,
+    ends: (d) => `Firm betaald tot ${d}. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, je verliest geen dag.`,
     ended: (d) => `Afgelopen op ${d}, nu op Community.`,
     noCharge: /Er wordt niets automatisch afgeschreven\./, renew: 'Verlengen', pricing: '/pricing',
   },

@@ -48,7 +48,7 @@ test('Firm to Business: the headline and the product lines give Business the sam
   // Ronde 2: the "daarna Firm" part stands once, in the product line, not
   // also in the headline right above it.
   assert.equal(nl.headline(upgraded),
-    'Business betaald tot 5 november 2026. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.');
+    'Business betaald tot 5 november 2026. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, je verliest geen dag.');
   assert.deepEqual([...nl.lines(upgraded)], [
     'Ondertekenen: Business tot 5 november 2026, daarna Firm tot 6 december 2026.',
     'Versturen: Firm tot 6 december 2026.',

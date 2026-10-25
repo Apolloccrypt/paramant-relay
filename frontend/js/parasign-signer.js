@@ -190,7 +190,7 @@ export async function resolvePasskeySigningKey() {
       kekSources: k.kekSources || [], hasPrf: true,
     };
   }
-  const e = new Error(tr('Er staat nog geen ondertekensleutel op dit apparaat. U maakt er een aan wanneer u ondertekent.', 'No signing key on this device yet. Set one up when you sign.'));
+  const e = new Error(tr('Er staat nog geen ondertekensleutel op dit apparaat. Je maakt er een aan wanneer je ondertekent.', 'No signing key on this device yet. Set one up when you sign.'));
   e.code = 'no_signing_passkey';
   throw e;
 }
@@ -338,7 +338,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   const pk_hash = toHex(sha3_256(kp.publicKey));
   try {
     // 2) Step-up challenge over THIS account's passkeys.
-    say(tr('Ondertekenen instellen met uw passkey…', 'Setting up signing with your passkey…'));
+    say(tr('Ondertekenen instellen met je passkey…', 'Setting up signing with your passkey…'));
     // An account without a passkey takes the authenticator-code path. Asked
     // with a plain read first, so the expected "no passkey" is not a 409 in the
     // console on every signature (retest T2-B6). A failed read changes nothing:
@@ -348,7 +348,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
       if (r.ok) {
         const j = await r.json().catch(() => null);
         if (j && Array.isArray(j.passkeys) && j.passkeys.length === 0) {
-          const err = new Error(tr('Voeg eerst een passkey toe aan uw account. Daarna kunt u ermee ondertekenen.', 'Add a passkey to your account first, then you can sign with it.'));
+          const err = new Error(tr('Voeg eerst een passkey toe aan je account. Daarna kun je ermee ondertekenen.', 'Add a passkey to your account first, then you can sign with it.'));
           err.code = 'no_passkey';
           throw err;
         }
@@ -361,7 +361,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
       opt = await _postJSON('/api/user/account/signing-key/step-up/options', {});
     } catch (e) {
       if (e && e.status === 409 && e.data && e.data.error === 'no_passkey') {
-        const err = new Error(tr('Voeg eerst een passkey toe aan uw account. Daarna kunt u ermee ondertekenen.', 'Add a passkey to your account first, then you can sign with it.'));
+        const err = new Error(tr('Voeg eerst een passkey toe aan je account. Daarna kun je ermee ondertekenen.', 'Add a passkey to your account first, then you can sign with it.'));
         err.code = 'no_passkey';
         throw err;
       }
@@ -372,7 +372,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     // 3) ONE WebAuthn get(): server challenge + per-wrap PRF eval salt. The
     //    platform offers the account's sign-in passkey from allowCredentials.
     const prfSalt = crypto.getRandomValues(new Uint8Array(16));
-    say(tr('Bevestig met Face ID, Touch ID of uw beveiligingssleutel…', 'Confirm with Face ID / Touch ID / your security key…'));
+    say(tr('Bevestig met Face ID, Touch ID of je beveiligingssleutel…', 'Confirm with Face ID / Touch ID / your security key…'));
     const allowList = (opt.options.allowCredentials || []);
     // Build BOTH PRF shapes with one shared salt: a per-credential evalByCredential
     // map (keyed by each passkey's base64url id, which Chromium needs when several
@@ -404,7 +404,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
       // The authenticator/provider engaged but could not complete a PRF assertion
       // (e.g. a passkey manager like Proton Pass that implements passkeys but not
       // the PRF extension). Signal the caller to fall back to a TOTP ephemeral key.
-      const err = new Error(tr('Uw passkey-aanbieder ondersteunt de PRF-ontgrendeling niet die ondertekenen met één tik nodig heeft.', 'Your passkey provider can’t do the PRF unlock that one-tap signing needs.'));
+      const err = new Error(tr('Je passkey-aanbieder kan de sleutel niet ontgrendelen op de manier die nodig is om met één tik te ondertekenen.', 'Your passkey provider can’t do the PRF unlock that one-tap signing needs.'));
       err.code = 'prf_unsupported'; err.cause = e;
       throw err;
     }
@@ -412,7 +412,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     if (!prfFirst) {
       // The assertion succeeded but produced no PRF result — same outcome: this
       // passkey can't be a one-tap signing key. The caller falls back to TOTP.
-      const err = new Error(tr('Deze passkey ondersteunt de PRF-extensie niet die ondertekenen met één tik nodig heeft.', 'This passkey doesn’t support the PRF extension that one-tap signing needs.'));
+      const err = new Error(tr('Deze passkey mist de functie die nodig is om met één tik te ondertekenen.', 'This passkey doesn’t support the PRF extension that one-tap signing needs.'));
       err.code = 'prf_unsupported';
       throw err;
     }
@@ -426,7 +426,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     //    (retest T3-4).
     const credentialId = _b64urlFromBuffer(cred.rawId);
     try {
-      say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
+      say(tr('Je ondertekensleutel wordt aan je account gekoppeld…', 'Linking your signing key to your account…'));
       await _postJSON('/api/user/account/signing-key/step-up/bind', {
         flowId: opt.flowId,
         response: _serializeAssertion(cred),
@@ -462,7 +462,7 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
   const say = (m) => { try { if (onStatus) onStatus(m); } catch { /* status is best-effort */ } };
   const code = String(totp == null ? '' : totp).trim();
   if (!/^\d{6}$/.test(code)) {
-    const err = new Error(tr('Vul de 6-cijferige code uit uw authenticator-app in.', 'Enter the 6-digit code from your authenticator app.'));
+    const err = new Error(tr('Vul de 6-cijferige code uit je authenticator-app in.', 'Enter the 6-digit code from your authenticator app.'));
     err.code = 'totp_required';
     throw err;
   }
@@ -476,7 +476,7 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
   const pk_hash = toHex(sha3_256(kp.publicKey));
 
   // Bind the PUBLIC key to the account, gated by the TOTP code (relay verifies it).
-  say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
+  say(tr('Je ondertekensleutel wordt aan je account gekoppeld…', 'Linking your signing key to your account…'));
   let enrolRes = null;
   try {
     enrolRes = await _postJSON('/api/user/account/signing-key', { pk_b64, label: label || 'Signing key', totp: code });
@@ -486,7 +486,7 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
     // Relay gates the TOTP enrol: 403 invalid_totp (wrong code) / 403 no_totp_setup
     // (account has no authenticator), 400 totp_required (malformed — caught above).
     if (errCode === 'too_many_active_keys') {
-      const err = new Error(tr('Er zijn al 50 actieve ondertekensleutels aan uw account gekoppeld. Een sleutel die u met een code koppelde vervalt na 24 uur vanzelf; trek anders oude sleutels in via Account en probeer het daarna opnieuw.', 'Your account already has 50 active signing keys. A key you linked with a code lapses by itself after 24 hours; otherwise revoke old keys on your Account page, then try again.'));
+      const err = new Error(tr('Er zijn al 50 actieve ondertekensleutels aan je account gekoppeld. Een sleutel die je met een code koppelde vervalt na 24 uur vanzelf; trek anders oude sleutels in via Account en probeer het daarna opnieuw.', 'Your account already has 50 active signing keys. A key you linked with a code lapses by itself after 24 hours; otherwise revoke old keys on your Account page, then try again.'));
       err.code = 'service_error'; throw err;
     }
     if (errCode === 'totp_locked') {
@@ -494,7 +494,7 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
       const err = new Error(tr('Te veel foute codes achter elkaar. Probeer het over ' + min + (min === 1 ? ' minuut' : ' minuten') + ' opnieuw.', 'Too many wrong codes in a row. Try again in ' + min + (min === 1 ? ' minute.' : ' minutes.')));
       err.code = 'totp_locked'; throw err;
     }
-    if (errCode === 'no_totp_setup') { const err = new Error(tr('Stel eerst een authenticator-app in op uw account en onderteken daarna met de code.', 'Set up an authenticator app on your account first, then sign with its code.')); err.code = 'totp_unavailable'; throw err; }
+    if (errCode === 'no_totp_setup') { const err = new Error(tr('Stel eerst een authenticator-app in op je account en onderteken daarna met de code.', 'Set up an authenticator app on your account first, then sign with its code.')); err.code = 'totp_unavailable'; throw err; }
     if (errCode === 'invalid_totp' || e.status === 403 || e.status === 401) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
     if (e && (e.status === 400 || e.status === 409) && /totp/i.test(errCode)) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
     // Anything else. This used to be a bare `throw e`, which put the wire's own

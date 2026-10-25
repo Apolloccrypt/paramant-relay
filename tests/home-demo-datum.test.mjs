@@ -41,17 +41,11 @@ async function rows(url, when, { js = true } = {}) {
   } finally { await browser.close(); server.close(); }
 }
 
-test('NL: de datums staan ten opzichte van vandaag, in de notatie van het dashboard', async () => {
-  // 10 maart 2027, 14:00 in Amsterdam: wintertijd, ver van de datums in de markup.
-  assert.deepEqual(await rows('/', '2027-03-10T13:00:00Z'), [
-    'Gemaakt 9 maart 2027', 'Verstuurd 10 maart 2027 om 09:12 (CET)', 'Gemaakt 2 maart 2027',
-  ]);
-});
-
-test('NL: voor 09:12 is de verzending van gisteren, niet uit de toekomst', async () => {
-  assert.deepEqual(await rows('/', '2027-03-10T06:00:00Z'), [
-    'Gemaakt 9 maart 2027', 'Verstuurd 9 maart 2027 om 09:12 (CET)', 'Gemaakt 2 maart 2027',
-  ]);
+// Sinds 25-10-2026 heeft de Nederlandse home geen voorbeelddashboard meer
+// (een vraag, een antwoord, een knop). js/home-demo.js vindt dan geen
+// [data-wp-demo] en doet niets; de Engelse home draagt de rijen nog.
+test('NL: de home heeft geen voorbeeldrijen meer, en dus geen datums die verouderen', async () => {
+  assert.deepEqual(await rows('/', null, { js: false }), []);
 });
 
 test('EN: hetzelfde, in de Engelse notatie', async () => {
@@ -61,7 +55,7 @@ test('EN: hetzelfde, in de Engelse notatie', async () => {
 });
 
 test('zonder script blijft de datum uit de markup staan', async () => {
-  const r = await rows('/', null, { js: false });
+  const r = await rows('/en', null, { js: false });
   assert.equal(r.length, 3);
-  for (const t of r) assert.match(t, /^(Gemaakt|Verstuurd) \d{1,2} [a-z]+ \d{4}/);
+  for (const t of r) assert.match(t, /^(Created|Sent) \d{1,2} [A-Z][a-z]+ \d{4}/);
 });

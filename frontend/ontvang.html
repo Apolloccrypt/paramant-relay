@@ -18,9 +18,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="live">
-<meta name="description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download.">
+<meta name="description" content="Er staat een beveiligd bestand voor jou klaar. Het wordt in je browser geopend en verdwijnt na één download.">
 <meta property="og:title" content="Er staat een beveiligd bestand klaar · Paramant">
-<meta property="og:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
+<meta property="og:description" content="Er staat een beveiligd bestand voor jou klaar. Het wordt in je browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
 <meta property="og:url" content="https://paramant.app/ontvang">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -28,7 +28,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Er staat een beveiligd bestand klaar · Paramant">
-<meta name="twitter:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
+<meta name="twitter:description" content="Er staat een beveiligd bestand voor jou klaar. Het wordt in je browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/ontvang">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/ontvang">
@@ -175,19 +175,19 @@ h1{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
      not an error. -->
 <div class="step" id="step-empty">
   <h1>Er staat nog niets klaar</h1>
-  <p class="sub">Deze pagina opent vanzelf via de link die u kreeg.</p>
+  <p class="sub">Deze pagina opent vanzelf via de link die je kreeg.</p>
   <a href="/parasend" class="btn">Zelf iets versturen</a>
 </div>
 
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
   <h1>Veilig ontvangen</h1>
-  <p class="sub">Uw browser maakt nu uw eigen sleutels. De geheime sleutel verlaat uw apparaat nooit. Daarna leest u de controlecode voor aan de afzender. Zo weet u allebei dat de verbinding klopt.</p>
+  <p class="sub">Je browser maakt nu je eigen sleutels. De geheime sleutel verlaat je apparaat nooit. Daarna lees je de controlecode voor aan de afzender. Zo weten jullie allebei dat de verbinding klopt.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Sleutels worden gemaakt...</div></div>
     <div class="card-body">
-      <div class="status-line" id="keygen-status">Uw browser maakt de sleutels (ML-KEM-768 en ECDH P-256)...</div>
+      <div class="status-line" id="keygen-status">Je browser maakt de sleutels (ML-KEM-768 en ECDH P-256)...</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="keygen-progress" style="width:30%"></div></div>
     </div>
   </div>
@@ -195,7 +195,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 
 <!-- STEP 2: Show fingerprint, wait for sender -->
 <div class="step" id="step-fingerprint">
-  <h1>Uw controlecode</h1>
+  <h1>Je controlecode</h1>
   <p class="sub">Lees deze code voor aan de afzender. Die controleert of het dezelfde code is als op zijn scherm. Pas daarna wordt het bestand verzegeld. Zo kan niemand ertussen komen.</p>
 
   <div class="card">
@@ -203,7 +203,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
     <div class="card-body">
       <p class="fingerprint-label">Lees dit voor aan de afzender:</p>
       <div class="fingerprint" id="fp-display">-</div>
-      <div class="status-line" id="fp-status">Verbonden. De afzender controleert uw controlecode.</div>
+      <div class="status-line" id="fp-status">Verbonden. De afzender controleert je controlecode.</div>
     </div>
   </div>
 </div>
@@ -211,7 +211,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <!-- STEP 3: Receiving & decrypting -->
 <div class="step" id="step-receiving">
   <h1>Bestand komt binnen...</h1>
-  <p class="sub">Het bestand wordt gedownload en met uw eigen sleutel geopend. Paramant heeft die sleutel nooit gehad.</p>
+  <p class="sub">Het bestand wordt gedownload en met je eigen sleutel geopend. Paramant heeft die sleutel nooit gehad.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Ontsleutelen</div></div>
@@ -229,8 +229,8 @@ h1{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <div class="step" id="step-done">
   <div class="done-state">
     <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
-    <h1 class="done-title">U hebt het bestand.</h1>
-    <p class="done-line" id="done-status">Het staat op uw apparaat. Onze kopie is voorgoed vernietigd.</p>
+    <h1 class="done-title">Je hebt het bestand.</h1>
+    <p class="done-line" id="done-status">Het staat op je apparaat. Onze kopie is voorgoed vernietigd.</p>
 
     <div class="done-payload"></div>
 
@@ -242,9 +242,9 @@ h1{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
     <details class="done-details">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
-        <p>Uw browser maakte bij het openen van deze pagina een eigen sleutelpaar. De geheime helft bleef op dit apparaat en staat er nog steeds. De afzender verzegelde het bestand met de openbare helft voordat het zijn apparaat verliet. Wat onderweg was, kon dus alleen u openen (<code>ML-KEM-768</code> met <code>ECDH P-256</code> voor de sleuteluitwisseling, <code>AES-256-GCM</code> voor het bestand).</p>
-        <p>De controlecode die u samen voorlas, is ook aan deze kant berekend uit uw eigen sleutels. Staat op beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld.</p>
-        <p>Een verzending via deze webapp wordt één keer gelezen. Elk deel is bij ons gewist zodra uw browser het ophaalde. Haalt niemand het op, dan wordt onze kopie vernietigd als de termijn voorbij is. Wat onze server onderweg meldde, staat hieronder.</p>
+        <p>Je browser maakte bij het openen van deze pagina een eigen sleutelpaar. De geheime helft bleef op dit apparaat en staat er nog steeds. De afzender verzegelde het bestand met de openbare helft voordat het zijn apparaat verliet. Wat onderweg was, kon dus alleen jij openen (<code>ML-KEM-768</code> met <code>ECDH P-256</code> voor de sleuteluitwisseling, <code>AES-256-GCM</code> voor het bestand).</p>
+        <p>De controlecode die je samen voorlas, is ook aan deze kant berekend uit je eigen sleutels. Staat op beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld.</p>
+        <p>Een verzending via deze webapp wordt één keer gelezen. Elk deel is bij ons gewist zodra je browser het ophaalde. Haalt niemand het op, dan wordt onze kopie vernietigd als de termijn voorbij is. Wat onze server onderweg meldde, staat hieronder.</p>
         <pre id="burn-receipt" hidden></pre>
       </div>
     </details>
@@ -301,7 +301,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
-<script src="/js/ontvang.page.js?v=11" defer></script>
+<script src="/js/ontvang.page.js?v=12" defer></script>
 <script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 </body>

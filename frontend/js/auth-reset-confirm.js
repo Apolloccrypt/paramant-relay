@@ -41,13 +41,13 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         document.getElementById('initial-view').style.display = 'none';
         document.getElementById('expired-view').style.display = '';
       } else {
-        errorDiv.textContent = nlEn('De reset lukte niet, dus uw huidige authenticator-app werkt nog. ', 'The reset did not go through, so your current authenticator still works. ') + (data.error ? nlEn('De server meldde: ', 'The relay reported: ') + data.error + '.' : nlEn('Probeer het zo opnieuw.', 'Try again in a moment.'));
+        errorDiv.textContent = nlEn('Het opnieuw instellen lukte niet. Je huidige authenticator-app werkt dus nog. ', 'The reset did not go through, so your current authenticator still works. ') + (data.error ? nlEn('De server meldde: ', 'The relay reported: ') + data.error + '.' : nlEn('Probeer het zo opnieuw.', 'Try again in a moment.'));
         errorDiv.classList.add('visible');
         confirmBtn.disabled = false;
         confirmBtn.textContent = nlEn('Ja, stel mijn authenticator-app opnieuw in', 'Yes, reset my authenticator');
       }
     } catch (err) {
-      errorDiv.textContent = nlEn('Paramant is niet bereikbaar. Controleer uw verbinding en probeer het opnieuw.', 'We could not reach Paramant. Check your connection and try again.');
+      errorDiv.textContent = nlEn('Paramant is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.', 'We could not reach Paramant. Check your connection and try again.');
       errorDiv.classList.add('visible');
       confirmBtn.disabled = false;
       confirmBtn.textContent = nlEn('Ja, stel mijn authenticator-app opnieuw in', 'Yes, reset my authenticator');

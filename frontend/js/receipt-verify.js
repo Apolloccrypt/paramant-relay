@@ -10,7 +10,7 @@
 // The checks mirror relay.js POST /v2/verify-receipt and relay/lib/ct-hash.js
 // byte for byte. Keep them in sync.
 import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
-import { anchorForReceipt, anchorByFingerprint, hostOfRelayId, PUBKEY_URL } from '/js/relay-trust-anchors.js?v=2';
+import { anchorForReceipt, anchorByFingerprint, hostOfRelayId, PUBKEY_URL } from '/js/relay-trust-anchors.js?v=3';
 
 const LEAF_TRANSFER = 0x02; // domain separator for blob/transfer leaves
 const NODE = 0x01;          // domain separator for inner Merkle nodes
@@ -216,13 +216,13 @@ const T = {
     nothing: 'Er is hier nog niets om te controleren.',
     damagedJson: 'Dit lijkt op JSON, maar het is beschadigd en daardoor niet te lezen.',
     notReceipt: 'Dit is geen ontvangstbewijs. Plak de tekst van het ontvangstbewijs, of sleep het bestand hierheen.',
-    notTransfer: 'Dit bestand is geen ontvangstbewijs van ParaSend. Een ontvangstbewijs noemt het bestand waar het over gaat en bevat de plek in het transparantielogboek.',
+    notTransfer: 'Dit bestand is geen ontvangstbewijs van ParaSend. Een ontvangstbewijs noemt het bestand waar het over gaat en bevat de plek in het openbare logboek.',
     leafOk: 'Het ontvangstbewijs gaat over dit bestand en geen ander.',
     leafBad: 'Het ontvangstbewijs past niet bij het bestand dat het noemt.',
-    leafBadWhy: 'De regel in het transparantielogboek waar het naar verwijst hoort bij een ander bestand, of de vingerafdruk in het ontvangstbewijs is achteraf veranderd.',
+    leafBadWhy: 'De regel in het openbare logboek waar het naar verwijst hoort bij een ander bestand, of de vingerafdruk in het ontvangstbewijs is achteraf veranderd.',
     leafUnreadable: 'De vingerafdruk van het bestand erin was niet te lezen ({err}).',
-    treeOk: 'Het bewijs van opname klopt: de relay heeft toen ondertekend dat deze regel in zijn transparantielogboek stond. Of hij die regel nu nog openbaar laat zien, controleert deze pagina niet; dat kan in het logboek zelf (/ct-log).',
-    treeBad: 'Het staat niet in het transparantielogboek waar het volgens zichzelf in staat.',
+    treeOk: 'Het bewijs van opname klopt: de server heeft destijds ondertekend dat deze regel in zijn openbare logboek stond. Of hij die regel nu nog openbaar laat zien, controleert deze pagina niet; dat kan in het logboek zelf (/ct-log).',
+    treeBad: 'Het staat niet in het openbare logboek waar het volgens zichzelf in staat.',
     treeBadWhy: 'Het logboek opnieuw berekenen vanuit de regel geeft een andere uitkomst, dus het bewijs van opname klopt niet.',
     treeErr: 'Het bewijs van opname kon niet opnieuw worden berekend ({err}).',
     sigUnknownRelay: 'De handtekening is niet gecontroleerd, omdat deze pagina deze server niet kent.',
@@ -246,12 +246,12 @@ const T = {
     keyNoRelay: 'Het zegt niet welke server het uitgaf. De ondertekenaar is hier dus niet vast te stellen.',
     keyNone: 'Er is geen ondertekenaar vast te stellen, omdat er geen sleutel was om mee te vergelijken.',
     againstNamed: 'de sleutel van {name} <code class="mono">{fp}</code>',
-    againstGiven: 'de sleutel die u gaf, vingerafdruk <code class="mono">{fp}</code>',
+    againstGiven: 'de sleutel die je gaf, vingerafdruk <code class="mono">{fp}</code>',
     keyMismatch: 'Het past niet bij {against}, dus deze pagina kan niet zeggen wie het ondertekende.',
     keyNamed: 'Het is ondertekend door {name}, sleutel <code class="mono">{fp}</code>.',
-    keyStranger: 'Het is ondertekend met een sleutel die deze pagina niet kent, vingerafdruk <code class="mono">{fp}</code>. Vergelijk die met de sleutel die Paramant publiceert voordat u erop vertrouwt.',
+    keyStranger: 'Het is ondertekend met een sleutel die deze pagina niet kent, vingerafdruk <code class="mono">{fp}</code>. Vergelijk die met de sleutel die Paramant publiceert voordat je erop vertrouwt.',
     bannerGenuine: '<div class="ps-banner ok"><strong>Dit ontvangstbewijs is echt.</strong> Het is uitgegeven door {name} en er is sindsdien geen enkel teken veranderd.</div>',
-    bannerUnchanged: '<div class="ps-banner ok"><strong>Dit ontvangstbewijs is ongewijzigd.</strong> Alles past nog bij de sleutel die u gaf, en die sleutel kent deze pagina niet.</div>',
+    bannerUnchanged: '<div class="ps-banner ok"><strong>Dit ontvangstbewijs is ongewijzigd.</strong> Alles past nog bij de sleutel die je gaf, en die sleutel kent deze pagina niet.</div>',
     bannerUnknownRelay: '<div class="ps-banner info"><strong>Deze pagina kent deze server niet.</strong> Alles wat te controleren was klopt, maar volgens het ontvangstbewijs komt het van {host}, en deze pagina heeft daar geen sleutel van. Plak de publieke sleutel van die server om de controle af te maken.</div>',
     bannerHolds: '<div class="ps-banner info"><strong>Het ontvangstbewijs klopt in zichzelf.</strong> De handtekening is niet gecontroleerd, omdat er geen sleutel van een server was.</div>',
     bannerBad: '<div class="ps-banner err"><strong>Vertrouw dit ontvangstbewijs niet.</strong> Minstens één van de controles hieronder is mislukt.</div>',
@@ -261,7 +261,7 @@ const T = {
     factFp: 'Het bestand waar het over gaat heeft vingerafdruk <code class="mono">{fp}</code>.',
     factBurned: 'De server vernietigde zijn kopie van het bestand bij de overdracht.',
     factKept: 'De server hield zijn kopie na deze download, omdat de verzending meer dan een download toestond.',
-    factEntry: 'Volgens het bewijs is het regel {n} in het logboek van de relay, dat op dat moment {size} regels telde.',
+    factEntry: 'Volgens het bewijs is het regel {n} in het logboek van de server, dat op dat moment {size} regels telde.',
     says: 'Wat dit ontvangstbewijs zegt',
     claims: 'Wat dit ontvangstbewijs beweert',
     checkedHead: '<h3 class="rv-sub">Wat er is gecontroleerd</h3><ul class="rv-checks">',

@@ -107,7 +107,7 @@ async function refusedText(slug) {
 
 test('/pricing explains a refused second plan in Dutch and does not invite a retry', async () => {
   const text = await refusedText('/pricing');
-  assert.match(text, /^U heeft al ParaSign Business tot 5 november 2026\./, text);
+  assert.match(text, /^Je hebt al ParaSign Business tot 5 november 2026\./, text);
   assert.match(text, /twee keer/, text);
   assert.match(text, /privacy@paramant\.app/, text);
   assert.doesNotMatch(text, /lukte niet|Probeer het opnieuw/i, text);
@@ -138,7 +138,7 @@ async function redeemSays(slug, body, status) {
   await page.click('[data-redeem-form] [data-redeem-submit]');
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-redeem-form] [data-redeem-message]');
-    return el && !el.hidden && el.textContent && !/Checking your code|We controleren uw code/.test(el.textContent);
+    return el && !el.hidden && el.textContent && !/Checking your code|We controleren je code/.test(el.textContent);
   }, null, { timeout: 10000 });
   const text = (await page.textContent('[data-redeem-form] [data-redeem-message]')).trim();
   await page.close();
@@ -200,7 +200,7 @@ async function usage(signs, cap) {
 
 test('/developer warns at 80% of the signing quota and names the way up', async () => {
   const high = await usage(85, 100);
-  assert.match(high.note, /Nog 15 handtekeningen over deze maand\. Bijna op\. Meer nodig\? Bekijk een groter plan/, high.note);
+  assert.match(high.note, /Nog 15 handtekeningen over deze maand\. Je tegoed is bijna op\. Heb je meer nodig\? Bekijk een groter plan/, high.note);
   assert.equal(high.href, '/pricing');
   const low = await usage(10, 100);
   assert.equal(low.href, null, 'no warning below 80%');
@@ -231,10 +231,10 @@ async function dashUsage(slug, quota) {
 test('/dashboard warns every account at 80% of a monthly quota and names the way up', async () => {
   const high = await dashUsage('/dashboard', { signs: 85, transfers: 0, caps: { signs: 100, transfers: 50 } });
   assert.equal(high.shown, true, 'band visible at 85%');
-  assert.match(high.text, /U heeft 85 van uw 100 handtekeningen deze maand gebruikt, nog 15 over\. Bijna op\. Meer nodig\?/, high.text);
+  assert.match(high.text, /Je hebt 85 van je 100 handtekeningen deze maand gebruikt, nog 15 over\. Het is bijna op\. Heb je meer nodig\?/, high.text);
   assert.equal(high.href, '/pricing');
   const full = await dashUsage('/dashboard', { signs: 0, transfers: 50, caps: { signs: 100, transfers: 50 } });
-  assert.match(full.text, /Uw tegoed van 50 verzendingen is op voor deze maand/, full.text);
+  assert.match(full.text, /Je tegoed van 50 verzendingen is op voor deze maand/, full.text);
   const en = await dashUsage('/en/dashboard', { signs: 9, transfers: 0, caps: { signs: 10, transfers: 50 } });
   assert.match(en.text, /You have used 9 of your 10 signatures this month, 1 left\. Almost used up/, en.text);
   assert.equal(en.href, '/en/pricing');

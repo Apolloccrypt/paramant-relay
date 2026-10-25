@@ -15,7 +15,7 @@ assert.match(account, /werkt de API-sleutel niet meer/i);
 // What deactivation erases, said the same way on the screen and in the mail
 // (acceptatie 3.1.1, taal #8): the screen said "the account record is kept"
 // while the mail said "your personal data has been erased".
-assert.match(account, /Uw sessies, de koppeling met uw authenticator-app en open ondertekenverzoeken verdwijnen/i);
+assert.match(account, /Je sessies, de koppeling met je authenticator-app en open ondertekenverzoeken verdwijnen/i);
 assert.match(account, /persoonsgegevens wissen we/i);
 assert.doesNotMatch(account, /accountrecord blijft bewaard/i);
 assert.doesNotMatch(account, /Stub mode|No real payments are charged|Mollie integration pending/i);
@@ -129,11 +129,11 @@ assert.doesNotMatch(signJs, /showProofScope\([^)]*signingMode/,
 // Said once, in the bar above the steps; the block under it says what works
 // without an account instead of repeating the requirement (acceptatie 3.1.1
 // ronde 2, taal #18).
-assert.match(signHtml, /Om te tekenen of te versturen heeft u een gratis Community-account nodig\./,
+assert.match(signHtml, /Om te tekenen of te versturen heb je een gratis Community-account nodig\./,
   'sign.html must state the account requirement up front');
 assert.doesNotMatch(signHtml, /Voor ondertekenen is een account nodig/i,
   'sign.html says the requirement twice, in the bar and in the block under it');
-assert.match(signHtml, /een verzoek openen dat iemand u stuurde/i,
+assert.match(signHtml, /een verzoek openen dat iemand je stuurde/i,
   'sign.html must say what an invited signer can still do without an account');
 assert.match(signEnHtml, /To sign or send it, you need a free Community account\./,
   'en/sign.html must state the account requirement up front');
@@ -176,11 +176,11 @@ const authFirstSentence = {
   'frontend/en/auth/request-reset.html': /one of your backup codes\. If they match, we first send an email to confirm the request/i,
   'frontend/en/auth/reset-confirm.html': /You get two emails, one after the other/i,
   'frontend/en/signup/verified.html': /Paramant has no passwords/i,
-  'frontend/auth/login.html': /Geen wachtwoord nodig: log in met uw passkey/i,
+  'frontend/auth/login.html': /Geen wachtwoord nodig: log in met je passkey/i,
   'frontend/auth/setup.html': /Kies er nu één en voeg de andere later toe/i,
-  'frontend/auth/backup.html': /Elke code werkt één keer\. Uw authenticator-app heeft u er niet voor nodig/i,
-  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan krijgt u eerst een mail om het verzoek te bevestigen/i,
-  'frontend/auth/reset-confirm.html': /U krijgt twee mails na elkaar/i,
+  'frontend/auth/backup.html': /Elke code werkt één keer\. Je authenticator-app heb je er niet voor nodig/i,
+  'frontend/auth/request-reset.html': /een van je back-upcodes\. Klopt dat, dan krijg je eerst een mail om het verzoek te bevestigen/i,
+  'frontend/auth/reset-confirm.html': /Je krijgt twee mails na elkaar/i,
   'frontend/signup/verified.html': /Paramant werkt zonder wachtwoord/i,
 };
 for (const [file, rx] of Object.entries(authFirstSentence)) {
@@ -244,7 +244,7 @@ assert.doesNotMatch(resetConfirmNl, /binnen een minuut/i,
 //    follows reads as phishing unless the page says why it is split in two.
 assert.match(resetConfirm, /someone who briefly had your mailbox open/i,
   'reset-confirm must say why the reset takes two emails');
-assert.match(resetConfirmNl, /wie even in uw mailbox kon kijken/i,
+assert.match(resetConfirmNl, /(wie|iemand die) even in je mailbox kon kijken/i,
   'the Dutch reset-confirm must say why the reset takes two emails');
 
 // 4. The sign-in 429 is now per IP and ONLY per IP (5 per 900s,
@@ -263,9 +263,9 @@ assert.match(loginJs, /counts the connection, not your account/i,
   'the 429 text must name the counter that can actually cause it');
 assert.match(loginJs, /nobody can trigger it by guessing at your email address/i,
   'and must say the thing that changed, because it is what a locked-out reader is looking for');
-assert.match(loginJs, /De grens telt de verbinding, niet uw account/,
+assert.match(loginJs, /De grens geldt voor de internetverbinding, niet voor je account/,
   'the Dutch 429 text must name the same counter');
-assert.match(loginJs, /niemand kan hem veroorzaken door uw e-mailadres te raden/,
+assert.match(loginJs, /Wie alleen je e-mailadres kent, kan je op deze manier niet buitensluiten/,
   'and say the same thing that changed');
 
 // 4a. The 428 is the priced attempt, not a refusal, and the page handles it by
@@ -291,7 +291,7 @@ assert.match(loginJs, /res\.status === 503/,
   'the login page must handle the fail-closed 503 separately from a wrong code');
 assert.match(loginJs, /Nothing is wrong with your account or your code/i,
   'the 503 text must say the outage is ours, not theirs');
-assert.match(loginJs, /Er is niets mis met uw account of uw code/,
+assert.match(loginJs, /Er is niets mis met je account of je code/,
   'the Dutch 503 text must say the outage is ours, not theirs');
 
 // 4b. POST /api/user/auth/request-totp-reset sends a CONFIRMATION mail whose
@@ -927,7 +927,7 @@ assert.equal(helpAnswers.split('\n').length, 3,
 // gives the buyer a button of the same weight as the developer's Quick start.
 assert.match(docsEn, /<p class="docs-buyer">Evaluating Paramant\? Your IT can check everything here\./,
   'en/docs.html must open with the visible line that tells a buyer what this page is for');
-assert.match(docsHtml, /<p class="docs-buyer">Overweegt u Paramant\? Uw IT kan hier alles controleren\./,
+assert.match(docsHtml, /<p class="docs-buyer">Overweeg je Paramant\? Je IT-afdeling kan hier alles controleren\./,
   'docs.html must open with the visible line that tells a buyer what this page is for');
 assert.match(docsEn, /<p class="lede">[^<]*The ParaSign API is available from Firm/,
   'en/docs.html must state in the visible lede which plan the ParaSign API needs');
@@ -940,7 +940,7 @@ for (const page of [docsEn, docsHtml]) {
   assert.match(docsActions, page === docsEn ? /<a href="\/en\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/ : /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
     'the buyer gets a real button to /pricing beside it, not only a text link');
 }
-assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API-toegang zit in het abonnement vanaf Firm/,
+assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API-toegang hoort bij de abonnementen vanaf Firm/,
   'developer.html must state in its visible lede which plan the ParaSign API needs');
 // /developer is noindex and only reachable once signed in, so it addresses the
 // developer reading it, never the buyer who sent them.
@@ -1033,7 +1033,7 @@ assert.match(securityHtml, /sends to named recipients and the extensions, the re
 const KEYS_SENTENCE = /The relay never sees plaintext and never holds a private key,[^.]*hosted signing ceremony[^.]*\/v1/;
 assert.match(docsEn, KEYS_SENTENCE,
   'en/docs.html is the source of the sentence /help quotes about plaintext and keys');
-assert.match(docsHtml, /De relay ziet nooit leesbare inhoud en heeft nooit een privésleutel, met één uitzondering: de gehoste ondertekenronde op de <code>\/v1<\/code>-API/,
+assert.match(docsHtml, /De server ziet dan nooit leesbare inhoud en heeft nooit een privésleutel\. De uitzondering is de gehoste ondertekenronde op de <code>\/v1<\/code>-API/,
   'docs.html must carry the same sentence in Dutch, exception included');
 assert.match(helpAnswers, KEYS_SENTENCE,
   'help/index.html must say where the keys are not, in the words docs.html uses, exception included');
@@ -1052,9 +1052,9 @@ for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/))
 const helpNlAnswers = [...helpNlHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
 assert.equal(helpNlAnswers.split('\n').length, 3,
   'help/index.html must keep the three buyer answers in the Dutch block too');
-assert.match(helpNlAnswers, /Om te ondertekenen heeft u een account nodig\./,
+assert.match(helpNlAnswers, /Om te ondertekenen heb je een account nodig\./,
   'help/index.html must answer whether an account is required');
-assert.match(helpNlAnswers, /Kreeg u een verzoek om te ondertekenen\? Dat opent u ook zonder account\./,
+assert.match(helpNlAnswers, /Kreeg je een verzoek om te ondertekenen\? Dat open je ook zonder account\./,
   'help/index.html must say what an invited signer can do without an account');
 assert.match(helpNlAnswers, /ParaSign Community is gratis, voor altijd, zonder betaalkaart: 2 handtekeningen per maand\./,
   'help/index.html must name the free allowance, not just promise that free exists');
@@ -1062,12 +1062,12 @@ assert.match(helpNlAnswers, /Firm: &euro;29 per maand excl\. btw \(&euro;35,09 i
   'help/index.html must name the first paid price the way /pricing prints it');
 assert.match(helpNlAnswers, /Elk plan heeft dezelfde versleuteling, dezelfde post-quantum handtekeningen en hetzelfde openbare bewijslog\./,
   'help/index.html must carry the same-crypto fact');
-assert.match(helpNlAnswers, /Uw documenten staan versleuteld op servers van Hetzner in Neurenberg, Duitsland\./,
+assert.match(helpNlAnswers, /Je documenten staan versleuteld op servers van Hetzner in Neurenberg, Duitsland\./,
   'help/index.html must answer where the documents live, and say they are ciphertext there');
-assert.match(helpNlAnswers, /bewaart nooit een privésleutel, behalve bij het gehoste ondertekenen op <code>\/v1<\/code>/,
+assert.match(helpNlAnswers, /bewaren nooit een privésleutel\. De enige uitzondering is ondertekenen via onze gehoste dienst \(de API op <code>\/v1<\/code>\)/,
   'help/index.html must say where the keys are not, exception included');
 // Fase 2 (SITE-34): "nooit ... een sleutel" was onwaar voor versturen op naam.
-assert.match(helpNlAnswers, /E-mail gaat nog via Resend in de VS: nooit het document, wel de links en codes die een bestand openen, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
+assert.match(helpNlAnswers, /Onze e-mail gaat nu nog via Resend in de VS\. Het document zelf gaat nooit per mail, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
   'help/index.html must name the mail exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpNlHtml.slice(helpNlHtml.indexOf('</head>')), /Betaal voor volume|Pay for volume, never for security/i,
   'help/index.html must not carry the sales line anywhere in the body; it is a support page');
@@ -1155,15 +1155,15 @@ for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn],
 }
 // /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
 // begrenzing tot de weg van de data, in de taal van de pagina.
-assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). De versleutelde bestanden staan alleen op onze servers in de EU.'),
+assert.ok(parasend.includes('Onze servers staan bij Hetzner in Duitsland.') && parasend.includes('staat bij Bunny in Slovenië. De versleutelde bestanden staan alleen op onze servers in de EU.'),
   'parasend.html lost the data-path wording of the EU claim');
-assert.ok(parasend.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasend.includes('bevat die mail de link met het token'),
+assert.ok(parasend.includes('Onze e-mail gaat nu nog via Resend, een bedrijf in de Verenigde Staten.') && parasend.includes('Bij versturen op naam geeft de afzender een code zelf door. Zonder die code kan niemand het bestand openen, ook wij niet.'),
   'parasend.html states the EU claim without naming the Resend exception');
 // /parasign is Dutch since 23 September 2026. The same two halves, in the
 // wording the Dutch homepage uses for proof 1.
 assert.ok(parasign.includes('De versleutelde documenten staan alleen op onze servers in de EU.'),
   'parasign.html lost the data-path wording of the EU claim');
-assert.ok(parasign.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasign.includes('wel de helft van de documentsleutel'),
+assert.ok(parasign.includes('Onze e-mail gaat nu nog via Resend, een bedrijf in de Verenigde Staten.') && parasign.includes('Er staat maar de helft van de sleutel in.'),
   'parasign.html states the EU claim without naming the mail exception');
 // And it may not be offered against a source that does not carry it. The
 // Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
@@ -1289,7 +1289,8 @@ for (const claim of [
 // /parasign carries the same three in Dutch, in the wording /about and
 // /security use on the Dutch side.
 for (const claim of [
-  'ML-DSA-65 (FIPS 204), in uw browser gemaakt. De private sleutel komt nooit bij de relay.',
+  'Je handtekening wordt in je browser gemaakt met ML-DSA-65 (FIPS 204).',
+  'De private sleutel komt nooit op onze server.',
   'Elke handtekening komt in een openbaar logboek waar alleen iets bij kan, niets uit.',
   'Een getekend document is te controleren zonder contact met ons.',
 ]) {
@@ -1302,9 +1303,9 @@ const SPLIT = 'Every plan gets the same encryption, the same post-quantum signat
 for (const [name, text] of [['pricing', pricingText], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(SPLIT), `${name}.html lost the pay-for-volume sentence`);
 }
-assert.ok(parasend.includes('Elk plan krijgt dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare logboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.'),
+assert.ok(parasend.includes('Elk plan krijgt dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare logboek. Je betaalt voor volume, nooit voor veiligheid. En je betaalt per organisatie, niet per gebruiker.'),
   'parasend.html lost the pay-for-volume sentence');
-assert.ok(parasign.includes('Elk plan krijgt dezelfde versleuteling, dezelfde post-quantum handtekeningen en hetzelfde openbare bewijslogboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.'),
+assert.ok(parasign.includes('Elk plan krijgt dezelfde versleuteling, dezelfde post-quantum handtekeningen en hetzelfde openbare bewijslogboek. Je betaalt voor volume, nooit voor veiligheid. En je betaalt per organisatie, niet per gebruiker.'),
   'parasign.html lost the pay-for-volume sentence');
 // The other half of the split: the free plan is permanent, it is called
 // Community, and the reason it stays free is named in the same sentence.
@@ -1318,7 +1319,7 @@ assert.ok(parasign.includes('niet om functies vrij te spelen, en dat houdt het C
   'parasign.html lost the Community-plan promise');
 // /sign carries the same split in one line, next to the account requirement,
 // and it names the plan the way /pricing names it.
-assert.match(signVisibleText, /Met een Community-account zet u 2 handtekeningen per maand/,
+assert.match(signVisibleText, /Met een Community-account zet je 2 handtekeningen per maand/,
   'sign.html must keep the free-tier line, under the plan name /pricing uses');
 assert.match(visible('frontend/en/sign.html'), /A Community account gives you 2 signatures a month/,
   'en/sign.html must keep the free-tier line, under the plan name /pricing uses');
@@ -1363,7 +1364,7 @@ const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-
 assert.ok(aboutVisible.includes('a signature made with Paramant is a Simple Electronic Signature (SES). It is not a qualified signature (QES) under eIDAS.'),
   'about.html lost the SES scope note');
 // /parasign says it in Dutch, with the same two levels named in the same words.
-const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in uw browser. Het is geen gekwalificeerde elektronische handtekening (QES) onder eIDAS.';
+const SES_NL = 'Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, gemaakt in je browser. Het is geen gekwalificeerde elektronische handtekening (QES) onder eIDAS.';
 assert.ok(parasign.includes(SES_NL), 'parasign.html must carry the SES scope note, not a softer version');
 assert.ok(parasignEn.includes(SES), 'en/parasign.html must carry the SES scope note, not a softer version');
 // Where it sits is part of the claim. The note has to land in the hero section,
@@ -1748,7 +1749,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
       auditors: /twee door R\. Zwarts, één door Ryan Williams van Smart Cyber Solutions/,
       findings: /Samen leverden ze 40 bevindingen op, waarvan 4 kritiek\./,
       audience: /Voor organisaties die Paramant op hun eigen server draaien/,
-      howToRead: '<h3>Zo leest u deze pagina</h3>',
+      howToRead: '<h3>Zo lees je deze pagina</h3>',
       jargon: /the operator who runs the relay|(?:beheerder|operator) die de relay draait/,
       plans: ['Ondertekenen Community', 'Versturen Community', 'Firm, Ondertekenen Business en Enterprise'],
       twoOfThree: /Businesses pay for Pro or Enterprise|Bedrijven betalen voor Pro of Enterprise/ },
@@ -2448,7 +2449,7 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
     '/en/account must say the choice never leaves the browser');
   assert.match(accountEn, /applies to every page/,
     '/en/account promises the choice holds on every page; tests/app-theme.test.mjs measures that');
-  assert.match(account, /Zonder keuze volgt de site uw systeem/,
+  assert.match(account, /Kies je niets, dan volgt de site de instelling van je apparaat/,
     '/account must say that no choice follows the system, because theme.js makes it so');
   assert.match(account, /alleen in deze\s+browser bewaard/,
     '/account must say the choice never leaves the browser');
@@ -2490,7 +2491,7 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
   // Acceptatie 3.1.1 (taal 36): a condition, not a claim. "The other person is
   // available right now" read as a statement the page made about him.
   const LIVE_EN = /<strong>Extra safe<\/strong>: choose this when the other person is at a screen right now too\. You compare a short code together, and nothing is stored\./;
-  const LIVE_NL = /<strong>Extra veilig<\/strong>: kies dit als de ontvanger nu ook achter een scherm zit\. U vergelijkt samen een korte code, en er wordt niets bewaard\./;
+  const LIVE_NL = /<strong>Extra veilig<\/strong>: kies dit als de ontvanger nu ook achter een scherm zit\. Je vergelijkt samen een korte code, en er wordt niets bewaard\./;
   for (const [naam, html, zin, box] of [['/en/parashare', parashareEn, LIVE_EN, 'Extra safe'], ['/parashare', parashare, LIVE_NL, 'Extra veilig']]) {
     assert.match(html, zin, `${naam} must say, on the Extra safe box, that the other person has to be there now and that you check a code together`);
     assert.match(html, /<input type="checkbox" id="ps-extra-safe"(?![^>]*checked)[^>]*>/,

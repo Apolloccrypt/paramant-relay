@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="description" content="Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo kan je IT-afdeling nagaan hoe het werkt.">
 <meta property="og:title" content="API-documentatie en zelf hosten · Paramant">
-<meta property="og:description" content="Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta property="og:description" content="Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo kan je IT-afdeling nagaan hoe het werkt.">
 <meta property="og:url" content="https://paramant.app/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="API-documentatie en zelf hosten · Paramant">
-<meta name="twitter:description" content="Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta name="twitter:description" content="Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo kan je IT-afdeling nagaan hoe het werkt.">
 <link rel="canonical" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
+      "description": "Documentatie van Paramant v3.1.6: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo kan je IT-afdeling nagaan hoe het werkt."
     },
     {
       "@type": "Organization",
@@ -258,8 +258,8 @@ tr:last-child td{border-bottom:none}
   <div class="docs-hero-inner">
     <span class="eyebrow">NASLAG</span>
     <h1>Documentatie</h1>
-    <p class="docs-buyer">Overweegt u Paramant? Uw IT kan hier alles controleren. Abonnementen en prijzen staan op <a href="/pricing">Prijzen</a>.</p>
-    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.1.6. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
+    <p class="docs-buyer">Overweeg je Paramant? Je IT-afdeling kan hier alles controleren. Abonnementen en prijzen staan op <a href="/pricing">Prijzen</a>.</p>
+    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.1.6. De server geeft je versleutelde bestanden door. In de broncode en in Docker heet hij de relay. Je hoeft die server niet te vertrouwen, want hij heeft nooit een sleutel om ze te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Snel starten</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">Bekijk abonnementen en prijzen</a>
@@ -307,7 +307,7 @@ tr:last-child td{border-bottom:none}
     <a href="#did">W3C DID</a>
     <a href="#teams">Teambeheer</a>
     <a href="#retention">Bewaartermijnen</a>
-    <a href="#sectors">Relay-sectoren</a>
+    <a href="#sectors">Sectorservers</a>
     <h3>Beveiliging</h3>
     <a href="#threat-model">Dreigingsmodel</a>
     <a href="#audits">Beveiligingsaudits</a>
@@ -326,21 +326,21 @@ tr:last-child td{border-bottom:none}
     <h2 id="whats-new">Nieuw in 3.0.0</h2>
     <p>Versie 3.0.0 houdt het wire format, de API en de cryptografische garanties van 2.5.x gelijk, dus elke 2.5.x-client blijft werken. Deze versie richt zich op beheer en zelf hosten. De belangrijkste wijziging zit in de opbouw: de post-quantum bouwstenen staan nu in een eigen, auditbare bibliotheek.</p>
     <ul>
-      <li><strong>Cryptografie apart in paramant-core (M5b).</strong> Het ondertekenen met ML-DSA-65 aan de serverkant gebeurt nu via <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: een losse Rust-bibliotheek, klaar voor audit (BUSL-1.1), die de relay gebruikt via de NAPI-binding <code>@paramant/core</code>. ML-KEM-768 draait nog steeds aan de clientkant, in de browser of de SDK; de relay heeft nooit een sleutel. Zie <a href="#crypto">Cryptografie</a>.</li>
-      <li><strong>Werkplek voor documenten.</strong> Vanuit het dashboard start u documentstromen, ziet u de ondertekenverzoeken van uw account en voert u acties als eigenaar uit, zonder dat er een nieuw vertrouwenspunt bijkomt.</li>
-      <li><strong>Vernieuwde interface.</strong> Donkere modus (schakelaar rechtsboven), statusupdates in real time en een indeling die ook op mobiel werkt, in het hele dashboard.</li>
-      <li><strong>Installatiewizard bij de eerste start.</strong> Een webwizard op <code>/setup</code> vervangt de handmatige beheerscripts voor nieuwe beheerders: admin-token, TOTP-registratie en de eerste sleutel, allemaal vanuit de browser (ADR R005).</li>
-      <li><strong>Configuratie in het beheerpaneel.</strong> <code>/admin/settings</code> toont de relayconfiguratie in het paneel, zodat u voor gewone wijzigingen niet meer <code>.env</code> hoeft te bewerken en opnieuw te starten.</li>
-      <li><strong>Beheer-CLI in de browser.</strong> <code>/admin/cli</code> is een webterminal voor foutopsporing door beheerders: u bekijkt de toestand van de relay zonder SSH-sessie.</li>
-      <li><strong>Onderhandeling over de cryptomodus (ADR R006, aangenomen).</strong> <code>/v2/capabilities</code> meldt standaard een compacte <em>core</em>-modus (2 algoritmen); uitgebreide sets zet u zelf aan. Zie <a href="#crypto">Cryptografie</a>.</li>
-      <li><strong>Architectuur voor add-ons (ADR R007, concept).</strong> Een specificatie voor integraties die in een eigen container draaien, zoals opslagspiegels, SIEM-exporters en SSO. Ze werken alleen met versleutelde gegevens en metadata, nooit met leesbare inhoud of sleutels.</li>
-      <li><strong>Statische frontend (ADR R011).</strong> Met de optionele statische handler <code>SERVE_FRONTEND</code> serveert één relay zijn eigen interface, zodat zelf hosten direct werkt. Zie <a href="#selfhost-docker">Zelf hosten</a>.</li>
+      <li><strong>Cryptografie apart in paramant-core.</strong> Het ondertekenen met ML-DSA-65 aan de serverkant gebeurt nu via <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: een losse Rust-bibliotheek, klaar voor audit (BUSL-1.1), die de server gebruikt via de NAPI-binding <code>@paramant/core</code>. ML-KEM-768 draait nog steeds aan de clientkant, in de browser of de SDK. De server krijgt die sleutels nooit. Zie <a href="#crypto">Cryptografie</a>.</li>
+      <li><strong>Werkplek voor documenten.</strong> Vanuit het dashboard start je documentstromen, zie je de ondertekenverzoeken van je account en voer je acties als eigenaar uit. Daarvoor hoef je geen extra partij te vertrouwen.</li>
+      <li><strong>Vernieuwde interface.</strong> Het hele dashboard heeft een donkere modus (schakelaar rechtsboven), toont de status direct en werkt ook op mobiel.</li>
+      <li><strong>Installatiewizard bij de eerste start.</strong> Een wizard op <code>/setup</code> vervangt voor nieuwe beheerders de handmatige beheerscripts. Je maakt het admin-token aan, registreert TOTP en maakt de eerste sleutel, allemaal in de browser (ADR R005).</li>
+      <li><strong>Configuratie in het beheerpaneel.</strong> <code>/admin/settings</code> toont de serverconfiguratie in het paneel, zodat je voor gewone wijzigingen niet meer <code>.env</code> hoeft te bewerken en opnieuw te starten.</li>
+      <li><strong>Beheer-CLI in de browser.</strong> <code>/admin/cli</code> is een webterminal voor foutopsporing door beheerders: je bekijkt de toestand van de server zonder SSH-sessie.</li>
+      <li><strong>Onderhandeling over de cryptomodus (ADR R006, aangenomen).</strong> <code>/v2/capabilities</code> meldt standaard een compacte <em>core</em>-modus (2 algoritmen); uitgebreide sets zet je zelf aan. Zie <a href="#crypto">Cryptografie</a>.</li>
+      <li><strong>Architectuur voor add-ons (ADR R007, concept).</strong> Een specificatie voor integraties die in een eigen container draaien, zoals opslagspiegels, SIEM-exporters en SSO. Ze krijgen alleen versleutelde gegevens en metadata te zien, nooit leesbare inhoud of sleutels.</li>
+      <li><strong>Statische frontend (ADR R011).</strong> Met de optionele statische handler <code>SERVE_FRONTEND</code> serveert één server zijn eigen interface, zodat zelf hosten direct werkt. Zie <a href="#selfhost-docker">Zelf hosten</a>.</li>
       <li><strong>Vastgelegde ontwerpkeuzes.</strong> De Architecture Decision Records R001 tot en met R011 leggen de keuzes achter 3.0.0 vast, van de hotfix-werkwijze tot de afsplitsing van de cryptografie. Ze staan in de repository onder <code>docs/adrs/</code>.</li>
     </ul>
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Snel starten</h2>
-    <p>Verstuur uw eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak een gratis account aan</a> (beveiligd met TOTP; uw sleutel staat in het dashboard).</p>
+    <p>Verstuur je eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak een gratis account aan</a> (beveiligd met TOTP; je sleutel staat in het dashboard).</p>
 
     <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Installeer de SDK (Python 3.10+ of Node 18+; beide gebruiken dezelfde encoder voor wire format v1)</p></div></div>
     <div class="cb">
@@ -352,7 +352,7 @@ pip install paramant-sdk
 npm install paramant-sdk</pre>
     </div>
 
-    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Verstuur een bestand: het wordt aan uw kant versleuteld voordat het uw apparaat verlaat</p></div></div>
+    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Verstuur een bestand: het wordt aan jouw kant versleuteld voordat het je apparaat verlaat</p></div></div>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
       <pre>from paramant_sdk import GhostPipe
@@ -383,13 +383,13 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
     <!-- ── Authentication ──────────────────────────────────────── -->
     <h2 id="authentication">Authenticatie</h2>
-    <p>Er zijn twee soorten sleutels, elk met een eigen rol. U kunt ze nooit door elkaar gebruiken.</p>
+    <p>Er zijn twee soorten sleutels, elk met een eigen rol. Je kunt ze nooit door elkaar gebruiken.</p>
     <table>
       <tr><th>Sleutel</th><th>Prefix</th><th>Voor wie</th><th>Doel</th></tr>
       <tr><td>pgp_</td><td><code>pgp_</code></td><td>Eindgebruikers</td><td>Bestanden versturen en ontvangen via de API</td></tr>
-      <tr><td>plk_</td><td><code>plk_</code></td><td>Relaybeheerders</td><td>Licentiesleutel: maakt meer dan 5 gebruikers mogelijk op een zelf gehoste relay</td></tr>
+      <tr><td>plk_</td><td><code>plk_</code></td><td>Serverbeheerders</td><td>Licentiesleutel: maakt meer dan 5 gebruikers mogelijk op een zelf gehoste server</td></tr>
     </table>
-    <p>Geef de <code>pgp_</code>-sleutel mee in de header <code>X-Api-Key</code>. Een sleutel in de queryparameter <code>?k=</code> weigert de relay met 400, zodat hij niet in een toegangslog belandt:</p>
+    <p>Geef de <code>pgp_</code>-sleutel mee in de header <code>X-Api-Key</code>. Een sleutel in de queryparameter <code>?k=</code> weigert de server met 400, zodat hij niet in een toegangslog belandt:</p>
     <pre>X-Api-Key: pgp_your_key_here
 <span class="cm"># bijvoorbeeld:</span>
 GET /v2/check-key
@@ -397,7 +397,7 @@ X-Api-Key: pgp_your_key_here</pre>
 
     <!-- ── SDK ──────────────────────────────────────────────────── -->
     <h2 id="sdk">SDK</h2>
-    <p>Er zijn twee officiële SDK's. Beide hebben dezelfde encoder voor wire format v1, standaard ML-KEM-768 + ML-DSA-65, en onderhandelen over mogelijkheden via <code>/v2/capabilities</code>. Kies de SDK die bij uw omgeving past: wat ze versturen is byte voor byte gelijk.</p>
+    <p>Er zijn twee officiële SDK's. Beide hebben dezelfde encoder voor wire format v1, standaard ML-KEM-768 + ML-DSA-65, en onderhandelen over mogelijkheden via <code>/v2/capabilities</code>. Kies de SDK die bij je omgeving past. Wat ze versturen, is byte voor byte gelijk.</p>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 22px">
       <a href="https://pypi.org/project/paramant-sdk/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">PyPI · paramant-sdk</a>
@@ -431,14 +431,14 @@ hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
 <span class="cm"># Receive: burn-on-read, returns (plaintext bytes, receipt or None)</span>
 data, receipt = gp.receive(hash_)</pre>
     </div>
-    <p>Dit is <code>paramant-sdk</code> 3.0.0 van PyPI. <code>send</code> en <code>receive</code> geven elk een paar terug. Een apparaat dat iets ontvangt, registreert eerst zijn sleutels met <code>receive_setup()</code>; zonder dat weigert <code>send</code> met "No pubkeys for this device". Het ontvangstbewijs (<code>receipt</code>) is in 3.0.0 meestal <code>None</code>: de SDK leest het alleen uit de oude header <code>X-Paramant-Receipt</code>, die de relay sinds september 2026 standaard niet meer stuurt. Haal het bewijs op met <code>GET /v2/transfers/:receipt_id/receipt</code> (zie <a href="/docs/api.md">docs/api.md</a>).</p>
+    <p>Dit is <code>paramant-sdk</code> 3.0.0 van PyPI. <code>send</code> en <code>receive</code> geven elk twee waarden terug. Een apparaat dat iets wil ontvangen, registreert eerst zijn sleutels met <code>receive_setup()</code>. Zonder die stap weigert <code>send</code> met "No pubkeys for this device". Het ontvangstbewijs (<code>receipt</code>) is in 3.0.0 meestal <code>None</code>: de SDK leest het alleen uit de oude header <code>X-Paramant-Receipt</code>, die de server sinds september 2026 standaard niet meer stuurt. Haal het bewijs op met <code>GET /v2/transfers/:receipt_id/receipt</code> (zie <a href="/docs/api.md">docs/api.md</a>).</p>
 
     <!-- ── Use cases ──────────────────────────────────────────── -->
     <h2 id="usecases">Toepassingen</h2>
-    <p>PARAMANT heeft vijf sectorrelays, elk afgestemd op de eigen regelgeving. Kies de sector die bij uw toepassing past.</p>
+    <p>PARAMANT heeft vijf servers, elk voor een eigen sector en afgestemd op de regels die daar gelden. Kies de sector die bij je toepassing past.</p>
 
     <h3><span class="sector-badge">health</span>Zorg: NEN 7510, DICOM, HL7 FHIR</h3>
-    <p>Verstuur MRI-scans, verwijsbrieven en labuitslagen tussen zorgverleners. <code>health.paramant.app</code> is ontworpen voor NEN 7510: versleuteld onderweg, alleen in RAM, onder EU-recht. Elke upload komt als regel in de openbare CT-log; downloaden en bevestigen leggen we vast in de privé-auditketen van uw sleutel (<code>/v2/audit</code>), niet in de CT-log.</p>
+    <p>Verstuur MRI-scans, verwijsbrieven en labuitslagen tussen zorgverleners. <code>health.paramant.app</code> is ontworpen voor NEN 7510: versleuteld onderweg, alleen in RAM, onder EU-recht. Elke upload komt als regel in de openbare CT-log; downloaden en bevestigen leggen we vast in de privé-auditketen van je sleutel (<code>/v2/audit</code>), niet in de CT-log.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send DICOM scan to specialist</span>
 from paramant_sdk import GhostPipe
@@ -446,7 +446,7 @@ gp = GhostPipe(api_key="pgp_xxx", device="mri-001", sector="health")
 hash_, proof = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
 
     <h3><span class="sector-badge">legal</span>Juridisch en notariaat: eIDAS, KNB</h3>
-    <p>Verstuur ondertekende aktes en processtukken die na ontvangst cryptografisch gewist zijn. De CT-log legt manipulatiebestendig vast dat het stuk bij de relay is aangeleverd, zonder de inhoud op te slaan. De ophaling en het wissen staan in de privé-auditketen van uw sleutel.</p>
+    <p>Verstuur ondertekende aktes en processtukken die na ontvangst cryptografisch gewist zijn. De CT-log legt manipulatiebestendig vast dat het stuk bij de server is aangeleverd, zonder de inhoud op te slaan. Ophalen en wissen worden vastgelegd in de privé-auditketen van je sleutel.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Signed deed: burn-on-read, CT log entry as proof of delivery</span>
 from paramant_sdk import GhostPipe
@@ -455,7 +455,7 @@ hash_, receipt = gp.send(open("deed.pdf","rb").read())
 gp.verify_receipt(receipt)  <span class="cm"># ML-DSA-65 signed</span></pre></div>
 
     <h3><span class="sector-badge">iot</span>Industriële IoT: IEC 62443</h3>
-    <p>PLC- en sensordata doorgeven zonder VPN en zonder dat de OT-omgeving direct aan internet hangt. Werkt als datadiode (met de Python-SDK post-quantum versleuteld): de OT-kant verstuurt alleen naar buiten, de IT-kant ontvangt. De SDK vult elk blok op tot vast 5 MB, dus de grootte van de inhoud blijft binnen een blok verborgen; het aantal blokken van een overdracht met meerdere blokken niet.</p>
+    <p>Geef PLC- en sensordata door zonder VPN en zonder dat de OT-omgeving direct aan internet hangt. Het werkt als een datadiode: de OT-kant verstuurt alleen naar buiten en de IT-kant ontvangt. De Python-SDK versleutelt post-quantum. De SDK vult elk blok op tot precies 5 MB, dus binnen een blok blijft de grootte van de inhoud verborgen. Bij een overdracht van meerdere blokken is het aantal blokken wel zichtbaar.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># PLC telemetry: outbound only, no VPN, no inbound port</span>
 from paramant_sdk import GhostPipe
@@ -465,7 +465,7 @@ while True:
     time.sleep(15)</pre></div>
 
     <h3><span class="sector-badge">finance</span>Finance: NIS2, DORA, ISO 20022</h3>
-    <p>ISO 20022-betaalbestanden doorgeven met een Merkle-bewijs per verzonden bestand (elke upload wordt een regel in de CT-log van de relay) voor DORA-audittrails. <code>finance.paramant.app</code>: EU-recht, geen Amerikaanse Cloud Act, geen bewaring van metadata.</p>
+    <p>Geef ISO 20022-betaalbestanden door met een Merkle-bewijs per verzonden bestand, voor een audittrail volgens DORA. Elke upload wordt een regel in de CT-log van de server. Voor <code>finance.paramant.app</code> geldt EU-recht en niet de Amerikaanse Cloud Act, en er wordt geen metadata bewaard.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send ISO 20022 payment file with CT proof for DORA audit</span>
 from paramant_sdk import GhostPipe
@@ -480,13 +480,13 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><th>Methode</th><th>Endpoint</th><th>Omschrijving</th><th>Auth</th></tr>
       <tr><td><span class="method get">GET</span></td><td>/health</td><td>Status van de node, versie, uptime, editie</td><td>n/a</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Versleutelde blob uploaden vanaf een geauthenticeerde client (alleen RAM)</td><td>Sleutel</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Verouderd, vervalt op 31 december 2026 (de datum die de relay meestuurt in de responsheader <code>Sunset</code>). Anoniem uploaden blijft bestaan voor compatibiliteit met sdk-js 3.x. Nieuwe integraties gebruiken <code>/v2/inbound</code>.</td><td>n/a</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Verouderd, vervalt op 31 december 2026 (de datum die de server meestuurt in de responsheader <code>Sunset</code>). Anoniem uploaden blijft bestaan voor compatibiliteit met sdk-js 3.x. Nieuwe integraties gebruiken <code>/v2/inbound</code>.</td><td>n/a</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/sends</td><td>Maakt van al geüploade blokken één verzending naar genoemde ontvangers: ieder krijgt een persoonlijke link die één keer werkt. Eén ontvanger per verzending op Community, tot 30 op Firm en Enterprise; meer wordt geweigerd met 403 <code>over_limit</code>. De body bevat de blokhashes, de adressen en per persoon één ingepakte bestandssleutel.</td><td>Sleutel</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/pickup/:token</td><td>De ontvangende kant. Die heeft geen inloggegevens nodig: het token uit de uitnodiging is zelf de toegang. <code>{"action":"code"}</code> mailt een korte code naar dezelfde mailbox; <code>{"code":"123456"}</code> geeft de bytes terug, één keer; <code>{"action":"confirm"}</code> meldt dat het bestand geopend is, en pas dan is het ophalen definitief.</td><td>n/a</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/pickup/:token</td><td>Dezelfde route, bewaard voor links die zijn gemaakt vóór de overstap naar POST. Een GET die mail verstuurt, wordt door elke linkscanner afgevuurd, dus nieuwe clients gebruiken POST.</td><td>n/a</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/pickup/:token</td><td>Dit endpoint is voor de ontvanger. Die hoeft niet in te loggen: het token in de link uit de uitnodiging geeft toegang. <code>{"action":"code"}</code> mailt een korte code naar dezelfde mailbox; <code>{"code":"123456"}</code> geeft de bytes terug, één keer; <code>{"action":"confirm"}</code> meldt dat het bestand geopend is, en pas dan is het ophalen definitief.</td><td>n/a</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/pickup/:token</td><td>Hetzelfde endpoint, bewaard voor links die zijn gemaakt vóór de overstap naar POST. Linkscanners openen elke link met een GET. Zou een GET mail versturen, dan gebeurt dat dus bij elke scan. Nieuwe clients gebruiken daarom POST.</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Downloaden en wissen: telt als één lezing van de link</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Controleren of een blob beschikbaar is, zonder hem te verbruiken</td><td>Sleutel</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Aflevering bevestigen; vastgelegd in de privé-auditketen van uw sleutel, niet in de CT-log</td><td>Sleutel</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Aflevering bevestigen; vastgelegd in de privé-auditketen van je sleutel, niet in de CT-log</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live statistieken: blobs onderweg, ACK-percentage</td><td>Sleutel</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Eenmalig WebSocket-ticket ophalen, 30 seconden geldig</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket-push: blob_ready-events</td><td>Ticket / sleutel</td></tr>
@@ -496,15 +496,15 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method post">POST</span></td><td>/v2/did/register</td><td>W3C Decentralized Identity registreren</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>DID-document opvragen</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency-log (openbaar)</td><td>n/a</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Geregistreerde relaynodes en hun status</td><td>n/a</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/verify</td><td>Een oude .psign (v1/v2) controleren tegen de notarissleutel van deze relay</td><td>n/a</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Geregistreerde servers en hun status</td><td>n/a</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/verify</td><td>Een oude .psign (v1/v2) controleren tegen de notarissleutel van deze server</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle-auditketen: export als JSON en CSV</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>Apparaten van het team tonen</td><td>Sleutel</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Apparaat aan het team toevoegen (Firm of hoger)</td><td>Sleutel</td></tr>
     </table>
 
     <h2 id="inbound">POST /v2/inbound</h2>
-    <p>Upload een versleutelde, opgevulde blob. Die staat alleen in RAM en wordt nooit naar schijf geschreven. U krijgt een hash terug waarmee u hem ophaalt.</p>
+    <p>Upload een versleutelde, opgevulde blob. Die staat alleen in RAM en wordt nooit naar schijf geschreven. Je krijgt een hash terug waarmee je hem ophaalt.</p>
     <pre><span class="cm">Request body (JSON):</span>
 {
   "hash":    "sha256_of_padded_payload",
@@ -516,10 +516,10 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
 <span class="cm">200: { "ok": true, "hash": "...", "ttl_ms": 3600000 }
 409: hash already exists
 503: relay at capacity (memory limit)</span></pre>
-    <p>TTL en <code>max_views</code> worden allebei begrensd op het maximum van het abonnement: Community krijgt 1 uur en 1 lezing, Firm 24 uur en tot 10 lezingen, Enterprise 7 dagen en 100 lezingen. Laat u <code>max_views</code> weg, dan wordt de link op elk abonnement bij de eerste lezing gewist. Zo werkt de webapp van Versturen. Het veld <code>hash</code> is de SHA-256 van de <em>opgevulde</em> inhoud, niet van het oorspronkelijke bestand. De SDK berekent dit zelf.</p>
+    <p>TTL en <code>max_views</code> worden allebei begrensd op het maximum van het abonnement: Community krijgt 1 uur en 1 lezing, Firm 24 uur en tot 10 lezingen, Enterprise 7 dagen en 100 lezingen. Laat je <code>max_views</code> weg, dan wordt de link op elk abonnement bij de eerste lezing gewist. Zo werkt de webapp van Versturen. Het veld <code>hash</code> is de SHA-256 van de <em>opgevulde</em> inhoud, niet van het oorspronkelijke bestand. De SDK berekent dit zelf.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>Telt als één lezing van de link.</strong> Een Community-link heeft één lezing, dus deze aanroep is de enige keer ophalen; een betaalde link kan er meer hebben, tot 10 op Firm. Een lezing telt pas als de hele blob is afgeleverd, dat wil zeggen zodra de relay het laatste byte heeft verstuurd: breekt uw verbinding eerder af, dan staat hij er nog en haalt u hem opnieuw op; de relay levert hem hooguit vijf keer in totaal. Verstuurd betekent hier: aan de verbinding gegeven, niet bij u aangekomen. Het besturingssysteem buffert enkele MB per verbinding, dus een blob tot de standaardgrens van 5 MB is meestal in één keer verstuurd, en een verbinding die na de eerste kilobytes afbreekt, kost de lezing dan al. Wilt u dat een afgebroken download niets kost, gebruik dan de deellink <code>/v2/dl</code> met <code>?claim=</code>: daar telt de lezing pas na uw eigen bevestiging. Na de laatste afgeleverde lezing wordt de buffer van de blob overschreven met willekeurige bytes en uit het RAM verwijderd. Herstellen is dan niet mogelijk.</p>
+    <p><strong>Telt als één lezing van de link.</strong> Een Community-link heeft één lezing, dus met deze aanroep haal je de blob één keer op. Een betaalde link kan er meer hebben, tot 10 op Firm. Een lezing telt pas als de hele blob is afgeleverd, dat wil zeggen zodra de server de laatste byte heeft verstuurd. Breekt je verbinding eerder af, dan staat de blob er nog en kun je hem opnieuw ophalen. De server levert hem hooguit vijf keer in totaal. Verstuurd betekent hier: de server heeft de bytes aan de verbinding gegeven. Ze zijn dan nog niet per se bij jou aangekomen. Het besturingssysteem buffert enkele MB per verbinding, dus een blob tot de standaardgrens van 5 MB is meestal in één keer verstuurd, en een verbinding die na de eerste kilobytes afbreekt, kost de lezing dan al. Wil je dat een afgebroken download niets kost, gebruik dan de deellink <code>/v2/dl</code> met <code>?claim=</code>: daar telt de lezing pas na je eigen bevestiging. Na de laatste afgeleverde lezing wordt de buffer van de blob overschreven met willekeurige bytes en uit het RAM verwijderd. Herstellen is dan niet mogelijk.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 
@@ -564,7 +564,7 @@ Relay POSTs to your url when a blob for that device arrives (POST /v2/inbound):
 And when it is downloaded (via the link or GET /v2/outbound):
 { "event": "blob_downloaded", "device_id": "scanner-01", "ts": "...",
   "hash": "...", "size": 5242880, "via": "link" }   // or "api"</span></pre>
-    <p>Alleen op Pro en hoger. Elke webhook is ondertekend. Geeft u een <code>secret</code> mee, dan tekent de relay daarmee. Laat u het weg, dan maakt de relay er zelf een (<code>whsec_</code>…) en geeft het één keer terug in het antwoord; bewaar het meteen, want het komt niet opnieuw. Elke aanroep draagt de headers <code>X-Paramant-Event</code> (de eventnaam) en <code>X-Paramant-Sig</code>: de HMAC-SHA256 in hex van de ruwe body, met het secret als sleutel. Daarnaast draagt elke aanroep <code>X-Paramant-Timestamp</code> en <code>X-Paramant-Signature: t=&lt;unix-seconden&gt;,v1=&lt;hex&gt;</code>, de HMAC-SHA256 over <code>&lt;t&gt;.&lt;ruwe body&gt;</code>: daar zit de tijd in de handtekening, dus weiger een aanroep ouder dan vijf minuten en een opgevangen aanroep is niet later opnieuw af te spelen. Reken de handtekening zelf na over de onbewerkte body, vergelijk in constante tijd en weiger callbacks waarvan de handtekening niet klopt. De registratie staat in redis (het geheugen is alleen een cache), dus ze overleeft een herstart en geldt op elke sector; per apparaat blijven de laatste 5 registraties bewaard, een account heeft hoogstens 20 apparaten met een webhook, en een registratie verloopt na 90 dagen tenzij u hem opnieuw doet. De relay probeert één keer (time-out 5 seconden) en doet geen nieuwe poging.</p>
+    <p>Alleen op Pro en hoger. Elke webhook is ondertekend. Geef je een <code>secret</code> mee, dan tekent de server daarmee. Laat je het weg, dan maakt de server er zelf een (<code>whsec_</code>…) en geeft het één keer terug in het antwoord; bewaar het meteen, want het komt niet opnieuw. Elke aanroep bevat de headers <code>X-Paramant-Event</code> (de eventnaam) en <code>X-Paramant-Sig</code>: de HMAC-SHA256 in hex van de ruwe body, met het secret als sleutel. Daarnaast bevat elke aanroep <code>X-Paramant-Timestamp</code> en <code>X-Paramant-Signature: t=&lt;unix-seconden&gt;,v1=&lt;hex&gt;</code>, de HMAC-SHA256 over <code>&lt;t&gt;.&lt;ruwe body&gt;</code>. Omdat de tijd in deze handtekening zit, kun je een aanroep weigeren die ouder is dan vijf minuten. Dan kan niemand een onderschepte aanroep later opnieuw afspelen. Reken de handtekening zelf na over de onbewerkte body, vergelijk in constante tijd en weiger callbacks waarvan de handtekening niet klopt. De registratie staat in Redis; het werkgeheugen dient alleen als cache. Daardoor overleeft de registratie een herstart en geldt ze voor elke sector. Per apparaat blijven de laatste 5 registraties bewaard, en een account heeft hoogstens 20 apparaten met een webhook. Een registratie verloopt na 90 dagen, tenzij je haar opnieuw doet. De server doet één afleverpoging met een time-out van 5 seconden en probeert het daarna niet opnieuw.</p>
 
     <h2 id="health">GET /health</h2>
     <pre><span class="cm">{
@@ -579,7 +579,7 @@ And when it is downloaded (via the link or GET /v2/outbound):
     <!-- ── ParaSign API (/v1) ───────────────────────────────────── -->
     <span id="parasign-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="v1-envelopes">API voor Ondertekenen (/v1)</h2>
-    <p>Gehoste ondertekenrondes vanuit uw eigen systemen: maak een envelope van een pdf en een lijst ondertekenaars, stuur elke ondertekenaar naar een gehoste ondertekenpagina en haal het voltooide <code>.psign</code>-bewijs op. Authenticeer met <code>Authorization: Bearer psk_live_...</code> (sleutels maakt u aan in het <a href="/developer">ontwikkelaarsdashboard</a>; API-toegang hoort bij Firm).</p>
+    <p>Gehoste ondertekenrondes vanuit je eigen systemen: maak een envelope van een pdf en een lijst ondertekenaars, stuur elke ondertekenaar naar een gehoste ondertekenpagina en haal het voltooide <code>.psign</code>-bewijs op. Authenticeer met <code>Authorization: Bearer psk_live_...</code> (sleutels maak je aan in het <a href="/developer">ontwikkelaarsdashboard</a>; API-toegang hoort bij Firm).</p>
     <pre><span class="cm">Endpoints:</span>
 POST   /v1/envelopes                Create an envelope; returns id + one sign_url per signer
 GET    /v1/envelopes/:id            Envelope status and per-signer progress
@@ -609,14 +609,14 @@ curl https://paramant.app/v1/envelopes/&lt;id&gt;/receipt \
       "sign_url": "https://paramant.app/co-sign?env=...&amp;p=0&amp;t=..." }
   ]
 }</pre>
-    <p>Het <code>id</code> is een willekeurige reeks van 20 tot 64 tekens zonder voorvoegsel. Elke ondertekenaar krijgt een eigen <code>sign_url</code> naar de gehoste pagina <code>/co-sign</code>. Een ondertekenaar staat op <code>pending</code> tot hij getekend heeft en daarna op <code>signed</code>, in het antwoord op het aanmaken en in <code>GET /v1/envelopes/:id</code> hetzelfde woord.</p>
-    <p>Limiet: 50 nieuwe envelopes per sleutel in elk willekeurig uur (een schuivend venster, niet het klokuur), dus ook rond het hele uur nooit meer dan 50 binnen zestig minuten. Een envelope wordt standaard 30 dagen bewaard (in te stellen met <code>ttl_days</code>, maximaal 365). Zolang hij bestaat, bewaart de relay ook de pdf zelf, versleuteld in redis, omdat de ondertekenaars hem moeten kunnen openen en de gestempelde pdf eruit wordt gemaakt. Na het verlopen is hij weg. Webhooks: stel <code>webhook_url</code> in, dan komen <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> en <code>envelope.voided</code> binnen, ondertekend met HMAC-SHA256 in de header <code>X-Paramant-Sig</code>. Een aflevering die mislukt (geen verbinding, of een 5xx of 429 van uw kant) probeert de relay opnieuw na 2 en na 10 seconden, drie pogingen in totaal, met dezelfde body en dezelfde <code>X-Paramant-Delivery</code>, zodat u een herhaling op die id herkent; <code>X-Paramant-Attempt</code> zegt welke poging het is. De events van één envelope gaan in volgorde, één voor één, en elke body draagt een oplopend <code>seq</code> (<code>envelope.sent</code> 1, <code>signer.completed</code> 1 plus het aantal handtekeningen, <code>envelope.completed</code> en <code>envelope.voided</code> het aantal ondertekenaars plus 2). Na drie mislukte pogingen geeft de relay het op, dus controleer de status ook zelf met <code>GET /v1/envelopes/:id</code>. Bewijzen zijn offline te controleren tegen de openbare CT-log; zie <a href="/verify">/verify</a>.</p>
-    <p>Veilig opnieuw proberen: stuur bij <code>POST /v1/envelopes</code> een header <code>Idempotency-Key</code> mee (8 tot 128 tekens uit <code>A-Z a-z 0-9 _ . : -</code>). Komt dezelfde sleutel binnen 24 uur opnieuw van dezelfde API-sleutel, dan krijgt u het eerste <code>201</code>-antwoord terug met <code>Idempotent-Replay: true</code>, zonder tweede envelope en zonder quotum te verbruiken. Alleen een geslaagde <code>201</code> wordt bewaard. De relay controleert de body vóór het uurquotum: <code>400 ambiguous_document</code> (zowel <code>content_base64</code> als <code>url</code>), <code>400 invalid_binding_mode</code> (niet <code>email</code> of <code>open</code>), <code>400 invalid_signer_email</code> (bij <code>email</code>-binding heeft elke ondertekenaar een geldig adres nodig; <code>signer_index</code> noemt de eerste foute) <code>400 invalid_metadata</code> (<code>metadata</code> is geen object) en <code>400 invalid_idempotency_key</code> kosten dus geen aanmaak. Verder: <code>400 missing_signers</code>, <code>400 missing_document</code> (geen <code>content_base64</code> en geen <code>url</code>), <code>400 empty_document</code> (lege <code>content_base64</code>), <code>400 too_many_signers</code> (meer namen dan uw abonnement op één document toelaat; <code>max_signers</code> zegt hoeveel), <code>413 document_too_large</code>, <code>422 not_a_pdf</code> en <code>422 document_unfetchable</code>. Een <code>429 rate_limited</code> draagt <code>Retry-After</code> met de seconden tot de oudste aanmaak van het afgelopen uur uit het venster valt. Is het maandquotum handtekeningen van uw abonnement op, dan antwoordt de relay <code>402 monthly_sign_quota_reached</code> met <code>plan</code>, <code>limit</code>, <code>used</code>, <code>reset_date</code> en <code>Retry-After: 86400</code>; er wordt dan niets aangemaakt. Een fout op <code>/v1</code> heeft altijd de vorm <code>{"error": "&lt;code&gt;", "message": "&lt;zin&gt;"}</code>.</p>
+    <p>Het <code>id</code> is een willekeurige reeks van 20 tot 64 tekens zonder voorvoegsel. Elke ondertekenaar krijgt een eigen <code>sign_url</code> naar de gehoste pagina <code>/co-sign</code>. Een ondertekenaar staat op <code>pending</code> tot hij getekend heeft, en daarna op <code>signed</code>. Het antwoord bij het aanmaken en <code>GET /v1/envelopes/:id</code> gebruiken hetzelfde woord.</p>
+    <p>Limiet: 50 nieuwe envelopes per sleutel in elk willekeurig uur (een schuivend venster, niet het klokuur), dus ook rond het hele uur nooit meer dan 50 binnen zestig minuten. Een envelope wordt standaard 30 dagen bewaard (in te stellen met <code>ttl_days</code>, maximaal 365). Zolang hij bestaat, bewaart de server ook de pdf zelf, versleuteld in redis, omdat de ondertekenaars hem moeten kunnen openen en de gestempelde pdf eruit wordt gemaakt. Daarna is hij weg. Webhooks: stel <code>webhook_url</code> in, dan komen <code>envelope.sent</code>, <code>signer.completed</code>, <code>envelope.completed</code> en <code>envelope.voided</code> binnen, ondertekend met HMAC-SHA256 in de header <code>X-Paramant-Sig</code>. Mislukt een aflevering (geen verbinding, of een 5xx of 429 van jouw kant), dan probeert de server het opnieuw na 2 en na 10 seconden, drie pogingen in totaal. Dat gebeurt met dezelfde body en dezelfde <code>X-Paramant-Delivery</code>, zodat je een herhaling op die id herkent; <code>X-Paramant-Attempt</code> zegt welke poging het is. De events van één envelope gaan in volgorde, één voor één, en elke body bevat een oplopend <code>seq</code> (<code>envelope.sent</code> 1, <code>signer.completed</code> 1 plus het aantal handtekeningen, <code>envelope.completed</code> en <code>envelope.voided</code> het aantal ondertekenaars plus 2). Na drie mislukte pogingen geeft de server het op, dus controleer de status ook zelf met <code>GET /v1/envelopes/:id</code>. Bewijzen zijn offline te controleren tegen de openbare CT-log; zie <a href="/verify">/verify</a>.</p>
+    <p>Veilig opnieuw proberen: stuur bij <code>POST /v1/envelopes</code> een header <code>Idempotency-Key</code> mee (8 tot 128 tekens uit <code>A-Z a-z 0-9 _ . : -</code>). Komt dezelfde sleutel binnen 24 uur opnieuw van dezelfde API-sleutel, dan krijg je het eerste <code>201</code>-antwoord terug met <code>Idempotent-Replay: true</code>, zonder tweede envelope en zonder quotum te verbruiken. Alleen een geslaagde <code>201</code> wordt bewaard. De server controleert de body vóór het uurquotum: <code>400 ambiguous_document</code> (zowel <code>content_base64</code> als <code>url</code>), <code>400 invalid_binding_mode</code> (niet <code>email</code> of <code>open</code>), <code>400 invalid_signer_email</code> (bij <code>email</code>-binding heeft elke ondertekenaar een geldig adres nodig; <code>signer_index</code> noemt de eerste foute), <code>400 invalid_metadata</code> (<code>metadata</code> is geen object) en <code>400 invalid_idempotency_key</code> gaan dus niet van je quotum af. Verder: <code>400 missing_signers</code>, <code>400 missing_document</code> (geen <code>content_base64</code> en geen <code>url</code>), <code>400 empty_document</code> (lege <code>content_base64</code>), <code>400 too_many_signers</code> (meer namen dan je abonnement op één document toelaat; <code>max_signers</code> zegt hoeveel), <code>413 document_too_large</code>, <code>422 not_a_pdf</code> en <code>422 document_unfetchable</code>. Een <code>429 rate_limited</code> bevat de header <code>Retry-After</code> met het aantal seconden tot de oudste aanmaak van het afgelopen uur uit het venster valt. Is het maandquotum handtekeningen van je abonnement op, dan antwoordt de server <code>402 monthly_sign_quota_reached</code> met <code>plan</code>, <code>limit</code>, <code>used</code>, <code>reset_date</code> en <code>Retry-After: 86400</code>; er wordt dan niets aangemaakt. Een fout op <code>/v1</code> heeft altijd de vorm <code>{"error": "&lt;code&gt;", "message": "&lt;zin&gt;"}</code>.</p>
 
     <!-- ── Account & billing API ────────────────────────────────── -->
     <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="user-history">GET /v2/user/history</h2>
-    <p>De geschiedenis van verzendingen en envelopes van uw eigen account: een alleen-lezen weergave van de Merkle-auditketen per sleutel. U krijgt alleen kenmerken, status en tijden terug, nooit inhoud, een downloadtoken of een sleutel. Authenticeer met uw <code>pgp_</code>-sleutel in de header <code>X-Api-Key</code>.</p>
+    <p>De geschiedenis van verzendingen en envelopes van je eigen account: een alleen-lezen weergave van de Merkle-auditketen per sleutel. Je krijgt alleen kenmerken, status en tijden terug, nooit inhoud, een downloadtoken of een sleutel. Authenticeer met je <code>pgp_</code>-sleutel in de header <code>X-Api-Key</code>.</p>
     <table>
       <tr><th>Veld</th><th>Waarde</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
@@ -644,7 +644,7 @@ X-Api-Key: pgp_xxx
   "message": "Send history and link management require a Firm plan or higher." }</pre>
 
     <h2 id="audit-export">GET /v2/parasign/audit-export</h2>
-    <p>Dit hoort bij de betaalde abonnementen van Ondertekenen en is bedoeld voor compliance. Een auditor krijgt het manipulatiebestendige ondertekenspoor van het account, de ondertekende tree head (STH) uit de Certificate Transparency-log die het verankert, en de volledige <code>.psign</code>-bewijzen van elke voltooide envelope, als CSV of JSON. Er verlaat geen document de relay; de export bevat alleen hashes en handtekeningen.</p>
+    <p>Dit hoort bij de betaalde abonnementen van Ondertekenen en is bedoeld voor compliance. Een auditor krijgt het manipulatiebestendige ondertekenspoor van het account, de ondertekende tree head (STH) uit de Certificate Transparency-log die het verankert, en de volledige <code>.psign</code>-bewijzen van elke voltooide envelope, als CSV of JSON. Geen enkel document verlaat de server. De export bevat alleen hashes en handtekeningen.</p>
     <table>
       <tr><th>Veld</th><th>Waarde</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
@@ -680,7 +680,7 @@ curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
   "message": "The ParaSign audit export requires a Business plan or higher." }</pre>
 
     <h2 id="billing">Betaal-API: POST /v2/billing/checkout</h2>
-    <p>Start een Mollie-betaling voor een Paramant-abonnement. De aanroeper geeft nooit zelf de prijs op: de server zoekt die op in de prijscatalogus aan de hand van <code>(product, plan, interval)</code>, en de webhook controleert het werkelijk betaalde bedrag voordat er iets wordt toegekend. Authenticeer met uw <code>pgp_</code>-sleutel.</p>
+    <p>Start een Mollie-betaling voor een Paramant-abonnement. De aanroeper geeft nooit zelf de prijs op: de server zoekt die op in de prijscatalogus aan de hand van <code>(product, plan, interval)</code>, en de webhook controleert het werkelijk betaalde bedrag voordat er iets wordt toegekend. Authenticeer met je <code>pgp_</code>-sleutel.</p>
     <table>
       <tr><th>Veld</th><th>Waarde</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code> (een geldige sleutel). Geen sleutel &rarr; <code>401</code>.</td></tr>
@@ -709,7 +709,7 @@ curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
 { "error": "checkout_failed" }</pre>
 
     <h3 id="billing-webhook">POST /v2/billing/webhook</h3>
-    <p>Wordt aangeroepen door Mollie, niet door uw integratie. Mollie stuurt met POST een formulierveld <code>id=tr_...</code>. De relay haalt die betaling opnieuw op bij Mollie (en vertrouwt alleen de aanbieder, nooit de body van het verzoek), controleert het bedrag tegen de catalogus en kent het recht idempotent toe. Zodra een event verwerkt is, antwoordt hij altijd <code>200</code>, zodat Mollie stopt met opnieuw proberen; bij een tijdelijke fout bij het ophalen komt er <code>503</code> terug, zodat Mollie het opnieuw probeert. Geen API-sleutel: de echtheid volgt uit het opnieuw ophalen van de betaling op id.</p>
+    <p>Wordt aangeroepen door Mollie, niet door je integratie. Mollie stuurt met POST een formulierveld <code>id=tr_...</code>. De server haalt die betaling zelf opnieuw op bij Mollie. Hij vertrouwt alleen wat Mollie teruggeeft, nooit de body van het verzoek. Daarna controleert hij het bedrag tegen de catalogus en kent het recht idempotent toe. Zodra een event verwerkt is, antwoordt hij altijd <code>200</code>, zodat Mollie stopt met opnieuw proberen; bij een tijdelijke fout bij het ophalen komt er <code>503</code> terug, zodat Mollie het opnieuw probeert. Een API-sleutel is hier niet nodig. De server weet dat het verzoek echt is, omdat hij de betaling met haar id zelf opnieuw bij Mollie ophaalt.</p>
     <pre><span class="cm"># Mollie -> relay (application/x-www-form-urlencoded)</span>
 POST /v2/billing/webhook
 id=tr_XXXX
@@ -721,13 +721,13 @@ id=tr_XXXX
     <!-- ── Self-hosting ─────────────────────────────────────────── -->
     <span id="self-hosting" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="selfhost-docker">Zelf hosten: Docker Compose</h2>
-    <p>Community Edition is altijd gratis voor maximaal 5 gebruikers. Eén <code>docker compose up</code> start 6 containers: vijf sectorrelays en een beheerpaneel.</p>
+    <p>Community Edition is altijd gratis voor maximaal 5 gebruikers. Eén <code>docker compose up</code> start 6 containers: vijf servers (één per sector) en een beheerpaneel.</p>
 
     <div class="callout"><span class="callout-label">Vereisten</span>
       <p><strong style="color:var(--lime)">Vereisten:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · minimaal 1 GB RAM · swap uitgeschakeld · een domein met wildcard-DNS</p>
     </div>
 
-    <div class="callout"><span class="callout-label">Waar u begint</span>
+    <div class="callout"><span class="callout-label">Waar je begint</span>
       <p>Deze links staan niet meer in het menu, alleen nog hier.
       Installeren met één regel: <a href="/install.sh">install.sh</a> voor een server,
       <a href="/install-pi.sh">install-pi.sh</a> voor een Raspberry Pi.
@@ -750,8 +750,8 @@ nano .env   <span class="cm"># vul de verplichte geheimen in:</span>
 <span class="cm">#   ADMIN_TOKEN, REDIS_PASSWORD, INTERNAL_AUTH_TOKEN: openssl rand -hex 32</span>
 <span class="cm">#   RELAY_REDIS_URL=redis://:&lt;REDIS_PASSWORD&gt;@redis:6379</span>
 <span class="cm">#   PARAMANT_TOTP_MASTER_KEY: openssl rand -base64 32</span>
-<span class="cm">#   PARASIGN_PUBLIC_ORIGIN, RELAY_SELF_URL_&lt;SECTOR&gt;: uw eigen publieke adres</span>
-<span class="cm">#   (install.sh schrijft deze allemaal voor u)</span>
+<span class="cm">#   PARASIGN_PUBLIC_ORIGIN, RELAY_SELF_URL_&lt;SECTOR&gt;: je eigen publieke adres</span>
+<span class="cm">#   (install.sh schrijft deze allemaal voor je)</span>
 
 <span class="cm"># 3. Launch</span>
 docker compose up -d
@@ -779,9 +779,9 @@ curl http://localhost:3000/health
       <tr><td>REDIS_PASSWORD</td><td>Ja</td><td>Wachtwoord van de redis-container; leeg start redis niet</td></tr>
       <tr><td>RELAY_REDIS_URL</td><td>Ja</td><td><code>redis://:&lt;REDIS_PASSWORD&gt;@redis:6379</code></td></tr>
       <tr><td>PARAMANT_TOTP_MASTER_KEY</td><td>Ja</td><td>Versleutelt de TOTP-geheimen van gebruikers (32 bytes, base64); verander hem nooit op een draaiende installatie</td></tr>
-      <tr><td>INTERNAL_AUTH_TOKEN</td><td>Ja</td><td>Tweede slot op de interne routes van de relays (beheer naar relay)</td></tr>
-      <tr><td>PARASIGN_PUBLIC_ORIGIN</td><td>Nee</td><td>Uw eigen publieke site; de betaling keert hierheen terug in plaats van naar paramant.app</td></tr>
-      <tr><td>RELAY_SELF_URL_&lt;SECTOR&gt;</td><td>Nee</td><td>Per relay (MAIN, HEALTH, FINANCE, LEGAL, IOT) zijn eigen publieke adres; zonder dit noemen ondertekende tree heads en bewijzen een paramant.app-host</td></tr>
+      <tr><td>INTERNAL_AUTH_TOKEN</td><td>Ja</td><td>Tweede slot op de interne routes van de servers (van het beheerpaneel naar de server)</td></tr>
+      <tr><td>PARASIGN_PUBLIC_ORIGIN</td><td>Nee</td><td>Je eigen publieke site; de betaling keert hierheen terug in plaats van naar paramant.app</td></tr>
+      <tr><td>RELAY_SELF_URL_&lt;SECTOR&gt;</td><td>Nee</td><td>Per server (MAIN, HEALTH, FINANCE, LEGAL, IOT) zijn eigen publieke adres; zonder dit noemen ondertekende tree heads en bewijzen een paramant.app-host</td></tr>
       <tr><td>TOTP_SECRET</td><td>Aanbevolen</td><td>Base32 TOTP-geheim: zet MFA aan bij het inloggen als beheerder</td></tr>
       <tr><td>PLK_KEY</td><td>Nee</td><td>Licentiesleutel: maakt meer dan 5 gebruikers mogelijk (Community = gratis, maximaal 5)</td></tr>
       <tr><td>RESEND_API_KEY</td><td>Nee</td><td>Sleutel van de e-mailaanbieder (voor meldingen bij het afleveren van sleutels)</td></tr>
@@ -844,13 +844,13 @@ open https://your-domain.com/admin/</pre>
     </div>
     <p>Community Edition heeft een harde grens van 5 gebruikers: de 6e <code>add</code> geeft HTTP 402. Zet een <code>PLK_KEY</code> in <code>.env</code> voor een onbeperkt aantal gebruikers.</p>
     <div class="callout"><span class="callout-label">Nieuw in 3.0.0</span>
-      <p><strong style="color:var(--lime)">Begeleide installatie:</strong> een webwizard op <code>/setup</code> vervangt bij de eerste start de handmatige beheerscripts voor nieuwe beheerders. U maakt het admin-token aan, registreert TOTP en maakt de eerste sleutel, allemaal vanuit de browser. De wizard werkt alleen bij de eerste start (nog geen sleutels) of met de expliciete vlag <code>SETUP_MODE</code>, en voert grondiger controles uit via <code>/v2/health/deep</code> en DNS voordat hij meldt dat alles werkt (ontwerp: ADR R005). Draait de relay eenmaal, dan toont <code>/admin/settings</code> de configuratie in beeld, zodat u <code>.env</code> niet meer met de hand bewerkt. <code>/admin/cli</code> geeft beheerders een terminal in de browser voor foutopsporing zonder SSH.</p>
+      <p><strong style="color:var(--lime)">Begeleide installatie:</strong> een webwizard op <code>/setup</code> vervangt bij de eerste start de handmatige beheerscripts voor nieuwe beheerders. Je maakt het admin-token aan, registreert TOTP en maakt de eerste sleutel, allemaal vanuit de browser. De wizard werkt alleen bij de eerste start (nog geen sleutels) of met de expliciete vlag <code>SETUP_MODE</code>, en voert grondiger controles uit via <code>/v2/health/deep</code> en DNS voordat hij meldt dat alles werkt (ontwerp: ADR R005). Draait de server eenmaal, dan toont <code>/admin/settings</code> de configuratie in beeld, zodat je <code>.env</code> niet meer met de hand bewerkt. <code>/admin/cli</code> geeft beheerders een terminal in de browser voor foutopsporing zonder SSH.</p>
     </div>
     <div class="callout"><span class="callout-label">Installatiecode</span>
-      <p><strong style="color:var(--lime)">De installatie afronden is niet anoniem:</strong> <code>POST /v2/setup/apply</code> vraagt het eenmalige installatietoken in de header <code>X-Setup-Token</code> (of uw <code>ADMIN_TOKEN</code> in <code>X-Admin-Token</code>), anders antwoordt hij <code>401 setup_token_required</code>. Bij de start schrijft de relay een vers token (<code>pst_...</code>) in het bestand <code>setup-token</code> naast <code>users.json</code> (modus 600); het log noemt alleen het bestand, nooit het token. Plak het in het veld <strong>Installatiecode</strong> van de wizard. Na de installatie wordt het verwijderd en werkt het niet meer. U vindt het met <code>docker compose exec relay-main cat /data/setup-token</code>.</p>
+      <p><strong style="color:var(--lime)">Afronden kan alleen met een code:</strong> <code>POST /v2/setup/apply</code> vraagt het eenmalige installatietoken in de header <code>X-Setup-Token</code> (of je <code>ADMIN_TOKEN</code> in <code>X-Admin-Token</code>), anders antwoordt hij <code>401 setup_token_required</code>. Bij de start schrijft de server een nieuw token (<code>pst_...</code>) in het bestand <code>setup-token</code> naast <code>users.json</code> (modus 600); het log noemt alleen het bestand, nooit het token. Plak het in het veld <strong>Installatiecode</strong> van de wizard. Na de installatie wordt het verwijderd en werkt het niet meer. Je vindt het met <code>docker compose exec relay-main cat /data/setup-token</code>.</p>
     </div>
     <div class="callout"><span class="callout-label">Nieuw in 3.0.0</span>
-      <p><strong style="color:var(--lime)">Direct bruikbaar:</strong> met <code>SERVE_FRONTEND=true</code> serveert één relay zijn eigen interface via een alleen-lezen statische handler, zodat een nieuwe zelf gehoste installatie geen aparte webserver nodig heeft (optioneel, standaard uit; ADR R011). Met <code>CRYPTO_MODE</code> kiest u welke algoritmen de relay meldt op <code>/v2/capabilities</code>: <code>core</code> (standaard: ML-KEM-768 + ML-DSA-65) of <code>extended</code> voor de volledige optionele set (ADR R006).</p>
+      <p><strong style="color:var(--lime)">Direct bruikbaar:</strong> met <code>SERVE_FRONTEND=true</code> serveert één server zijn eigen interface via een alleen-lezen statische handler, zodat een nieuwe zelf gehoste installatie geen aparte webserver nodig heeft (optioneel, standaard uit; ADR R011). Met <code>CRYPTO_MODE</code> kies je welke algoritmen de server meldt op <code>/v2/capabilities</code>: <code>core</code> (standaard: ML-KEM-768 + ML-DSA-65) of <code>extended</code> voor de volledige optionele set (ADR R006).</p>
     </div>
 
     <h2 id="selfhost-upgrade">Upgraden</h2>
@@ -868,28 +868,28 @@ docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>
     <div class="callout warn"><span class="callout-label">Belangrijk</span>
-      <p><strong style="color:var(--brick-ink)">Let op:</strong> gebruikersgegevens en de CT-log blijven bij upgrades bewaard in benoemde Docker-volumes. Het identiteitssleutelpaar van de relay (ML-DSA-65) wordt eenmalig aangemaakt bij de eerste start en opgeslagen in <code>/data/relay-identity.json</code>. Verwijder dit volume niet, anders verliest de relay zijn geregistreerde identiteit. Sinds v3.0.0 komt het ondertekenen met ML-DSA-65 achter deze identiteit uit <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>, de Rust-cryptobibliotheek van de relay die klaar is voor audit (gebruikt via de NAPI-binding <code>@paramant/core</code>). Die zit in de Docker-image, dus een extra installatiestap is niet nodig.</p>
+      <p><strong style="color:var(--brick-ink)">Let op:</strong> gebruikersgegevens en de CT-log blijven bij upgrades bewaard in benoemde Docker-volumes. Het identiteitssleutelpaar van de server (ML-DSA-65) wordt eenmalig aangemaakt bij de eerste start en opgeslagen in <code>/data/relay-identity.json</code>. Verwijder dit volume niet, anders verliest de server zijn geregistreerde identiteit. Sinds v3.0.0 komt het ondertekenen met ML-DSA-65 achter deze identiteit uit <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>, de Rust-cryptobibliotheek van de server die klaar is voor audit (gebruikt via de NAPI-binding <code>@paramant/core</code>). Die zit in de Docker-image, dus een extra installatiestap is niet nodig.</p>
     </div>
 
     <!-- ── Admin scripts ─────────────────────────────────────────── -->
     <h2 id="client-deb">Beheerscripts</h2>
-    <p>De beheerscripts zitten in de repository van de relay. Na het clonen van <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a> staat het beheerprogramma voor de server onder <code>deploy/</code>: voer <code>python3 deploy/paramant-admin.py [command]</code> direct uit. Hulpscripts voor beheerders (sleutels toevoegen of intrekken, installatie bij de eerste start) staan onder <code>scripts/</code>. Een installatiepakket voor het hele systeem is er op dit moment niet: de SDK-pakketten op PyPI (<code>paramant-sdk</code>) en npm (<code>paramant-sdk</code>) zijn de officiële clientintegraties.</p>
+    <p>De beheerscripts zitten in de repository van de server. Na het clonen van <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a> staat het beheerprogramma voor de server onder <code>deploy/</code>: voer <code>python3 deploy/paramant-admin.py [command]</code> direct uit. Hulpscripts voor beheerders (sleutels toevoegen of intrekken, installatie bij de eerste start) staan onder <code>scripts/</code>. Een installatiepakket voor het hele systeem is er op dit moment niet: de SDK-pakketten op PyPI (<code>paramant-sdk</code>) en npm (<code>paramant-sdk</code>) zijn de officiële clientintegraties.</p>
     <div class="callout"><span class="callout-label">Binnenkort</span>
-      <p><strong style="color:var(--lime)">Add-ons:</strong> er is een architectuur voor add-ons gespecificeerd, voor integraties net buiten de kern van de relay: opslagspiegels, koppelingen voor meldingen, SIEM-exporters, OIDC/SAML SSO. Elk in een eigen container, met mogelijkheden die in een manifest staan, zoals bij HomeAssistant. Ze werken alleen met versleutelde gegevens en metadata, nooit met leesbare inhoud of sleutels. Specificatie: ADR R007, concept.</p>
+      <p><strong style="color:var(--lime)">Add-ons:</strong> er is een architectuur voor add-ons beschreven. Dat zijn integraties die naast de server draaien, zoals opslagspiegels, koppelingen voor meldingen, SIEM-exporters en OIDC/SAML SSO. Elke add-on draait in een eigen container en legt in een manifest vast wat hij mag, zoals bij HomeAssistant. Add-ons krijgen alleen versleutelde gegevens en metadata te zien, nooit leesbare inhoud of sleutels. De specificatie staat in ADR R007 (concept).</p>
     </div>
 
     <h2 id="client-cli">CLI-referentie</h2>
-    <p>Er is geen installeerbare CLI: <code>pip install paramant-sdk</code> en <code>npm install paramant-sdk</code> leveren alleen de bibliotheek, geen commando's. Wat er wel is, zijn scripts in de repository van de relay, die u vanuit een clone draait:</p>
+    <p>Er is geen installeerbare CLI: <code>pip install paramant-sdk</code> en <code>npm install paramant-sdk</code> leveren alleen de bibliotheek, geen commando's. Wat er wel is, zijn scripts in de repository van de server, die je vanuit een clone draait:</p>
     <table>
       <tr><th>Script</th><th>Omschrijving</th></tr>
       <tr><td>scripts/paramant-sender.py</td><td>Een bestand, stdin of tekst versleutelen en uploaden; met <code>--watch DIR</code> een map in de gaten houden</td></tr>
       <tr><td>scripts/paramant-receiver.py</td><td>Op hash ophalen en ontsleutelen; met <code>--listen</code> blijven luisteren</td></tr>
-      <tr><td>scripts/paramant-verify-sth</td><td>De ondertekende boomkop (STH) van een relay controleren</td></tr>
-      <tr><td>scripts/paramant-verify-peers</td><td>De gespiegelde boomkoppen van andere relays controleren</td></tr>
-      <tr><td>scripts/paramant-scan.sh</td><td>Relaynodes vinden via het register</td></tr>
-      <tr><td>deploy/paramant-admin.py</td><td>Gebruikers en sleutels op uw eigen relay beheren</td></tr>
+      <tr><td>scripts/paramant-verify-sth</td><td>De ondertekende boomkop (STH) van een server controleren</td></tr>
+      <tr><td>scripts/paramant-verify-peers</td><td>De gespiegelde boomkoppen van andere servers controleren</td></tr>
+      <tr><td>scripts/paramant-scan.sh</td><td>Servers vinden via het register</td></tr>
+      <tr><td>deploy/paramant-admin.py</td><td>Gebruikers en sleutels op je eigen server beheren</td></tr>
     </table>
-    <p>De twee Python-scripts nemen met <code>--relay</code> een gehoste sector (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>) of het https-adres van uw eigen relay, bijvoorbeeld <code>--relay https://relay.example.com</code>. Ze versleutelen met een eigen transfergeheim (<code>--secret</code> of <code>PARAMANT_TRANSFER_SECRET</code>), nooit met de API-sleutel.</p>
+    <p>Bij de twee Python-scripts geef je met <code>--relay</code> een gehoste sector op (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>) of het https-adres van je eigen server, bijvoorbeeld <code>--relay https://relay.example.com</code>. Ze versleutelen met een eigen transfergeheim (<code>--secret</code> of <code>PARAMANT_TRANSFER_SECRET</code>), nooit met de API-sleutel.</p>
     <pre><span class="cm"># Example: send a file (the transfer secret is printed once; give it to the receiver)</span>
 python3 scripts/paramant-sender.py --key pgp_xxx --relay health --file scan.dcm
 
@@ -898,7 +898,7 @@ python3 scripts/paramant-receiver.py --key pgp_xxx --relay health --hash &lt;has
 
     <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Cryptografie</h2>
-    <p>Op elke route op deze pagina, op één na, gebeurt het versleutelen aan de clientkant. De relay ziet nooit leesbare inhoud en heeft nooit een privésleutel, met één uitzondering: de gehoste ondertekenronde op de <code>/v1</code>-API. Het curl-voorbeeld hierboven uploadt een pdf als <code>content_base64</code>, en dan leest de relay een document omdat dat verzoek erom vroeg.</p>
+    <p>Bij alle endpoints op deze pagina, op één na, versleutelt de client zelf. De server ziet dan nooit leesbare inhoud en heeft nooit een privésleutel. De uitzondering is de gehoste ondertekenronde op de <code>/v1</code>-API. Het curl-voorbeeld hierboven uploadt een pdf als <code>content_base64</code>. In dat geval leest de server het document, omdat het verzoek daarom vraagt.</p>
     <table>
       <tr><th>Algoritme</th><th>Rol</th><th>Standaard</th></tr>
       <tr><td>ML-KEM-768</td><td>Post-quantum sleutelinkapseling</td><td>NIST FIPS 203</td></tr>
@@ -906,19 +906,19 @@ python3 scripts/paramant-receiver.py --key pgp_xxx --relay health --hash &lt;has
       <tr><td>AES-256-GCM</td><td>Symmetrische geauthenticeerde versleuteling</td><td>NIST FIPS 197</td></tr>
       <tr><td>HKDF-SHA256</td><td>Sleutelafleiding uit de uitvoer van de hybride KEM</td><td>RFC 5869</td></tr>
       <tr><td>SHA3-256</td><td>Merkle-hashes van de CT-log · DID-hashes</td><td>NIST FIPS 202</td></tr>
-      <tr><td>ML-DSA-65</td><td>Identiteitshandtekeningen van de relay (authenticatie tussen relays)</td><td>NIST FIPS 204</td></tr>
+      <tr><td>ML-DSA-65</td><td>Identiteitshandtekeningen van de server (authenticatie tussen servers)</td><td>NIST FIPS 204</td></tr>
       <tr><td>Argon2id</td><td>Wachtwoord op een overdracht (hash, optionele module)</td><td>RFC 9106</td></tr>
     </table>
-    <p>Versleuteling in de browser draait als <strong>Rust/WASM</strong>, gecompileerd uit <code>crypto-wasm/</code>. De WASM-binary wordt tijdens het draaien met SHA-256 gecontroleerd, vóór het eerste gebruik. De JS-code van de relay kan op geen enkel moment bij sleutels om te ontsleutelen.</p>
-    <p>De twee helften draaien verschillende builds van dezelfde Rust-cryptografie. <strong>Sleutelinkapseling met ML-KEM-768 blijft aan de clientkant</strong> (WASM in de browser of de SDK): de relay wisselt nooit sleutels uit en heeft nooit een privésleutel. <strong>ML-DSA-65 draait aan de serverkant</strong>, voor het identiteitssleutelpaar van de relay, ondertekende ontvangstbewijzen en ondertekende tree heads (STH), en om handtekeningen van apparaten en ontvangstbewijzen te controleren. Sinds de M5b-migratie (27 mei 2026) komt die ML-DSA-65 aan de serverkant uit <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: een losse Rust-cryptobibliotheek, klaar voor audit (BUSL-1.1), die de relay gebruikt via de NAPI-binding <code>@paramant/core</code>.</p>
+    <p>Versleuteling in de browser draait als <strong>Rust/WASM</strong>, gecompileerd uit <code>crypto-wasm/</code>. De WASM-binary wordt tijdens het draaien met SHA-256 gecontroleerd, vóór het eerste gebruik. De JavaScript-code van de server kan op geen enkel moment bij de sleutels waarmee wordt ontsleuteld.</p>
+    <p>De client en de server gebruiken dezelfde Rust-cryptografie, elk apart gecompileerd. <strong>Sleutelinkapseling met ML-KEM-768 blijft aan de clientkant</strong> (WASM in de browser of de SDK): de server wisselt nooit sleutels uit en heeft nooit een privésleutel. <strong>ML-DSA-65 draait aan de serverkant</strong>, voor het identiteitssleutelpaar van de server, ondertekende ontvangstbewijzen en ondertekende tree heads (STH), en om handtekeningen van apparaten en ontvangstbewijzen te controleren. Sinds de migratie van 27 mei 2026 komt die ML-DSA-65 aan de serverkant uit <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: een losse Rust-cryptobibliotheek, klaar voor audit (BUSL-1.1), die de server gebruikt via de NAPI-binding <code>@paramant/core</code>.</p>
 
     <h2 id="burn">Burn-on-read: wissen na ophalen</h2>
-    <p>Zodra <code>GET /v2/outbound/:hash</code> de laatste byte heeft afgeleverd, overschrijft de relay de buffer van de blob met cryptografisch willekeurige bytes en verwijdert hij de vermelding uit het geheugen. Breekt de ontvanger de download af voordat de relay de laatste byte aan de verbinding gaf, dan blijft de blob staan en levert de volgende poging hem opnieuw, helemaal. Bij een blob tot een paar MB is die laatste byte door de buffers van het besturingssysteem meestal meteen weg. Versleutelde inhoud wordt tijdens de overdracht <strong>nooit naar schijf geschreven</strong>.</p>
-    <p>De CT-log slaat cryptografische hashes op schijf op (Merkle-leafhashes, tree-hashes, apparaathashes), nooit inhoud. Zelfs een volledige schijfkopie van de relayserver laat geen bestandsinhoud zien.</p>
-    <p>Wissen in twee stappen: eerst wordt de blob ter plekke met nullen overschreven, daarna wordt de Map-vermelding verwijderd. Zo is er geen kort moment waarop een gedeeltelijke lezing mogelijk is.</p>
+    <p>Zodra <code>GET /v2/outbound/:hash</code> de laatste byte heeft afgeleverd, overschrijft de server de buffer van de blob met cryptografisch willekeurige bytes en verwijdert hij de vermelding uit het geheugen. Breekt de ontvanger de download af voordat de server de laatste byte aan de verbinding gaf, dan blijft de blob staan en levert de volgende poging hem opnieuw, in zijn geheel. Bij een blob tot een paar MB is die laatste byte meestal meteen verstuurd, omdat het besturingssysteem de gegevens buffert. Versleutelde inhoud wordt tijdens de overdracht <strong>nooit naar schijf geschreven</strong>.</p>
+    <p>De CT-log slaat cryptografische hashes op schijf op (Merkle-leafhashes, tree-hashes, apparaathashes), nooit inhoud. Zelfs een volledige schijfkopie van de server laat geen bestandsinhoud zien.</p>
+    <p>Wissen gaat in twee stappen. Eerst wordt de blob ter plekke met nullen overschreven, daarna wordt de vermelding uit de Map verwijderd. Zo is er geen moment waarop iemand een deel van de blob nog kan lezen.</p>
 
     <h2 id="padding">Vaste opvulling tot 5 MB (SDK en live overdracht)</h2>
-    <p>De opvulling gebeurt bij de afzender, niet op de relay: de relay bewaart en levert precies de bytes die hij krijgt. De SDK's (standaard) en de live overdracht in de webapp van Versturen vullen elk blok vóór het uploaden op tot precies 5.242.880 bytes (5 MiB) met cryptografisch willekeurige bytes. Een eenmalige link uit de webapp en een verzending naar ontvangers op naam worden niet opgevuld; die blobs hebben hun echte versleutelde grootte. Bij een opgevuld blok geldt: de blokgrootte zegt een waarnemer niets over het bestand. Maar een overdracht groter dan één blok gaat als meerdere blokken, en <code>total_chunks</code> reist onversleuteld mee. Het aantal blokken is dus zichtbaar, en de bestandsgrootte is op een orde van grootte te schatten. Dat is bevinding 5 van de audit van april 2026, een bewust geaccepteerde afweging.</p>
+    <p>De afzender vult op. De server bewaart en levert precies de bytes die hij krijgt. De SDK's (standaard) en de live overdracht in de webapp van Versturen vullen elk blok vóór het uploaden op tot precies 5.242.880 bytes (5 MiB) met cryptografisch willekeurige bytes. Een eenmalige link uit de webapp en een verzending naar ontvangers op naam worden niet opgevuld; die blobs hebben hun echte versleutelde grootte. Bij een opgevuld blok zegt de blokgrootte een waarnemer niets over het bestand. Een overdracht groter dan één blok gaat wel als meerdere blokken, en <code>total_chunks</code> gaat onversleuteld mee. Het aantal blokken is dus zichtbaar, en de bestandsgrootte is op een orde van grootte te schatten. De audit van april 2026 noemde dit als bevinding 5. We hebben die afweging bewust geaccepteerd.</p>
 
     <h2 id="ct-log">Certificate Transparency-log</h2>
     <p>Elke overdrachtshash en elke apparaatregistratie wordt toegevoegd aan een openbare Merkle-boom. De root-hash verandert bij elke toevoeging en is door iedereen te controleren. Iedereen kan aantonen dat een overdracht plaatsvond, zonder te weten wat er is overgedragen.</p>
@@ -935,7 +935,7 @@ python3 scripts/paramant-receiver.py --key pgp_xxx --relay health --hash &lt;has
 
     <!-- ── Identity & Teams ─────────────────────────────────────── -->
     <h2 id="did">W3C Decentralized Identity</h2>
-    <p>Apparaten kunnen een W3C DID registreren op basis van ML-DSA-65- en ECDH-sleutels. Daarna worden verzoeken ondertekend, zonder API-sleutel in de header.</p>
+    <p>Apparaten kunnen een W3C DID registreren op basis van ML-DSA-65- en ECDH-sleutels. Daarna ondertekent het apparaat zijn verzoeken en is er geen API-sleutel in de header nodig.</p>
     <pre>POST /v2/did/register
 { "device_id": "mri-001", "ecdh_pub": "base64...", "dsa_pub": "base64..." }
 
@@ -956,19 +956,19 @@ python3 deploy/paramant-admin.py sync
 <span class="cm"># Revoke a key immediately</span>
 python3 deploy/paramant-admin.py revoke --key pgp_xxxxx
 python3 deploy/paramant-admin.py sync</pre>
-    <p>Sleutels wijzigen kan zonder onderbreking: bij een sync laadt de relay <code>users.json</code> opnieuw in zonder herstart. Ingetrokken sleutels krijgen binnen enkele seconden WebSocket-sluitcode <code>4401</code>.</p>
+    <p>Je kunt sleutels wijzigen zonder onderbreking. Bij een synchronisatie laadt de server <code>users.json</code> opnieuw in zonder herstart. Ingetrokken sleutels krijgen binnen enkele seconden WebSocket-sluitcode <code>4401</code>.</p>
 
     <h2 id="retention">Bewaartermijnen</h2>
     <table>
       <tr><th>Abonnement</th><th>Standaard-TTL</th><th>Maximale TTL</th><th>Maximale bestandsgrootte</th></tr>
       <tr><td>Community (pgp_)</td><td>1 uur</td><td>1 uur</td><td>500 MB</td></tr>
       <tr><td>Firm</td><td>1 uur</td><td>24 uur</td><td>500 MB</td></tr>
-      <tr><td>Enterprise</td><td>1 uur</td><td>7 dagen</td><td>500 MB, of de limiet die voor uw eigen relay is ingesteld</td></tr>
+      <tr><td>Enterprise</td><td>1 uur</td><td>7 dagen</td><td>500 MB, of de limiet die voor je eigen server is ingesteld</td></tr>
     </table>
-    <p>De abonnementen verschillen niet in bestandsgrootte, dus het plafond is overal gelijk. Twee andere getallen worden hier vaak mee verward. Een blob van de SDK op <code>POST /v2/inbound</code> is een vast blok van 5 MB, de opvulgrootte onderweg, dus een bestand groter dan één blok gaat als meerdere blokken. En een eenmalige link uit de webapp van Versturen is één blok onder één token, dus die ene manier van versturen stopt bij 5 MB per bestand. De live overdracht in dezelfde webapp knipt het bestand in stukken en haalt wel de 500 MB uit deze tabel.</p>
+    <p>De maximale bestandsgrootte is op elk abonnement gelijk. Twee andere getallen worden hier vaak mee verward. Een blob van de SDK op <code>POST /v2/inbound</code> is een vast blok van 5 MB: dat is de opvulgrootte onderweg. Een bestand groter dan één blok gaat dus als meerdere blokken. Een eenmalige link uit de webapp van Versturen is één blok onder één token. Op die manier kun je dus hoogstens 5 MB per bestand versturen. De live overdracht in dezelfde webapp knipt het bestand in stukken en haalt wel de 500 MB uit deze tabel.</p>
 
-    <h2 id="sectors">Relay-sectoren</h2>
-    <p>Alle sectornodes draaien <strong>dezelfde Ghost Pipe-relaysoftware</strong>. Sectoren zijn routeringsdomeinen: ze houden verkeer gescheiden en hebben compliance-documentatie per sector. De cryptografie en de API zijn overal gelijk.</p>
+    <h2 id="sectors">Sectorservers</h2>
+    <p>Alle sectornodes draaien <strong>dezelfde serversoftware (Ghost Pipe)</strong>. Een sector is een apart domein voor het verkeer. Zo blijft het verkeer per sector gescheiden, met eigen compliance-documentatie. De cryptografie en de API zijn overal gelijk.</p>
     <table>
       <tr><th>Sector</th><th>URL</th><th>Belangrijkste gebruik</th><th>Compliance</th></tr>
       <tr><td><span class="sector-badge">health</span></td><td>health.paramant.app</td><td>DICOM, patiëntdossiers, vitale functies</td><td>NEN 7510, AVG</td></tr>
@@ -979,29 +979,29 @@ python3 deploy/paramant-admin.py sync</pre>
 
     <!-- ── Security ─────────────────────────────────────────────── -->
     <h2 id="threat-model">Beveiliging: dreigingsmodel</h2>
-    <p>Het ontwerp gaat ervan uit dat de relay <strong>niet te vertrouwen</strong> is. De beveiliging hangt niet af van vertrouwen in de beheerder.</p>
+    <p>Het ontwerp gaat ervan uit dat de server <strong>niet te vertrouwen</strong> is. Je hoeft de beheerder dus niet te vertrouwen voor de beveiliging.</p>
     <table>
-      <tr><th>Wat een gecompromitteerde relay kan</th><th>Wat hij niet kan</th></tr>
+      <tr><th>Wat een gecompromitteerde server kan</th><th>Wat hij niet kan</th></tr>
       <tr><td>Dienst weigeren of vertragen</td><td>Bestandsinhoud lezen (geen sleutel om te ontsleutelen)</td></tr>
       <tr><td>Tijdstip en frequentie van overdrachten zien</td><td>Een geregistreerde publieke ML-KEM-sleutel vervangen (de CT-log voorkomt terugdraaien)</td></tr>
-      <tr><td>Zien dat er een blob binnenkwam (inhoud onleesbaar; van de SDK en de live overdracht vast 5 MB, van een eenmalige link of een verzending op naam de echte versleutelde grootte)</td><td>Handtekeningen van de relay vervalsen (ML-DSA-65-sleutel per relay, ondertekend)</td></tr>
+      <tr><td>Zien dat er een blob binnenkwam (inhoud onleesbaar; van de SDK en de live overdracht vast 5 MB, van een eenmalige link of een verzending op naam de echte versleutelde grootte)</td><td>Handtekeningen van de server vervalsen (ML-DSA-65-sleutel per server, ondertekend)</td></tr>
       <tr><td>Een bepaalde apparaathash blokkeren</td><td>Opgeslagen versleutelde gegevens ontsleutelen</td></tr>
     </table>
-    <p>Het dreigingsmodel gaat uit van aanvallers op netwerkniveau, gecompromitteerde relaybeheerders en aanvallers met een quantumcomputer. Bij de live overdracht in de webapp is de versleuteling hybride (ML-KEM-768 + ECDH P-256), zodat het breken van <em>één</em> van beide niet genoeg is: beide moeten tegelijk gebroken worden. De Python-SDK gebruikt ML-KEM-768. Een eenmalige link en een verzending op naam gebruiken AES-256-GCM zonder ML-KEM.</p>
+    <p>Het dreigingsmodel gaat uit van aanvallers op netwerkniveau, gecompromitteerde serverbeheerders en aanvallers met een quantumcomputer. Bij de live overdracht in de webapp is de versleuteling hybride (ML-KEM-768 + ECDH P-256), Wie <em>één</em> van beide breekt, komt er nog niet in: beide moeten tegelijk gebroken worden. De Python-SDK gebruikt ML-KEM-768. Een eenmalige link en een verzending op naam gebruiken AES-256-GCM zonder ML-KEM.</p>
 
-    <div class="callout"><span class="callout-label">De kern</span>
-      <p><strong style="color:var(--lime)">De kern:</strong> bij de live overdracht, de SDK en een eenmalige link bewaart de relay versleutelde blobs die hij niet kan ontsleutelen, en Merkle-hashes die hij niet kan vervalsen. Twee uitzonderingen. Bij een verzending naar ontvangers op naam krijgt de relay in hetzelfde verzoek de ingepakte sleutel en het token dat hem uitpakt, en dat token gaat per e-mail naar de ontvanger; dat is dus niet zero-knowledge. En de ParaSign-API <code>/v1</code> bewaart de pdf zelf, versleuteld met een sleutel van de relay, zolang de envelope bestaat.</p>
+    <div class="callout"><span class="callout-label">Samengevat</span>
+      <p><strong style="color:var(--lime)">Samengevat:</strong> bij de live overdracht, de SDK en een eenmalige link bewaart de server versleutelde blobs die hij niet kan ontsleutelen, en Merkle-hashes die hij niet kan vervalsen. Er zijn twee uitzonderingen. Bij een verzending naar ontvangers op naam krijgt de server in hetzelfde verzoek de ingepakte sleutel en het token waarmee die sleutel wordt uitgepakt. Dat token gaat per e-mail naar de ontvanger. Strikt genomen is versturen op naam dus niet zero-knowledge. De sleutel zit daarnaast op slot met een code die de afzender zelf doorgeeft en die nooit bij de server komt. Zonder die code kan de server het bestand niet openen. Daarnaast bewaart de ParaSign-API <code>/v1</code> de pdf zelf, versleuteld met een sleutel van de server, zolang de envelope bestaat.</p>
     </div>
 
     <h3>Rechtsgebied</h3>
-    <p>De beheerde relay-infrastructuur draait uitsluitend bij <strong>Hetzner in Neurenberg, Duitsland</strong>. EU-recht en de AVG zijn van toepassing. De Amerikaanse Cloud Act geldt niet: Hetzner is een Duits bedrijf zonder Amerikaans moederbedrijf. Bestanden en documenten gaan niet buiten de EU. De uitzondering is e-mail: het e-mailadres en de link gaan via Resend in de Verenigde Staten. Bij een verzending naar ontvangers op naam opent die link het bestand, dus dan reist de sleutel tot het bestand via Resend. Elke partij met haar status: <a href="/partners">/partners</a>.</p>
+    <p>De beheerde serverinfrastructuur draait uitsluitend bij <strong>Hetzner in Neurenberg, Duitsland</strong>. EU-recht en de AVG zijn van toepassing. De Amerikaanse Cloud Act geldt niet: Hetzner is een Duits bedrijf zonder Amerikaans moederbedrijf. Bestanden en documenten gaan niet buiten de EU. De uitzondering is e-mail. Onze e-mail gaat nu nog via Resend, een bedrijf in de Verenigde Staten. Resend is de enige partij buiten de EU die iets van je verzending te zien krijgt. In een uitnodiging om te tekenen staat maar de helft van de sleutel; de andere helft krijgt de ontvanger pas als die is ingelogd. Met alleen de mail kan niemand het document openen. Bij versturen op naam geeft de afzender een code zelf door. Zonder die code kan niemand het bestand openen, ook wij niet. Elke partij met haar status: <a href="/partners">/partners</a>.</p>
 
     <h2 id="audits">Beveiligingsaudits</h2>
     <table>
       <tr><th>Datum</th><th>Auditor</th><th>Bevindingen</th><th>Status</th></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (verificatie)</td><td>14 in totaal (1H · 8M · 5L)</td><td>Alles opgelost: e6f216d</td></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (onafhankelijk)</td><td>6 in totaal (3H · 3M)</td><td>Alles opgelost: 0db3ef0</td></tr>
-      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>Opgelost in 0db3ef0, op drie na: #4 (kritiek, bestandsnaam leesbaar in het RAM van de relay), #6 (hoog, het wissen van sleutels in de Python-scripts werkt alleen op CPython en waarschuwt nog niet) en #14 (CT-boom niet volgens RFC 6962) staan nog open, zie <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a></td></tr>
+      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>Opgelost in 0db3ef0, op drie na: #4 (kritiek, bestandsnaam leesbaar in het RAM van de server), #6 (hoog, het wissen van sleutels in de Python-scripts werkt alleen op CPython en waarschuwt nog niet) en #14 (CT-boom niet volgens RFC 6962) staan nog open, zie <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a></td></tr>
     </table>
     <p>Alle bevindingen staan openbaar in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)" rel="noopener">SECURITY.md</a>. Een kwetsbaarheid melden: <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
 
@@ -1011,7 +1011,7 @@ python3 deploy/paramant-admin.py sync</pre>
     <ul>
       <li>Post-quantum versleuteling bij de live overdracht en de SDK (cryptografie die ook later standhoudt)</li>
       <li>Merkle CT-log: manipulatiebestendig auditspoor voor elke overdracht</li>
-      <li>Infrastructuur alleen in de EU (Hetzner DE): bestanden blijven in het EU-rechtsgebied; e-mail loopt via Resend in de VS, en bij een verzending op naam zit in die mail de link met het token dat het bestand opent</li>
+      <li>Infrastructuur alleen in de EU (Hetzner DE): bestanden blijven in het EU-rechtsgebied; e-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen op naam geeft de afzender een code zelf door; zonder die code kan niemand het bestand openen, ook wij niet</li>
       <li>Burn-on-read: zo min mogelijk bewaarde gegevens</li>
       <li>Sleutels intrekken zonder onderbreking: direct ingrijpen bij een incident</li>
     </ul>
@@ -1021,7 +1021,7 @@ python3 deploy/paramant-admin.py sync</pre>
     <p>NEN 7510 is de Nederlandse norm voor informatiebeveiliging in de zorg. De sector health.paramant.app is ontworpen voor NEN 7510:</p>
     <ul>
       <li>Versleuteld onderweg en in opslag (technisch: alleen RAM, nooit schijf)</li>
-      <li>Uploads in de openbare CT-log; elke download en bevestiging in de privé-auditketen van uw sleutel (<code>/v2/audit</code>)</li>
+      <li>Uploads in de openbare CT-log; elke download en bevestiging in de privé-auditketen van je sleutel (<code>/v2/audit</code>)</li>
       <li>Registratie van apparaatidentiteit (DID): toegang per apparaat te herleiden</li>
       <li>Toegang op basis van sleutels: API-sleutels per gebruiker, in te trekken</li>
       <li>Hetzner DE: EU-recht en AVG, geschikt voor het doorgeven van patiëntgegevens</li>
@@ -1040,12 +1040,12 @@ python3 deploy/paramant-admin.py sync</pre>
     <!-- ── FAQ ──────────────────────────────────────────────────── -->
     <!-- Operator scripts -->
     <h2 id="operator-scripts">Scripts voor beheerders</h2>
-    <p>Wie zelf host, krijgt een set hulpprogramma's voor de opdrachtregel onder <code>scripts/</code> in de repo <a href="https://github.com/Apolloccrypt/paramant-relay" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-relay</a>. Log met SSH in op uw relayserver en voer ze uit vanuit de hoofdmap van de repo. Voor de meeste is er een variant in de browser op <a href="/admin/cli" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">/admin/cli</a> (inloggen als beheerder vereist).</p>
+    <p>Wie zelf host, krijgt een set hulpprogramma's voor de opdrachtregel onder <code>scripts/</code> in de repo <a href="https://github.com/Apolloccrypt/paramant-relay" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-relay</a>. Log met SSH in op de server waarop je server draait en voer ze uit vanuit de hoofdmap van de repo. Voor de meeste is er een variant in de browser op <a href="/admin/cli" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">/admin/cli</a> (inloggen als beheerder vereist).</p>
     <ul>
       <li><strong>Sleutels.</strong> <code>scripts/paramant-key-add.sh</code>: een API-sleutel aanmaken.</li>
-      <li><strong>Ondertekenen.</strong> <code>scripts/paramant-sign</code>: controleert een <code>.psign</code>-envelope (<code>verify --psign ... --document ...</code>). Document en handtekening controleert hij lokaal; de notarishandtekening vraagt hij aan de relay (<code>POST /v2/verify</code>), dus daarvoor is een verbinding nodig. Het commando <code>sign</code> werkt niet meer: de relay heeft <code>/v2/sign</code> uitgezet (410). Ondertekenen gaat in de browser op <a href="/sign">/sign</a>.</li>
-      <li><strong>Veilig uitrollen.</strong> <code>scripts/post-deploy-verify.sh</code>: snelle controle na het uitrollen (exitcode 2 bij een kritieke fout); <code>scripts/rollback-3.0.0.sh</code>: terug naar de vorige gebouwde relay-image.</li>
-      <li><strong>Reservekopieën.</strong> <code>scripts/backup-users-json.sh</code>: met age versleutelde reservekopie van de sleutelmetadata van de relay (staat al in cron, dagelijks om 03:15; alleen ontsleutelen in tmpfs).</li>
+      <li><strong>Ondertekenen.</strong> <code>scripts/paramant-sign</code>: controleert een <code>.psign</code>-envelope (<code>verify --psign ... --document ...</code>). Document en handtekening controleert het script lokaal. Voor de notarishandtekening vraagt het de server (<code>POST /v2/verify</code>), dus daarvoor is een verbinding nodig. Het commando <code>sign</code> werkt niet meer: de server heeft <code>/v2/sign</code> uitgezet (410). Ondertekenen gaat in de browser op <a href="/sign">/sign</a>.</li>
+      <li><strong>Veilig uitrollen.</strong> <code>scripts/post-deploy-verify.sh</code>: snelle controle na het uitrollen (exitcode 2 bij een kritieke fout); <code>scripts/rollback-3.0.0.sh</code>: zet de vorige image van de server terug.</li>
+      <li><strong>Reservekopieën.</strong> <code>scripts/backup-users-json.sh</code>: met age versleutelde reservekopie van de sleutelmetadata van de server (staat al in cron, dagelijks om 03:15; alleen ontsleutelen in tmpfs).</li>
     </ul>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
@@ -1057,48 +1057,48 @@ python3 deploy/paramant-admin.py sync</pre>
     <h2 id="faq">Veelgestelde vragen</h2>
 
     <div class="faq-item">
-      <div class="faq-q">Kan de relaybeheerder mijn bestanden lezen?</div>
-      <div class="faq-a">Nee. Het versleutelen gebeurt in de browser of de SDK, voordat het bestand uw apparaat verlaat. De relay ontvangt versleutelde gegevens die hij niet kan ontsleutelen. Zelfs wie volledige rootrechten op de relayserver krijgt, vindt alleen versleutelde blobs en Merkle-hashes.</div>
+      <div class="faq-q">Kan de serverbeheerder mijn bestanden lezen?</div>
+      <div class="faq-a">Nee. Het versleutelen gebeurt in de browser of de SDK, voordat het bestand je apparaat verlaat. De server ontvangt versleutelde gegevens die hij niet kan ontsleutelen. Zelfs wie volledige rootrechten op de server krijgt, vindt alleen versleutelde blobs en Merkle-hashes. Er zijn twee kanttekeningen. Bij ondertekenen via de API <code>/v1</code> krijgt de server het document zelf, omdat hij de ondertekening uitvoert; hij bewaart de pdf versleuteld met een eigen sleutel zolang de envelope bestaat. Bij versturen op naam ziet de server de link één keer, maar zonder de code die de afzender zelf doorgeeft, gaat het bestand niet open.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Wat gebeurt er nadat het bestand is gedownload?</div>
-      <div class="faq-a">De buffer van de blob wordt direct overschreven met willekeurige bytes en uit het geheugen verwijderd. Er is geen herstel, geen reservekopie en geen tweede download. De CT-log bevat alleen de hash van het uploaden; het ophalen en wissen staan in de privé-auditketen van uw sleutel. Geen van beide bevat de inhoud van het bestand.</div>
+      <div class="faq-a">De buffer van de blob wordt direct overschreven met willekeurige bytes en uit het geheugen verwijderd. Er is geen herstel, geen reservekopie en geen tweede download. De CT-log bevat alleen de hash van het uploaden; het ophalen en wissen staan in de privé-auditketen van je sleutel. Geen van beide bevat de inhoud van het bestand.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Is Community Edition echt altijd gratis?</div>
-      <div class="faq-a">Ja. Tot 5 gebruikers, zonder licentiesleutel en zonder tijdslimiet. De 6e gebruiker geeft HTTP 402: zet een <code>PLK_KEY</code> in .env voor een onbeperkt aantal gebruikers. De broncode is beschikbaar onder BUSL-1.1.</div>
+      <div class="faq-a">Ja. Tot 5 gebruikers, zonder licentiesleutel en zonder tijdslimiet. Bij de 6e gebruiker krijg je HTTP 402. Zet een <code>PLK_KEY</code> in .env voor een onbeperkt aantal gebruikers. De broncode is beschikbaar onder BUSL-1.1.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Wat is het verschil tussen pgp_- en plk_-sleutels?</div>
-      <div class="faq-a"><code>pgp_</code>-sleutels zijn voor eindgebruikers: ze authenticeren API-aanroepen om bestanden te versturen en te ontvangen. <code>plk_</code>-sleutels zijn licentiesleutels voor relaybeheerders: ze staan in .env, niet in API-aanroepen, en maken een onbeperkt aantal gebruikers mogelijk. Het zijn nooit dezelfde sleutels en ze zijn niet uitwisselbaar.</div>
+      <div class="faq-a"><code>pgp_</code>-sleutels zijn voor eindgebruikers: ze authenticeren API-aanroepen om bestanden te versturen en te ontvangen. <code>plk_</code>-sleutels zijn licentiesleutels voor serverbeheerders: ze staan in .env, niet in API-aanroepen, en maken een onbeperkt aantal gebruikers mogelijk. Het zijn nooit dezelfde sleutels en ze zijn niet uitwisselbaar.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Hoe beschermt de opvulling tot 5 MB mij?</div>
-      <div class="faq-a">De SDK en de live overdracht vullen elk blok op tot dezelfde 5 MiB (een eenmalige link en een verzending op naam niet), dus een passieve waarnemer ziet geen verschil tussen een heartbeat van 1 KB en een DICOM-scan van 4,9 MB: beide zijn één blok. De blokgrootte zegt een waarnemer niets over het bestand. Maar een overdracht groter dan één blok gaat als meerdere blokken, en <code>total_chunks</code> reist onversleuteld mee. Het aantal blokken is dus zichtbaar, en de bestandsgrootte is op een orde van grootte te schatten. Dat is bevinding 5 van de audit van april 2026, een bewust geaccepteerde afweging.</div>
+      <div class="faq-a">De SDK en de live overdracht vullen elk blok op tot dezelfde 5 MiB (een eenmalige link en een verzending op naam niet), dus een passieve waarnemer ziet geen verschil tussen een heartbeat van 1 KB en een DICOM-scan van 4,9 MB: beide zijn één blok. De blokgrootte zegt een waarnemer niets over het bestand. Een overdracht groter dan één blok gaat wel als meerdere blokken, en <code>total_chunks</code> gaat onversleuteld mee. Het aantal blokken is dus zichtbaar, en de bestandsgrootte is op een orde van grootte te schatten. De audit van april 2026 noemde dit als bevinding 5. We hebben die afweging bewust geaccepteerd.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Kan ik dit op een Raspberry Pi draaien?</div>
-      <div class="faq-a">Ja. De relay draait op arm64: Raspberry Pi 3B+, 4 en 5 worden ondersteund. Het script <code>curl -fsSL https://paramant.app/install-pi.sh | bash</code> herkent uw Pi-model, installeert Docker, schakelt swap uit en start de relay. Minimaal 512 MB RAM voor een relay met één sector.</div>
+      <div class="faq-a">Ja. De server draait op arm64: Raspberry Pi 3B+, 4 en 5 worden ondersteund. Het script <code>curl -fsSL https://paramant.app/install-pi.sh | bash</code> herkent je Pi-model, installeert Docker, schakelt swap uit en start de server. Minimaal 512 MB RAM voor een server met één sector.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Is de broncode te controleren?</div>
-      <div class="faq-a">Ja. De volledige broncode van de relay staat op <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="color:var(--cobalt)" rel="noopener">github.com/Apolloccrypt/paramant-relay</a> onder BUSL-1.1. In april 2026 zijn drie onafhankelijke beveiligingsaudits uitgevoerd; alle bevindingen staan openbaar in SECURITY.md. De checksum van de relaybinary wordt bij het opstarten gecontroleerd en vastgelegd in de CT-log.</div>
+      <div class="faq-a">Ja. De volledige broncode van de server staat op <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="color:var(--cobalt)" rel="noopener">github.com/Apolloccrypt/paramant-relay</a> onder BUSL-1.1. In april 2026 zijn drie onafhankelijke beveiligingsaudits uitgevoerd; alle bevindingen staan openbaar in SECURITY.md. De checksum van het serverprogramma wordt bij het opstarten gecontroleerd en vastgelegd in de CT-log.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Wat is Ghost Pipe?</div>
-      <div class="faq-a">Ghost Pipe is het relayprotocol: een versleuteld overdrachtsprotocol op basis van WebSocket; de SDK versleutelt post-quantum (ML-KEM-768). Gegevens staan alleen in RAM en worden vernietigd na de laatste lezing die de link toestaat (één op Community, tot 10 op Firm). De SDK vult elk blok op tot een vaste grootte. Het is ontworpen voor vijandige omgevingen waarin de relay zelf gecompromitteerd kan zijn.</div>
+      <div class="faq-a">Ghost Pipe is de naam van het protocol waarmee de server gegevens doorgeeft. Het is een versleuteld overdrachtsprotocol op basis van WebSocket. De SDK versleutelt post-quantum (ML-KEM-768). Gegevens staan alleen in RAM en worden vernietigd na de laatste lezing die de link toestaat (één op Community, tot 10 op Firm). De SDK vult elk blok op tot een vaste grootte. Het is ontworpen voor vijandige omgevingen waarin de server zelf gecompromitteerd kan zijn.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">Hoe krijg ik een pgp_-API-sleutel?</div>
-      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a>: maak een gratis account aan en ontvang uw API-sleutel, beveiligd met TOTP. Community-abonnement: 50 overdrachten per maand, 500 MB per bestand verstuurd in blokken van 5 MB, TTL van 1 uur, gewist bij de eerste lezing. Een eenmalige link uit de webapp is één blok, dus die manier stopt bij 5 MB per bestand. Zie <a href="/pricing">/pricing</a> voor de details per abonnement.</div>
+      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a>: maak een gratis account aan en ontvang je API-sleutel, beveiligd met TOTP. Community-abonnement: 50 overdrachten per maand, 500 MB per bestand verstuurd in blokken van 5 MB, TTL van 1 uur, gewist bij de eerste lezing. Een eenmalige link uit de webapp is één blok. Daarmee kun je dus hoogstens 5 MB per bestand versturen. Zie <a href="/pricing">/pricing</a> voor de details per abonnement.</div>
     </div>
 
   </div>

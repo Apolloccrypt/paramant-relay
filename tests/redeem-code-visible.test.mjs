@@ -109,7 +109,7 @@ async function typeAndSubmit(page, code) {
   await page.click('[data-redeem-form] [data-redeem-submit]');
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-redeem-form] [data-redeem-message]');
-    return el && !el.hidden && el.textContent && !/Checking your code|We controleren uw code/.test(el.textContent);
+    return el && !el.hidden && el.textContent && !/Checking your code|We controleren je code/.test(el.textContent);
   }, null, { timeout: 10000 });
   return page.textContent('[data-redeem-form] [data-redeem-message]');
 }
@@ -119,7 +119,7 @@ async function typeAndSubmit(page, code) {
 // page declares.
 const REDEEM_COPY = {
   en: { empty: 'Enter your code first.', offline: /try again in a minute/i },
-  nl: { empty: 'Vul eerst uw code in.', offline: /probeer het over een minuut opnieuw/i },
+  nl: { empty: 'Vul eerst je code in.', offline: /probeer het over een minuut opnieuw/i },
 };
 for (const slug of ['/pricing', '/en/pricing', '/account', '/en/account']) {
   test(`${slug} carries the code field, and asks for no credential until it is used`, async () => {

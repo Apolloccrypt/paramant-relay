@@ -183,11 +183,11 @@ test('/co-sign noemt een niet-gekoppelde sleutel bij naam en biedt opnieuw koppe
   await page.locator('#cs-pass-panel:not([hidden])').waitFor({ timeout: 20000 });
   await page.locator('#cs-pass-input').fill('123456');
   await page.locator('#cs-pass-confirm').click();
-  await page.waitForFunction(() => /niet aan uw account gekoppeld|e-mailadres/.test(document.querySelector('#sign-status')?.textContent || ''), null, { timeout: 30000 });
+  await page.waitForFunction(() => /niet aan je account gekoppeld|e-mailadres/.test(document.querySelector('#sign-status')?.textContent || ''), null, { timeout: 30000 });
   const text = await page.locator('#sign-status').innerText();
   const relink = await page.locator('#cs-relink-key').count();
   await ctx.close();
-  assert.match(text, /niet aan uw account gekoppeld/, text);
+  assert.match(text, /niet aan je account gekoppeld/, text);
   assert.doesNotMatch(text, /ander e-mailadres/, text);
   assert.equal(relink, 1, 'er is een knop om de sleutel opnieuw te koppelen');
 });

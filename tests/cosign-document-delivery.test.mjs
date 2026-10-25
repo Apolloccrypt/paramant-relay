@@ -243,11 +243,11 @@ const seededLook = await seedPage.evaluate(() => {
 });
 ok('the seeded box wears the requested style, not the signed style',
   /\brequested\b/.test(seededLook.className) && seededLook.borderStyle === 'dashed'
-  && /Uw handtekening komt hier/i.test(seededLook.text) && !/Signer Demo/.test(seededLook.text) && !seededLook.hasRemove,
+  && /Je handtekening komt hier/i.test(seededLook.text) && !/Signer Demo/.test(seededLook.text) && !seededLook.hasRemove,
   JSON.stringify(seededLook));
 ok('the marked spot is brought into view when the document opens', seededLook.inView === true, JSON.stringify(seededLook));
 ok('a line above the document points at the spot',
-  seededLook.noteVisible && /afzender heeft aangegeven waar u tekent/i.test(seededLook.noteText) && /Naar die plek/i.test(seededLook.goLabel),
+  seededLook.noteVisible && /afzender heeft aangegeven waar je tekent/i.test(seededLook.noteText) && /Naar die plek/i.test(seededLook.goLabel),
   JSON.stringify(seededLook));
 
 // Scroll away, then use the button: it has to bring the spot back.
@@ -284,7 +284,7 @@ const touchTargets = await seedPage.evaluate(() => Array.from(
 ).filter((b) => b.offsetParent !== null).map((b) => ({ id: b.id, h: Math.round(b.getBoundingClientRect().height) })));
 ok('every control on the signing screen is a 44px touch target',
   touchTargets.length >= 5 && touchTargets.every((b) => b.h >= 44), JSON.stringify(touchTargets));
-ok('the recipient is told it is a request they may move', /plekken zijn voor u/i.test(seeded.help) && /verplaatsen/i.test(seeded.help) && /waar u echt tekent/i.test(seeded.help), seeded.help);
+ok('the recipient is told it is a request they may move', /plekken zijn voor jou/i.test(seeded.help) && /verplaatsen/i.test(seeded.help) && /waar je echt tekent/i.test(seeded.help), seeded.help);
 ok('a requested position is not silently adopted as the signer draft', seeded.draft === '', seeded.draft);
 
 await seedPage.locator('#appearance-seal').click();

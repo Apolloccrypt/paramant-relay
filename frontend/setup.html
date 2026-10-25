@@ -17,19 +17,17 @@
 <body>
   <main class="setup-wizard" style="max-width:640px;margin:48px auto;padding:0 20px">
     <h1>Eerste installatie van Paramant</h1>
-    <p>Uw relay instellen duurt ongeveer 5 minuten. Deze wizard draait één keer
-       en gaat dicht zodra uw eerste gebruiker is aangemaakt.</p>
+    <p>Het instellen van je server duurt ongeveer 5 minuten. Deze wizard werkt maar één keer. Zodra je eerste gebruiker is aangemaakt, gaat hij dicht.</p>
 
     <noscript>
-      <p><strong>Deze wizard heeft JavaScript nodig.</strong> U kunt de relay
-         ook met de hand instellen: pas <code>.env</code> aan en gebruik
+      <p><strong>Deze wizard heeft JavaScript nodig.</strong> Je kunt de server ook met de hand instellen: pas <code>.env</code> aan en gebruik
          <code>scripts/paramant-key-add.sh</code>.</p>
     </noscript>
 
     <div class="step" data-step="1">
-      <h2>Stap 1 van 6: kies uw sectoren</h2>
-      <p>Elke sector is een relay voor een eigen compliancegebied.</p>
-      <label><input type="checkbox" name="sector-general" checked> Algemene relay</label><br>
+      <h2>Stap 1 van 6: kies je sectoren</h2>
+      <p>Elke sector krijgt een eigen server, met de regels die voor die sector gelden.</p>
+      <label><input type="checkbox" name="sector-general" checked> Algemene server</label><br>
       <label><input type="checkbox" name="sector-health"> Zorg (NEN 7510)</label><br>
       <label><input type="checkbox" name="sector-finance"> Financiën (NIS2/DORA)</label><br>
       <label><input type="checkbox" name="sector-legal"> Juridisch (eIDAS)</label><br>
@@ -39,11 +37,11 @@
 
     <div class="step" data-step="2" hidden>
       <h2>Stap 2 van 6: domein en TLS</h2>
-      <p>Op welk domein bereiken gebruikers deze relay?</p>
+      <p>Op welk domein bereiken gebruikers deze server?</p>
       <input type="text" name="domain" placeholder="relay.your-org.com">
-      <p class="hint">Laat leeg om in localhost-modus te draaien (geen publiek domein, geen TLS).</p>
+      <p class="hint">Laat dit leeg als de server alleen lokaal draait, op localhost. Dan is er geen publiek domein en geen TLS.</p>
       <label><input type="checkbox" name="auto-tls" checked> TLS automatisch aanvragen via Let's Encrypt</label>
-      <p class="hint">Hiervoor zijn DNS A-records nodig voor elk subdomein per sector.</p>
+      <p class="hint">Daarvoor heeft elke sector een eigen subdomein nodig, met een DNS A-record.</p>
       <p id="dns-status" class="hint" aria-live="polite" style="min-height:3.2em"></p>
       <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
         <button class="back btn btn-secondary" type="button">Terug</button>
@@ -63,7 +61,7 @@
 
     <div class="step" data-step="4" hidden>
       <h2>Stap 4 van 6: eerste gebruikersaccount</h2>
-      <p>Maak de API-sleutel voor uw eerste gebruiker. U ontvangt hem per e-mail.</p>
+      <p>Maak de API-sleutel voor je eerste gebruiker. Je ontvangt hem per e-mail.</p>
       <input type="email" name="first-user-email" required placeholder="user@your-org.com">
       <input type="text" name="first-user-label" placeholder="my-laptop">
       <select name="first-user-plan">
@@ -78,7 +76,7 @@
 
     <div class="step" data-step="5" hidden>
       <h2>Stap 5 van 6: compliancesjabloon</h2>
-      <p>We stellen bewaartermijnen, audit en TTL alvast in voor uw situatie.</p>
+      <p>We stellen de bewaartermijnen, het auditlog en de levensduur van bestanden (TTL) alvast in voor je situatie.</p>
       <select name="compliance-template">
         <option value="generic">Algemeen (NIS2-basis)</option>
         <option value="nen7510">NEN 7510 (Nederlandse zorg)</option>
@@ -94,11 +92,11 @@
 
     <div class="step" data-step="6" hidden>
       <h2>Stap 6 van 6: controleren en starten</h2>
-      <p>Controleer uw instellingen voordat u ze toepast.</p>
+      <p>Controleer je instellingen voordat je ze toepast.</p>
       <div id="review-summary" aria-live="polite"></div>
       <label for="setup-token" style="display:block;margin-top:16px">Installatiecode</label>
       <input type="text" id="setup-token" name="setup-token" autocomplete="off" spellcheck="false" placeholder="pst_..." style="font-family:var(--mono)">
-      <p class="hint">De relay schrijft deze eenmalige code bij de start in het bestand <code>setup-token</code> naast <code>users.json</code> (niet in zijn log). Zo kan alleen wie de server beheert de installatie afronden.</p>
+      <p class="hint">Bij het starten schrijft de server deze eenmalige code in het bestand <code>setup-token</code>, naast <code>users.json</code>. De code komt niet in het logboek. Zo kan alleen wie de server beheert de installatie afronden.</p>
       <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
         <button class="back btn btn-secondary" type="button">Terug</button>
         <button id="apply" class="btn btn-primary" type="button">Instellingen toepassen</button>
@@ -107,14 +105,14 @@
     </div>
 
     <div class="step" data-step="done" hidden>
-      <h2>Uw relay draait</h2>
+      <h2>Je server draait</h2>
       <div id="done-body">
-        <p>Installatie klaar. Log in op het dashboard om uw eerste bestand te versturen.</p>
+        <p>De installatie is klaar. Log in op het dashboard om je eerste bestand te versturen.</p>
         <a href="/auth/login" class="btn">Inloggen</a>
       </div>
     </div>
   </main>
 
-  <script src="/setup.js?v=10"></script>
+  <script src="/setup.js?v=11"></script>
 </body>
 </html>

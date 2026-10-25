@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="De regels waar Paramant zich aan houdt: geen verzoeken naar derden, Europese soevereiniteit, standaard post-quantum, u beheert uw eigen sleutels, eerlijk van opzet.">
+<meta name="description" content="De regels van Paramant: je browser praat alleen met ons, de servers staan in Europa, de versleuteling is bestand tegen quantumcomputers en je sleutels zijn van jou.">
 <meta property="og:title" content="Onze regels · Waar Paramant voor staat">
-<meta property="og:description" content="De regels waar Paramant zich aan houdt: geen verzoeken naar derden, Europese soevereiniteit, standaard post-quantum, u beheert uw eigen sleutels, eerlijk van opzet.">
+<meta property="og:description" content="De regels van Paramant: je browser praat alleen met ons, de servers staan in Europa, de versleuteling is bestand tegen quantumcomputers en je sleutels zijn van jou.">
 <meta property="og:url" content="https://paramant.app/rules">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Onze regels · Waar Paramant voor staat">
-<meta name="twitter:description" content="De regels waar Paramant zich aan houdt: geen verzoeken naar derden, Europese soevereiniteit, standaard post-quantum, u beheert uw eigen sleutels, eerlijk van opzet.">
+<meta name="twitter:description" content="De regels van Paramant: je browser praat alleen met ons, de servers staan in Europa, de versleuteling is bestand tegen quantumcomputers en je sleutels zijn van jou.">
 <link rel="canonical" href="https://paramant.app/rules">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/rules">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/rules">
@@ -133,7 +133,7 @@ footer a{color:var(--ink);text-decoration:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "De regels waar Paramant zich aan houdt: geen verzoeken naar derden, Europese soevereiniteit, standaard post-quantum, u beheert uw eigen sleutels, eerlijk van opzet."
+      "description": "De regels van Paramant: je browser praat alleen met ons, de servers staan in Europa, de versleuteling is bestand tegen quantumcomputers en je sleutels zijn van jou."
     },
     {
       "@type": "Organization",
@@ -215,7 +215,7 @@ footer a{color:var(--ink);text-decoration:none}
 <h1>Onze regels</h1>
 <p class="updated">Waar Paramant voor staat, en hoe we het bouwen.</p>
 
-<p>Dit zijn de regels. Geen reclametekst. Het zijn de grenzen waar we ons aan houden, in het product en in de code. Breken we er ooit een, spreek ons daar dan op aan.</p>
+<p>Hieronder staan de grenzen waar we ons aan houden, in het product en in de code. Breken we er ooit een, spreek ons daar dan op aan.</p>
 
 <style>
 .rule-verify { margin-top: -6px; }
@@ -224,59 +224,59 @@ footer a{color:var(--ink);text-decoration:none}
 </style>
 <h2>Wat we garanderen</h2>
 
-<h3>1 &middot; We hebben het nooit gehad</h3>
-<p>Bestanden worden in uw browser versleuteld voordat ze bij ons aankomen. Bij Versturen bewaart de relay alleen versleutelde data, in het werkgeheugen, en vernietigt die na de laatste keer ophalen die de link toestaat: één keer op Community, tot 10 keer op Firm. We kunnen het niet lezen, niet lekken, en niet gedwongen worden af te staan wat we nooit hadden. Eén uitzondering: bij versturen naar ontvangers op naam (per e-mailadres) gaat het token dat de sleutel uitpakt één keer langs de relay om te worden gemaild. Op dat moment zouden we het bestand kunnen openen, dus die route is niet zero-knowledge. Een eenmalige link is dat wel.</p>
-<p class="rule-verify"><a href="/security">controleer: de opbouw van de relay &rarr;</a></p>
+<h3>1 &middot; Wat je verstuurt, kunnen wij niet lezen</h3>
+<p>Je browser versleutelt een bestand voordat het bij ons aankomt. Bij Versturen bewaart onze server alleen de versleutelde versie, in het werkgeheugen. Hij wist die zodra de link zo vaak is geopend als is toegestaan: één keer op Community, tot 10 keer op Firm. Wij kunnen het bestand dus niet lezen en niet lekken. Wat we nooit hebben gehad, kan ook niemand ons dwingen af te geven. Eén kanttekening: verstuur je een bestand naar ontvangers op naam (via hun e-mailadres), dan gaat de link waarmee de sleutel van het bestand wordt ontgrendeld één keer langs onze server, zodat wij die kunnen mailen. Daarom geef je de ontvanger ook zelf een code, bijvoorbeeld door te bellen. Die code komt nooit bij ons. Zonder die code kunnen wij het bestand niet openen.</p>
+<p class="rule-verify"><a href="/security">controleer: hoe onze server is opgebouwd &rarr;</a></p>
 
-<h3>2 &middot; Uw browser praat alleen met ons</h3>
-<p>Geen verzoeken naar derden. Geen Google Fonts, geen CDN, geen analytics, geen pixels, geen ingesloten widgets. Open de netwerkinspector op welke pagina dan ook: elk verzoek gaat naar paramant.app en nergens anders heen.</p>
-<p class="rule-verify"><a href="/security">controleer: de content-security-policy die we meesturen &rarr;</a></p>
+<h3>2 &middot; Je browser praat alleen met ons</h3>
+<p>Je browser maakt op onze site geen verbinding met andere partijen. We gebruiken geen lettertypen van Google, geen extern netwerk dat bestanden voor ons uitlevert (een CDN), geen bezoekersstatistieken, geen volgpixels en geen ingesloten onderdelen van anderen. Je kunt dat zelf nagaan in de netwerkweergave van de ontwikkelaarshulpmiddelen van je browser, op welke pagina dan ook. Elk verzoek gaat naar paramant.app en nergens anders heen.</p>
+<p class="rule-verify"><a href="/security">controleer: de beveiligingsregels voor de browser (content-security-policy) die we meesturen &rarr;</a></p>
 
-<h3>3 &middot; Geen surveillance</h3>
-<p>Geen trackingcookies, geen fingerprinting, geen advertentietechniek. Eén functionele sessiecookie nadat u inlogt. Dat is de hele lijst.</p>
+<h3>3 &middot; We volgen je niet</h3>
+<p>We gebruiken geen cookies om je te volgen, we herkennen je apparaat niet aan zijn kenmerken (fingerprinting) en we gebruiken geen advertentietechniek. Nadat je inlogt, zetten we één cookie die je ingelogd houdt. Meer cookies zijn er niet.</p>
 <p class="rule-verify"><a href="/privacy">controleer: de lijst met cookies en logging &rarr;</a></p>
 
-<h3>4 &middot; Uw sleutels zijn van u</h3>
-<p>Sleutels worden op uw apparaat gemaakt en verlaten het nooit. De privésleutel van uw passkey is alleen van u. Wij zien alleen de publieke helft.</p>
+<h3>4 &middot; Je sleutels zijn van jou</h3>
+<p>Sleutels worden op je eigen apparaat gemaakt. De geheime sleutel van je passkey (de inlogsleutel op je telefoon of computer) verlaat dat apparaat nooit en is alleen van jou. Wij zien alleen de openbare helft. Voor de sleutel van een bestand of document zijn er twee uitzonderingen, en die gaan allebei over e-mail. Verstuur je een bestand naar ontvangers op naam, dan gaat de link één keer langs onze server en per e-mail naar de ontvanger. Het bestand opent pas met de code die je zelf doorgeeft (zie regel 1). Nodig je iemand uit om te tekenen, dan staat de helft van de documentsleutel in de uitnodiging, en geeft onze server de andere helft pas aan de ontvanger als die is ingelogd (zie regel 5). Wil je dat de sleutel van een bestand je apparaat niet verlaat, verstuur het dan met een eenmalige link. Die link geef je zelf door.</p>
 <p class="rule-verify"><a href="https://github.com/Apolloccrypt/paramant-relay">controleer: het maken van sleutels in de broncode &rarr;</a></p>
 
-<h3>5 &middot; Europese bodem, Europees recht</h3>
-<p>Gehost in Duitsland, van boven tot onder in Europese handen. De versleutelde bestanden verlaten de EU nooit. Eén uitzondering noemen we liever zelf: e-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen naar ontvangers op naam bevat die mail de link met het token, en de ophaalcode gaat ook per mail: wie beide mails leest, kan het bestand openen. Een uitnodiging om te ondertekenen bevat de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. Resend, onze e-mailprovider, is de enige Amerikaanse partij in de keten; we stappen over naar een Nederlandse aanbieder. We zeggen dat liever dan dat we een zuiverheid claimen die niet klopt. Zie <a href="/privacy">de lijst met subverwerkers</a>.</p>
+<h3>5 &middot; Servers in Europa, onder Europees recht</h3>
+<p>Paramant draait op servers in Duitsland en is van boven tot onder in Europese handen. De versleutelde bestanden verlaten de EU nooit. Er is één uitzondering, en die noemen we liever zelf. Onze e-mail gaat nu nog via Resend, een bedrijf in de Verenigde Staten. Dat is de enige partij buiten de EU die iets van je verzending te zien krijgt. In een uitnodiging om te tekenen staat maar de helft van de sleutel; de andere helft krijgt de ontvanger pas als die is ingelogd. Met alleen de mail kan niemand het document openen. Bij versturen op naam geeft de afzender een code zelf door. Zonder die code kan niemand het bestand openen, ook wij niet. We stappen over naar een Nederlandse aanbieder van e-mail. Alle partijen die voor ons gegevens verwerken, staan in <a href="/privacy">de lijst met subverwerkers</a>.</p>
 <p class="rule-verify"><a href="/security">controleer: de tabel met rechtsgebieden &rarr;</a></p>
 
 <h3>6 &middot; Standaard bestand tegen quantumcomputers</h3>
-<p>FIPS 203/204 (ML-KEM en ML-DSA) vandaag, niet &lsquo;binnenkort&rsquo;. Nu verzamelen en later ontsleutelen (harvest-now-decrypt-later) gebeurt al. We versleutelen voor de komende tien jaar, niet voor de demo.</p>
+<p>We gebruiken nu al de nieuwe standaarden die bestand zijn tegen quantumcomputers: ML-KEM voor het versleutelen en ML-DSA voor het ondertekenen (vastgelegd als FIPS 203 en FIPS 204). Dat is nodig, want er worden nu al versleutelde gegevens verzameld om ze later met een quantumcomputer te ontsleutelen. Wat je vandaag verstuurt, moet over tien jaar nog veilig zijn.</p>
 <p class="rule-verify"><a href="/crypto-agility">controleer: de parameters van FIPS 203/204 &rarr;</a></p>
 
 <h3>7 &middot; Eerlijk van opzet</h3>
-<p>Geen misleidende ontwerptrucs. Gaat er iets mis, dan vertellen we wat er misging en hoe u verder kunt. Nooit een vaag of misleidend bericht om de schermen er netjes uit te laten zien.</p>
-<p class="rule-verify"><a href="/changelog">controleer: wat we veranderden en toegaven &rarr;</a></p>
+<p>We gebruiken geen ontwerptrucs die je ergens toe verleiden. Gaat er iets mis, dan vertellen we wat er misging en hoe je verder kunt. We tonen nooit een vaag of misleidend bericht om de schermen er netjes uit te laten zien.</p>
+<p class="rule-verify"><a href="/changelog">controleer: wat we veranderden en wat we toegaven &rarr;</a></p>
 
-<h3>8 &middot; Controleerbaar, niet op ons woord</h3>
-<p>Open-core software die u zelf kunt draaien, een openbaar Certificate Transparency-log, en een relay die aantoont wat hij doet. U hoeft ons niet te vertrouwen. U kunt het nagaan.</p>
+<h3>8 &middot; Je kunt het zelf nagaan</h3>
+<p>De broncode van Paramant staat openbaar op GitHub, onder de Business Source License 1.1, en je kunt de software zelf draaien. Elke registratie van een publieke sleutel komt in een openbaar logboek dat alleen kan groeien (een Certificate Transparency-log). En onze server laat zien wat hij doet. Je hoeft ons dus niet op ons woord te geloven.</p>
 <p class="rule-verify"><a href="/ct-log">controleer: het openbare transparantielog &rarr;</a></p>
 
 <h3>9 &middot; Alleen wat nodig is</h3>
-<p>Een e-mailadres voor uw account. Geen telefoonnummer, geen logging van IP-adressen buiten het transport. Minimalisme als beveiliging: gegevens die we niet hebben, kunnen niet uitlekken, niet gevorderd worden en niet verkocht.</p>
+<p>Voor een account vragen we alleen een e-mailadres, geen telefoonnummer. IP-adressen leggen we niet vast; we gebruiken ze alleen om de verbinding zelf te laten werken. Zo weinig mogelijk bewaren is ook een vorm van beveiliging. Gegevens die we niet hebben, kunnen niet uitlekken, niet bij ons worden gevorderd en niet worden verkocht.</p>
 <p class="rule-verify"><a href="/.well-known/security.txt">controleer: security.txt (RFC 9116) &rarr;</a></p>
 
 <h2>Hoe we het bouwen</h2>
-<p>Dezelfde regels gelden voor hoe we uitrollen. De beloften hierboven zijn alleen geloofwaardig als het werk erachter gedisciplineerd is.</p>
+<p>Dezelfde regels gelden voor de manier waarop we wijzigingen live zetten. De beloften hierboven zijn alleen geloofwaardig als we daarbij zorgvuldig werken.</p>
 
-<h3>We rollen nooit blind uit</h3>
-<p>Voor elke wijziging in productie maken we eerst een reservekopie en een gemarkeerd terugzetpunt, en daarna controleren we de wijziging op de live site. Kunnen we niet aantonen dat het op de draaiende dienst werkt, dan is het niet af.</p>
+<h3>We zetten niets ongecontroleerd live</h3>
+<p>Voordat we iets aan de live dienst veranderen, maken we een reservekopie en een vast punt om naar terug te gaan. Daarna controleren we de wijziging op de live site. Kunnen we niet aantonen dat het op de draaiende dienst werkt, dan is het niet af.</p>
 
-<h3>Standaard terug te draaien</h3>
-<p>Elke uitrol is in één stap terug te draaien (een gemarkeerde image, een reservekopie), vastgelegd vóór de wijziging en niet geïmproviseerd nadat er iets stukgaat.</p>
+<h3>Elke wijziging is terug te draaien</h3>
+<p>Elke wijziging is in één stap terug te draaien, met een gemarkeerde versie van de software of met een reservekopie. Die leggen we vast voordat we iets veranderen. We gaan niet pas improviseren als er iets stukgaat.</p>
 
-<h3>Het inloggen is heilig</h3>
-<p>Wijzigingen aan het inloggen rollen we nooit zomaar uit. Eerst een terugzetpunt, daarna controleren we elke manier van inloggen voor en na de wijziging. We zijn liever traag dan dat we u buitensluiten.</p>
+<h3>Extra voorzichtig met inloggen</h3>
+<p>Wijzigingen aan het inloggen voeren we nooit zomaar door. Eerst maken we een terugzetpunt. Daarna controleren we elke manier van inloggen, voor en na de wijziging. We werken liever langzaam dan dat je niet meer bij je account kunt.</p>
 
 <h3>We overschrijven elkaars werk niet</h3>
-<p>Voordat we een bestand aanpassen, controleren we of wat live staat nog is wat we verwachten. Verrassingen melden we, we walsen er niet overheen.</p>
+<p>Voordat we een bestand op de server aanpassen, controleren we of wat daar staat nog is wat we verwachten. Zien we iets onverwachts, dan melden we dat. We gaan er niet overheen.</p>
 
-<h3>Eerlijke fouten boven handige leugens</h3>
-<p>Dezelfde regel als in het product: mislukt een uitrol of een controle, dan zeggen we dat gewoon, ook in onze eigen logs en rapporten, in plaats van het te verbloemen.</p>
+<h3>Fouten melden we eerlijk</h3>
+<p>Dezelfde regel als in het product: mislukt een wijziging of een controle, dan zeggen we dat gewoon, ook in onze eigen logboeken en rapporten. We verbloemen het niet.</p>
 
 </div>
 

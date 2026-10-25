@@ -35,7 +35,7 @@
     ? 'Something went wrong on our side. Try again in a minute; if it keeps happening, ' +
       'mail privacy@paramant.app with the time and what you did.'
     : 'Er ging aan onze kant iets mis. Probeer het over een minuut opnieuw; blijft het gebeuren, ' +
-      'mail dan privacy@paramant.app met het tijdstip en wat u deed.';
+      'mail dan privacy@paramant.app met het tijdstip en wat je deed.';
 
   // The cases we DID plan for. Each tells the customer something he can act on
   // that the generic sentence cannot, so they keep their own words. Every other
@@ -45,9 +45,9 @@
     totp_invalid:     'That code did not match. Try the code your app shows now.',
     totp_unavailable: 'Set up an authenticator app on your account first, then sign with its code.',
   } : {
-    totp_required:    'Vul de code van 6 cijfers uit uw authenticator-app in.',
-    totp_invalid:     'Die code klopt niet. Probeer de code die uw app nu toont.',
-    totp_unavailable: 'Koppel eerst een authenticator-app aan uw account. Onderteken daarna met de code uit die app.',
+    totp_required:    'Vul de code van 6 cijfers uit je authenticator-app in.',
+    totp_invalid:     'Die code klopt niet. Probeer de code die je app nu toont.',
+    totp_unavailable: 'Koppel eerst een authenticator-app aan je account. Onderteken daarna met de code uit die app.',
   };
 
   function isKnownFailure(error) {

@@ -13,9 +13,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="link">
-<meta name="description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download.">
+<meta name="description" content="Er staat een beveiligd bestand voor jou klaar. Het wordt in je browser geopend en verdwijnt na één download.">
 <meta property="og:title" content="Er staat een beveiligd bestand klaar · Paramant">
-<meta property="og:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
+<meta property="og:description" content="Er staat een beveiligd bestand voor jou klaar. Het wordt in je browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
 <meta property="og:url" content="https://paramant.app/get">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -23,7 +23,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Er staat een beveiligd bestand klaar · Paramant">
-<meta name="twitter:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
+<meta name="twitter:description" content="Er staat een beveiligd bestand voor jou klaar. Het wordt in je browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/get">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/get">
@@ -189,10 +189,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <!-- No token: public receive landing -->
 <div class="step" id="step-enter">
   <h1>Bestand ontvangen</h1>
-  <p class="sub">Plak de eenmalige link die u kreeg. Het bestand wordt in uw browser geopend. Paramant heeft de sleutel nooit.</p>
+  <p class="sub">Plak de eenmalige link die je kreeg. Het bestand wordt in je browser geopend. Paramant heeft de sleutel nooit.</p>
   <div class="card">
     <div class="card-body">
-      <label class="label" for="enter-link">Uw eenmalige link</label>
+      <label class="label" for="enter-link">Je eenmalige link</label>
       <input id="enter-link" type="text" placeholder="https://paramant.app/get?t=..." autocomplete="off" spellcheck="false" style="width:100%;padding:12px;border:1px solid var(--ink-hair);border-radius:var(--r-2);font-family:var(--mono);font-size:13px;background:var(--bone);color:var(--ink)">
       <div class="status-line err" id="enter-err" style="margin-top:8px"></div>
       <button class="btn" data-click="goReceive" style="margin-top:14px">Ontvangen</button>
@@ -203,8 +203,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <!-- A link: nothing is fetched until the receiver presses the button, so a
      mail scanner that opens the link spends nothing. -->
 <div class="step" id="step-ready">
-  <h1>Er staat een beveiligd bestand voor u klaar</h1>
-  <p class="sub">Het bestand wordt pas opgehaald als u op de knop drukt. Daarna opent het in uw browser. Paramant heeft de sleutel nooit.</p>
+  <h1>Er staat een beveiligd bestand voor jou klaar</h1>
+  <p class="sub">Het bestand wordt pas opgehaald als je op de knop drukt. Daarna opent het in je browser. Paramant heeft de sleutel nooit.</p>
   <div class="card">
     <div class="card-body">
       <div class="status-line" id="ready-meta"></div>
@@ -216,7 +216,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <!-- Downloading + decrypting -->
 <div class="step active" id="step-loading">
   <h1>Er komt een beveiligd bestand binnen</h1>
-  <p class="sub">Het verzegelde bestand wordt gedownload en in uw browser geopend. Paramant heeft de sleutel nooit gehad.</p>
+  <p class="sub">Het verzegelde bestand wordt gedownload en in je browser geopend. Paramant heeft de sleutel nooit gehad.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title" id="loading-title">Voorbereiden...</div></div>
@@ -235,8 +235,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <div class="step" id="step-done">
   <div class="done-state">
     <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
-    <h1 class="done-title">U hebt het bestand.</h1>
-    <p class="done-line" id="done-line">Het staat op uw apparaat. Onze kopie is voorgoed vernietigd.</p>
+    <h1 class="done-title">Je hebt het bestand.</h1>
+    <p class="done-line" id="done-line">Het staat op je apparaat. Onze kopie is voorgoed vernietigd.</p>
 
     <div class="done-payload"></div>
 
@@ -248,10 +248,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
     <details class="done-details">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
-        <p>Het openen gebeurde hier, in uw browser. Het bestand kwam verzegeld binnen (<code>AES-256-GCM</code>) en is geopend met de sleutel die in de link achter de <code>#</code> stond. Dat deel van een link stuurt een browser nooit naar een server.</p>
-        <p>Een link uit deze webapp werkt één keer. Onze kopie is gewist zodra uw browser het bestand helemaal binnen had en kon openen. Een onderbroken download kost u dus niets.</p>
+        <p>Het openen gebeurde hier, in je browser. Het bestand kwam verzegeld binnen (<code>AES-256-GCM</code>) en is geopend met de sleutel die in de link achter de <code>#</code> stond. Dat deel van een link stuurt een browser nooit naar een server.</p>
+        <p>Een link uit deze webapp werkt één keer. Onze kopie is gewist zodra je browser het bestand helemaal binnen had en kon openen. Een onderbroken download kost je dus niets.</p>
         <p>De bestandsnaam zat in het verzegelde bestand, niet ernaast. Ook die konden wij dus nooit lezen.</p>
-        <p id="done-pdf-note" hidden>Deze browser heeft de pagina's hierboven zelf uit het bestand opgebouwd. Daarvoor is niets verstuurd. Sluit u dit tabblad, dan blijft er niets van het document achter.</p>
+        <p id="done-pdf-note" hidden>Deze browser heeft de pagina's hierboven zelf uit het bestand opgebouwd. Daarvoor is niets verstuurd. Sluit je dit tabblad, dan blijft er niets van het document achter.</p>
       </div>
     </details>
   </div>
@@ -268,14 +268,14 @@ h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <!-- A link that did not arrive whole: wrong token shape, no key after #. -->
 <div class="step" id="step-invalid">
   <h1>Deze link is ongeldig of onvolledig.</h1>
-  <p class="sub">Misschien is er bij het kopiëren een stuk afgevallen. Open hem opnieuw vanuit het bericht dat u kreeg, of plak hier de hele link.</p>
+  <p class="sub">Misschien is er bij het kopiëren een stuk afgevallen. Open hem opnieuw vanuit het bericht dat je kreeg, of plak hier de hele link.</p>
   <a href="/get" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Link plakken</a>
 </div>
 
 <!-- Error -->
 <div class="step" id="step-error">
   <h1>Er ging iets mis</h1>
-  <p class="sub">Hieronder staat wat er gebeurde en wat u kunt doen.</p>
+  <p class="sub">Hieronder staat wat er gebeurde en wat je kunt doen.</p>
   <div class="card">
     <div class="card-head"><div class="dot red"></div><div class="card-head-title">Fout</div></div>
     <div class="card-body">
@@ -324,6 +324,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:var(--track-heading);margin-bot
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/protocol-trail.js?v=1" defer></script>
-<script src="/js/get.page.js?v=13" defer></script>
+<script src="/js/get.page.js?v=14" defer></script>
 </body>
 </html>

@@ -41,7 +41,7 @@ test('/developer zonder ontwikkelaarstoegang blijft niet op "Verbruik wordt gela
   await page.goto(origin + '/developer', { waitUntil: 'load' });
   const note = page.locator('#usage-note');
   await page.waitForFunction(() => !/wordt geladen/.test(document.getElementById('usage-note').textContent), null, { timeout: 15000 });
-  assert.match(await note.innerText(), /staat voor uw account op het dashboard/);
+  assert.match(await note.innerText(), /staat voor je account op het dashboard/);
   assert.equal(await note.locator('a').getAttribute('href'), '/dashboard');
   await ctx.close();
 });

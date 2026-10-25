@@ -75,13 +75,13 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     const toDoc = /^\/(en\/)?(co-sign|sign)\b/.test(dest);
     if (cont) {
       cont.setAttribute('href', dest);
-      cont.textContent = toDoc ? nlEn('Verder naar het document', 'Continue to the document') : nlEn('Verder naar uw account', 'Continue to your account');
+      cont.textContent = toDoc ? nlEn('Verder naar het document', 'Continue to the document') : nlEn('Verder naar je account', 'Continue to your account');
       cont.addEventListener('click', function(ev) { ev.preventDefault(); window.location = dest; });
     }
     // And on its own after a few seconds: the tip must never be a stop.
     const auto = document.getElementById('sha1-auto');
     let left = 8;
-    const say = function () { if (auto) auto.textContent = nlEn('U gaat over ' + left + ' seconden vanzelf verder.', 'Continuing on its own in ' + left + ' seconds.'); };
+    const say = function () { if (auto) auto.textContent = nlEn('Je gaat over ' + left + ' seconden vanzelf verder.', 'Continuing on its own in ' + left + ' seconds.'); };
     say();
     const timer = setInterval(function () {
       left -= 1;
@@ -139,28 +139,28 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         if (body && body.totp_algorithm === 'sha1' && !seen) { showSha1Notice(returnUrl); return; }
         window.location = returnUrl;
       } else if (res.status === 401) {
-        errorDiv.textContent = nlEn('Dit e-mailadres en deze code horen niet bij elkaar. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.');
+        errorDiv.textContent = nlEn('Dit e-mailadres en deze code horen niet bij elkaar. De code verandert elke 30 seconden, dus gebruik de code die je app nu toont.', 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.');
         errorDiv.classList.add('visible');
         document.getElementById('totp').value = '';
         document.getElementById('totp').focus();
       } else if (res.status === 403) {
-        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. Heeft u een back-upcode? <a href="/auth/request-reset">Koppel dan een nieuwe app</a>. Geen back-upcode? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf uw accountadres.', 'This account has no authenticator app linked to it yet. Have a backup code? <a href="/en/auth/request-reset">Link a new app</a>. No backup code? Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.');
+        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. Heb je een back-upcode? <a href="/auth/request-reset">Koppel dan een nieuwe app</a>. Geen back-upcode? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf je accountadres.', 'This account has no authenticator app linked to it yet. Have a backup code? <a href="/en/auth/request-reset">Link a new app</a>. No backup code? Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.');
         errorDiv.classList.add('visible');
       } else if (res.status === 428) {
         errorDiv.textContent = nlEn('De extra controle voor deze inlogpoging lukte niet. Vernieuw de pagina en probeer het opnieuw.', 'We could not run the extra verification this sign-in needs. Refresh the page and try again.');
         errorDiv.classList.add('visible');
       } else if (res.status === 429) {
-        errorDiv.textContent = nlEn('Te veel inlogpogingen vanaf deze internetverbinding. Inloggen vanaf hier is maximaal 15 minuten geblokkeerd. De grens telt de verbinding, niet uw account. Iemand anders op uw netwerk kan hem dus ook bereiken. Maar niemand kan hem veroorzaken door uw e-mailadres te raden.', 'Too many sign-in attempts from this internet connection. Sign-in from here is paused for up to 15 minutes. The limit counts the connection, not your account. So someone else on your network can set it off too. But nobody can trigger it by guessing at your email address.');
+        errorDiv.textContent = nlEn('Te veel inlogpogingen vanaf deze internetverbinding. Inloggen vanaf hier is maximaal 15 minuten geblokkeerd. De grens geldt voor de internetverbinding, niet voor je account. Ook iemand anders op hetzelfde netwerk kan hem dus bereiken. Wie alleen je e-mailadres kent, kan je op deze manier niet buitensluiten.', 'Too many sign-in attempts from this internet connection. Sign-in from here is paused for up to 15 minutes. The limit counts the connection, not your account. So someone else on your network can set it off too. But nobody can trigger it by guessing at your email address.');
         errorDiv.classList.add('visible');
       } else if (res.status === 503) {
-        errorDiv.textContent = nlEn('Inloggen kan even niet. Er is niets mis met uw account of uw code. Probeer het over een paar minuten opnieuw.', 'Sign-in is temporarily unavailable. Nothing is wrong with your account or your code. Try again in a few minutes.');
+        errorDiv.textContent = nlEn('Inloggen kan even niet. Er is niets mis met je account of je code. Probeer het over een paar minuten opnieuw.', 'Sign-in is temporarily unavailable. Nothing is wrong with your account or your code. Try again in a few minutes.');
         errorDiv.classList.add('visible');
       } else {
-        errorDiv.textContent = nlEn('Inloggen lukte niet. Er is niets aan uw account veranderd. Probeer het zo opnieuw.', 'Sign-in did not go through. Nothing changed on your account. Try again in a moment.');
+        errorDiv.textContent = nlEn('Inloggen lukte niet. Er is niets aan je account veranderd. Probeer het zo opnieuw.', 'Sign-in did not go through. Nothing changed on your account. Try again in a moment.');
         errorDiv.classList.add('visible');
       }
     } catch (err) {
-      errorDiv.textContent = nlEn('Paramant is niet bereikbaar. Controleer uw verbinding en probeer het opnieuw.', 'We could not reach Paramant. Check your connection and try again.');
+      errorDiv.textContent = nlEn('Paramant is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.', 'We could not reach Paramant. Check your connection and try again.');
       errorDiv.classList.add('visible');
     }
 

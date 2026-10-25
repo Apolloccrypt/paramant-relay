@@ -158,9 +158,9 @@ test('a genuine entry goes green only after key, head and inclusion all held; gr
   const { ctx, page, errors } = await openPage(state);
   const r1 = await check(page, state.tree.leaf(3));
   assert.equal(r1.verdict, 'verified', r1.text);
-  assert.match(r1.text, /✓ Geverifieerd: index 3 staat in de door deze relay ondertekende boom/);
+  assert.match(r1.text, /✓ Geverifieerd: index 3 staat in de boom die deze server heeft ondertekend/);
   assert.deepEqual(r1.steps, ['key:t', 'sth:t', 'inclusion:t', 'consistency:n']);
-  assert.match(r1.text, /Geen eerdere boomstand in deze browser/);
+  assert.match(r1.text, /Deze browser heeft nog geen eerdere boomstand gezien/);
   assert.match(r1.text, /dat anderen dezelfde boom zien/);
   await page.close();
 

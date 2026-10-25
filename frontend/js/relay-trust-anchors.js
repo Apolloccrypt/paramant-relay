@@ -38,7 +38,7 @@ export const PUBKEY_URL = 'https://relay.paramant.app/v2/pubkey';
 export const RELAY_TRUST_ANCHORS = [
   {
     name: 'the Paramant relay',
-    name_nl: 'de Paramant-relay',
+    name_nl: 'de Paramant-server',
     host: 'relay.paramant.app',
     sector: 'relay',
     alg: 'ML-DSA-65',
@@ -47,7 +47,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant health relay',
-    name_nl: 'de zorgrelay van Paramant',
+    name_nl: 'de zorgserver van Paramant',
     host: 'health.paramant.app',
     sector: 'health',
     alg: 'ML-DSA-65',
@@ -56,7 +56,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant legal relay',
-    name_nl: 'de juridische relay van Paramant',
+    name_nl: 'de juridische server van Paramant',
     host: 'legal.paramant.app',
     sector: 'legal',
     alg: 'ML-DSA-65',
@@ -65,7 +65,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant finance relay',
-    name_nl: 'de financiële relay van Paramant',
+    name_nl: 'de financiële server van Paramant',
     host: 'finance.paramant.app',
     sector: 'finance',
     alg: 'ML-DSA-65',
@@ -74,7 +74,7 @@ export const RELAY_TRUST_ANCHORS = [
   },
   {
     name: 'the Paramant IoT relay',
-    name_nl: 'de IoT-relay van Paramant',
+    name_nl: 'de IoT-server van Paramant',
     host: 'iot.paramant.app',
     sector: 'iot',
     alg: 'ML-DSA-65',

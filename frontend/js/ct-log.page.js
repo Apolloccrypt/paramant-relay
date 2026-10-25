@@ -98,8 +98,8 @@ function render() {
       '<div class="empty-state">'
       + '<h3>' + (allEntries.length === 0 ? 'Het log is leeg' : 'Geen resultaten') + '</h3>'
       + '<p>' + (allEntries.length === 0
-          ? 'Nog geen registraties van publieke sleutels. Het CT-log legt elke registratie van een apparaat vast als vermelding die niet meer te wijzigen is. Nieuwe vermeldingen verschijnen hier direct.'
-          : 'Geen vermeldingen die bij uw filter passen.')
+          ? 'Er zijn nog geen publieke sleutels geregistreerd. Het CT-log legt elke registratie van een apparaat vast als een vermelding die niet meer te wijzigen is. Nieuwe vermeldingen verschijnen hier meteen.'
+          : 'Geen vermeldingen die bij je filter passen.')
       + '</p></div>';
     return;
   }
@@ -186,10 +186,10 @@ function clearVerify() {
 // is said only after js/ct-log-verify.js has checked the pinned key, the signed
 // tree head and the inclusion proof in this browser (see that file for why).
 var VT = {
-  key: {t: 'Sleutel van de relay is de sleutel die deze site vastzet', n: 'Geen vastgezette sleutel voor deze relay; niet gecontroleerd', f: 'Sleutel klopt niet'},
-  sth: {t: 'Ondertekende boomstand (STH) klopt onder die sleutel', n: 'Ondertekende boomstand kon niet worden opgehaald', f: 'Handtekening over de boomstand klopt niet'},
-  inclusion: {t: 'Inclusiebewijs leidt van deze vermelding naar de ondertekende wortel', n: 'Inclusiebewijs kon niet worden opgehaald', f: 'Inclusiebewijs klopt niet'},
-  consistency: {t: 'Boom is een uitbreiding van de stand die deze browser eerder zag', n: 'Geen eerdere boomstand in deze browser, dus groei niet gecontroleerd. Bij een volgend bezoek wel.', f: 'Boom is geen uitbreiding van de stand die deze browser eerder zag'}
+  key: {t: 'De sleutel van de server is dezelfde als de sleutel die deze site heeft vastgelegd', n: 'Deze site heeft voor deze server geen sleutel vastgelegd, dus dit is niet gecontroleerd', f: 'De sleutel klopt niet'},
+  sth: {t: 'De ondertekende boomstand (STH) klopt met die sleutel', n: 'De ondertekende boomstand kon niet worden opgehaald', f: 'De handtekening onder de boomstand klopt niet'},
+  inclusion: {t: 'Het inclusiebewijs leidt van deze vermelding naar de ondertekende wortel', n: 'Het inclusiebewijs kon niet worden opgehaald', f: 'Het inclusiebewijs klopt niet'},
+  consistency: {t: 'De boom is een uitbreiding van de stand die deze browser eerder zag', n: 'Deze browser heeft nog geen eerdere boomstand gezien, dus de groei is niet gecontroleerd. Bij een volgend bezoek gebeurt dat wel.', f: 'De boom is geen uitbreiding van de stand die deze browser eerder zag'}
 };
 var verifyRun = 0;
 
@@ -228,12 +228,12 @@ function verifyHash() {
     return;
   }
   el.innerHTML = '<strong>' + esc('Gevonden in de lijst op index {i}. Cryptografische controle loopt…'.replace('{i}', idx)) + '</strong>' + details;
-  import('/js/ct-log-verify.js?v=1').then(function(m) {
+  import('/js/ct-log-verify.js?v=2').then(function(m) {
     return m.verifyEntry({ relay: RELAY, index: match.index, leafHash: match.leaf_hash });
   }).then(function(res) {
     if (run !== verifyRun) return;
-    var head = res.verdict === 'verified' ? '✓ Geverifieerd: index {i} staat in de door deze relay ondertekende boom'
-      : res.verdict === 'failed' ? '✗ Controle mislukt: het antwoord van de relay klopt niet' : 'Gevonden in de lijst op index {i}, niet cryptografisch bevestigd';
+    var head = res.verdict === 'verified' ? '✓ Geverifieerd: index {i} staat in de boom die deze server heeft ondertekend'
+      : res.verdict === 'failed' ? '✗ Controle mislukt: het antwoord van de server klopt niet' : 'Gevonden in de lijst op index {i}, niet cryptografisch bevestigd';
     el.className = 'verify-result ' + (res.verdict === 'verified' ? 'found' : res.verdict === 'failed' ? 'notfound' : 'listed');
     var list = '<ul class="verify-steps">' + res.steps.map(function(s) {
       var k = s.ok === true ? 't' : s.ok === false ? 'f' : 'n';
@@ -280,9 +280,9 @@ async function loadRelays() {
 
     if (relays.length === 0) {
       el.innerHTML = '<div class="empty-state">'
-        + '<h3>Nog geen relays geregistreerd</h3>'
-        + '<p>Relays registreren zichzelf bij het opstarten via <code>POST /v2/relays/register</code>, met een payload die is ondertekend met ML-DSA-65. '
-        + 'Stel <code>RELAY_SELF_URL</code> en <code>RELAY_PRIMARY_URL</code> in de omgeving van de relay in om automatische registratie aan te zetten.</p></div>';
+        + '<h3>Nog geen servers geregistreerd</h3>'
+        + '<p>Servers registreren zichzelf bij het opstarten via <code>POST /v2/relays/register</code>, met een bericht dat is ondertekend met ML-DSA-65. '
+        + 'Zet automatische registratie aan door <code>RELAY_SELF_URL</code> en <code>RELAY_PRIMARY_URL</code> in te stellen in de omgeving van de server.</p></div>';
       return;
     }
 
@@ -304,7 +304,7 @@ async function loadRelays() {
         + '</div>';
     }).join('');
   } catch (e) {
-    el.innerHTML = '<div class="loading">Het relayregister kon niet worden geladen: ' + esc(e.message) + '</div>';
+    el.innerHTML = '<div class="loading">Het serverregister kon niet worden geladen: ' + esc(e.message) + '</div>';
   }
 }
 

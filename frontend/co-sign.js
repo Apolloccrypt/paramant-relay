@@ -169,7 +169,7 @@ function showError(m, kind) {
   const step = $('step-error');
   const h = step && step.querySelector('h1'), sub = step && step.querySelector('.sub');
   if (step && !step.dataset.h1) { step.dataset.h1 = h ? h.textContent : ''; step.dataset.sub = sub ? sub.textContent : ''; }
-  if (h) h.textContent = kind === 'busy' ? L('Even te druk', 'Busy for a moment') : kind === 'fault' ? L('Even een storing', 'A fault for a moment') : kind === 'ready' ? L('Uw account staat klaar', 'Your account is ready') : step.dataset.h1;
+  if (h) h.textContent = kind === 'busy' ? L('Even te druk', 'Busy for a moment') : kind === 'fault' ? L('Even een storing', 'A fault for a moment') : kind === 'ready' ? L('Je account staat klaar', 'Your account is ready') : step.dataset.h1;
   if (sub) sub.textContent = kind === 'busy' ? L('De link is in orde. Er kwamen even te veel verzoeken tegelijk binnen.', 'The link is fine. Too many requests came in at once.') : kind === 'fault' ? L('De link is in orde. Het ligt aan ons.', 'The link is fine. The fault is ours.') : kind === 'ready' ? L('Nog \u00e9\u00e9n stap naar het document.', 'One more step to the document.') : step.dataset.sub;
   showStep('step-error');
 }
@@ -344,7 +344,7 @@ function statusText(state, e) {
 
 function closedExplanation(state) {
   if (state === 'declined') return L('Een ondertekenaar heeft geweigerd te tekenen. Daarmee is dit verzoek gestopt en kan niemand er nog op tekenen. Vraag de afzender om een nieuw verzoek als dat nodig is.', 'A signer declined to sign, so this request has stopped and nobody can sign it any more. Ask the sender for a new request if needed.');
-  if (state === 'cancelled') return L('De afzender heeft dit verzoek ingetrokken. U hoeft niets te doen en kunt hier niet meer tekenen.', 'The sender withdrew this request. There is nothing for you to do and it can no longer be signed.');
+  if (state === 'cancelled') return L('De afzender heeft dit verzoek ingetrokken. Je hoeft niets te doen en kunt hier niet meer tekenen.', 'The sender withdrew this request. There is nothing for you to do and it can no longer be signed.');
   if (state === 'expired') return L('De termijn om te tekenen is voorbij. Vraag de afzender om een nieuw verzoek.', 'The signing period has ended. Ask the sender for a new request.');
   return '';
 }
@@ -357,10 +357,10 @@ function ownerClosedExplanation(state, env) {
     const d = (env && Array.isArray(env.parties) ? env.parties : []).find((p) => p && p.status === 'declined');
     const who = d ? (d.label || L('ondertekenaar ', 'signer ') + (Number(d.index || 0) + 1)) : L('een ondertekenaar', 'a signer');
     const when = d && d.declined_at ? L(' op ', ' on ') + humanDate(d.declined_at) : '';
-    return L('Geweigerd door ', 'Declined by ') + who + when + L('. Daarmee is dit verzoek gestopt en kan niemand er nog op tekenen. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', '. This request has stopped and nobody can sign it any more. To try again, send a new request.');
+    return L('Geweigerd door ', 'Declined by ') + who + when + L('. Daarmee is dit verzoek gestopt en kan niemand er nog op tekenen. Wil je het opnieuw proberen, stuur dan een nieuw verzoek.', '. This request has stopped and nobody can sign it any more. To try again, send a new request.');
   }
-  if (state === 'cancelled') return L('U heeft dit verzoek ingetrokken. Niemand kan er nog op tekenen.', 'You withdrew this request. Nobody can sign it any more.');
-  if (state === 'expired') return L('De termijn om te tekenen is voorbij. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', 'The signing period has ended. To try again, send a new request.');
+  if (state === 'cancelled') return L('Je hebt dit verzoek ingetrokken. Niemand kan er nog op tekenen.', 'You withdrew this request. Nobody can sign it any more.');
+  if (state === 'expired') return L('De termijn om te tekenen is voorbij. Wil je het opnieuw proberen, stuur dan een nieuw verzoek.', 'The signing period has ended. To try again, send a new request.');
   return '';
 }
 
@@ -375,7 +375,7 @@ async function init() {
   const partyIndex = parseInt(params.get('p') || '', 10);
   __inviteToken = (params.get('t') || '').trim();
   if (__signupResume && !__inviteToken) {
-    return showError(L('Open de link uit de uitnodigingsmail nog een keer, in deze browser. U bent nu ingelogd, dus het document opent dan meteen. De link zelf bewaart deze browser niet, omdat hij de sleutel van het document bevat.', 'Open the link from the invitation email once more, in this browser. You are signed in now, so the document opens straight away. This browser does not keep the link itself, because it holds the key to the document.'), 'ready');
+    return showError(L('Open de link uit de uitnodigingsmail nog een keer, in deze browser. Je bent nu ingelogd, dus het document opent dan meteen. De link zelf bewaart deze browser niet, omdat hij de sleutel van het document bevat.', 'Open the link from the invitation email once more, in this browser. You are signed in now, so the document opens straight away. This browser does not keep the link itself, because it holds the key to the document.'), 'ready');
   }
   if (!envId || !Number.isInteger(partyIndex) || partyIndex < 0) {
     return showError(L('Deze link is niet compleet. Open de link uit de mail nog een keer, of vraag de afzender om een nieuwe.', 'This link is not complete. Open the link from the email once more, or ask the sender for a new one.'));
@@ -395,7 +395,7 @@ async function init() {
     const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery, { headers: inviteHeaders() });
     if (r.status === 404) return showError(L('Dit verzoek bestaat niet, is verlopen of is al gebruikt.', 'This request does not exist, has expired, or was already used.'));
     if (r.status === 429) return showError(L('Even te veel tegelijk vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too much at once from this address. Try again in a minute.'), 'busy');
-    if (!r.ok) return showError(L('Door een storing bij ons lukt het ophalen nu niet. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'A fault on our side stops us from fetching it right now. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
+    if (!r.ok) return showError(L('Door een storing bij ons lukt het ophalen nu niet. Er is niets mis met je link. Probeer het over een paar minuten opnieuw.', 'A fault on our side stops us from fetching it right now. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
     const data = await r.json();
     __envelope = withPlainLabels(data.envelope);
     if (__partyIndex >= __envelope.party_count) return showError(L('Deze link verwijst naar een ondertekenaar die niet in dit verzoek staat.', 'This link points to a signer who is not part of this request.'));
@@ -430,7 +430,7 @@ async function init() {
     if (__session) await loadDeliveredDocument(envId, partyIndex);
     else setDeliveryStatus('warn', L('Log in met het e-mailadres van deze uitnodiging. Dan opent het document.', 'Sign in with the email address this invitation went to. Then the document opens.'));
   } catch (e) {
-    showError(e.message || L('Er is geen verbinding. Controleer uw internet en probeer het opnieuw.', 'No connection. Check your internet and try again.'));
+    showError(e.message || L('Er is geen verbinding. Controleer je internet en probeer het opnieuw.', 'No connection. Check your internet and try again.'));
   }
 }
 
@@ -472,7 +472,7 @@ function renderEnvelope() {
     const idx = Number(p.index);
     row.innerHTML =
       '<div class="party-idx">' + (Number.isFinite(idx) ? idx + 1 : '') + '</div>' +
-      '<div class="party-label">' + label + (p.index === __partyIndex ? L(' (u)', ' (you)') : '') + '</div>' +
+      '<div class="party-label">' + label + (p.index === __partyIndex ? L(' (jij)', ' (you)') : '') + '</div>' +
       '<div class="party-status ' + statusClass + '">' + statusLabel + '</div>';
     list.appendChild(row);
   }
@@ -492,7 +492,7 @@ function renderEnvelope() {
     saveAppearanceDraft();
     syncParaafBox();
     __appearanceTool = '';
-    setAppearanceHelp(L('Uw zichtbare velden zijn gewist. U kunt ze opnieuw plaatsen of tekenen zonder zichtbare stempel.', 'Your visible fields were cleared. You can place them again or sign without a visible mark.'), false);
+    setAppearanceHelp(L('Je zichtbare velden zijn gewist. Je kunt ze opnieuw plaatsen of tekenen zonder zichtbare stempel.', 'Your visible fields were cleared. You can place them again or sign without a visible mark.'), false);
     renderAppearanceOverlays();
   };
   // The paraaf on every page is ADDED to the signature, never instead of it:
@@ -518,8 +518,8 @@ function renderEnvelope() {
     const cover = on ? await paraafCoverNote(__appearance) : '';
     setPdfNote(cover);
     setAppearanceHelp(on
-      ? (cover || L('Op elke pagina staat nu uw paraaf in de marge, naast die van de anderen. Uw handtekening blijft op haar eigen plek.', 'Every page now has your initials in the margin, next to the others. Your signature stays where it is.'))
-      : L('De paraaf op elke pagina is weg. Uw handtekening blijft staan.', 'The initials on every page are gone. Your signature stays.'), !!cover);
+      ? (cover || L('Op elke pagina staat nu je paraaf in de marge, naast die van de anderen. Je handtekening blijft op haar eigen plek.', 'Every page now has your initials in the margin, next to the others. Your signature stays where it is.'))
+      : L('De paraaf op elke pagina is weg. Je handtekening blijft staan.', 'The initials on every page are gone. Your signature stays.'), !!cover);
     renderAppearanceOverlays();
   };
   wireInkControls(me);
@@ -690,7 +690,7 @@ async function loadSession() {
 }
 
 function showSessionFault() {
-  setStatus('err', L('Wij konden niet nagaan of u bent ingelogd, door een storing bij ons. Er is niets mis met uw link of uw account. Probeer het over een paar minuten opnieuw.', 'We could not check whether you are signed in, because of a fault on our side. Nothing is wrong with your link or your account. Please try again in a few minutes.'));
+  setStatus('err', L('Wij konden niet nagaan of je bent ingelogd, door een storing bij ons. Er is niets mis met je link of je account. Probeer het over een paar minuten opnieuw.', 'We could not check whether you are signed in, because of a fault on our side. Nothing is wrong with your link or your account. Please try again in a few minutes.'));
   showCta('<button class="btn" type="button" id="session-retry">' + L('Opnieuw proberen', 'Try again') + '</button>');
   const b = $('session-retry');
   if (b) b.onclick = () => location.reload();
@@ -704,7 +704,7 @@ function loginCtaHtml() {
   try { store = window.sessionStorage; } catch { store = null; }
   const ret = encodeURIComponent(store ? stashReturn(store, location) : location.pathname);
   return '<a class="btn" href="/auth/login?return=' + ret + '">' + L('Inloggen om verder te gaan', 'Sign in to continue') + '</a>'
-    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link" target="_blank" rel="noopener">Maak er gratis een</a> met het e-mailadres van deze uitnodiging. Daarna komt u vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link" target="_blank" rel="noopener">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
+    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link" target="_blank" rel="noopener">Maak er gratis een</a> met het e-mailadres van deze uitnodiging. Daarna kom je vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link" target="_blank" rel="noopener">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
 }
 
 // "Maak er gratis een": which request and party this is waits in this browser
@@ -734,7 +734,7 @@ async function prepareSigning() {
     // button and the authenticator panel, so signing in is the only thing on
     // screen. It comes off the moment a session resolves.
     document.body.classList.add('needs-login');
-    setStatus('warn', L('Log in met het e-mailadres waarop u bent uitgenodigd. Dan opent het document en kunt u tekenen.', 'Sign in with the email address this invitation went to. Then the document opens and you can sign.'));
+    setStatus('warn', L('Log in met het e-mailadres waarop je bent uitgenodigd. Dan opent het document en kun je tekenen.', 'Sign in with the email address this invitation went to. Then the document opens and you can sign.'));
     showCta(loginCtaHtml());
     // Back in this tab after making an account or signing in elsewhere: the
     // link here still has the token and the key, so this tab just reloads.
@@ -752,13 +752,13 @@ async function prepareSigning() {
     if (e && e.code === 'no_signing_passkey') {
       __signKey = null;   // doSign() will set it up with one tap before signing
     } else {
-      setStatus('err', e.message || L('Uw ondertekensleutel kon niet worden gecontroleerd.', 'Could not check your signing key.'));
+      setStatus('err', e.message || L('Je ondertekensleutel kon niet worden gecontroleerd.', 'Could not check your signing key.'));
       return;
     }
   }
 
   if (__signKey) {
-    setStatus('', L('Ingelogd als ', 'Signed in as ') + (__session.email || L('uw account', 'your account')) + L('. U tekent met uw ondertekensleutel (vingerafdruk ', '. You\'ll sign with your signing key (fingerprint ') + __signKey.fingerprint + ').');
+    setStatus('', L('Ingelogd als ', 'Signed in as ') + (__session.email || L('je account', 'your account')) + L('. Je tekent met je ondertekensleutel (vingerafdruk ', '. You\'ll sign with your signing key (fingerprint ') + __signKey.fingerprint + ').');
   } else {
     // An account without a passkey, or a browser without WebAuthn, signs with
     // the code: say that, not "the passkey you sign in with" (hertest r2 R2-c).
@@ -769,10 +769,10 @@ async function prepareSigning() {
         if (r.ok) { const d = await r.json(); passkeys = d && Array.isArray(d.passkeys) ? d.passkeys.length : Number(d && d.total); }
       } else passkeys = 0;
     } catch { passkeys = null; }
-    const who = L('Ingelogd als ', 'Signed in as ') + (__session.email || L('uw account', 'your account'));
+    const who = L('Ingelogd als ', 'Signed in as ') + (__session.email || L('je account', 'your account'));
     setStatus('', who + (passkeys === 0
-      ? L('. U tekent met de code uit uw authenticator-app.', '. You\'ll sign with the code from your authenticator app.')
-      : L('. U tekent met de passkey waarmee u inlogt. Die zet u met één tik klaar als u tekent. Geen passkey op dit apparaat? Dan tekent u met de code uit uw authenticator-app.', '. You\'ll sign with your sign-in passkey. It is set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.')));
+      ? L('. Je tekent met de code uit je authenticator-app.', '. You\'ll sign with the code from your authenticator app.')
+      : L('. Je tekent met de passkey waarmee je inlogt. Die zet je met één tik klaar als je tekent. Geen passkey op dit apparaat? Dan teken je met de code uit je authenticator-app.', '. You\'ll sign with your sign-in passkey. It is set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.')));
   }
   $('sign-confirm').onclick = doSign;
   const decline = $('decline-btn');
@@ -831,7 +831,7 @@ async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
     // or a link that lost its end on the way: matrix COSIGN-46). The request
     // itself is fine; only this copy of the link cannot open the document.
     // Say so, and give the ways that do work, in order.
-    const err = new Error(L('Deze link opent het document niet, omdat het laatste stuk van de link ontbreekt. Open de link uit uw eerste uitnodigingsmail, of open deze link in de browser waarin u die eerste uitnodiging al opende. Lukt dat niet? Vraag de afzender dan om de uitnodiging opnieuw te sturen vanuit zijn overzicht. Heeft u het document al als bestand? Kies het dan hieronder. Wij controleren of het precies het document uit dit verzoek is.', 'This link does not open the document, because the last part of the link is missing. Open the link from your first invitation email, or open this link in the browser where you opened that first invitation. Does that not work? Then ask the sender to send the invitation again from their overview. Do you already have the document as a file? Choose it below. We check that it is exactly the document of this request.'));
+    const err = new Error(L('Deze link opent het document niet, omdat het laatste stuk van de link ontbreekt. Open de link uit je eerste uitnodigingsmail, of open deze link in de browser waarin je die eerste uitnodiging al opende. Lukt dat niet? Vraag de afzender dan om de uitnodiging opnieuw te sturen vanuit zijn overzicht. Heb je het document al als bestand? Kies het dan hieronder. Wij controleren of het precies het document uit dit verzoek is.', 'This link does not open the document, because the last part of the link is missing. Open the link from your first invitation email, or open this link in the browser where you opened that first invitation. Does that not work? Then ask the sender to send the invitation again from their overview. Do you already have the document as a file? Choose it below. We check that it is exactly the document of this request.'));
     err.noKey = true;
     throw err;
   }
@@ -877,7 +877,7 @@ async function loadDeliveredDocument(envId, partyIndex) {
     await verifyAndRenderDocument(delivered.bytes, 'delivery');
     if (__hashMatches) {
       setDeliveryStatus('ok', delivered.fromMemory
-        ? L('Het document is geopend met de sleutel die deze browser bewaarde van uw eerste uitnodiging, en klopt met dit verzoek.', 'The document is open with the key this browser kept from your first invitation, and matches this request.')
+        ? L('Het document is geopend met de sleutel die deze browser bewaarde van je eerste uitnodiging, en klopt met dit verzoek.', 'The document is open with the key this browser kept from your first invitation, and matches this request.')
         : L('Het document is geopend en klopt met dit verzoek.', 'The document is open and matches this request.'));
     }
   } catch (e) {
@@ -946,7 +946,7 @@ async function paraafCoverNote(appearance) {
   const over = paraafCoveredPages({ spot: par, pages, textBoxesPerPage: boxes });
   __coverPages = new Set(over);
   if (!over.length) return '';
-  return L('Let op: op ' + pageListText(over, false) + ' is in de marge geen vrije plek, dus daar staat uw paraaf over de tekst. Kijk in het voorbeeld of dat zo kan; de paraaf blijft wel klein.',
+  return L('Let op: op ' + pageListText(over, false) + ' is in de marge geen vrije plek, dus daar staat je paraaf over de tekst. Kijk in het voorbeeld of dat zo kan; de paraaf blijft wel klein.',
     'Note: on ' + pageListText(over, true) + ' the margin has no free spot, so your paraaf lies over the text there. Check in the preview whether that is acceptable; the paraaf stays small.');
 }
 
@@ -966,7 +966,7 @@ async function verifyAndRenderDocument(buf, source) {
     b.hidden = source === 'delivery';
     b.textContent = source === 'delivery'
       ? L('De controle klopt. Dit is precies het document dat bij dit verzoek hoort.', 'The check matches. This is exactly the document of this request.')
-      : L('De controle klopt. Dit is precies het document uit dit verzoek. Wat u hieronder ziet, is wat u ondertekent.', 'The check matches. This is exactly the document in this request: what you see below is what you sign.');
+      : L('De controle klopt. Dit is precies het document uit dit verzoek. Je ondertekent precies wat je hieronder ziet.', 'The check matches. This is exactly the document in this request: what you see below is what you sign.');
   } else {
     b.className = 'banner err';
     b.textContent = L('Dit bestand is niet het document uit dit verzoek. Onderteken het niet. Berekend: ', 'This file is not the document in this request. Do not sign it. Computed: ') + h.slice(0, 16) + L('... Verwacht: ', '... Expected: ') + __envelope.doc_hash.slice(0, 16) + '...';
@@ -977,8 +977,8 @@ async function verifyAndRenderDocument(buf, source) {
   const notes = [];
   if (__hashMatches && isPdfBytes(buf) && !__visualCopy.ok) {
     notes.push(__visualCopy.why === 'encrypted'
-      ? L('Deze pdf is beveiligd met een wachtwoord of een slot van de maker. Uw handtekening geldt voor precies dit bestand, maar er kan geen kopie met zichtbare handtekening of paraaf worden gemaakt. U krijgt het bewijs (.psign) bij het originele bestand.', 'This PDF is locked with a password or an author lock. Your signature binds exactly this file, but no copy with a visible signature or initials can be made. You get the proof (.psign) for the original file.')
-      : L('Deze pdf is beschadigd of onvolledig en kan hier niet goed worden geopend. Uw handtekening geldt voor precies dit bestand, maar er komt geen kopie met zichtbare handtekening of paraaf. U krijgt het bewijs (.psign) bij het originele bestand.', 'This PDF is damaged or incomplete and cannot be opened properly here. Your signature binds exactly this file, but no copy with a visible signature or initials comes out. You get the proof (.psign) for the original file.'));
+      ? L('Deze pdf is beveiligd met een wachtwoord of een slot van de maker. Je handtekening geldt voor precies dit bestand, maar er kan geen kopie met zichtbare handtekening of paraaf worden gemaakt. Je krijgt het bewijs (.psign) bij het originele bestand.', 'This PDF is locked with a password or an author lock. Your signature binds exactly this file, but no copy with a visible signature or initials can be made. You get the proof (.psign) for the original file.')
+      : L('Deze pdf is beschadigd of onvolledig en kan hier niet goed worden geopend. Je handtekening geldt voor precies dit bestand, maar er komt geen kopie met zichtbare handtekening of paraaf. Je krijgt het bewijs (.psign) bij het originele bestand.', 'This PDF is damaged or incomplete and cannot be opened properly here. Your signature binds exactly this file, but no copy with a visible signature or initials comes out. You get the proof (.psign) for the original file.'));
   } else if (__hashMatches && isPdfBytes(buf) && hasDigitalSignature(buf)) {
     notes.push(L('Dit document heeft al een digitale handtekening (bijvoorbeeld van Adobe of een notaris). In de pdf-kopie met de handtekeningen van ParaSign geldt die eerdere handtekening niet meer, want die kopie is een gewijzigd bestand. Het originele document en het bewijs (.psign) blijven ongewijzigd en geldig; bewaar het origineel.', 'This document already carries a digital signature (for example from Adobe or a notary). In the PDF copy with the ParaSign signatures that earlier signature no longer holds, because the copy is a changed file. The original document and the proof (.psign) stay unchanged and valid; keep the original.'));
   }
@@ -998,7 +998,7 @@ async function verifyAndRenderDocument(buf, source) {
     const cover = await paraafCoverNote(__appearance);
     if (cover) notes.push(cover);
     if (seed) {
-      setAppearanceHelp((__pageNote ? __pageNote + ' ' : '') + L('De gemarkeerde plekken zijn voor u: niemand anders tekent daar. Kies Plaats mijn handtekening om de handtekening te verplaatsen. Uw handtekening geldt voor de plek waar u echt tekent.', 'The marked spots are yours: nobody else signs there. Choose Place my signature to move the signature. Your signature binds where you actually sign.'), false);
+      setAppearanceHelp((__pageNote ? __pageNote + ' ' : '') + L('De gemarkeerde plekken zijn voor jou: niemand anders tekent daar. Kies Plaats mijn handtekening om de handtekening te verplaatsen. Je handtekening geldt voor de plek waar je echt tekent.', 'The marked spots are yours: nobody else signs there. Choose Place my signature to move the signature. Your signature binds where you actually sign.'), false);
     } else if (__pageNote) {
       setAppearanceHelp(__pageNote, true);
     }
@@ -1229,7 +1229,7 @@ async function renderDocPreview(bytes) {
       if (mime && mime.startsWith('image/')) {
         await renderImagePreview(bytes, mime, host);
       } else {
-        host.innerHTML = '<div class="doc-preview-meta">' + L('Dit soort bestand kan de browser niet tonen. De controle hierboven bewijst al dat dit precies het document uit dit verzoek is. Open het in uw eigen programma en lees het voordat u tekent.', 'This file type cannot be shown in the browser. The check above already proves it is the exact document in this request: open it in your own app to read it before you sign.') + '</div>';
+        host.innerHTML = '<div class="doc-preview-meta">' + L('Dit soort bestand kan de browser niet tonen. De controle hierboven bewijst al dat dit precies het document uit dit verzoek is. Open het in je eigen programma en lees het voordat je tekent.', 'This file type cannot be shown in the browser. The check above already proves it is the exact document in this request: open it in your own app to read it before you sign.') + '</div>';
       }
     }
   } catch (e) {
@@ -1292,7 +1292,7 @@ async function renderPdfPage(wrap) {
       wrap.dataset.blank = '1';
       const note = document.createElement('div');
       note.className = 'doc-preview-meta page-blank';
-      note.textContent = L('Deze pagina kan dit apparaat niet tonen. Het document zelf is in orde en de controle hierboven klopt; open het op een ander apparaat om deze pagina te lezen voordat u tekent.', 'This device cannot display this page. The document itself is fine and the check above matches; open it on another device to read this page before you sign.');
+      note.textContent = L('Deze pagina kan dit apparaat niet tonen. Het document zelf is in orde en de controle hierboven klopt; open het op een ander apparaat om deze pagina te lezen voordat je tekent.', 'This device cannot display this page. The document itself is fine and the check above matches; open it on another device to read this page before you sign.');
       wrap.appendChild(note);
     }
   }
@@ -1384,7 +1384,7 @@ function armAppearanceTool(type) {
   if (!__documentBytes || !isPdfBytes(__documentBytes)) return;
   __appearanceTool = type;
   setAppearanceHelp(type === 'seal'
-    ? L('Handtekening gekozen. Klik op de plek in het document waar uw handtekening moet komen.', 'Signature selected. Click the spot in the document where your signature should go.')
+    ? L('Handtekening gekozen. Klik op de plek in het document waar je handtekening moet komen.', 'Signature selected. Click the spot in the document where your signature should go.')
     : L('Datum gekozen. Klik op de plek in het document waar de datum van ondertekening moet komen.', 'Date selected. Click the spot in the document where the signing date should go.'), true);
 }
 
@@ -1414,7 +1414,7 @@ function placeAppearanceField(event) {
   setAppearance(fields);
   __appearanceTool = '';
   setAppearanceHelp(field.type === 'seal'
-    ? L('Uw handtekening staat. Kies opnieuw Plaats mijn handtekening om hem te verplaatsen.', 'Your signature is placed. Choose Place my signature again to move it.')
+    ? L('Je handtekening staat. Kies opnieuw Plaats mijn handtekening om hem te verplaatsen.', 'Your signature is placed. Choose Place my signature again to move it.')
     : L('De datum staat. Kies opnieuw Plaats datum om hem te verplaatsen.', 'The signing date is placed. Choose Place date again to move it.'), false);
   renderAppearanceOverlays();
 }
@@ -1450,7 +1450,7 @@ function addAppearanceNode(layer, field, party, current, requested) {
     // cannot query its own size.
     const lbl = document.createElement('span');
     lbl.className = 'lbl';
-    lbl.textContent = paraaf ? L('Uw paraaf', 'Your initials') : field.type === 'date' ? L('Datum', 'Date') : L('Uw handtekening komt hier', 'Your signature goes here');
+    lbl.textContent = paraaf ? L('Je paraaf', 'Your initials') : field.type === 'date' ? L('Datum', 'Date') : L('Je handtekening komt hier', 'Your signature goes here');
     node.appendChild(lbl);
   } else if (field.type === 'date') {
     const lbl = document.createElement('span');
@@ -1836,7 +1836,7 @@ function retitleForResult(owner) {
   const review = $('review-title');
   if (review) review.textContent = L('Het document', 'The document');
   const sign = $('sign-title');
-  if (sign) sign.textContent = owner ? L('Stand van het verzoek', 'State of the request') : L('Uw handtekening', 'Your signature');
+  if (sign) sign.textContent = owner ? L('Stand van het verzoek', 'State of the request') : L('Je handtekening', 'Your signature');
 }
 
 async function showResultForParty(envId, partyIndex) {
@@ -1845,7 +1845,7 @@ async function showResultForParty(envId, partyIndex) {
   const complete = __envelope.status === 'complete';
   setStatus('ok', complete
     ? L('Iedereen heeft getekend. Het complete document met alle handtekeningen en het bewijs staan klaar bij Het getekende document.', 'Everyone has signed. The complete document with every signature and the proof are ready under The signed document.')
-    : L('U heeft getekend. Zodra iedereen heeft getekend, opent deze zelfde link het complete document.', 'You have signed. Once everyone has signed, this same link opens the complete document.'));
+    : L('Je hebt getekend. Zodra iedereen heeft getekend, opent deze zelfde link het complete document.', 'You have signed. Once everyone has signed, this same link opens the complete document.'));
   $('sign-confirm').hidden = true;
   if (!__session) { showCta(loginCtaHtml()); watchForSignIn(); return; }
   await loadDeliveredDocument(envId, partyIndex);
@@ -1894,7 +1894,7 @@ function wireResultCard({ proofUrl, proofNeedsToken = false }) {
       // without the document both are hidden (r5, C).
       ? (__documentBytes
         ? L('Bewaar het origineel (' + String(__envelope.original_filename || 'het originele document') + ') en het bewijs samen. Daarmee kan iedereen later op paramant.app/verify nagaan wie waar heeft getekend. De pdf met alle handtekeningen werkt daar ook.', 'Keep the original (' + String(__envelope.original_filename || 'the original document') + ') and the proof together. With them anyone can check later, on paramant.app/en/verify, who signed where. The pdf with every signature works there too.')
-        : L('Het origineel en de pdf met alle handtekeningen kunt u hier downloaden zodra het document op deze pagina is geopend. De melding hierboven zegt waarom dat nu niet lukte.', 'You can download the original and the pdf with every signature here once the document has opened on this page. The message above says why that did not work just now.'))
+        : L('Het origineel en de pdf met alle handtekeningen kun je hier downloaden zodra het document op deze pagina is geopend. De melding hierboven zegt waarom dat nu niet lukte.', 'You can download the original and the pdf with every signature here once the document has opened on this page. The message above says why that did not work just now.'))
       : L('Het bewijs komt beschikbaar zodra iedereen heeft getekend.', 'The proof becomes available once everyone has signed.');
   }
 }
@@ -1913,19 +1913,19 @@ async function initOwner(resultRef, ownerId) {
       if (r.status === 401) {
         showStep('step-cosign');
         { const head = cosignHeading({ state: 'open', owner: true }, L); $('cosign-title').textContent = head.title; $('cosign-sub').textContent = head.sub; }
-        setStatus('warn', L('Log in met het account waarmee u het verzoek verstuurde.', 'Sign in with the account you sent the request from.'));
+        setStatus('warn', L('Log in met het account waarmee je het verzoek verstuurde.', 'Sign in with the account you sent the request from.'));
         showCta(loginCtaHtml());
         document.body.classList.add('needs-login');
         watchForSignIn();
         return;
       }
-      if (!r.ok) return showError(L('Deze link werkt niet (meer). Open uw documenten in het dashboard.', 'This link no longer works. Open your documents in the dashboard.'));
+      if (!r.ok) return showError(L('Deze link werkt niet (meer). Open je documenten in het dashboard.', 'This link no longer works. Open your documents in the dashboard.'));
       envId = (await r.json()).envelope_id;
     }
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(String(envId || ''))) return showError(L('De link bevat geen geldig verzoek.', 'The link does not contain a valid request.'));
     const v = await fetch('/api/user/envelopes/' + encodeURIComponent(envId) + '/owner-view', { credentials: 'include', cache: 'no-store' });
-    if (v.status === 401) return showError(L('Log in met het account waarmee u het verzoek verstuurde.', 'Sign in with the account you sent the request from.'));
-    if (!v.ok) return showError(L('Dit verzoek is niet gevonden bij uw account.', 'This request was not found on your account.'));
+    if (v.status === 401) return showError(L('Log in met het account waarmee je het verzoek verstuurde.', 'Sign in with the account you sent the request from.'));
+    if (!v.ok) return showError(L('Dit verzoek is niet gevonden bij je account.', 'This request was not found on your account.'));
     __envelope = withPlainLabels((await v.json()).envelope);
     __partyIndex = -1;
     renderEnvelope();
@@ -1959,14 +1959,14 @@ async function initOwner(resultRef, ownerId) {
       } catch { /* fall back to the original file */ }
     }
     if (!__documentBytes) {
-      setDeliveryStatus('err', L('Kies het originele document dat u liet tekenen. Het blijft in uw browser; daar wordt de pdf met alle handtekeningen gemaakt.', 'Choose the original document you sent for signing. It stays in your browser, where the pdf with every signature is made.'));
+      setDeliveryStatus('err', L('Kies het originele document dat je liet tekenen. Het blijft in je browser; daar wordt de pdf met alle handtekeningen gemaakt.', 'Choose the original document you sent for signing. It stays in your browser, where the pdf with every signature is made.'));
       $('verify-file').onchange = async (ev) => { await onVerifyFile(ev); wireResultCard({ proofUrl: state === 'complete' ? '/api/user/documents/' + encodeURIComponent(envId) + '/receipt' : '' }); };
     } else {
       setDeliveryStatus('ok', L('Het document is geopend.', 'The document is open.'));
     }
     wireResultCard({ proofUrl: state === 'complete' ? '/api/user/documents/' + encodeURIComponent(envId) + '/receipt' : '' });
   } catch (e) {
-    showError(e.message || L('Er is geen verbinding. Controleer uw internet en probeer het opnieuw.', 'No connection. Check your internet and try again.'));
+    showError(e.message || L('Er is geen verbinding. Controleer je internet en probeer het opnieuw.', 'No connection. Check your internet and try again.'));
   }
 }
 
@@ -1982,9 +1982,9 @@ function refreshSignGate() {
   btn.disabled = __hashMatches !== true;
   gate.hidden = false;
   if (__hashMatches === true) {
-    gate.innerHTML = '<span class="gate-ok">' + L('U heeft het document hierboven geopend en gecontroleerd.', 'You have opened and verified the document above.') + '</span>';
+    gate.innerHTML = '<span class="gate-ok">' + L('Je hebt het document hierboven geopend en gecontroleerd.', 'You have opened and verified the document above.') + '</span>';
   } else if (__hashMatches === false) {
-    gate.textContent = L('Het bestand dat u opende hoort niet bij dit verzoek, dus ondertekenen kan niet. Open het juiste document.', 'The file you opened does not match this request, so signing is blocked. Open the correct document.');
+    gate.textContent = L('Het bestand dat je opende hoort niet bij dit verzoek, dus ondertekenen kan niet. Open het juiste document.', 'The file you opened does not match this request, so signing is blocked. Open the correct document.');
   } else {
     gate.textContent = L('Ondertekenen kan zodra het document hierboven open is.', 'Signing is possible once the document above is open.');
   }
@@ -1992,7 +1992,7 @@ function refreshSignGate() {
 
 // ---------- saying no ----------
 async function doDecline() {
-  if (!confirm(L('Weet u zeker dat u niet tekent? Het verzoek stopt dan voor iedereen, en de afzender krijgt bericht.', 'Are you sure you will not sign? The request then stops for everyone, and the sender is told.'))) return;
+  if (!confirm(L('Weet je zeker dat je niet tekent? Het verzoek stopt dan voor iedereen, en de afzender krijgt bericht.', 'Are you sure you will not sign? The request then stops for everyone, and the sender is told.'))) return;
   const btn = $('decline-btn');
   btn.disabled = true;
   try {
@@ -2002,8 +2002,8 @@ async function doDecline() {
     });
     if (!r.ok) {
       const body = await r.json().catch(() => ({}));
-      throw new Error(body.error === 'signed' ? L('U heeft al getekend; weigeren kan dan niet meer.', 'You have already signed, so you can no longer decline.')
-        : r.status === 403 ? L('Log in met het e-mailadres waarop u bent uitgenodigd.', 'Sign in with the invited email address.')
+      throw new Error(body.error === 'signed' ? L('Je hebt al getekend; weigeren kan dan niet meer.', 'You have already signed, so you can no longer decline.')
+        : r.status === 403 ? L('Log in met het e-mailadres waarop je bent uitgenodigd.', 'Sign in with the invited email address.')
         : L('Weigeren lukte niet. Probeer het zo opnieuw.', 'Declining did not work. Please try again.'));
     }
     __envelope.status = 'void';
@@ -2011,7 +2011,7 @@ async function doDecline() {
     const me = (__envelope.parties || [])[__partyIndex]; if (me) me.status = 'declined';
     renderEnvelope();
     showClosed('declined');
-    setStatus('ok', L('U heeft geweigerd. Het verzoek is gestopt en de afzender krijgt bericht.', 'You declined. The request has stopped and the sender is told.'));
+    setStatus('ok', L('Je hebt geweigerd. Het verzoek is gestopt en de afzender krijgt bericht.', 'You declined. The request has stopped and the sender is told.'));
     show('review-card', false);
   } catch (e) {
     setStatus('err', e.message);
@@ -2024,12 +2024,12 @@ async function doSign() {
   // The gate keeps this button disabled until the document is verified; re-check
   // here as defence in depth.
   if (__hashMatches !== true) {
-    setStatus('err', L('Open en bekijk het document hierboven voordat u tekent.', 'Open and review the document above before signing.'));
+    setStatus('err', L('Open en bekijk het document hierboven voordat je tekent.', 'Open and review the document above before signing.'));
     refreshSignGate();
     return;
   }
   if (__documentBytes && isPdfBytes(__documentBytes) && __visualCopy.ok && Number(__envelope.recipe_version) >= 5 && __appearance.fields.length === 0) {
-    if (!confirm(L('Ondertekenen zonder zichtbare handtekening in het document? Uw handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your signature is still recorded.'))) return;
+    if (!confirm(L('Ondertekenen zonder zichtbare handtekening in het document? Je handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your signature is still recorded.'))) return;
   }
   $('sign-confirm').disabled = true;
   $('sign-cta').hidden = true;
@@ -2046,7 +2046,7 @@ async function doSign() {
         if (!e || !['prf_unsupported', 'no_passkey', 'no_webauthn', 'vault_unavailable'].includes(e.code)) throw e;
         const code = await promptTotp('cs-pass');
         if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
-        setStatus('', L('Uw ondertekensleutel wordt klaargezet...', 'Setting up your signing key…'));
+        setStatus('', L('Je ondertekensleutel wordt klaargezet...', 'Setting up your signing key…'));
         ({ signKey: __signKey, signer: __ephemeralSigner } = await enrolEphemeralSigningKeyWithTotp({ totp: code, onStatus: (m) => setStatus('', m) }));
       }
     }
@@ -2082,7 +2082,7 @@ async function doSign() {
     }
 
     // 3) Submit, with the handwriting encrypted for the other parties.
-    setStatus('', L('Uw handtekening wordt vastgelegd...', 'Recording your signature...'));
+    setStatus('', L('Je handtekening wordt vastgelegd...', 'Recording your signature...'));
     let ink = '';
     try { ink = await sealInk({ ink: __ink, documentKey: __docKey, envelopeId: __envelope.id, partyIndex: __partyIndex }); } catch { ink = ''; }
     const data = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance, ink });
@@ -2092,8 +2092,8 @@ async function doSign() {
     // The line under the heading follows the status: the last signer read
     // "once everyone has signed..." under "Signed by everyone" (hertest r2 K1).
     { const sub = $('done-sub'); if (sub) sub.textContent = data.status === 'complete'
-      ? L('Iedereen heeft nu getekend. Download hieronder het complete document met alle handtekeningen. Dezelfde link uit uw uitnodiging opent het later opnieuw.', 'Everyone has now signed. Download the complete document with every signature below. The same link from your invitation opens it again later.')
-      : L('Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.', 'Once everyone has signed, the same link from your invitation opens the complete document with every signature.'); }
+      ? L('Iedereen heeft nu getekend. Download hieronder het complete document met alle handtekeningen. Dezelfde link uit je uitnodiging opent het later opnieuw.', 'Everyone has now signed. Download the complete document with every signature below. The same link from your invitation opens it again later.')
+      : L('Zodra iedereen heeft getekend, opent dezelfde link uit je uitnodiging het complete document met alle handtekeningen.', 'Once everyone has signed, the same link from your invitation opens the complete document with every signature.'); }
     $('done-env-id').textContent = __envelope.id;
     $('done-status').textContent = data.status === 'complete' ? L('Door iedereen getekend', 'Signed by everyone') : L('Wacht op de anderen', 'Waiting for the others');
     $('done-progress').textContent = (data.signed_count != null ? data.signed_count : '?') + ' / ' + (data.party_count != null ? data.party_count : __envelope.party_count) + L(' getekend', ' signed');
@@ -2136,22 +2136,22 @@ async function doSign() {
     // sender_sign_quota_reached): nothing for the signer to buy, so no upgrade
     // pitch, just what is going on and who can fix it.
     if (e && e.status === 402 && e.data && e.data.error === 'sender_sign_quota_reached') {
-      setStatus('err', L('Het tegoed van de afzender voor deze maand is op. Uw handtekening is niet gezet. De afzender krijgt daar een e-mail over; u kunt later met dezelfde link tekenen.', 'The sender has used up this month\'s allowance. Your signature was not recorded. The sender gets an email about it; you can sign later with the same link.'));
+      setStatus('err', L('Het tegoed van de afzender voor deze maand is op. Je handtekening is niet gezet. De afzender krijgt daar een e-mail over; je kunt later met dezelfde link tekenen.', 'The sender has used up this month\'s allowance. Your signature was not recorded. The sender gets an email about it; you can sign later with the same link.'));
       $('sign-confirm').disabled = false;
       return;
     }
     if (e && e.status === 402 && window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(e.status, e.data)) {
-      setStatus('err', L('U heeft uw gratis handtekeningen voor deze maand gebruikt.', 'Free monthly signing limit reached.'));
+      setStatus('err', L('Je hebt je gratis handtekeningen voor deze maand gebruikt.', 'Free monthly signing limit reached.'));
       showCta(window.paQuotaUpgrade.html(e.data));
       $('sign-confirm').disabled = false;
       return;
     }
     let msg;
     const reason = e && e.data && e.data.error;
-    if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, Inloggen met passkey) en open daarna deze link opnieuw. De passkey waarmee u inlogt wordt dan uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link. Your sign-in passkey becomes your signing key.');
+    if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan je account (Account, Inloggen met passkey) en open daarna deze link opnieuw. De passkey waarmee je inlogt wordt dan je ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link. Your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
-    else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of duurde te lang. Tik op Ondertekenen om het opnieuw te proberen.', 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.');
-    else if (e && e.status === 401) msg = L('U bent uitgelogd. Log opnieuw in met het uitgenodigde e-mailadres en probeer het nog eens.', 'You were signed out. Sign in again with the invited email address and try again.');
+    else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met je passkey is geannuleerd of duurde te lang. Tik op Ondertekenen om het opnieuw te proberen.', 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.');
+    else if (e && e.status === 401) msg = L('Je bent uitgelogd. Log opnieuw in met het uitgenodigde e-mailadres en probeer het nog eens.', 'You were signed out. Sign in again with the invited email address and try again.');
     else if (e && e.status === 429) {
       const wait = Number(e.data && (e.data.retry_after || e.data.retryAfter)) || 0;
       msg = wait > 0
@@ -2164,27 +2164,27 @@ async function doSign() {
     else if (e && e.status === 403 && (reason === 'not_authorized' || reason === 'recipient_mismatch')) msg = L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het adres waar de uitnodiging naartoe ging.', 'This invite is bound to a different email address. Sign in with the address the invite was sent to.');
     else if (e && e.status === 403 && reason === 'doc_hash_mismatch') msg = L('Het document in deze browser is niet het document uit dit verzoek. Laad de pagina opnieuw; er is niets ondertekend.', 'The document in this browser is not the document in this request. Reload the page; nothing has been signed.');
     else if (e && e.status === 403 && reason === 'invite_invalid') msg = L('Deze uitnodigingslink werkt niet (meer). Open de link uit de uitnodigingsmail opnieuw, of vraag de afzender om een nieuwe uitnodiging. Er is niets ondertekend.', 'This invitation link does not work (any more). Open the link from the invitation email again, or ask the sender for a new invitation. Nothing has been signed.');
-    else if (e && e.status === 403 && reason === 'account_mismatch') msg = L('U bent tussendoor met een ander account ingelogd. Laad de pagina opnieuw en teken met het uitgenodigde account. Er is niets ondertekend.', 'You signed in with another account in the meantime. Reload the page and sign with the invited account. Nothing has been signed.');
+    else if (e && e.status === 403 && reason === 'account_mismatch') msg = L('Je bent tussendoor met een ander account ingelogd. Laad de pagina opnieuw en teken met het uitgenodigde account. Er is niets ondertekend.', 'You signed in with another account in the meantime. Reload the page and sign with the invited account. Nothing has been signed.');
     else if (e && e.status === 403) msg = L('Ondertekenen werd geweigerd. Laad de pagina opnieuw en probeer het nog eens; er is niets ondertekend.', 'Signing was refused. Reload the page and try again; nothing has been signed.');
     else if (e && e.status === 410 && (reason === 'voided' || reason === 'declined')) msg = closedExplanation(reason === 'declined' ? 'declined' : 'cancelled');
     else if (e && e.status === 410) msg = L('De termijn om te tekenen is voorbij (tot ', 'The signing period has ended (until ') + humanDate(__envelope.sign_expires_at) + L('). Vraag de afzender om een nieuw verzoek.', '). Ask the sender for a new request.');
     else if (e && e.status === 409 && reason === 'already_complete') msg = L('Iedereen heeft al getekend. Laad de pagina opnieuw om het document te downloaden.', 'Everyone has already signed. Reload the page to download the document.');
     else if (e && e.status === 409) msg = L('Deze toestemming om te ondertekenen is al gebruikt of verlopen. Laad de pagina opnieuw en probeer het nog eens.', 'That signing authorization was already used or expired. Reload the page and try again.');
-    else if (e && e.code === 'cancelled') msg = L('Ondertekenen is geannuleerd. Tik op Ondertekenen als u klaar bent.', 'Signing cancelled. Tap Sign when you’re ready.');
+    else if (e && e.code === 'cancelled') msg = L('Ondertekenen is geannuleerd. Tik op Ondertekenen als je klaar bent.', 'Signing cancelled. Tap Sign when you’re ready.');
     else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = L('Die code klopte niet. Tik op Ondertekenen en vul de huidige code van 6 cijfers in.', 'That authenticator code didn’t match. Tap Sign and enter the current 6-digit code.');
     else if (e && e.code === 'totp_locked') msg = e.message;
-    else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op uw account (Account, Tweestapsverificatie) en teken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
+    else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op je account (Account, Tweestapsverificatie) en teken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
     // Already translated by the signer (js/error-message.js).
     else if (e && e.code === 'service_error') msg = e.message;
-    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = L('Uw passkey kan hier niet met één tik ondertekenen. Tik op Ondertekenen om met de code uit uw authenticator-app te tekenen.', 'Your passkey can’t do one-tap signing here. Tap Sign to sign with your authenticator code instead.');
+    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = L('Je passkey kan hier niet met één tik ondertekenen. Tik op Ondertekenen om met de code uit je authenticator-app te tekenen.', 'Your passkey can’t do one-tap signing here. Tap Sign to sign with your authenticator code instead.');
     else if (e && e.status) msg = L('Ondertekenen lukt nu niet (serverfout ', 'Signing could not be completed right now (server error ') + e.status + L('). Probeer het zo opnieuw.', '). Please try again in a moment.');
-    else msg = L('Uw passkey kon het ondertekenen in deze browser niet afronden. Tik op Ondertekenen om het opnieuw te proberen. Lukt het steeds niet, probeer dan een andere browser of gebruik de passkey op uw telefoon.', 'Your passkey could not complete signing on this browser. Tap Sign to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');
+    else msg = L('Je passkey kon het ondertekenen in deze browser niet afronden. Tik op Ondertekenen om het opnieuw te proberen. Lukt het steeds niet, probeer dan een andere browser of gebruik de passkey op je telefoon.', 'Your passkey could not complete signing on this browser. Tap Sign to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');
     if (msg === 'relink') {
       // 403 signer_not_enrolled: the key in this browser is not linked to this
       // account (a link that stopped halfway, or another account signing in the
       // same browser). It is not the e-mail address (retest T3-4). The way out
       // is a new key, linked now, as /sign offers it.
-      setStatus('err', L('De ondertekensleutel in deze browser is niet aan uw account gekoppeld, bijvoorbeeld omdat het koppelen eerder halverwege stopte of omdat hier ook een ander account tekent. Koppel opnieuw: deze browser maakt een nieuwe sleutel en koppelt die met één bevestiging aan uw account. Er is nog niets ondertekend. ', 'The signing key in this browser is not linked to your account, for example because linking stopped halfway earlier or because another account also signs here. Link again: this browser makes a new key and links it to your account with one confirmation. Nothing has been signed yet. '));
+      setStatus('err', L('De ondertekensleutel in deze browser is niet aan je account gekoppeld, bijvoorbeeld omdat het koppelen eerder halverwege stopte of omdat hier ook een ander account tekent. Koppel opnieuw: deze browser maakt een nieuwe sleutel en koppelt die met één bevestiging aan je account. Er is nog niets ondertekend. ', 'The signing key in this browser is not linked to your account, for example because linking stopped halfway earlier or because another account also signs here. Link again: this browser makes a new key and links it to your account with one confirmation. Nothing has been signed yet. '));
       const st = $('sign-status');
       if (st) {
         const b = document.createElement('button');

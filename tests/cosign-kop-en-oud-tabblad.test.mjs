@@ -1,5 +1,5 @@
 // Acceptatie 3.1.1, twee punten op /co-sign:
-//   10. De kop zei altijd "Lees het document en zet uw handtekening", ook
+//   10. De kop zei altijd "Lees het document en zet je handtekening", ook
 //       boven "Door iedereen getekend" en op de resultaatpagina van de
 //       afzender. De kop volgt nu de status (js/cosign-heading.js).
 //    5. Na een account maken via de uitnodiging opende het document in het
@@ -25,7 +25,7 @@ const NL = (nl) => nl;
 const EN = (_nl, en) => en;
 
 test('kop per status: alleen een open verzoek vraagt om te tekenen', () => {
-  const asks = /zet uw handtekening/;
+  const asks = /zet je handtekening/;
   assert.match(cosignHeading({ state: 'open' }, NL).sub, asks);
   for (const s of [
     { state: 'complete' }, { state: 'complete', owner: true }, { state: 'complete', signedByMe: true },
@@ -38,8 +38,8 @@ test('kop per status: alleen een open verzoek vraagt om te tekenen', () => {
     assert.doesNotMatch(e.title + ' ' + e.sub, /add your signature/, JSON.stringify(s));
   }
   assert.equal(cosignHeading({ state: 'complete' }, NL).title, 'Door iedereen getekend');
-  assert.equal(cosignHeading({ state: 'open', owner: true }, NL).title, 'Uw verzoek');
-  assert.equal(cosignHeading({ state: 'open', signedByMe: true }, NL).title, 'U heeft getekend');
+  assert.equal(cosignHeading({ state: 'open', owner: true }, NL).title, 'Je verzoek');
+  assert.equal(cosignHeading({ state: 'open', signedByMe: true }, NL).title, 'Je hebt getekend');
   assert.equal(cosignHeading({ state: 'cancelled' }, EN).title, 'This request was withdrawn');
 });
 
@@ -179,6 +179,6 @@ test('kop boven een afgerond verzoek vraagt niet om te tekenen', async () => {
   const page = await ctx.newPage();
   await page.goto(link, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.getElementById('cosign-title')?.textContent === 'Door iedereen getekend', null, { timeout: 30000 });
-  assert.doesNotMatch(await page.locator('#cosign-sub').textContent(), /zet uw handtekening/);
+  assert.doesNotMatch(await page.locator('#cosign-sub').textContent(), /zet je handtekening/);
   await ctx.close();
 });

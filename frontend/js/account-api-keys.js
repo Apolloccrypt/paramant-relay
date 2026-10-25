@@ -121,7 +121,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
           }
           say('');
           if (fresh) {
-            fresh.textContent = out.body.key + nlEn('  ·  kopieer hem nu. U ziet hem maar één keer.', '  ·  copy it now. You only see it once.');
+            fresh.textContent = out.body.key + nlEn('  ·  kopieer hem nu. Je ziet hem maar één keer.', '  ·  copy it now. You only see it once.');
             fresh.hidden = false;
           }
           load();

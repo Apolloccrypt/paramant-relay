@@ -22,9 +22,9 @@ const T = {
     inUse: 'Deze link is al in gebruik. Vraag de afzender om een nieuwe.',
     waitFp: 'Klaar. Wacht tot de afzender de controlecode bevestigt.',
     fpOkTitle: 'Controlecode bevestigd. Bestand komt binnen...',
-    fpOkStatus: 'De afzender heeft de controlecode bevestigd. Het bestand wordt voor u verzegeld.',
+    fpOkStatus: 'De afzender heeft de controlecode bevestigd. Het bestand wordt voor jou verzegeld.',
     peerLeft: 'De verbinding met de afzender is verbroken.',
-    senderRejected: 'De afzender zag een andere controlecode dan u en is gestopt. Er is niets verstuurd en niets ontvangen. Vraag de afzender om een nieuwe link.',
+    senderRejected: 'De afzender zag een andere controlecode dan jij en is gestopt. Er is niets verstuurd en niets ontvangen. Vraag de afzender om een nieuwe link.',
     senderGone: 'De afzender heeft deze sessie niet afgemaakt: er kwam in tien minuten geen bestand. Er is niets ontvangen en niets gewist. Is de afzender er nog? Druk dan op Opnieuw proberen. Zo niet, vraag dan om een nieuwe link.',
     keygenFail: 'Sleutels maken is mislukt: ',
     dlChunk: (i, n) => `Deel ${i} van ${n} wordt gedownload...`,
@@ -33,13 +33,13 @@ const T = {
     decChunk: (i, n) => `Deel ${i} van ${n} wordt ontsleuteld...`,
     bridge: 'De versleuteling is nog niet klaar',
     saving: 'Bestand wordt opgeslagen...',
-    haveFile: 'U hebt het bestand.',
-    savedLine: (name) => name + ' staat op uw apparaat. Onze kopie is voorgoed vernietigd.',
+    haveFile: 'Je hebt het bestand.',
+    savedLine: (name) => name + ' staat op je apparaat. Onze kopie is voorgoed vernietigd.',
     decFail: 'Ontsleutelen is mislukt: ',
     vaultRecv: (n) => 'Map wordt ontvangen: ' + n + ' bestanden...',
     vaultStep: (i, n) => 'Map: ' + i + ' van ' + n + ' gedownload',
-    haveFiles: 'U hebt de bestanden.',
-    savedFiles: (n) => n + ' bestanden staan op uw apparaat. Onze kopieën zijn voorgoed vernietigd.',
+    haveFiles: 'Je hebt de bestanden.',
+    savedFiles: (n) => n + ' bestanden staan op je apparaat. Onze kopieën zijn voorgoed vernietigd.',
     burnLine: (b) => 'blok ' + b.chunk + '  hash ' + b.hash + '...  gewist ' + b.ts,
   },
   en: {
@@ -619,7 +619,7 @@ let savedFile = null;
     if (dash && d && d.authenticated) {
       const en = /^en\b/i.test(document.documentElement.lang || '');
       dash.setAttribute('href', en ? '/en/dashboard' : '/dashboard');
-      dash.textContent = en ? 'Open your dashboard' : 'Naar uw overzicht';
+      dash.textContent = en ? 'Open your dashboard' : 'Naar je overzicht';
     }
   } catch { /* stays the link to the site */ }
 })();

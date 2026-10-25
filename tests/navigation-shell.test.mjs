@@ -63,7 +63,9 @@ await (async () => {
 })();
 // The Dutch homepage: the same bar in Dutch, with the two outward product
 // names, re-rendered identically by js/nav-auth.js after the session check;
-// and in the demo dashboard one primary action (Account maken) and one secondary (Probeer het zelf).
+// and in the hero one button (Probeer het gratis) and one quiet link (Hoe werkt dat?).
+// Since 25 October 2026 the homepage is a question, an answer and one button;
+// the demo dashboard is gone and the three tiles under the hero lead on.
 await (async () => {
   const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
   await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
@@ -73,10 +75,10 @@ await (async () => {
   ok('the Dutch homepage names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
   const authText = await nl.locator('#nav-auth').evaluate((n) => n.textContent);
   ok('the Dutch bar says Hulp, Inloggen and Account maken after the session check', /Hulp/.test(authText) && /Inloggen/.test(authText) && /Account maken/.test(authText), authText);
-  const actions = await nl.locator('[data-home="out"] .wp-demo-top .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className, n.textContent.trim()]));
-  ok('the Dutch homepage leads with Account maken and Probeer het zelf, inside the demo dashboard', JSON.stringify(actions) === JSON.stringify([['/signup','hp-btn hp-btn-fill','Account maken'],['/sign?mode=invite','hp-btn hp-btn-line','Probeer het zelf']]), JSON.stringify(actions));
-  const ctas = await nl.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
-  ok('the Dutch homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/parasend','/parasign']), JSON.stringify(ctas));
+  const actions = await nl.locator('[data-home="out"] .hx .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className, n.textContent.trim()]));
+  ok('the Dutch homepage leads with one button, Probeer het gratis, and one quiet link', JSON.stringify(actions) === JSON.stringify([['/signup','hp-btn hp-btn-fill','Probeer het gratis'],['#hoe','hx-how','Hoe werkt dat?']]), JSON.stringify(actions));
+  const ctas = await nl.locator('#hoe .hx-tile a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
+  ok('the Dutch homepage leads to both product pages and to verify', JSON.stringify(ctas) === JSON.stringify(['/parasend','/parasign','/verify']), JSON.stringify(ctas));
   await nl.close();
 })();
 const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
@@ -302,7 +304,7 @@ const homeSections = await homePage.evaluate(() => {
 ok('the signed-in homepage stops after the hero', homeSections.total > 1 && JSON.stringify(homeSections.visible) === JSON.stringify(['home-hero']), JSON.stringify(homeSections));
 // Mick, 4 September: one note is enough. The founder line left both hero states,
 // so what the signed-in hero has to carry is the workspace a customer came for.
-ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Uw documenten'), await homePage.locator('[data-home="in"]').innerText());
+ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Je documenten'), await homePage.locator('[data-home="in"]').innerText());
 if (process.env.PARAMANT_HOME_SCREENSHOT_PATH) await stableScreenshot(homePage, { path:process.env.PARAMANT_HOME_SCREENSHOT_PATH });
 await homePage.close();
 
@@ -389,14 +391,14 @@ await demoPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
 await demoPage.locator('[data-home="out"]:not([hidden])').waitFor();
 const demoOut = await demoPage.evaluate(() => {
   const main = document.querySelector('main').getBoundingClientRect();
-  const tiles = Array.from(document.querySelectorAll('[data-home="out"] .wp-demo .wp-tile')).map((tile) => tile.getBoundingClientRect());
+  const tiles = Array.from(document.querySelectorAll('#hoe .hx-tile')).map((tile) => tile.getBoundingClientRect());
   return {
     tiles: tiles.filter((box) => box.width > 0 && box.height > 0).length,
     cut: tiles.filter((box) => box.bottom > main.bottom || box.top < main.top || box.left < main.left || box.right > main.right).length,
   };
 });
 await demoPage.close();
-ok('signed out at 1440, the demo dashboard draws its three tiles whole', demoOut.tiles === 3 && demoOut.cut === 0, JSON.stringify(demoOut));
+ok('signed out at 1440, the three tiles under the hero draw whole', demoOut.tiles === 3 && demoOut.cut === 0, JSON.stringify(demoOut));
 
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));

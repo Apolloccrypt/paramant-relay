@@ -40,10 +40,10 @@ if (path && welcome) {
       const buy = isPricingPath(path);
       if (lede) {
         lede.textContent = buy
-          ? (EN ? 'Your account is active. You now go back to the plan you chose, to pay.' : 'Uw account is actief. U gaat nu terug naar het plan dat u koos, om af te rekenen.')
-          : (EN ? 'Your account is active. You now continue where you were.' : 'Uw account is actief. U gaat nu verder waar u was.');
+          ? (EN ? 'Your account is active. You now go back to the plan you chose, to pay.' : 'Je account is actief. Je gaat nu terug naar het plan dat je koos, om af te rekenen.')
+          : (EN ? 'Your account is active. You now continue where you were.' : 'Je account is actief. Je gaat nu verder waar je was.');
       }
-      if (link) link.textContent = buy ? (EN ? 'Back to your plan' : 'Terug naar uw plan') : (EN ? 'Continue where I was' : 'Verder waar ik was');
+      if (link) link.textContent = buy ? (EN ? 'Back to your plan' : 'Terug naar je plan') : (EN ? 'Continue where I was' : 'Verder waar ik was');
     }
     if (box) box.hidden = false;
     if (rest) rest.hidden = true;
