@@ -48,6 +48,16 @@ const PUBLIC_ROUTES = [
     src: "path.match(/^\\/v2\\/pickup\\/([A-Za-z0-9_-]{16,128})$/)",
     why: 'the second half of the same pickup: the code from the mailbox, and then the '
        + 'bytes. Same reason it carries no key, and three wrong codes close the door.' },
+  { method: 'GET',  docs: '/v2/opvraag/:id',
+    src: "path.match(/^\\/v2\\/opvraag\\/([A-Za-z0-9_-]{24})$/)",
+    why: 'stukken opvragen, the client side. The client is somebody an office asked for '
+       + 'documents, not an account holder. The capability is the id in the link the office '
+       + 'shared; the answer is what the client is shown anyway, and never an address or a file.' },
+  { method: 'POST', docs: '/v2/opvraag/:id/stuk/:n',
+    src: "path.match(/^\\/v2\\/opvraag\\/([A-Za-z0-9_-]{24})\\/stuk\\/(\\d{1,2})$/)",
+    why: 'the same client adding a file. Only an encrypt_blob packet, at most 5 MiB, only '
+       + 'while the request is open, within its caps per document and per request, rate '
+       + 'limited per address. Nothing here reads a file back.' },
   { method: 'GET',  docs: '/v2/check-key',
     src: "path === '/v2/check-key'",
     why: 'a client must be able to discover which relay accepts its key before it has one.' },
