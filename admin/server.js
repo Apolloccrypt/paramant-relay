@@ -3641,6 +3641,71 @@ api.post("/user/sends/:id/reinvite", authUser, async (req, res) => {
   }
 });
 
+// ── stukken opvragen: the office's side ──────────────────────────────────────
+// Same shape as the sends above: the session supplies the account, the browser
+// only names a request id. The files that pass through here are ciphertext for
+// a key only the office's own browser holds (relay/lib/opvraag.js); this process
+// never sees a key, a file name or a file.
+const OPVRAAG_ID_RE = /^[A-Za-z0-9_-]{24}$/;
+async function opvraagProxy(res, op, body, binary) {
+  try {
+    const relayRes = await callRelay("/v2/user/opvraag/" + op, body, "POST");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    if (binary && relayRes.ok) {
+      res.setHeader("Content-Type", "application/octet-stream");
+      return res.status(200).send(Buffer.from(await relayRes.arrayBuffer()));
+    }
+    const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(out);
+  } catch (err) {
+    console.error("[user/opvragen " + op + "]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+}
+function opvraagId(req, res) {
+  const id = String(req.params.id || "");
+  if (!OPVRAAG_ID_RE.test(id)) { res.status(404).json({ error: "unknown" }); return null; }
+  return id;
+}
+api.get("/user/opvragen/info", authUser, (req, res) =>
+  opvraagProxy(res, "info", { user_id: req.userSession.user_id }));
+api.post("/user/opvragen/kluis", authUser, (req, res) =>
+  opvraagProxy(res, "kluis", { user_id: req.userSession.user_id,
+    kluis_id: String((req.body || {}).kluis_id || ""), wrap: (req.body || {}).wrap || null }));
+api.get("/user/opvragen", authUser, (req, res) =>
+  opvraagProxy(res, "list", { user_id: req.userSession.user_id }));
+api.post("/user/opvragen", authUser, (req, res) => {
+  const b = req.body || {};
+  return opvraagProxy(res, "create", { user_id: req.userSession.user_id,
+    descriptor: b.descriptor, client_name: b.client_name, client_email: b.client_email,
+    lang: b.lang, sk_wrapped: b.sk_wrapped, kluis_id: b.kluis_id });
+});
+api.get("/user/opvragen/:id", authUser, (req, res) => {
+  const id = opvraagId(req, res); if (!id) return;
+  return opvraagProxy(res, "detail", { user_id: req.userSession.user_id, id });
+});
+api.get("/user/opvragen/:id/bestand/:n", authUser, (req, res) => {
+  const id = opvraagId(req, res); if (!id) return;
+  const n = Number(req.params.n);
+  if (!Number.isInteger(n) || n < 0 || n > 1000) return res.status(404).json({ error: "unknown" });
+  return opvraagProxy(res, "file", { user_id: req.userSession.user_id, id, n }, true);
+});
+api.post("/user/opvragen/:id/sluiten", authUser, (req, res) => {
+  const id = opvraagId(req, res); if (!id) return;
+  return opvraagProxy(res, "close", { user_id: req.userSession.user_id, id });
+});
+api.post("/user/opvragen/:id/verwijderen", authUser, (req, res) => {
+  const id = opvraagId(req, res); if (!id) return;
+  return opvraagProxy(res, "delete", { user_id: req.userSession.user_id, id });
+});
+// The hash for the link comes from the office browser, out of its own locked
+// box; the relay puts it in the mail and keeps nothing.
+api.post("/user/opvragen/:id/herinnering", authUser, (req, res) => {
+  const id = opvraagId(req, res); if (!id) return;
+  return opvraagProxy(res, "remind", { user_id: req.userSession.user_id, id,
+    pin: String((req.body || {}).pin || "").slice(0, 64) });
+});
+
 api.get("/user/documents/lookup", authUser, async (req, res) => {
   const { user_id } = req.userSession;
   const docHash = String(req.query.doc_hash || "").trim().toLowerCase();
