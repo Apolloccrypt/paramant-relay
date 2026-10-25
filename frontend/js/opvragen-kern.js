@@ -56,6 +56,8 @@ export async function checkDescriptor(d, id, pin) {
   if (!d || d.v !== 1 || d.id !== id) return false;
   if (!Array.isArray(d.items) || !d.items.length || d.items.some((x) => typeof x !== 'string')) return false;
   if (typeof d.office !== 'string' || typeof d.greet !== 'string' || !Number.isSafeInteger(d.expires_at)) return false;
+  // The relay refuses these on the way in; a page that shows them refuses too.
+  if ([d.office, d.greet, ...d.items].some((x) => new RegExp(INVISIBLE_RE.source).test(x))) return false;
   let kem, ecdh;
   try { kem = fromB64u(d.kem_pub); ecdh = fromB64u(d.ecdh_pub); } catch { return false; }
   if (kem.length !== 1184 || ecdh.length !== 65 || ecdh[0] !== 4) return false;
@@ -154,8 +156,9 @@ export function zipStore(files) {
 }
 
 // A file name that is safe in a zip and on every disk.
+export const INVISIBLE_RE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 export function safeName(s) {
-  return String(s || '').normalize('NFC').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'bestand';
+  return String(s || '').normalize('NFC').replace(INVISIBLE_RE, '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'bestand';
 }
 
 export function formatSize(n, lang) {

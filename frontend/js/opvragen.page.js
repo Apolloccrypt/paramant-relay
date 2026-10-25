@@ -42,7 +42,9 @@ const T = {
     bezig: 'Bezig…', sleutels: 'Sleutels maken…', passkey: 'Bevestig met je passkey…', ontgrendel: 'Ontgrendel met je passkey…',
     kies: 'Vink minstens één stuk aan.', naamNodig: 'Vul de naam van je klant in.', mailFout: 'Dit e-mailadres klopt niet.',
     teVeelStukken: (n) => 'Je kunt tot ' + n + ' stukken tegelijk opvragen.',
-    teVeelOpen: (n) => n === 1 ? 'Je abonnement laat één open verzoek tegelijk toe. Sluit eerst je andere verzoek.' : 'Je hebt al ' + n + ' open verzoeken. Sluit er eerst een.',
+    teVeelOpen: (n) => (n === 1 ? 'Je abonnement laat één verzoek tegelijk toe.' : 'Je hebt al ' + n + ' verzoeken.') + ' Een gesloten verzoek met bestanden telt mee tot je het verwijdert.',
+    geenKantoornaam: 'Vul eerst de naam van je kantoor in bij je factuurgegevens op de accountpagina. Die naam ziet je klant.',
+    alleenBetaald: 'Herinneringen per mail horen bij Firm en hoger. Deel de link zelf opnieuw.',
     maakFout: 'De link kon niet worden gemaakt. Probeer het opnieuw.',
     geenOpslag: 'Deze browser kan de sleutel niet bewaren (privévenster?). Gebruik een gewoon venster, of voeg een passkey toe aan je account.',
     alleenHier: 'Je kunt deze stukken alleen openen in deze browser. Voeg een passkey toe aan je account om ze ook op een andere computer te openen.',
@@ -81,7 +83,9 @@ const T = {
     bezig: 'Working…', sleutels: 'Making keys…', passkey: 'Confirm with your passkey…', ontgrendel: 'Unlock with your passkey…',
     kies: 'Tick at least one document.', naamNodig: 'Fill in your client\'s name.', mailFout: 'This email address is not right.',
     teVeelStukken: (n) => 'You can ask for up to ' + n + ' documents at once.',
-    teVeelOpen: (n) => n === 1 ? 'Your plan allows one open request at a time. Close your other request first.' : 'You already have ' + n + ' open requests. Close one first.',
+    teVeelOpen: (n) => (n === 1 ? 'Your plan allows one request at a time.' : 'You already have ' + n + ' requests.') + ' A closed request with files counts until you delete it.',
+    geenKantoornaam: 'First fill in your office name in your billing details on the account page. Your client sees that name.',
+    alleenBetaald: 'Email reminders come with Firm and up. Share the link again yourself.',
     maakFout: 'The link could not be made. Please try again.',
     geenOpslag: 'This browser cannot keep the key (private window?). Use a normal window, or add a passkey to your account.',
     alleenHier: 'You can open these documents in this browser only. Add a passkey to your account to open them on another computer too.',
@@ -211,7 +215,7 @@ function card(r) {
     + '<button type="button" class="ov-btn primary sm" data-a="download">' + ico('down', 18) + '<span></span></button>';
   acts.children[0].querySelector('span').textContent = T.herinnering;
   acts.children[1].querySelector('span').textContent = T.downloaden;
-  acts.children[0].disabled = r.state !== 'open' || r.reminders >= r.max_reminders;
+  acts.children[0].disabled = r.state !== 'open' || r.reminders >= r.max_reminders || !INFO.limits.reminders;
   if (r.state === 'open' && !r.has_email) acts.children[0].title = T.geenMail;
   acts.children[1].disabled = r.files === 0;
   c.appendChild(acts);
@@ -306,20 +310,21 @@ async function download(r, say, btn) {
 }
 
 async function remind(r, say, btn) {
+  if (!INFO.limits.reminders) return zeg(say, T.alleenBetaald, true);
   if (!r.has_email) return zeg(say, T.geenMail, true);
   btn.disabled = true;
   try {
-    const { sk } = await unlock(r, say);
-    const rr = await api('/' + encodeURIComponent(r.id) + '/herinnering', { method: 'POST', body: { pin: sk.pin } });
+    const rr = await api('/' + encodeURIComponent(r.id) + '/herinnering', { method: 'POST', body: {} });
     const b = await rr.json().catch(() => ({}));
     if (rr.ok) { zeg(say, T.herinnerd); r.reminders = b.reminders; btn.disabled = r.reminders >= r.max_reminders; return; }
     btn.disabled = false;
     if (b.error === 'reminder_too_soon' || b.error === 'too_many_invitations') return zeg(say, T.teSnel, true);
     if (b.error === 'reminder_limit') return zeg(say, T.maxHerinnering(b.limit || 3), true);
+    if (b.error === 'paid_only') return zeg(say, T.alleenBetaald, true);
     return zeg(say, T.herinnerFout, true);
   } catch (e) {
     btn.disabled = false;
-    zeg(say, e && e.code === 'not_here' ? T.nietHier : T.herinnerFout, true);
+    zeg(say, T.herinnerFout, true);
   }
 }
 
@@ -448,6 +453,7 @@ async function make(e) {
       const b = await r.json().catch(() => ({}));
       if (r.status === 201) { out = { d, pin }; break; }
       if (b.error === 'too_many_open') throw Object.assign(new Error('open'), { open: b.limit });
+      if (b.error === 'no_office_name') throw Object.assign(new Error('naam'), { naam: true });
       if (b.error === 'office_changed') { await loadInfo(); continue; }
       if (b.error === 'id_taken') continue;
       throw new Error('create ' + r.status + ' ' + (b.error || ''));
@@ -474,6 +480,7 @@ async function make(e) {
     btn.disabled = false; btn.textContent = tekst;
     if (err && err.message === 'login') return;
     if (err && err.open) return fout(T.teVeelOpen(err.open));
+    if (err && err.naam) return fout(T.geenKantoornaam);
     if (err && err.code === 'no_storage') return fout(T.geenOpslag);
     fout(T.maakFout);
   }

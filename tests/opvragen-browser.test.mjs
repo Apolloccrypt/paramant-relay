@@ -259,10 +259,9 @@ async function reis(lang) {
   await kp.locator('.client button[data-a=remind]').first().click();
   await kp.waitForFunction(() => /verstuurd|sent/i.test(document.querySelector('.client .say')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
   await new Promise((r) => setTimeout(r, 300));
-  const m = mails.find((x) => (x.text || '').includes('/v/'));
-  // De relay bouwt de link op SITE_URL; pad en fragment moeten die van het kantoor zijn.
-  const padEnHash = link.replace(/^https?:\/\/[^/]+/, '');
-  ok(lang + ': de herinnering ging uit met precies de link van het kantoor', !!m && m.text.includes(padEnHash), m && m.text);
+  const m = mails.find((x) => /Acme Administratie/.test(x.subject || ''));
+  ok(lang + ': de herinnering ging uit, zonder link', !!m && !/https?:\/\/|\/v\//.test(m.text), m && m.text);
+  ok(lang + ': en verwijst naar de link van het kantoor', !!m && m.text.includes(en ? 'Use the link you received from Acme Administratie' : 'Gebruik de link die je eerder van Acme Administratie kreeg'), m && m.text);
   ok(lang + ': en noemt wat er nog ontbreekt', !!m && m.text.includes(en ? 'Annual statement' : 'Jaaropgave'), m && m.text);
   ok(lang + ': en de datum zonder tijdzone-rest', !!m && !/ (om|at) [A-Z]{3,4}\b/.test(m.text), m && m.text);
 
@@ -291,8 +290,8 @@ async function reis(lang) {
     const p4 = await klant.newPage(); luister(p4, lang + ' gesloten');
     await p4.goto(link);
     await p4.waitForSelector('#v-stop:not([hidden])', { timeout: 15000 });
-    ok(lang + ': na sluiten zegt de link dat het kantoor het verzoek sloot',
-       (await p4.textContent('#stop-title')) === 'Acme Administratie heeft dit verzoek gesloten', await p4.textContent('#stop-title'));
+    ok(lang + ': na sluiten zegt de link alleen dat hij niet meer werkt, zonder naam van de relay',
+       (await p4.textContent('#stop-title')) === 'Deze link werkt niet meer' && /gesloten/.test(await p4.textContent('#stop-text')), await p4.textContent('#stop-title'));
     await kp.click('#seg-done');
     await kp.waitForSelector('.client button[data-a=delete]', { timeout: 15000 });
     await kp.locator('.client button[data-a=delete]').first().click();

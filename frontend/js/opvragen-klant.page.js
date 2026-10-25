@@ -22,7 +22,7 @@ const T = {
     doneLead: (o) => o + ' heeft je stukken.',
     badLinkT: 'Deze link klopt niet', badLink: 'Vraag het kantoor om de link opnieuw te sturen. Er is niets verstuurd.',
     goneT: 'Deze link werkt niet meer', gone: 'Het verzoek is verlopen of verwijderd. Vraag het kantoor om een nieuwe link.',
-    closedT: (o) => o + ' heeft dit verzoek gesloten', closed: 'Je hoeft niets meer te sturen.',
+    closed: 'Het verzoek is gesloten. Je hoeft niets meer te sturen.',
     netT: 'Het lukt nu even niet', net: 'Het verzoek kon niet worden geopend. Probeer het zo nog eens.',
     tooBig: (mb) => 'Dit bestand is te groot. Een bestand mag tot ' + mb + ' MB zijn.',
     full: 'Bij dit stuk kunnen geen bestanden meer bij.',
@@ -43,7 +43,7 @@ const T = {
     doneLead: (o) => o + ' has your documents.',
     badLinkT: 'This link is not right', badLink: 'Ask the office to send the link again. Nothing was sent.',
     goneT: 'This link no longer works', gone: 'The request has expired or was removed. Ask the office for a new link.',
-    closedT: (o) => o + ' has closed this request', closed: 'You do not need to send anything else.',
+    closed: 'The request is closed. You do not need to send anything else.',
     netT: 'Not working right now', net: 'The request could not be opened. Please try again in a moment.',
     tooBig: (mb) => 'This file is too big. A file can be up to ' + mb + ' MB.',
     full: 'No more files fit with this document.',
@@ -90,10 +90,9 @@ async function load() {
   try { r = await fetch(RELAY + '/v2/opvraag/' + ID, { cache: 'no-store', referrerPolicy: 'no-referrer' }); }
   catch { return stop(T.netT, T.net); }
   if (r.status === 404) return stop(T.goneT, T.gone);
-  if (r.status === 410) {
-    const b = await r.json().catch(() => ({}));
-    return stop(T.closedT(b.office || ''), T.closed);
-  }
+  // Closed: a plain answer. The name in a 410 comes from the relay, unchecked
+  // by any hash, so it is not shown.
+  if (r.status === 410) return stop(T.goneT, T.closed);
   if (!r.ok) return stop(T.netT, T.net);
   const v = await r.json().catch(() => null);
   // The whole point: what the relay hands out must hash to what the office put
@@ -242,9 +241,9 @@ async function send() {
       const b = r ? await r.json().catch(() => ({})) : {};
       btn.textContent = T.versturen; btn.disabled = false;
       if (r && r.status === 404) return stop(T.goneT, T.gone);
-      if (r && r.status === 410) return stop(T.closedT(D.office), T.closed);
+      if (r && r.status === 410) return stop(T.goneT, T.closed);
       if (b.error === 'item_full') return showErr(T.full);
-      if (b.error === 'request_full') return showErr(T.requestFull);
+      if (b.error === 'request_full' || b.error === 'account_full') return showErr(T.requestFull);
       if (r && (r.status === 503 || r.status === 429)) return showErr(T.busy);
       return showErr(T.sendFail);
     }
