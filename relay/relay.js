@@ -9175,7 +9175,22 @@ async function handleRelayRequest(req, res) {
       return res.end(J({ error: 'too_many_uploads' }));
     }
     if (!ramOk()) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
-    // Refuse a stranger before reading five megabytes from him.
+    // Refuse a stranger before reading five megabytes from him: an id that
+    // opens nothing, or a body that announces itself as too big.
+    const _len = Number(req.headers['content-length'] || 0);
+    if (_len > opvraagMod.FILE_MAX_BYTES) {
+      res.writeHead(413, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'too_large', limit: opvraagMod.FILE_MAX_BYTES }));
+    }
+    try {
+      const pre = await _opvraagStore().publicView(opvrUp[1]);
+      if (!pre.ok) {
+        res.writeHead(pre.reason === 'closed' ? 410 : 404, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: pre.reason === 'closed' ? 'closed' : 'unknown' }));
+      }
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
+    }
     let buf;
     try { buf = await readBody(req, opvraagMod.FILE_MAX_BYTES); }
     catch (e) { res.writeHead(413, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'too_large', limit: opvraagMod.FILE_MAX_BYTES })); }

@@ -122,6 +122,9 @@ test('de hele reis over de draad: maken, lezen, uploaden, downloaden, sluiten', 
 test('een onbekend of verkeerd gevormd id: altijd hetzelfde antwoord', async () => {
   assert.equal((await fetch(`${BASE}/v2/opvraag/${b64u(18)}`)).status, 404);
   assert.equal((await fetch(`${BASE}/v2/opvraag/${b64u(18)}/stuk/0`, { method: 'POST', body: pakket(3000) })).status, 404);
+  // Een te grote upload wordt aan de kop herkend, voor er iets gelezen is.
+  const groot = await fetch(`${BASE}/v2/opvraag/${b64u(18)}/stuk/0`, { method: 'POST', body: pakket(5 * 1048576 + 1) });
+  assert.equal(groot.status, 413);
 });
 
 test('de naam boven het verzoek is die van het account, niet wat de browser zegt', async () => {

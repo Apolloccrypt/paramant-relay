@@ -367,7 +367,7 @@ function renderForm() {
   own.placeholder = T.zelf;
   own.setAttribute('aria-label', T.zelf);
   const voegToe = () => {
-    const v = clean(own.value).slice(0, 60);
+    const v = clean(own.value).slice(0, 60).trim();
     if (!v) return;
     const bestaat = [...box.querySelectorAll('input[type=checkbox]')].find((x) => x.value.toLowerCase() === v.toLowerCase());
     if (bestaat) bestaat.checked = true; else box.insertBefore(itemRow(v, true), add);
@@ -410,7 +410,7 @@ async function make(e) {
   fout('');
   $('own') && $('own').blur();
   const items = [...$('items').querySelectorAll('input[type=checkbox]')].filter((x) => x.checked).map((x) => x.value);
-  const naam = clean($('client-name').value).slice(0, 80);
+  const naam = clean($('client-name').value).slice(0, 80).trim();
   const mail = $('client-email').value.trim();
   if (!items.length) return fout(T.kies);
   if (!naam) return fout(T.naamNodig);
@@ -434,7 +434,7 @@ async function make(e) {
     const ec = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
     const ecPub = new Uint8Array(await crypto.subtle.exportKey('raw', ec.publicKey));
     const ecD = (await crypto.subtle.exportKey('jwk', ec.privateKey)).d;
-    const greet = clean(naam.split(' ')[0]).slice(0, 40);
+    const greet = clean(naam.split(' ')[0]).slice(0, 40).trim();
     const days = Number($('ttl').value) || 7;
     let out = null;
     for (let poging = 0; poging < 2 && !out; poging++) {
