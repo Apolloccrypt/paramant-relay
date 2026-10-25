@@ -146,21 +146,26 @@ test('Community: een open verzoek tegelijk', async () => {
   assert.equal((await b.r.json()).error, 'too_many_open');
 });
 
-test('herinnering: gaat via de mailer, met de link en de pin uit de browser', async () => {
+test('herinnering: gaat via de mailer, zonder link, en niet op het gratis plan', async () => {
   const { d } = await maak();
-  const pin = b64u(32);
-  const r = await intern('remind', { user_id: SLEUTEL, id: d.id, pin });
+  const r = await intern('remind', { user_id: SLEUTEL, id: d.id });
   assert.equal(r.status, 200, await r.clone().text());
-  const m = mails.find((x) => x.text && x.text.includes('/v/' + d.id));
+  const m = mails.find((x) => x.text && x.text.includes('Kopie paspoort, Loonstrook'));
   assert.ok(m, 'er ging een mail uit');
   assert.deepEqual(m.to, ['demo@example.com']);
-  assert.ok(m.text.includes('#' + pin), 'de link draagt de pin in het fragment');
+  assert.ok(!/https?:\/\/|\/v\//.test(m.text), 'geen link: die kan alleen het kantoor zelf geven');
+  assert.ok(m.text.includes('Gebruik de link die je eerder van Acme Administratie kreeg'));
   assert.match(m.subject, /Acme Administratie/);
   assert.ok(m.text.includes('Kopie paspoort, Loonstrook'), 'de mail noemt wat nog ontbreekt');
-  assert.equal((await intern('remind', { user_id: SLEUTEL, id: d.id, pin })).status, 429, 'niet twee keer binnen het uur');
-  assert.equal((await intern('remind', { user_id: SLEUTEL, id: d.id, pin: 'x' })).status, 400);
+  assert.equal((await intern('remind', { user_id: SLEUTEL, id: d.id })).status, 429, 'niet twee keer binnen het uur');
   const zonder = await maak(SLEUTEL, { client_email: '' });
-  assert.equal((await intern('remind', { user_id: SLEUTEL, id: zonder.d.id, pin })).status, 409);
+  assert.equal((await intern('remind', { user_id: SLEUTEL, id: zonder.d.id })).status, 409);
+  const lijst = await (await intern('list', { user_id: GRATIS })).json();
+  const gratisId = lijst.requests[0] && lijst.requests[0].id;
+  assert.ok(gratisId, 'het gratis account heeft een verzoek uit de vorige test');
+  const g = await intern('remind', { user_id: GRATIS, id: gratisId });
+  assert.equal(g.status, 403);
+  assert.equal((await g.json()).error, 'paid_only');
 });
 
 test('verwijderen: weg voor iedereen', async () => {

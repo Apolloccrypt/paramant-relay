@@ -3698,12 +3698,10 @@ api.post("/user/opvragen/:id/verwijderen", authUser, (req, res) => {
   const id = opvraagId(req, res); if (!id) return;
   return opvraagProxy(res, "delete", { user_id: req.userSession.user_id, id });
 });
-// The hash for the link comes from the office browser, out of its own locked
-// box; the relay puts it in the mail and keeps nothing.
+// The reminder carries no link: the client uses the one the office shared.
 api.post("/user/opvragen/:id/herinnering", authUser, (req, res) => {
   const id = opvraagId(req, res); if (!id) return;
-  return opvraagProxy(res, "remind", { user_id: req.userSession.user_id, id,
-    pin: String((req.body || {}).pin || "").slice(0, 64) });
+  return opvraagProxy(res, "remind", { user_id: req.userSession.user_id, id });
 });
 
 api.get("/user/documents/lookup", authUser, async (req, res) => {

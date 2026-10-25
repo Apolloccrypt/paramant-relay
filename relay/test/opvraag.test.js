@@ -54,9 +54,16 @@ test('elk plan heeft de vier opvraaggrenzen, en het gratis plan de krapste', () 
   }
   assert.equal(tiers.tierLimitNum('community', 'opvraag_open'), 1);
   assert.ok(tiers.tierLimitNum('pro', 'opvraag_open') > 1);
-  // Nooit meer per verzoek dan een verzending in dezelfde opslag mag houden.
+  // Nooit meer beloven dan de opslag eronder kan houden: per verzoek niet meer
+  // dan een verzending, per account niet meer dan het aandeel in de begroting,
+  // en nooit langer dan het begrotingsrecord leeft (8 dagen).
+  const send = require('../lib/send');
   for (const plan of Object.keys(tiers.TIER_LIMITS)) {
-    assert.ok(tiers.tierLimitNum(plan, 'opvraag_mb') <= 25, plan);
+    assert.ok(tiers.tierLimitNum(plan, 'opvraag_mb') <= send.SEND_MAX_MB, plan);
+    assert.ok(tiers.tierLimitNum(plan, 'opvraag_mb') <= tiers.tierLimitNum(plan, 'opvraag_total_mb'), plan);
+    const deel = plan === 'community' ? send.SEND_FREE_ACCOUNT_MB : send.SEND_ACCOUNT_MB;
+    assert.ok(tiers.tierLimitNum(plan, 'opvraag_total_mb') <= deel, plan + ' belooft meer dan zijn aandeel');
+    assert.ok(tiers.tierLimitNum(plan, 'opvraag_ttl_ms') <= 7 * DAG, plan);
   }
 });
 
@@ -103,7 +110,8 @@ test('grenzen per plan: open verzoeken, aantal stukken en geldigheid', async () 
 
   assert.equal((await nieuw(o, clock(), { expires_at: clock() + 8 * DAG }, { plan: 'community', accountId: 'acct_y' })).r.reason, 'too_long');
   assert.equal((await nieuw(o, clock(), { expires_at: clock() + 60_000 }, { plan: 'pro', accountId: 'acct_y' })).r.reason, 'too_short');
-  assert.equal((await nieuw(o, clock(), { expires_at: clock() + 14 * DAG }, { plan: 'pro', accountId: 'acct_y' })).r.ok, true);
+  assert.equal((await nieuw(o, clock(), { expires_at: clock() + 14 * DAG }, { plan: 'pro', accountId: 'acct_y' })).r.reason, 'too_long');
+  assert.equal((await nieuw(o, clock(), { expires_at: clock() + 7 * DAG }, { plan: 'pro', accountId: 'acct_y' })).r.ok, true);
 });
 
 test('hetzelfde id twee keer: de tweede wordt geweigerd, ook vanaf een ander account', async () => {
@@ -204,6 +212,8 @@ test('verwijderen geeft de ruimte in de begroting terug', async () => {
 
 test('herinnering: alleen met adres, niet als alles binnen is, met een plafond en een uur ertussen', async () => {
   const { o, clock, plus } = maak();
+  const gratis = await nieuw(o, clock(), {}, { plan: 'community', accountId: 'acct_gratis' });
+  assert.equal((await o.takeReminder(gratis.d.id, 'acct_gratis')).reason, 'paid_only', 'geen herinneringsmail op het gratis plan');
   const zonder = await nieuw(o, clock(), {}, { email: '' });
   assert.equal((await o.takeReminder(zonder.d.id, 'acct_demo')).reason, 'no_email');
   const { d } = await nieuw(o, clock());
@@ -234,4 +244,38 @@ test('kluis: per account, met begrensde passkey-wraps', async () => {
   assert.equal(lijst.length, 1);
   assert.equal(lijst[0].wraps.length, 1, 'dezelfde passkey vervangt zijn eigen wrap');
   assert.deepEqual(await o.kluisList('acct_ander'), []);
+});
+
+test('onzichtbare tekens, links en adressen in wat de klant leest: geweigerd', async () => {
+  const { o, clock } = maak();
+  for (const over of [{ greet: 'De\u200Bmo' }, { items: ['Loon\u202Estrook'] }, { items: ['\uFEFFPaspoort'] },
+                      { items: ['Upload via https://evil.example'] }, { items: ['Kijk op www.voorbeeld.nl'] },
+                      { items: ['Mail naar demo@example.com'] }, { items: ['factuur.pdf.com'] }, { greet: 'Demo\u2066' }]) {
+    assert.equal((await nieuw(o, clock(), over)).r.ok, false, JSON.stringify(over));
+  }
+  assert.equal((await nieuw(o, clock(), { items: ['Jaaropgave 2025', 'Uittreksel KvK', 'Polis B.V.'] })).r.ok, true,
+    'gewone labels met punten blijven werken');
+  assert.equal(opvraag.cleanText('Acme\u200F Administratie', 120, false), null);
+});
+
+test('een gesloten verzoek met bestanden telt mee tot het verwijderd is', async () => {
+  const { o, clock } = maak();
+  const a = await nieuw(o, clock(), {}, { plan: 'community', accountId: 'acct_g' });
+  await o.upload(a.d.id, 0, pakket(5000));
+  await o.close(a.d.id, 'acct_g');
+  assert.equal((await nieuw(o, clock(), {}, { plan: 'community', accountId: 'acct_g' })).r.reason, 'too_many_open');
+  await o.remove(a.d.id, 'acct_g');
+  assert.equal((await nieuw(o, clock(), {}, { plan: 'community', accountId: 'acct_g' })).r.ok, true);
+});
+
+test('per account geldt een totaal over alle verzoeken, gesloten meegeteld', async () => {
+  const { o, clock } = maak();
+  // Firm: 25 MB per verzoek, 35 MB samen.
+  const a = await nieuw(o, clock(), {}, { accountId: 'acct_f' });
+  const b = await nieuw(o, clock(), {}, { accountId: 'acct_f' });
+  for (const i of [0, 0, 0, 1, 1]) assert.equal((await o.upload(a.d.id, i, pakket(5 * 1048576 - 100))).ok, true);
+  await o.close(a.d.id, 'acct_f');
+  assert.equal((await o.upload(b.d.id, 0, pakket(5 * 1048576 - 100))).ok, true);
+  assert.equal((await o.upload(b.d.id, 1, pakket(5 * 1048576 - 100))).ok, true);
+  assert.equal((await o.upload(b.d.id, 2, pakket(5 * 1048576 - 100))).reason, 'account_full');
 });

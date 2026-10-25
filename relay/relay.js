@@ -3013,9 +3013,12 @@ async function _opvraagOffice(userId) {
   const kd = apiKeys.get(userId) || {};
   let naam = '';
   try { naam = (await _billingBuyerOf(acctOf(userId))).company || ''; } catch { naam = ''; }
-  if (!naam) naam = kd.label || kd.email || '';
-  return String(naam).normalize('NFC').replace(/[\x00-\x1f\x7f\u2028\u2029<>]/g, ' ')
+  if (!naam) naam = kd.label || '';
+  naam = String(naam).normalize('NFC').replace(/[\x00-\x1f\x7f\u2028\u2029<>]/g, ' ')
     .replace(/\s+/g, ' ').trim().slice(0, 120).trim();
+  // No address as a fallback, and no name with a link or an invisible mark in
+  // it: the client reads this name as who is asking (opvraag.cleanText).
+  return opvraagMod.cleanText(naam, 120, false) === null ? '' : naam;
 }
 
 // Keyless reads and uploads on a request, per address. The request itself
@@ -6445,7 +6448,7 @@ async function handleRelayRequest(req, res) {
           clientName: input.client_name, clientEmail: input.client_email, lang: input.lang,
           skWrapped: input.sk_wrapped, kluisId: input.kluis_id,
         });
-        if (!out.ok) return stuur(out.reason === 'too_many_open' ? 403 : out.reason === 'id_taken' || out.reason === 'office_changed' ? 409 : 400,
+        if (!out.ok) return stuur(out.reason === 'too_many_open' ? 403 : out.reason === 'id_taken' || out.reason === 'office_changed' || out.reason === 'no_office_name' ? 409 : 400,
           { error: out.reason, limit: out.limit, limit_ms: out.limit_ms });
         return stuur(201, out);
       }
@@ -6470,40 +6473,34 @@ async function handleRelayRequest(req, res) {
         return stuur(out.ok ? 200 : 404, out.ok ? out : { error: 'unknown' });
       }
       if (op === 'remind') {
-        // The hash for the link comes from the office browser, which read it
-        // out of its own locked box; we only put it in the mail.
-        const pin = typeof input.pin === 'string' ? input.pin : '';
-        if (!/^[A-Za-z0-9_-]{43}$/.test(pin)) return stuur(400, { error: 'bad_pin' });
-        // Through the same hourly brake as every other mail to a non-customer.
+        // No link in the reminder, on purpose. A link built here would be one
+        // this relay could point at a request and a key of its own; the only
+        // link the client should trust is the one the office shared itself.
         const rem = inviteRateOk(accountId, kd, 1);
         if (!rem.ok) return stuur(429, { error: 'too_many_invitations', retry_after_s: rem.retry_after_s });
         const out = await store.takeReminder(reqId, accountId);
         if (!out.ok) {
           inviteRateGeef(accountId, 1);
-          return stuur(out.reason === 'unknown' ? 404 : out.reason === 'reminder_limit' || out.reason === 'reminder_too_soon' ? 429 : 409,
-            { error: out.reason, limit: out.limit });
+          return stuur(out.reason === 'unknown' ? 404 : out.reason === 'reminder_limit' || out.reason === 'reminder_too_soon' ? 429
+            : out.reason === 'paid_only' ? 403 : 409, { error: out.reason, limit: out.limit });
         }
         const taal = out.lang === 'en' ? 'en' : 'nl';
         const kantoor = mailer.veiligeNaam(out.descriptor.office || '');
-        const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
-        const sector = sectorOfKey(kd);
-        const link = base + (taal === 'en' ? '/en' : '') + '/v/' + encodeURIComponent(out.descriptor.id)
-                   + (sector !== 'health' ? '?r=' + encodeURIComponent(sector) : '') + '#' + pin;
         const tot = mailDatum(out.expires_at, taal, { weekday: 'long', day: 'numeric', month: 'long', timeZoneName: undefined });
         const groet = out.descriptor.greet ? (taal === 'en' ? 'Hi ' : 'Hoi ') + out.descriptor.greet + ',' : (taal === 'en' ? 'Hi,' : 'Hoi,');
         const mist = out.missing.join(', ');
         const nl = {
           onderwerp: 'Herinnering van ' + kantoor + ': we missen nog een paar stukken',
           zin: kantoor + ' wacht nog op: ' + mist + '.',
-          knop: 'Stukken sturen',
-          slot: 'De link werkt tot ' + tot + '. Je bestanden gaan op slot op je telefoon. Alleen ' + kantoor + ' kan ze openen.',
+          link: 'Gebruik de link die je eerder van ' + kantoor + ' kreeg. Deze mail bevat bewust geen link.',
+          slot: 'Die link werkt tot ' + tot + '. Je bestanden gaan op slot op je telefoon. Alleen ' + kantoor + ' kan ze openen.',
           voet: 'Je krijgt deze mail omdat ' + kantoor + ' je adres heeft ingevuld bij Paramant.',
         };
         const en = {
           onderwerp: 'A reminder from ' + kantoor + ': a few documents are still missing',
           zin: kantoor + ' is still waiting for: ' + mist + '.',
-          knop: 'Send documents',
-          slot: 'The link works until ' + tot + '. Your files are locked on your phone. Only ' + kantoor + ' can open them.',
+          link: 'Use the link you received from ' + kantoor + ' earlier. This mail contains no link on purpose.',
+          slot: 'That link works until ' + tot + '. Your files are locked on your phone. Only ' + kantoor + ' can open them.',
           voet: 'You are getting this mail because ' + kantoor + ' entered your address at Paramant.',
         };
         const t = taal === 'en' ? en : nl;
@@ -6512,10 +6509,8 @@ async function handleRelayRequest(req, res) {
           from: mailer.afzenderNamens(undefined, kantoor),
           replyTo: kd.email || undefined,
           subject: t.onderwerp,
-          text: groet + '\n\n' + t.zin + '\n\n' + link + '\n\n' + t.slot + '\n\n' + t.voet,
-          html: '<p>' + escHtml(groet) + '</p><p>' + escHtml(t.zin) + '</p>'
-              + '<p><a href="' + escHtml(link) + '" style="display:inline-block;padding:11px 18px;'
-              + 'border-radius:6px;background:#1D4ED8;color:#fff;text-decoration:none">' + escHtml(t.knop) + '</a></p>'
+          text: groet + '\n\n' + t.zin + '\n\n' + t.link + '\n\n' + t.slot + '\n\n' + t.voet,
+          html: '<p>' + escHtml(groet) + '</p><p>' + escHtml(t.zin) + '</p><p>' + escHtml(t.link) + '</p>'
               + '<p style="color:#666;font-size:13px">' + escHtml(t.slot) + '</p>'
               + '<p style="color:#666;font-size:12px">' + escHtml(t.voet) + '</p>',
         });
@@ -9198,7 +9193,7 @@ async function handleRelayRequest(req, res) {
       const out = await _opvraagStore().upload(opvrUp[1], Number(opvrUp[2]), buf);
       if (!out.ok) {
         const status = out.reason === 'unknown' ? 404 : out.reason === 'closed' ? 410
-                     : out.reason === 'too_large' || out.reason === 'request_full' ? 413
+                     : out.reason === 'too_large' || out.reason === 'request_full' || out.reason === 'account_full' ? 413
                      : out.reason === 'item_full' ? 409
                      : out.reason === 'store_full' || out.reason === 'account_store_full' ? 503 : 400;
         const kop = { 'Content-Type': 'application/json' };

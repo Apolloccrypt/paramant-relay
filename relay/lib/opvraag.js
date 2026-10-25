@@ -87,6 +87,15 @@ function b64urlLen(s) {
   return Buffer.from(s, 'base64url').length;
 }
 
+// Characters that change how text reads without being seen: zero-width marks
+// and the bidi controls that can turn "rekening.pdf" into something else on
+// screen. A name a client trusts may not carry them.
+const INVISIBLE_RE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/;
+// No addresses either. The office name, the greeting and the document labels
+// are shown to a stranger under our domain; a link or a mail address in them
+// is how a request page becomes a phishing page.
+const URLISH_RE = /:\/\/|www\.|@|\b[a-z0-9-]+\.(?:nl|com|net|org|app|io|eu|be|de|info|biz|xyz|link|me|co|ly|ru|cn|top|site|online|shop|click)\b/i;
+
 // Clean text, or null. Clean means: already trimmed, already NFC, no control
 // characters, within the length. We never repair it, see the header.
 function cleanText(v, max, allowEmpty) {
@@ -96,6 +105,7 @@ function cleanText(v, max, allowEmpty) {
   if (v !== v.trim()) return null;
   if (v.normalize('NFC') !== v) return null;
   if (/[\x00-\x1f\x7f\u2028\u2029<>]/.test(v)) return null;
+  if (INVISIBLE_RE.test(v) || URLISH_RE.test(v)) return null;
   return v;
 }
 
@@ -122,6 +132,8 @@ function limitsFor(plan) {
     items: tiers.tierLimitNum(p, 'opvraag_items'),
     bytes: Number.isFinite(mb) ? mb * 1048576 : Infinity,
     ttl_ms: tiers.tierLimitNum(p, 'opvraag_ttl_ms'),
+    total_bytes: tiers.tierLimitNum(p, 'opvraag_total_mb') * 1048576,
+    reminders: p !== 'community',
     file_max_bytes: FILE_MAX_BYTES,
     files_per_item: FILES_PER_ITEM,
   };
@@ -136,6 +148,7 @@ function checkDescriptor(d, { plan, office, now }) {
   if (keys !== 'ecdh_pub,expires_at,greet,id,items,kem_pub,office,v') return { ok: false, reason: 'bad_descriptor' };
   if (d.v !== 1) return { ok: false, reason: 'bad_version' };
   if (typeof d.id !== 'string' || !ID_RE.test(d.id)) return { ok: false, reason: 'bad_id' };
+  if (!office) return { ok: false, reason: 'no_office_name' };
   if (cleanText(d.office, OFFICE_MAX, false) === null || d.office !== office) return { ok: false, reason: 'office_changed' };
   if (cleanText(d.greet, GREET_MAX, true) === null) return { ok: false, reason: 'bad_greet' };
   const lim = limitsFor(plan);
@@ -227,11 +240,21 @@ function createOpvraagStore({ store, budget, log, now }) {
     return k && Array.isArray(k.kluizen) ? k.kluizen : [];
   }
 
+  // A closed request that still holds files still takes room, so it counts
+  // as open until it expires or the office deletes it.
   async function openCount(accountId) {
     let n = 0;
     for (const id of await indexIds(accountId)) {
       const r = await read(id);
-      if (r && !r.closed_at) n++;
+      if (r && (!r.closed_at || r.files.length > 0)) n++;
+    }
+    return n;
+  }
+  async function accountBytes(accountId) {
+    let n = 0;
+    for (const id of await indexIds(accountId)) {
+      const r = await read(id);
+      if (r && r.account_id === accountId) n += r.bytes;
     }
     return n;
   }
@@ -316,6 +339,9 @@ function createOpvraagStore({ store, budget, log, now }) {
         }
         const lim = limitsFor(r.plan);
         if (r.bytes + buf.length > lim.bytes) return { ok: false, reason: 'request_full', limit: lim.bytes };
+        if ((await accountBytes(r.account_id)) + buf.length > lim.total_bytes) {
+          return { ok: false, reason: 'account_full', limit: lim.total_bytes };
+        }
         const n = r.next;
         const room = await ledger.reserve(budgetId(id, n), buf.length, r.expires_at, r.account_id, r.plan === 'community');
         if (!room.ok) return { ok: false, reason: room.account ? 'account_store_full' : 'store_full' };
@@ -400,6 +426,7 @@ function createOpvraagStore({ store, budget, log, now }) {
         const r = await owned(id, accountId);
         if (!r) return { ok: false, reason: 'unknown' };
         if (r.closed_at) return { ok: false, reason: 'closed' };
+        if (!limitsFor(r.plan).reminders) return { ok: false, reason: 'paid_only' };
         if (!r.client_email) return { ok: false, reason: 'no_email' };
         const items = itemView(r);
         if (items.every((x) => x.count > 0)) return { ok: false, reason: 'complete' };
