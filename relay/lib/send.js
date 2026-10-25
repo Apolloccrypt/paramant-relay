@@ -152,6 +152,31 @@ const MAX_WRONG_TOTAL = 9;
 // is shut out of a document they were sent.
 const COUNTER_WINDOW_MS = 3_600_000;
 const CODE_TTL_MS = 15 * 60 * 1000;
+
+// THE SENDER'S OWN CODE. With "Ik geef de code zelf door" on, the file key is
+// also locked under a code the sender passes on outside the mail. This relay
+// never sees that code. It keeps a check per recipient, SHA-256 of a proof the
+// recipient's browser derives from the code and the token, and compares the
+// proof when the recipient collects.
+//
+// Five wrong proofs and the link is closed, and that one does NOT age out like
+// the counters above. The difference is who can reach it: a proof is only
+// looked at after the mailbox code was right, so locking somebody out needs
+// their mailbox as well, and then the link is better closed than guessable.
+// Five, not three: a code read out over the phone is easy to mistype once.
+const MAX_SENDER_CODE_WRONG = 5;
+const SALT_SHAPE = /^[A-Za-z0-9_-]{22,64}$/;
+
+function proofCheck(proof) {
+  return crypto.createHash('sha256').update(Buffer.from(String(proof || ''), 'base64url'))
+    .digest('base64url');
+}
+
+function sameCheck(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length || !a.length) return false;
+  try { return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b)); }
+  catch { return false; }
+}
 const CODE_TRIES = 3;
 const CODE_DIGITS = 6;
 
@@ -341,11 +366,18 @@ function createSendStore({ store, log, now }) {
     //
     // `tokens` maps each address to its one-time token. The caller mails those
     // and then forgets them: they cannot be recovered from what is stored.
-    async create({ plan, blob, addresses, ttlMs, filename, accountId, sealed, sender }) {
+    // `senderCode` is null, or { salt } when the sender passes on a code of
+    // their own. Only the salt for the slow derivation travels: the code stays
+    // in the sender's browser.
+    async create({ plan, blob, addresses, ttlMs, filename, accountId, sealed, sender, senderCode }) {
       if (!Buffer.isBuffer(blob) || blob.length === 0) {
         return { ok: false, reason: 'no_blob' };
       }
-      const built = recipients.buildRecipients(plan, addresses, clock(), sealed);
+      const metCode = Boolean(senderCode);
+      if (metCode && (typeof senderCode.salt !== 'string' || !SALT_SHAPE.test(senderCode.salt))) {
+        return { ok: false, reason: 'bad_code_salt' };
+      }
+      const built = recipients.buildRecipients(plan, addresses, clock(), sealed, metCode);
       if (!built.ok) {
         return { ok: false, reason: built.reason, limit: built.limit,
                  asked: built.asked, rejected: built.rejected };
@@ -385,6 +417,9 @@ function createSendStore({ store, log, now }) {
         // reminder later. Empty means both: Dutch with the English underneath.
         lang: (sender && (sender.taal === 'nl' || sender.taal === 'en')) ? sender.taal : '',
         salt: built.salt,
+        // A flag and a salt, never the code. Absent on every other send, so a
+        // send filed before this existed behaves exactly as it did.
+        ...(metCode ? { sender_code: true, code_salt: senderCode.salt } : {}),
         created_at: created,
         expires_at: created + ttl,
         size: blob.length,
@@ -462,7 +497,7 @@ function createSendStore({ store, log, now }) {
       }
       if (log) log('info', 'send_created', { id, count: built.records.length, ttl_ms: ttl });
       return { ok: true, id, tokens: built.tokens, expires_at: send.expires_at,
-               count: built.records.length };
+               count: built.records.length, sender_code: metCode };
     },
 
     // The public entry points. Each one queues behind the previous change to
@@ -474,10 +509,10 @@ function createSendStore({ store, log, now }) {
       return opVolgorde(g.id, () => this._requestPickup(token));
     },
 
-    async collect(token, code) {
+    async collect(token, code, senderProof) {
       const g = await this._zoekSend(token);
       if (!g.ok) return g;
-      return opVolgorde(g.id, () => this._collect(token, code));
+      return opVolgorde(g.id, () => this._collect(token, code, senderProof));
     },
 
     async revoke(id, email) {
@@ -528,6 +563,7 @@ function createSendStore({ store, log, now }) {
 
       const refusal = recipients.pickupRefusal(record, clock());
       if (refusal) return { ok: false, reason: refusal };
+      if (this._codeOp(send, record)) return { ok: false, reason: 'sender_code_locked' };
 
       this._verlooptellers(record);
 
@@ -552,7 +588,14 @@ function createSendStore({ store, log, now }) {
       return { ok: true, email: record.email, masked: maskEmail(record.email),
                code, expires_in_s: Math.floor(CODE_TTL_MS / 1000),
                sender_name: send.sender_name || '', sender_email: send.sender_email || '',
-               lang: send.lang || '', filename: send.filename || '' };
+               lang: send.lang || '', filename: send.filename || '',
+               sender_code: Boolean(send.sender_code),
+               code_salt: send.sender_code ? (send.code_salt || '') : '' };
+    },
+
+    // Has this link used up its tries at the sender's code?
+    _codeOp(send, record) {
+      return Boolean(send.sender_code) && (record.sender_wrong || 0) >= MAX_SENDER_CODE_WRONG;
     },
 
     // Shared lookup for every token-bearing call.
@@ -575,13 +618,14 @@ function createSendStore({ store, log, now }) {
     // two simultaneous clicks from both being served.
     //
     // Returns { ok, blob, filename, email, remaining } or { ok:false, reason }.
-    async _collect(token, code) {
+    async _collect(token, code, senderProof) {
       const found = await this._locate(token);
       if (!found.ok) return found;
       const { send, record } = found;
 
       const refusal = recipients.pickupRefusal(record, clock());
       if (refusal) return { ok: false, reason: refusal };
+      if (this._codeOp(send, record)) return { ok: false, reason: 'sender_code_locked' };
 
       this._verlooptellers(record);
       if (!record.code_hash) return { ok: false, reason: 'no_code_requested' };
@@ -600,6 +644,25 @@ function createSendStore({ store, log, now }) {
         await writeSend(send.id, send, Math.max(1000, send.expires_at - clock()));
         if (log) log('info', 'pickup_code_wrong', { id: send.id, tries_left: left });
         return { ok: false, reason: 'wrong_code', tries_left: Math.max(0, left) };
+      }
+      // The mailbox is proven. With the sender's code on, that is half of it:
+      // the proof is checked only now, so nobody without the mailbox can spend
+      // the five tries and lock the rightful recipient out. A wrong proof
+      // leaves the mailbox code standing, so a mistyped code from the phone
+      // costs one try and not a fresh mail.
+      if (send.sender_code) {
+        const proof = typeof senderProof === 'string' ? senderProof : '';
+        if (!proof || proof.length > 128) {
+          return { ok: false, reason: 'sender_code_required' };
+        }
+        if (!record.code_check || !sameCheck(record.code_check, proofCheck(proof))) {
+          record.sender_wrong = (record.sender_wrong || 0) + 1;
+          const left = Math.max(0, MAX_SENDER_CODE_WRONG - record.sender_wrong);
+          await writeSend(send.id, send, Math.max(1000, send.expires_at - clock()));
+          if (log) log('info', 'pickup_sender_code_wrong', { id: send.id, tries_left: left });
+          return { ok: false, reason: left === 0 ? 'sender_code_locked' : 'wrong_sender_code',
+                   tries_left: left };
+        }
       }
       // The code is spent the moment it works, so a mailbox somebody else reads
       // later cannot replay it.
@@ -825,6 +888,7 @@ function createSendStore({ store, log, now }) {
       await writeSend(id, send, Math.max(1000, send.expires_at - clock()));
       return { ok: true, email: record.email, reminders: uit.reminders,
                invited_at: uit.invited_at, expires_at: send.expires_at,
+               sender_code: Boolean(send.sender_code),
                sender_name: send.sender_name || '', sender_email: send.sender_email || '',
                lang: send.lang || '', filename: send.filename || '' };
     },
@@ -832,6 +896,6 @@ function createSendStore({ store, log, now }) {
 }
 
 module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
-                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL, COUNTER_WINDOW_MS,
+                   maskEmail, proofCheck, MAX_SENDER_CODE_WRONG, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL, COUNTER_WINDOW_MS,
                    SEND_MAX_MB, SEND_MAX_BYTES, SEND_TOTAL_MB, SEND_TOTAL_BYTES, SEND_ACCOUNT_MB,
                    SEND_FREE_POOL_MB, SEND_FREE_ACCOUNT_MB };

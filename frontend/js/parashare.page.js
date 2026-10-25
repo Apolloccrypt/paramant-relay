@@ -42,6 +42,9 @@ const T = {
     testModeLead: (n) => 'This server delivers no mail (test mode). The file is stored for ' + n + (n === 1 ? ' recipient' : ' recipients') + ', but no invitation went out.',
     testModeNote: 'Ask the administrator to set up a mail provider (MAIL_PROVIDER), then send again.',
     sentTitle: 'Sent',
+    lockedTitle: 'Sent. Now pass on the code',
+    copyCode: 'Copy code',
+    lockingCode: 'Locking the file under your own code...',
     invitesLead: (aantal) => aantal + ' invitations are on their way. Everyone got their own link.',
     invitesNote: 'They each prove their mailbox with a short code before the file opens. '
       + 'You can see who collected it in your dashboard.',
@@ -186,6 +189,9 @@ const T = {
     testModeLead: (n) => 'Deze server bezorgt geen mail (testmodus). Het bestand staat klaar voor ' + n + (n === 1 ? ' ontvanger' : ' ontvangers') + ', maar er is geen uitnodiging verstuurd.',
     testModeNote: 'Vraag de beheerder een mailprovider in te stellen (MAIL_PROVIDER) en verstuur het daarna opnieuw.',
     sentTitle: 'Verstuurd',
+    lockedTitle: 'Verstuurd. Geef nu de code door',
+    copyCode: 'Kopieer code',
+    lockingCode: 'Het bestand gaat op slot met je eigen code...',
     invitesLead: (aantal) => aantal + ' uitnodigingen zijn onderweg. Iedere ontvanger kreeg een eigen link.',
     invitesNote: 'Iedere ontvanger bevestigt eerst het eigen e-mailadres met een controlecode. '
       + 'In uw dashboard ziet u wie het heeft opgehaald.',
@@ -1243,12 +1249,13 @@ function onRecipientsInput() {
 // What she sees when it worked. Without this she was left on the progress bar
 // at 100 percent with one line of text: no confirmation, no way onward, and no
 // idea whether the invitations had gone out.
-function toonVerzending(verzending, naam) {
+function toonVerzending(verzending, naam, afzenderCode) {
   // The live block on step-done describes a hand-over with a check code and a
   // key we never hold. That is not this path: show the honest one instead.
   const live = $('done-details-live'), named = $('done-details-named');
   if (live) live.hidden = true;
   if (named) named.hidden = false;
+  toonAfzenderCode(afzenderCode);
   // A relay without a mail provider (test mode) accepts the invitations and
   // delivers none. Say that, not "sent to 2 of 2" (hertest L6).
   if (verzending && verzending.mail_test_mode) {
@@ -1266,7 +1273,7 @@ function toonVerzending(verzending, naam) {
   const aantal = t('xOfY')(verzending.invited, verzending.recipients);
   if (window.paramantDone && paramantDone.fill) {
     paramantDone.fill('step-done', {
-      title: t('sentTitle'),
+      title: afzenderCode ? t('lockedTitle') : t('sentTitle'),
       lead: t('invitesLead')(aantal),
       note: t('invitesNote'),
       // "Nog een bestand versturen" is already the primary button of step-done.
@@ -1277,6 +1284,31 @@ function toonVerzending(verzending, naam) {
   const kop = $('done-title');
   if (kop) kop.textContent = t('sentTo')(aantal);
   return { send: verzending, name: naam };
+}
+
+// The sender's own code, on the screen and nowhere else. Shown in two groups
+// of five so it can be read out; copied without the dash, which the receiving
+// page forgives either way.
+function toonAfzenderCode(code) {
+  const blok = $('done-own-code');
+  if (!blok) return;
+  blok.hidden = !code;
+  const veld = $('done-own-code-value');
+  if (veld) veld.textContent = code ? paramantSendWrap.formatCode(code) : '';
+}
+async function copyOwnCode(el) {
+  const veld = $('done-own-code-value');
+  const code = veld ? veld.textContent : '';
+  if (!code || !el) return;
+  let copied = true;
+  await navigator.clipboard.writeText(code).catch(() => { copied = false; });
+  if (el._resetTimer) clearTimeout(el._resetTimer);
+  el.textContent = copied ? t('copied') : t('copyFailed');
+  el.classList.toggle('is-copied', copied);
+  el._resetTimer = setTimeout(() => {
+    el.textContent = t('copyCode');
+    el.classList.remove('is-copied');
+  }, 2000);
 }
 
 // ── Named recipients ─────────────────────────────────────────────────────────
@@ -1396,7 +1428,7 @@ function rememberSendLinks(verzending, sealed) {
   } catch (_) { /* storage off */ }
 }
 
-async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed) {
+async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed, senderCode) {
   const r = await relayFetch(RELAY_API + '/v2/sends', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1405,8 +1437,10 @@ async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed) {
     // Geen bestandsnaam (hertest T4-9): de relay en de mailer krijgen alleen
     // adressen en de verzegelde sleutels. De naam reist alleen IN het
     // verzegelde bestand; de ontvangstpagina haalt hem daar uit.
+    // sender_code: alleen de vlag en het zout. De code zelf blijft hier.
     body: JSON.stringify({ hashes: hashes, recipients: ontvangers, sealed: sealed,
-                           ttl_ms: ttlMs, lang: LANG }),
+                           ttl_ms: ttlMs, lang: LANG,
+                           sender_code: senderCode || undefined }),
     signal: AbortSignal.timeout(60000)
   });
   const body = await r.json().catch(function () { return {}; });
@@ -2075,25 +2109,31 @@ async function createLink() {
       $('seal-status').textContent = t('lockingKeys');
       const geheim = paramantSendWrap.fromB64url(nieuw[0].key);
       const sealed = {};
+      // THE SENDER'S OWN CODE, on every send to named recipients. It is made
+      // here and stays here: it goes on the screen for the sender to pass on
+      // by phone or an app, never into a request and never into a mail.
+      //
+      // Wrapped here, in this browser. The relay receives each token once,
+      // because it mails it in the invitation link, together with a wrapping it
+      // cannot open: the outer layer needs the code as well. What leaves is the
+      // salt of the slow derivation and, per recipient, a check derived from
+      // the code and the token (send-wrap.js, wrapWithCode).
+      $('seal-status').textContent = t('lockingCode');
+      const afzenderCode = paramantSendWrap.newSenderCode();
+      const codeZout = paramantSendWrap.newCodeSalt();
+      const gerekt = await paramantSendWrap.stretchCode(afzenderCode, codeZout);
       for (const adres of ontvangers) {
         const token = paramantSendWrap.newToken();
-        // Wrapped here, in this browser. NOT zero-knowledge: the relay receives
-        // the token together with the wrapping, because it mails the token to
-        // the recipient in the invitation link. While it holds both it could
-        // unwrap the key. The end screen says so (done-details-named); a real
-        // recipient key for this path is issue #550.
-        sealed[adres.toLowerCase()] = {
-          token,
-          wrapped_key: await paramantSendWrap.wrap(token, geheim),
-        };
+        const w = await paramantSendWrap.wrapWithCode(token, geheim, gerekt);
+        sealed[adres.toLowerCase()] = { token, wrapped_key: w.wrapped_key, code_check: w.code_check };
       }
       $('seal-status').textContent = t('sendingInvites');
       const verzending = await maakVerzending(
-        nieuw[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
+        nieuw[0].hashes, files[0].name, ttlMs, ontvangers, sealed, { salt: codeZout });
       rememberSendLinks(verzending, sealed);
       setSealProgress(100);
       trailToEnd('step-done');
-      return toonVerzending(verzending, files[0].name);
+      return toonVerzending(verzending, files[0].name, afzenderCode);
     }
 
     setSealProgress(100);
@@ -2706,7 +2746,7 @@ act('click','createSession',()=>startSend());act('click','expandApiKeyCard',()=>
 act('click','chooseModeLive',()=>chooseModeLive());act('click','chooseModeLink',()=>chooseModeLink());
 act('click','chooseModeGroup',()=>chooseModeGroup());act('change','toggleExtraSafe',(el)=>toggleExtraSafe(el));
 act('click','backToSetup',()=>backToSetup());
-act('click','copySentLink',(el)=>copySentLink(el));act('click','refreshSentLinks',()=>refreshSentLinks());
+act('click','copySentLink',(el)=>copySentLink(el));act('click','copyOwnCode',(el)=>copyOwnCode(el));act('click','refreshSentLinks',()=>refreshSentLinks());
 act('click','rejectFingerprint',()=>rejectFingerprint());act('input','onKeyInput',()=>onKeyInput());
 act('click','reload',()=>location.reload());
 act('click','reopenSession',()=>reopenSession());

@@ -448,7 +448,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <link rel="stylesheet" href="/app-2026.css?v=14">
 <link rel="stylesheet" href="/done-state.css?v=2">
 <link rel="stylesheet" href="/protocol-trail.css?v=1">
-<link rel="stylesheet" href="/parashare.css?v=4">
+<link rel="stylesheet" href="/parashare.css?v=5">
 <link rel="stylesheet" href="/werkplek.css?v=5">
 <script src="/js/theme.js?v=6"></script>
 </head>
@@ -672,7 +672,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="ps-how-body">
       <p>Your file is locked in your own browser before it leaves. Only the person you send it to can unlock it. We keep only the locked version and cannot open it, and neither can anyone who takes it from us.</p>
       <p>With a link, the key is inside the link itself, after the # sign. A browser never sends that part to a server. So whoever has the link can open the file. Send it only to the person it is for.</p>
-      <p>With several people, everyone gets their own link by email. Before the file opens, each of them confirms their email address with a code. Your dashboard shows who has opened it.</p>
+      <p>With several people, everyone gets their own link by email. Before the file opens, each of them confirms their email address with a code. Then they enter a second code, which you pass on yourself, for example by phone. That code never reaches us. Your dashboard shows who has opened it.</p>
       <p>With Extra safe, the other person's browser makes its own lock. You read a short code to each other, for example on the phone. If both screens show the same code, nobody swapped anything along the way.</p>
       <p>For readers who want the technical names: Extra safe is a <strong>hybrid</strong> key exchange. ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. A link does no key exchange: your browser makes a fresh AES-256-GCM key and puts it after the <code>#</code> in the link. The link <em>is</em> the key.</p>
       <p>Neither mode signs the file. The only signatures here are our server's own: on the public log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once it has been picked up.</p>
@@ -856,6 +856,14 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
     <div class="done-payload"></div>
 
+    <div class="ps-own-code" id="done-own-code" hidden>
+      <p class="ps-own-code-title">Code for the recipient</p>
+      <p class="ps-own-code-value" id="done-own-code-value"></p>
+      <p class="ps-own-code-note">Pass this code on to the recipient yourself, for example by phone or through an app. Without this code nobody can open the file, not even us.</p>
+      <p class="ps-own-code-note">We do not keep the code and cannot show it again. Write it down or copy it before you close this page.</p>
+      <button type="button" class="ps-copy" data-click="copyOwnCode">Copy code</button>
+    </div>
+
     <div class="done-actions">
       <button class="btn done-primary" data-click="reload">Send another file</button>
       <button type="button" class="done-quiet" id="done-receipt" hidden>Keep the receipt</button>
@@ -877,9 +885,9 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <details class="done-details" id="done-details-named" hidden>
       <summary>How this is protected</summary>
       <div class="done-details-body">
-        <p>Your browser sealed the file before it left this device (<code>AES-256-GCM</code>). The key is wrapped for each recipient with a link of their own.</p>
-        <p>That link is in the invitation our server mails to the recipient. At the moment of sending, our server can therefore reach the key. So this is not zero-knowledge, unlike the live hand-over with a check code. If we must never be able to reach the key, use the live hand-over.</p>
-        <p>The recipient first confirms their own email address with a code sent to that same address. A link alone does not open it. We keep the locked copy until the recipient collects it or the time runs out.</p>
+        <p>Your browser sealed the file before it left this device (<code>AES-256-GCM</code>). For each recipient the key sits behind two locks: one opened by that recipient's own link, one by the code above.</p>
+        <p>The link is in the invitation our server mails, so our server sees it once. Strictly speaking this is therefore not zero-knowledge. But the code never reaches us and never goes into a mail. Without it we cannot open the file, and neither can the mail provider.</p>
+        <p>The recipient first confirms their own email address with a code sent to that same address, then enters your code. Five wrong codes and the link is used up. The key is derived with <code>PBKDF2-SHA256</code> (600,000 rounds) and <code>HKDF</code>, so guessing away from our server is pointless too. We keep the locked copy until the recipient collects it or the time runs out.</p>
       </div>
     </details>
   </div>
@@ -954,8 +962,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/protocol-trail.js?v=1" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
-<script src="/js/send-wrap.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=27" defer></script>
+<script src="/js/send-wrap.js?v=2" defer></script>
+<script src="/js/parashare.page.js?v=28" defer></script>
 <script src="/nav.js?v=18" defer></script>
 <script src="/js/nav-auth.js?v=22" defer></script>
 <footer>

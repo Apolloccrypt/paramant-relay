@@ -43,6 +43,21 @@
   function pickupUrl() { return RELAY + '/v2/pickup/' + encodeURIComponent(TOKEN); }
 
   var el = function (id) { return document.getElementById(id); };
+
+  // Set when the code answer says this send has the sender's own code: the
+  // salt, and the slow derivation of the code last typed, so a mistyped mail
+  // code does not cost a second wait.
+  var AFZENDER = null;
+
+  // The proof for the code in the field, never the code. Runs PBKDF2 once per
+  // distinct code typed.
+  async function afzenderBewijs(code) {
+    if (!AFZENDER.gerekt || AFZENDER.voor !== code) {
+      AFZENDER.gerekt = await paramantSendWrap.stretchCode(code, AFZENDER.salt);
+      AFZENDER.voor = code;
+    }
+    return paramantSendWrap.proofFor(TOKEN, AFZENDER.gerekt);
+  }
   var show = function (id) { var n = el(id); if (n) n.hidden = false; };
   var hide = function (id) { var n = el(id); if (n) n.hidden = true; };
 
@@ -74,7 +89,13 @@
         + 'Vraag de afzender om een nieuwe link.',
       noReach: 'Paramant is niet bereikbaar. Probeer het opnieuw.',
       saved: function (naam) { return 'Opgeslagen als ' + naam + '. Gebeurt er niets, '
-        + 'dan heeft uw browser het misschien tegengehouden.'; }
+        + 'dan heeft uw browser het misschien tegengehouden.'; },
+      mailCodeLabel: 'Code uit de mail',
+      senderShape: 'De code van de afzender heeft tien tekens. Heb je hem niet? Vraag hem dan aan de afzender.',
+      senderChecking: 'Even controleren. Dit duurt een paar tellen...',
+      senderWrong: function (n) { return 'De code van de afzender klopt niet. Nog ' + n
+        + (n === 1 ? ' poging over.' : ' pogingen over.'); },
+      senderMissing: 'Vul ook de code van de afzender in.'
     },
     en: {
       sending: 'Sending the code...',
@@ -90,7 +111,13 @@
         + 'Ask the sender for a new link.',
       noReach: 'Could not reach Paramant. Try again.',
       saved: function (naam) { return 'Saved as ' + naam + '. If nothing happened, '
-        + 'your browser may have blocked it.'; }
+        + 'your browser may have blocked it.'; },
+      mailCodeLabel: 'Code from the email',
+      senderShape: 'The code from the sender has ten characters. Do not have it? Ask the sender.',
+      senderChecking: 'Checking. This takes a few seconds...',
+      senderWrong: function (n) { return 'The code from the sender is wrong. ' + n
+        + (n === 1 ? ' try left.' : ' tries left.'); },
+      senderMissing: 'Also enter the code from the sender.'
     }
   };
   function t(k) { return T[LANG][k]; }
@@ -108,6 +135,8 @@
       'For your own protection this link is now closed. Ask the sender to send the file again.'],
     too_many_tries: ['Too many wrong codes',
       'For your own protection this link is now closed. Ask the sender to send the file again.'],
+    sender_code_locked: ['The code from the sender was wrong too often',
+      'To protect the file this link no longer works. Ask the sender to send it again.'],
     code_not_sent: ['We could not send the code',
       'The code was not sent, so there is nothing in your mailbox. '
       + 'Try again in a minute.'],
@@ -127,6 +156,8 @@
       'Voor uw eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
     too_many_tries: ['Te vaak een verkeerde code',
       'Voor uw eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
+    sender_code_locked: ['De code van de afzender is te vaak verkeerd ingevuld',
+      'Om het bestand te beschermen werkt deze link niet meer. Vraag de afzender om het opnieuw te sturen.'],
     code_not_sent: ['We konden de code niet versturen',
       'De code is niet verstuurd, dus er staat niets in uw mailbox. '
       + 'Probeer het over een minuut opnieuw.'],
@@ -168,6 +199,14 @@
       if (geldig && res.body.expires_in_s) {
         geldig.textContent = String(Math.round(res.body.expires_in_s / 60));
       }
+      // A send with the sender's own code says so here. The salt is no secret;
+      // the code itself never comes from the server, it comes from the sender.
+      if (res.body.sender_code && res.body.code_salt) {
+        AFZENDER = { salt: String(res.body.code_salt), gerekt: null, voor: '' };
+        show('sender-field');
+        var lab = el('code-label');
+        if (lab) lab.textContent = t('mailCodeLabel');
+      }
       hide('step-start');
       show('step-code');
       say('code-say', '');
@@ -194,14 +233,37 @@
       if (invoer) invoer.focus();
       return;
     }
+    var eigen = '';
+    var eigenVeld = el('sender-code');
+    if (AFZENDER) {
+      var getypt = eigenVeld ? eigenVeld.value : '';
+      if (!String(getypt).trim()) {
+        say('code-say', t('senderMissing'), 'fail');
+        if (eigenVeld) eigenVeld.focus();
+        return;
+      }
+      eigen = paramantSendWrap.normaliseCode(getypt);
+      if (!eigen) {
+        say('code-say', t('senderShape'), 'fail');
+        if (eigenVeld) eigenVeld.focus();
+        return;
+      }
+    }
     if (knop) knop.disabled = true;
-    say('code-say', t('checking'));
+    say('code-say', AFZENDER ? t('senderChecking') : t('checking'));
 
-    fetch(pickupUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ code: code }),
-      cache: 'no-store'
+    // The sender's code stays in this browser. What goes out is a proof
+    // derived from it and this link; the relay compares that with what the
+    // sender's browser left, and only then hands over the locked box.
+    (AFZENDER ? afzenderBewijs(eigen) : Promise.resolve('')).then(function (bewijs) {
+      var lijf = { code: code };
+      if (bewijs) lijf.sender_proof = bewijs;
+      return fetch(pickupUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(lijf),
+        cache: 'no-store'
+      });
     }).then(function (r) {
       if (r.status === 200) {
         // The file key comes back wrapped under this link's own token. The
@@ -233,6 +295,18 @@
       }
 
       var reden = res.body.error;
+      if (reden === 'wrong_sender_code') {
+        say('code-say', t('senderWrong')(res.body.tries_left || 0), 'fail');
+        if (eigenVeld) { eigenVeld.focus(); eigenVeld.select(); }
+        return;
+      }
+      if (reden === 'sender_code_required') {
+        say('code-say', t('senderMissing'), 'fail');
+        return;
+      }
+      if (reden === 'sender_code_locked') {
+        return stop('sender_code_locked');
+      }
       if (reden === 'wrong_code') {
         var over = res.body.tries_left;
         say('code-say', over === 0
@@ -289,7 +363,10 @@
   // and never had the key to it.
   async function openMetToken(sealed, wrapped) {
     if (!wrapped) throw new Error('no_key');
-    var sleutel = await paramantSendWrap.unwrap(TOKEN, wrapped);
+    // Two locks on a send with the sender's code: that code, then this link.
+    var sleutel = AFZENDER
+      ? await paramantSendWrap.unwrapWithCode(TOKEN, wrapped, AFZENDER.gerekt)
+      : await paramantSendWrap.unwrap(TOKEN, wrapped);
     var key = await crypto.subtle.importKey('raw', sleutel.rawKey,
                                             { name: 'AES-GCM' }, false, ['decrypt']);
     var plain = new Uint8Array(await crypto.subtle.decrypt(
@@ -362,6 +439,13 @@
       invoer.addEventListener('input', function () {
         var schoon = invoer.value.replace(/\D+/g, '').slice(0, 6);
         if (schoon !== invoer.value) invoer.value = schoon;
+      });
+    }
+
+    var eigenInvoer = el('sender-code');
+    if (eigenInvoer) {
+      eigenInvoer.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); haalOp(); }
       });
     }
 
