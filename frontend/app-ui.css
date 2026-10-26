@@ -80,7 +80,8 @@ button.pa-ch:hover .pa-nm{text-decoration:underline;text-underline-offset:3px}
 .pa-prog + .pa-row{margin-top:6px}
 /* A name or an address is never cut off: it wraps, at the @ and the dots
    first (dashboard.js puts the breaks there), and only then anywhere. */
-.pa-row .who{min-width:0;flex:0 1 auto;overflow-wrap:anywhere;padding:6px 0;line-height:1.35}
+.pa-row .pa-wt{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:12px;flex:1;min-width:0;padding:6px 0}
+.pa-row .who{flex:0 0 auto;min-width:0;max-width:100%;overflow-wrap:break-word;line-height:1.35}
 .pa-row .meta{margin-left:auto;font-size:13px;color:var(--label-3);text-align:right;white-space:nowrap}
 .pa-row.miss{color:var(--label-2)}
 .pa-row.miss .meta{color:var(--warning)}

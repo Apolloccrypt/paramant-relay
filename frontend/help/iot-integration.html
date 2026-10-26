@@ -296,7 +296,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 API_KEY = os.environ["PARAMANT_API_KEY"]   # pgp_...
-Server   = "https://health.paramant.app"    # the sector your key belongs to
+RELAY   = "https://health.paramant.app"    # the sector your key belongs to
 SECTOR  = "health"
 PATH    = "/var/log/sensor-log.csv"        # one block: at most about 5 MB
 
@@ -310,7 +310,7 @@ sealed  = AESGCM(key).encrypt(iv, plain, None)
 body = json.dumps({"hash": hashlib.sha256(sealed).hexdigest(),
                    "payload": base64.b64encode(sealed).decode(),
                    "ttl_ms": 3600000}).encode()
-req = urllib.request.Request(Server + "/v2/inbound", data=body, method="POST",
+req = urllib.request.Request(RELAY + "/v2/inbound", data=body, method="POST",
       headers={"X-Api-Key": API_KEY, "Content-Type": "application/json"})
 token = json.load(urllib.request.urlopen(req))["download_token"]
 

@@ -280,14 +280,18 @@ nginx's default `proxy_buffer_size` is 4k/8k, so a receipt in the header meant
 off by default from 2026-09 and will be removed after **2026-12-01**. An
 operator can put it back for the transition with
 `PARAMANT_INLINE_RECEIPT_HEADER=1`, and must then also raise
-`proxy_buffer_size` on any proxy in front of the relay.
+`proxy_buffer_size` on any proxy in front of the relay. Even then the header
+goes only to a client that asks for it: a request with
+`X-Paramant-Want-Receipt: inline`, or one from the Python SDK before 3.3
+(`User-Agent: paramant-sdk/3.2.0` and older). Every other download, a plain
+Node `fetch()` included, gets the reference only.
 
-While the old header is off, every download also carries
+While the old header is not sent, every download also carries
 `X-Paramant-Receipt-Deprecated: removed 2026-12-01; GET /v2/transfers/<id>/receipt`.
 It exists because a client that reads `X-Paramant-Receipt` and finds nothing
 cannot tell "this transfer had no receipt" from "the receipt moved", and a
-delivery proof must never go missing quietly. The header is not sent when the
-opt-in is on, because then there is nothing to announce.
+delivery proof must never go missing quietly. The header is not sent on a response
+that carries the old header, because then there is nothing to announce.
 
 ---
 

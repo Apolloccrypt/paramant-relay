@@ -337,7 +337,10 @@ test('every screen that prints a plan name knows the tier a gift code grants', a
   const tier = couponLib.DEFAULT_GRANTS[0].tier;
   assert.strictEqual(tier, 'pro', 'the campaign code grants the pro tier');
   const root = path.join(__dirname, '..', '..', 'frontend', 'js');
-  for (const file of ['home-auth.js', 'account.inline1.js', 'dashboard.js']) {
+  // home-auth.js left this list on 25 October 2026: the homepage no longer
+  // draws a signed-in screen, it only sends a signed-in visitor to /dashboard,
+  // so it prints no plan name at all.
+  for (const file of ['account.inline1.js', 'dashboard.js']) {
     const src = fs.readFileSync(path.join(root, file), 'utf8');
     assert.match(src, new RegExp(`\\b${tier}\\s*:\\s*'[A-Z]`),
       `${file} must map the '${tier}' tier to the name it is sold under, or the screen prints Community`);

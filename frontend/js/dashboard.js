@@ -642,7 +642,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   function row(ok, who, meta, extra, full) {
     return '<div class="pa-row' + (ok ? '' : ' miss') + '">' +
       (ok ? '<span class="pa-check ok">' + ico('check', 13) + '</span>' : '<span class="pa-check no"></span>') +
-      '<span class="who" title="' + esc(full || who) + '">' + whoHtml(who) + '</span><span class="meta">' + esc(meta) + '</span>' + (extra || '') + '</div>';
+      '<span class="pa-wt"><span class="who" title="' + esc(full || who) + '">' + whoHtml(who) + '</span><span class="meta">' + esc(meta) + '</span></span>' + (extra || '') + '</div>';
   }
   // A recipient by name: the name when the relay knows one, else the address.
   function recipientName(p) {
