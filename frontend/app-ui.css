@@ -37,6 +37,19 @@ body.pa-app{background:var(--window-bg);color:var(--label);font-family:var(--san
 .pa-menu a + a{border-top:1px solid var(--separator)}
 .pa-menu a:hover{background:var(--card-bg-2)}
 .pa-menu svg{color:var(--label-3)}
+/* the account behind the initials: the address, Account, and the language.
+   The language lives here, not as a line at the foot of the list. */
+button.pa-avatar{padding:0;font-family:inherit;cursor:pointer}
+.pa-acct-menu{position:absolute;right:0;top:44px;width:260px;max-width:calc(100vw - 32px);background:var(--card-bg);border:1px solid var(--separator);border-radius:var(--r-3);box-shadow:var(--sh-2);overflow:hidden;z-index:6}
+.pa-acct-who{margin:0;padding:12px 14px;font-size:13px;color:var(--label-3);border-bottom:1px solid var(--separator);overflow-wrap:anywhere}
+.pa-acct-who:empty{display:none}
+.pa-acct-menu > a{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 14px;font-size:15px;color:var(--label);text-decoration:none}
+.pa-acct-menu > a:hover,.pa-acct-lang a:hover{background:var(--card-bg-2)}
+.pa-acct-menu svg{color:var(--label-3)}
+.pa-acct-lang{display:flex;align-items:center;gap:6px;padding:8px 14px 10px;border-top:1px solid var(--separator)}
+.pa-acct-lbl{font-size:13px;color:var(--label-3);margin-right:auto}
+.pa-acct-lang a{display:inline-flex;align-items:center;min-height:36px;padding:0 10px;border-radius:var(--r-2);font-size:14px;color:var(--label-2);text-decoration:none}
+.pa-acct-lang a[aria-checked="true"]{background:var(--fill);color:var(--label);font-weight:600}
 
 /* the page */
 .pa-main{padding:20px 0 96px}
@@ -65,7 +78,9 @@ button.pa-ch:hover .pa-nm{text-decoration:underline;text-underline-offset:3px}
 .pa-prog i{display:block;height:100%;background:var(--success);border-radius:2px}
 .pa-row{display:flex;align-items:center;gap:12px;padding:0 14px;min-height:50px;border-top:1px solid var(--separator);font-size:15px}
 .pa-prog + .pa-row{margin-top:6px}
-.pa-row .who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A name or an address is never cut off: it wraps, at the @ and the dots
+   first (dashboard.js puts the breaks there), and only then anywhere. */
+.pa-row .who{min-width:0;flex:0 1 auto;overflow-wrap:anywhere;padding:6px 0;line-height:1.35}
 .pa-row .meta{margin-left:auto;font-size:13px;color:var(--label-3);text-align:right;white-space:nowrap}
 .pa-row.miss{color:var(--label-2)}
 .pa-row.miss .meta{color:var(--warning)}
@@ -163,7 +178,7 @@ button.pa-ch:hover .pa-nm{text-decoration:underline;text-underline-offset:3px}
   .pa-new,.pa-menu{display:none!important}
   .pa-main{padding:8px 0 110px}
   .pa-h1{font-size:40px;margin-bottom:18px}
-  .pa-tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;height:80px;border-top:1px solid var(--separator);background:var(--headerbar-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);justify-content:space-around;padding-top:8px;z-index:5}
+  .pa-tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;height:80px;border-top:1px solid var(--separator);background:var(--card-bg);justify-content:space-around;padding-top:8px;z-index:5}
   .pa-tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:500;color:var(--label-3);width:84px;text-decoration:none}
   .pa-tabbar a.on{color:var(--accent)}
   /* The house minimum for a finger is 44px, reached with padding so the type
@@ -174,16 +189,14 @@ button.pa-ch:hover .pa-nm{text-decoration:underline;text-underline-offset:3px}
   .pa-links button,.pa-links a{min-height:44px;display:inline-flex;align-items:center}
   .pa-row .x{min-height:44px}
   .pa-dl{width:44px;height:44px}
-  .pa-lang a{display:inline-flex;align-items:center;min-height:44px}
+  .pa-acct-lang a{min-height:44px}
   .pa-plan a{display:inline-flex;align-items:center;min-height:44px}
 }
 @media (pointer:coarse){
   .pa-seg button,.pa-new,.pa-dialog-close,.pa-dl{min-height:44px;min-width:44px}
-  .pa-btn,.pa-links button,.pa-links a,.pa-row .x,.pa-lang a,.pa-plan a,.pa-avatar,.pa-menu a{min-height:44px;min-width:44px}
-  .pa-links button,.pa-links a,.pa-lang a,.pa-plan a{display:inline-flex;align-items:center}
+  .pa-btn,.pa-links button,.pa-links a,.pa-row .x,.pa-plan a,.pa-avatar,.pa-menu a,.pa-acct-menu a{min-height:44px;min-width:44px}
+  .pa-links button,.pa-links a,.pa-plan a{display:inline-flex;align-items:center}
   .pa-avatar{width:44px;height:44px}
   .pa-mark,.pa-skip{display:inline-flex;align-items:center;min-height:44px}
 }
 .pa-btn.danger{color:var(--danger)}
-.pa-lang{margin:32px 4px 0;font-size:13px}
-.pa-lang a{color:var(--label-3)}

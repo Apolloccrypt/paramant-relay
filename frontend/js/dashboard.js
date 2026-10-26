@@ -396,6 +396,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       avatar.textContent = initials(data);
       avatar.setAttribute('title', email);
     }
+    var who = document.getElementById('pa-acct-who');
+    if (who) who.textContent = email;
 
     // Remembered for the return-from-Mollie band, which has to know whether
     // the webhook has landed yet.
@@ -630,10 +632,28 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var pct = total ? Math.round((done / total) * 100) : 0;
     return '<div class="pa-prog" role="img" aria-label="' + esc(done + nlEn(' van ', ' of ') + total) + '"><i style="width:' + pct + '%"></i></div>';
   }
-  function row(ok, who, meta, extra) {
+  // A name or an address in full, never cut off: an address may break after
+  // the @ and before a dot, so it wraps where a reader still sees its parts.
+  function whoHtml(text) {
+    var t = esc(text);
+    if (String(text).indexOf('@') === -1) return t;
+    return t.replace(/@/g, '@<wbr>').replace(/\./g, '<wbr>.');
+  }
+  function row(ok, who, meta, extra, full) {
     return '<div class="pa-row' + (ok ? '' : ' miss') + '">' +
       (ok ? '<span class="pa-check ok">' + ico('check', 13) + '</span>' : '<span class="pa-check no"></span>') +
-      '<span class="who" title="' + esc(who) + '">' + esc(who) + '</span><span class="meta">' + esc(meta) + '</span>' + (extra || '') + '</div>';
+      '<span class="who" title="' + esc(full || who) + '">' + whoHtml(who) + '</span><span class="meta">' + esc(meta) + '</span>' + (extra || '') + '</div>';
+  }
+  // A recipient by name: the name when the relay knows one, else the address.
+  function recipientName(p) {
+    var name = String((p && (p.name || p.label)) || '').trim();
+    var mail = String((p && p.email) || '').trim();
+    if (name && name.toLowerCase() !== mail.toLowerCase()) return name;
+    return mail || nlEn('Ontvanger', 'Recipient');
+  }
+  function recipientFull(p) {
+    var name = recipientName(p), mail = String((p && p.email) || '').trim();
+    return mail && name !== mail ? name + ' <' + mail + '>' : name;
   }
 
   // A request a signer refused is "Geweigerd" with the name, not "Geannuleerd":
@@ -715,10 +735,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
           nlEn('Toon iedereen (', 'Show everyone (') + people.length + ')</button></div>' : '');
     }
     function personRow(p) {
-      if (p.status === 'collected') return row(true, p.email, p.picked_up_at ? fmtDate(p.picked_up_at) : nlEn('opgehaald', 'collected'));
-      if (p.status === 'revoked') return row(false, p.email, nlEn('ingetrokken', 'withdrawn'));
-      return row(false, p.email, nlEn('nog niet opgehaald', 'not collected yet'),
-        '<button type="button" class="x" data-pa-action="send-revoke" data-send-id="' + id + '" data-email="' + esc(p.email) + '">' + nlEn('Intrekken', 'Withdraw') + '</button>');
+      var nm = recipientName(p), full = recipientFull(p);
+      if (p.status === 'collected') return row(true, nm, p.picked_up_at ? fmtDate(p.picked_up_at) : nlEn('opgehaald', 'collected'), '', full);
+      if (p.status === 'revoked') return row(false, nm, nlEn('ingetrokken', 'withdrawn'), '', full);
+      return row(false, nm, nlEn('nog niet opgehaald', 'not collected yet'),
+        '<button type="button" class="x" data-pa-action="send-revoke" data-send-id="' + id + '" data-email="' + esc(p.email) + '" aria-label="' + esc(nlEn('Intrekken voor ', 'Withdraw for ') + full) + '">' + nlEn('Intrekken', 'Withdraw') + '</button>', full);
     }
     return '<div class="pa-card dh-send-row" data-send-id="' + id + '">' +
       head('send', sendName(s), nlEn('Verstuurd ', 'Sent ') + paramantDate.moment(s.created_at), (s.collected || 0) + nlEn(' van ', ' of ') + sendTotal(s)) +
@@ -1335,6 +1356,18 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     });
   }
 
+  // The circle with the initials opens the account: the address, Account, and
+  // the language of this screen.
+  function wireAccountMenu() {
+    var btn = document.getElementById('pa-avatar');
+    var menu = document.getElementById('pa-acct-menu');
+    if (!btn || !menu || btn.tagName !== 'BUTTON') return;
+    function set(open) { menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+    btn.addEventListener('click', function (ev) { ev.stopPropagation(); set(menu.hidden); if (!menu.hidden) { var f = menu.querySelector('a'); if (f) f.focus(); } });
+    document.addEventListener('click', function (ev) { if (!menu.hidden && !menu.contains(ev.target)) set(false); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !menu.hidden) { set(false); btn.focus(); } });
+  }
+
   // One button Nieuw, with the three ways to start something.
   function wireMenu() {
     var btn = document.getElementById('pa-new');
@@ -1520,6 +1553,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     wireActions();
     wireTabs();
     wireMenu();
+    wireAccountMenu();
   }
 
   function start(tries) {

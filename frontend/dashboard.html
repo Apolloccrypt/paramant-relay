@@ -53,7 +53,16 @@
         <a role="menuitem" href="/parashare"><svg width="20" height="20" aria-hidden="true"><use href="#i-send"/></svg>Verstuur een bestand</a>
         <a role="menuitem" href="/opvragen"><svg width="20" height="20" aria-hidden="true"><use href="#i-inbox"/></svg>Vraag stukken op</a>
       </div>
-      <a class="pa-avatar" id="pa-avatar" href="/account" aria-label="Je account"></a>
+      <button class="pa-avatar" id="pa-avatar" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="pa-acct-menu" aria-label="Je account"></button>
+      <div class="pa-acct-menu" role="menu" id="pa-acct-menu" aria-label="Je account" hidden>
+        <p class="pa-acct-who" id="pa-acct-who" role="presentation"></p>
+        <a role="menuitem" href="/account"><svg width="20" height="20" aria-hidden="true"><use href="#i-user"/></svg>Account</a>
+        <div class="pa-acct-lang" role="group" aria-label="Taal">
+          <span class="pa-acct-lbl" aria-hidden="true">Taal</span>
+          <a href="/dashboard" hreflang="nl" lang="nl" role="menuitemradio" aria-checked="true">Nederlands</a>
+          <a href="/en/dashboard" hreflang="en" lang="en" role="menuitemradio" aria-checked="false">English</a>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -140,7 +149,6 @@
         </div>
       </details>
 
-      <p class="pa-lang"><a href="/en/dashboard" hreflang="en" lang="en">This page in English</a></p>
     </div>
   </div>
 </main>

@@ -362,8 +362,14 @@ for (const width of [1440, 390]) {
   ok('the phone bar of Je documenten is Documenten, Versturen, Ondertekenen, Opvragen', JSON.stringify(tabs.map((t) => [t.text, t.href])) === JSON.stringify([['Documenten','/dashboard'],['Versturen','/parashare'],['Ondertekenen','/sign'],['Opvragen','/opvragen']]), JSON.stringify(tabs));
   ok('every place in that bar is finger-sized', tabs.length === 4 && tabs.every((t) => t.height >= 44 && t.width >= 44), JSON.stringify(tabs));
   ok('the current place is marked', await dash.locator('.pa-tabbar a[aria-current="page"]').getAttribute('href') === '/dashboard', '');
-  const avatar = await dash.locator('#pa-avatar').evaluate((n) => ({ href:n.getAttribute('href'), text:n.textContent.trim(), label:n.getAttribute('aria-label') }));
-  ok('the account sits behind the initials', avatar.href === '/account' && avatar.text === 'DE' && /account/i.test(avatar.label), JSON.stringify(avatar));
+  const avatar = await dash.locator('#pa-avatar').evaluate((n) => ({ text:n.textContent.trim(), label:n.getAttribute('aria-label'), popup:n.getAttribute('aria-haspopup') }));
+  await dash.locator('#pa-avatar').click();
+  const acct = await dash.locator('#pa-acct-menu').evaluate((m) => ({ hidden:m.hidden, account:(m.querySelector('a[role="menuitem"]') || {}).getAttribute?.('href'),
+    langs:[...m.querySelectorAll('a[role="menuitemradio"]')].map((a) => [a.getAttribute('href'), a.getAttribute('aria-checked')]) }));
+  ok('the account sits behind the initials, with the language', avatar.text === 'DE' && /account/i.test(avatar.label) && avatar.popup === 'menu'
+    && !acct.hidden && acct.account === '/account' && JSON.stringify(acct.langs) === JSON.stringify([['/dashboard','true'],['/en/dashboard','false']]), JSON.stringify([avatar, acct]));
+  ok('no language line at the foot of Je documenten', !(await dash.locator('.pa-lang').count()), '');
+  await dash.keyboard.press('Escape');
   ok('Nieuw is not on the phone; the bar carries the starts', !(await dash.locator('#pa-new').isVisible()), '');
   ok('Je documenten fits the phone viewport', await dash.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), '');
   await dash.setViewportSize({ width:1280, height:900 });

@@ -107,6 +107,10 @@ test('/dashboard: the account behind the initials uses the name the customer gav
   await t.page.reload();
   await t.page.waitForSelector('#dh-root:not([hidden])', { timeout: 10000 });
   assert.equal((await t.page.textContent('#pa-avatar')).trim(), 'DA');
-  assert.equal(await t.page.getAttribute('#pa-avatar', 'href'), '/account');
+  // The initials open a menu: the address, Account, and the language.
+  await t.page.click('#pa-avatar');
+  await t.page.waitForSelector('#pa-acct-menu:not([hidden])', { timeout: 5000 });
+  assert.equal(await t.page.getAttribute('#pa-acct-menu a[role="menuitem"]', 'href'), '/account');
+  assert.equal((await t.page.textContent('#pa-acct-who')).trim(), 'anna@kantoor.nl');
   await t.ctx.close();
 });

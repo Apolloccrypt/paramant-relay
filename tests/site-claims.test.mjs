@@ -3871,8 +3871,12 @@ test('the sign-in and account pages exist in both languages and link each other'
         if (!html.includes(`<link rel="alternate" hreflang="${lang}" href="${ORIGIN}${href}">`)) problems.push(`${name}: hreflang ${lang} must point at ${href}`);
       }
     }
-    if (!nlHtml.includes(`<a href="${en}" hreflang="en" lang="en">This page in English</a>`)) problems.push(`${slug}: no visible way to the English page`);
-    if (!enHtml.includes(`<a href="${nl}" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a>`)) problems.push(`en/${slug}: no visible way back to the Dutch page`);
+    // Je documenten carries the language in the account menu behind the
+    // initials, not as a line at the foot of the list.
+    const toEn = slug === 'dashboard' ? `<a href="${en}" hreflang="en" lang="en" role="menuitemradio" aria-checked="false">English</a>` : `<a href="${en}" hreflang="en" lang="en">This page in English</a>`;
+    const toNl = slug === 'dashboard' ? `<a href="${nl}" hreflang="nl" lang="nl" role="menuitemradio" aria-checked="false">Nederlands</a>` : `<a href="${nl}" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a>`;
+    if (!nlHtml.includes(toEn)) problems.push(`${slug}: no visible way to the English page`);
+    if (!enHtml.includes(toNl)) problems.push(`en/${slug}: no visible way back to the Dutch page`);
   }
   // The pages that load one script for both copies must tell it the language:
   // every script that holds both texts reads <html lang>, and nothing else.
