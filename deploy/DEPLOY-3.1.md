@@ -146,6 +146,10 @@ Two ways out if the release is not ready and the deploy cannot wait:
   `/v2/outbound` locations in nginx, or the download is a 502; the repo copy of
   `deploy/nginx-paramant-public.conf` already carries that setting with a
   comment, the production conf does not.
+  Since release/najaar the flag no longer puts the header on every download:
+  only a request with `X-Paramant-Want-Receipt: inline` or the User-Agent of
+  the Python SDK before 3.3 (`paramant-sdk/3.2.0`) gets it. With the flag on
+  for everybody, every Node client failed with `UND_ERR_HEADERS_OVERFLOW`.
 - Or hold main. The default is off on purpose, because on a default nginx the
   fat header is a 502 rather than a feature.
 

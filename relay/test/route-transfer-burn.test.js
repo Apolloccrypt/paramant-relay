@@ -400,27 +400,61 @@ test('with redis, a receipt outlives the process that issued it', async () => {
 test('the fat header comes back only when an operator asks for it, and it is deprecated', async () => {
   // The removal is not silent: an out-of-tree client that still reads
   // X-Paramant-Receipt gets one release to move, behind an explicit opt-in.
+  // Even with the opt-in on, the header goes only to a client that asks for it:
+  // sent to every download it broke Node, whose fetch refuses a header block
+  // over 16 KB (UND_ERR_HEADERS_OVERFLOW).
   const legacy = await boot({
     tag: 'transfer-legacy-receipt',
     env: { PARAMANT_INLINE_RECEIPT_HEADER: '1' },
     users: { api_keys: [{ key: PRO, plan: 'pro', active: true, email: 'pro@example.test', account_id: 'acct_pro' }] },
   });
-  const b = blob('legacy-header');
-  assert.strictEqual((await legacy.post('/v2/inbound', {
-    headers: { 'X-Api-Key': PRO }, body: { hash: b.hash, payload: b.payload.toString('base64') },
-  })).status, 200);
-  // Reading it back needs room Node does not give by default. That IS the bug:
-  // a client cannot ask for this without knowing about it first.
-  const r = await legacy.get(`/v2/outbound/${b.hash}`, {
-    headers: { 'X-Api-Key': PRO }, maxHeaderSize: 96 * 1024,
-  });
-  assert.strictEqual(r.status, 200);
-  assert.ok(r.headers['x-paramant-receipt'], 'the opt-in really puts the old header back');
-  assert.ok(Buffer.byteLength(r.headers['x-paramant-receipt']) > 16384,
-    'and it is still the header that does not fit, which is why it is going away');
-  assert.ok(r.headers['x-paramant-receipt-id'], 'the reference is served alongside it during the window');
-  assert.ok(!('x-paramant-receipt-deprecated' in r.headers),
-    'and while the opt-in is on there is nothing to announce: the old header is really there');
+  async function put(label) {
+    const b = blob(label);
+    assert.strictEqual((await legacy.post('/v2/inbound', {
+      headers: { 'X-Api-Key': PRO }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+    })).status, 200);
+    return b;
+  }
+  // 1. A plain Node fetch, default header limit: the download works, and the
+  //    reference and the announcement are there instead of the fat header.
+  const plain = await put('legacy-node-fetch');
+  const nf = await fetch(`${legacy.base}/v2/outbound/${plain.hash}`, { headers: { 'X-Api-Key': PRO } });
+  assert.strictEqual(nf.status, 200, 'a Node fetch download succeeds with the flag on');
+  assert.deepStrictEqual(Buffer.from(await nf.arrayBuffer()), plain.payload, 'and it carries the bytes');
+  assert.strictEqual(nf.headers.get('x-paramant-receipt'), null, 'no fat header for a client that did not ask');
+  assert.ok(nf.headers.get('x-paramant-receipt-id'), 'the receipt goes by reference');
+  assert.ok(nf.headers.get('x-paramant-receipt-deprecated'), 'and the move is announced on the response');
+
+  // 2. The Python SDK before 3.3 (its User-Agent) and an explicit ask still get
+  //    the old header. Reading it back needs room Node does not give by default.
+  for (const [label, hdr] of [
+    ['legacy-sdk-3.2', { 'User-Agent': 'paramant-sdk/3.2.0' }],
+    ['legacy-sdk-3.0', { 'User-Agent': 'paramant-sdk/3.0' }],
+    ['legacy-explicit', { 'X-Paramant-Want-Receipt': 'inline' }],
+  ]) {
+    const b = await put(label);
+    const r = await legacy.get(`/v2/outbound/${b.hash}`, {
+      headers: { 'X-Api-Key': PRO, ...hdr }, maxHeaderSize: 96 * 1024,
+    });
+    assert.strictEqual(r.status, 200, label);
+    assert.ok(r.headers['x-paramant-receipt'], `${label}: the opt-in really puts the old header back`);
+    assert.ok(Buffer.byteLength(r.headers['x-paramant-receipt']) > 16384,
+      'and it is still the header that does not fit, which is why it is going away');
+    assert.ok(r.headers['x-paramant-receipt-id'], 'the reference is served alongside it during the window');
+    assert.ok(!('x-paramant-receipt-deprecated' in r.headers),
+      'and while the old header is really there there is nothing to announce');
+  }
+
+  // 3. The SDKs that read the reference do not get it: Python 3.3 and the JS SDK.
+  for (const [label, ua] of [['legacy-sdk-3.3', 'paramant-sdk/3.3.0'], ['legacy-sdk-js', 'paramant-sdk/3.2.0 js']]) {
+    const b = await put(label);
+    const r = await legacy.get(`/v2/outbound/${b.hash}`, {
+      headers: { 'X-Api-Key': PRO, 'User-Agent': ua }, maxHeaderSize: 96 * 1024,
+    });
+    assert.strictEqual(r.status, 200, label);
+    assert.ok(!('x-paramant-receipt' in r.headers), `${label}: no fat header`);
+    assert.ok(r.headers['x-paramant-receipt-id'], `${label}: the reference instead`);
+  }
   legacy.stop();
   did();
 });

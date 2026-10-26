@@ -3545,6 +3545,22 @@ async function fetchDeliveryReceipt(id) {
 // removed after 2026-12-01; see docs/api.md.
 const INLINE_RECEIPT_HEADER = process.env.PARAMANT_INLINE_RECEIPT_HEADER === '1';
 
+// Even with the flag on, the fat header goes only to a client that needs it.
+// Sent to everybody it broke every Node download: undici refuses a response
+// header block over 16 KB (UND_ERR_HEADERS_OVERFLOW), and this one is ~18.5 KB.
+// Two ways to ask for it: an explicit X-Paramant-Want-Receipt: inline, or the
+// User-Agent of the Python SDK before 3.3 ("paramant-sdk/3.2.0"), the one client
+// that reads the header and has no other way to the receipt. The JS SDK says
+// "paramant-sdk/<v> js" and runs on Node, so it is never matched.
+function wantsInlineReceipt(req) {
+  const h = (req && req.headers) || {};
+  if (String(h['x-paramant-want-receipt'] || '').trim().toLowerCase() === 'inline') return true;
+  const m = /^paramant-sdk\/(\d+)\.(\d+)(?:\.\d+)?$/.exec(String(h['user-agent'] || '').trim());
+  if (!m) return false;
+  const major = Number(m[1]), minor = Number(m[2]);
+  return major < 3 || (major === 3 && minor < 3);
+}
+
 // Serialized async write queue for users.json — prevents lost-update race.
 // _writeUsersJson: low-level write (caller must already hold the snapshot).
 // _mutateUsersJson: safe read-modify-write inside the queue (use this at call sites).
@@ -9847,7 +9863,7 @@ async function handleRelayRequest(req, res) {
       // header is a silent receipt=None (sdk-py/paramant_sdk.py:681). A silent
       // downgrade of a delivery proof is the one failure mode this route must
       // not have, so the removal announces itself and says where to go.
-      if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+      if (INLINE_RECEIPT_HEADER && wantsInlineReceipt(req)) outHeaders['X-Paramant-Receipt'] = receiptHeader;
       else outHeaders['X-Paramant-Receipt-Deprecated'] = `removed 2026-12-01; GET /v2/transfers/${receiptId}/receipt`;
     }
     outHeaders['X-Accel-Buffering'] = 'no';
