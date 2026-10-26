@@ -96,6 +96,8 @@ async function schermtekst(page, pad) {
   await page.goto(S.origin + pad);
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1200);
+  // What a screen folds away (Je plan, on /dashboard) is still what it says.
+  await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
   return (await page.locator('body').innerText()).replace(/\s+/g, ' ');
 }
 
@@ -149,22 +151,28 @@ test('1. de kassa rekent het bedrag af dat op de knop staat', async () => {
 
 test('2. de vier schermen zeggen na de betaling hetzelfde', async () => {
   // Deze vier spraken elkaar tegen: dat is de reden dat poort 6 bestaat.
+  // Since 25 October 2026 the homepage sends a signed-in visitor on to Je
+  // documenten, so what "/" says after the payment is what that screen says.
   const thuis = await schermtekst(S.pageK, '/');
+  assert.match(S.pageK.url(), /\/dashboard$/, 'de ingelogde homepage gaat niet door naar Je documenten');
   const thuisEn = await schermtekst(S.pageK, '/en/');
+  assert.match(S.pageK.url(), /\/en\/dashboard$/, 'de Engelse ingelogde homepage gaat niet door naar Your documents');
   const account = await schermtekst(S.pageK, '/account');
   const dashboard = await schermtekst(S.pageK, '/dashboard');
 
   // / is Nederlands, /en de Engelse homepage; beide moeten het zeggen.
-  assert.match(thuis, new RegExp(`${FIRM_SIGNS} van ${FIRM_SIGNS} handtekeningen over deze maand`),
+  assert.match(thuis, /Je plan: Firm/, 'de ingelogde homepage noemt het plan niet Firm');
+  assert.match(thuis, new RegExp(`${FIRM_SIGNS} handtekeningen per maand`),
     'de ingelogde homepage toont de gekochte limiet niet');
-  assert.doesNotMatch(thuis, /Community, gratis, voor altijd/,
+  assert.doesNotMatch(thuis, /Community, gratis, voor altijd|Je zit op Community/,
     'de homepage noemt een betalend account nog Community');
-  assert.match(thuisEn, new RegExp(`${FIRM_SIGNS} of ${FIRM_SIGNS} signatures left`),
+  assert.match(thuisEn, /Your plan: Firm/, 'de Engelse ingelogde homepage noemt het plan niet Firm');
+  assert.match(thuisEn, new RegExp(`${FIRM_SIGNS} signatures a month`),
     'de Engelse ingelogde homepage toont de gekochte limiet niet');
-  assert.doesNotMatch(thuisEn, /Community, free for good/,
+  assert.doesNotMatch(thuisEn, /Community, free for good|You are on Community/,
     'de Engelse homepage noemt een betalend account nog Community');
   assert.match(account, /FIRM PLAN/, '/account noemt het plan niet Firm');
-  assert.match(dashboard, /FIRM PLAN/, '/dashboard noemt het plan niet Firm');
+  assert.match(dashboard, /Je plan: Firm/, '/dashboard noemt het plan niet Firm');
   // De termijn staat op beide schermen, met dezelfde zin.
   // /account en /dashboard zijn Nederlands sinds 23 september 2026; de Engelse
   // kopieën onder /en houden de Engelse zin.
