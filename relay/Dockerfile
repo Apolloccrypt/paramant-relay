@@ -19,7 +19,7 @@
 # 0.13.0), which resolves it. NOTE: CI's crypto suite builds on ubuntu/glibc,
 # not via this musl Dockerfile; paramant-core's `musl-node-binding` job pins
 # the same digest, and any base bump must still be verified by an image build.
-FROM rust:1.98-alpine@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS paramant-core-binding
+FROM rust:1.100-alpine@sha256:8d0e82abfdf9a38071e07cabc5afba4ddbe077631a80e4e742a760c38beadc33 AS paramant-core-binding
 
 RUN apk add --no-cache musl-dev gcc g++ make cmake ninja clang clang-dev llvm-dev perl nasm git bash
 ENV LIBCLANG_PATH=/usr/lib
